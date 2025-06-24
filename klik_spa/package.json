@@ -1,0 +1,44 @@
+{
+  "name": "klik_spa",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build --base=/assets/klik_pos/klik_spa/ && yarn copy-html-entry",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "copy-html-entry": "cp ../klik_pos/public/klik_spa/index.html ../klik_pos/www/klik_spa.html"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.81.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.518.0",
+    "frappe-react-sdk": "^1.11.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.6.2",
+    "tailwind-merge": "^3.3.1",
+    "zustand": "^5.0.3",
+    "tailwindcss": "^4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@eslint/js": "^9.29.0",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.5.2",
+    "autoprefixer": "^10.4.21",
+    "tailwindcss": "^4",
+    "tw-animate-css": "^1.3.4",
+    "eslint": "^9.29.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "globals": "^16.2.0",
+    "typescript": "~5.8.3",
+    "typescript-eslint": "^8.34.1",
+    "vite": "^7.0.0"
+  }
+}

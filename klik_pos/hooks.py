@@ -242,3 +242,5 @@ app_license = "mit"
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
 
+
+website_route_rules = [{'from_route': '/klik_spa/<path:app_path>', 'to_route': 'klik_spa'}, {'from_route': '/klik_spa/<path:app_path>', 'to_route': 'klik_spa'},]

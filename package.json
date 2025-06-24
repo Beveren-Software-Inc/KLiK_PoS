@@ -1,0 +1,15 @@
+{
+  "name": "klik_pos",
+  "version": "1.0.0",
+  "description": "KLIK POS: A Modern Point of Sale for your Business",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "cd klik_spa && yarn install",
+    "dev": "cd klik_spa && yarn dev",
+    "build": "cd klik_spa && yarn build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
