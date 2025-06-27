@@ -1,7 +1,7 @@
 "use client";
 
 import { useFrappeGetDocList } from "frappe-react-sdk";
-import { itemGroupIconMap } from "../utils/iconMap"
+import { itemGroupIconMap } from "../utils/iconMap";
 import { useI18n } from "../hooks/useI18n";
 
 interface CategoryTabsProps {
@@ -17,26 +17,59 @@ export default function CategoryTabs({
 }: CategoryTabsProps) {
   const { isRTL } = useI18n();
 
-  const { data: itemGroups, isLoading, error } = useFrappeGetDocList("Item Group", {
+  const {
+    data: itemGroups,
+    error,
+    isValidating,
+    mutate,
+  } = useFrappeGetDocList("Item Group", {
     fields: ["name", "item_group_name"],
     limit: 100,
+    orderBy: {
+      field: "modified",
+      order: "desc",
+    },
   });
 
-  if (isLoading) return <div>Loading categories...</div>;
-  if (error) return <div>Error loading categories</div>;
+  if (isValidating) return <div>Loading categories...</div>;
+
+if (error) {
+  console.error("❌ Error fetching item groups:", error);
+
+  let fallbackError = "Unknown error occurred";
+
+  if (typeof error === "string") {
+    fallbackError = error;
+  } else if (error instanceof Error) {
+    fallbackError = error.message;
+  } else if (typeof error === "object" && error !== null) {
+    fallbackError = JSON.stringify(error, null, 2);
+  }
+
+  return (
+    <div className="text-red-600">
+      <p>Error loading categories:</p>
+      <pre className="text-xs bg-red-100 p-2 rounded">{fallbackError}</pre>
+    </div>
+  );
+}
+
+  if (!itemGroups || itemGroups.length === 0) {
+    return <div>No item groups found.</div>;
+  }
 
   const categories = [
     {
       id: "all",
       name: "All Menu",
       icon: itemGroupIconMap["All Menu"] ?? "📦",
-      count: itemGroups?.length || 0,
+      count: itemGroups.length,
     },
-    ...itemGroups!.map((group) => ({
+    ...itemGroups.map((group) => ({
       id: group.name,
-      name: group.item_group_name,
+      name: group.item_group_name || group.name,
       icon: itemGroupIconMap[group.item_group_name] ?? "📦",
-      count: 1, // optional: you can later calculate based on items if needed
+      count: 1,
     })),
   ];
 
@@ -54,7 +87,9 @@ export default function CategoryTabs({
         >
           <span className={`${isMobile ? "text-sm" : "text-base"}`}>{category.icon}</span>
           <div className="flex flex-col items-start">
-            <span className={`font-medium ${isMobile ? "text-xs" : "text-sm"}`}>{category.name}</span>
+            <span className={`font-medium ${isMobile ? "text-xs" : "text-sm"}`}>
+              {category.name}
+            </span>
             <span className={`${isMobile ? "text-xs" : "text-xs"} opacity-75`}>
               {category.count} Item{category.count !== 1 ? "s" : ""}
             </span>
