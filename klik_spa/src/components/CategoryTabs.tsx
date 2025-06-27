@@ -10,6 +10,7 @@ interface CategoryTabsProps {
   isMobile?: boolean;
 }
 
+
 export default function CategoryTabs({
   selectedCategory,
   onCategoryChange,
