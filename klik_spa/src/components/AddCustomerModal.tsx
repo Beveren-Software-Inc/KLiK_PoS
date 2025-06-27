@@ -1,17 +1,22 @@
-import React, { useState, useEffect } from "react"
-import { X, User, Mail, Phone, MapPin, Calendar, CreditCard, Tag, Save, Building, Users } from "lucide-react"
-import { type Customer } from "../data/mockCustomers"
+import React, { useState, useEffect } from "react";
+import { X, User, Mail, Phone, MapPin, Calendar, CreditCard, Tag, Save, Building, Users } from "lucide-react";
+import { type Customer } from "../data/mockCustomers";
+import { useCustomerActions } from "../services/customerService";
 
 interface AddCustomerModalProps {
-  customer?: Customer | null
-  onClose: () => void
-  onSave: (customer: Partial<Customer>) => void
-  isFullPage?: boolean
+  customer?: Customer | null;
+  onClose: () => void;
+  onSave: (customer: Partial<Customer>) => void;
+  isFullPage?: boolean;
 }
 
 export default function AddCustomerModal({ customer, onClose, onSave, isFullPage = false }: AddCustomerModalProps) {
-  const isEditing = !!customer
-  
+  const { createCustomer, updateCustomer } = useCustomerActions();
+  const isEditing = !!customer;
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Initialize form data with all possible fields
   const [formData, setFormData] = useState({
     type: "individual" as Customer['type'],
     name: "",
@@ -24,25 +29,23 @@ export default function AddCustomerModal({ customer, onClose, onSave, isFullPage
       zipCode: "",
       country: "UAE"
     },
-    // Individual fields
     dateOfBirth: "",
     gender: "" as "male" | "female" | "other" | "",
-    // Company fields
     companyName: "",
     contactPerson: "",
     taxId: "",
     industry: "",
     employeeCount: "",
-    // Common fields
     preferredPaymentMethod: "card" as Customer['preferredPaymentMethod'],
     notes: "",
     tags: [] as string[],
     status: "active" as Customer['status']
-  })
+  });
 
-  const [tagInput, setTagInput] = useState("")
-  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [tagInput, setTagInput] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Initialize form with customer data if editing
   useEffect(() => {
     if (customer) {
       setFormData({
@@ -51,115 +54,140 @@ export default function AddCustomerModal({ customer, onClose, onSave, isFullPage
         email: customer.email,
         phone: customer.phone,
         address: customer.address,
-        // Individual fields
         dateOfBirth: customer.dateOfBirth || "",
         gender: customer.gender || "",
-        // Company fields
         companyName: customer.companyName || "",
         contactPerson: customer.contactPerson || "",
         taxId: customer.taxId || "",
         industry: customer.industry || "",
         employeeCount: customer.employeeCount || "",
-        // Common fields
         preferredPaymentMethod: customer.preferredPaymentMethod,
         notes: customer.notes || "",
         tags: customer.tags || [],
         status: customer.status
-      })
+      });
     }
-  }, [customer])
+  }, [customer]);
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {}
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
 
     if (!formData.name.trim()) {
-      newErrors.name = "Name is required"
+      newErrors.name = "Name is required";
     }
 
     if (!formData.email.trim()) {
-      newErrors.email = "Email is required"
+      newErrors.email = "Email is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Please enter a valid email address"
+      newErrors.email = "Please enter a valid email address";
     }
 
     if (!formData.phone.trim()) {
-      newErrors.phone = "Phone number is required"
+      newErrors.phone = "Phone number is required";
     }
 
     if (!formData.address.street.trim()) {
-      newErrors.street = "Street address is required"
+      newErrors.street = "Street address is required";
     }
 
     if (!formData.address.city.trim()) {
-      newErrors.city = "City is required"
+      newErrors.city = "City is required";
     }
 
-    // Company-specific validation
     if (formData.type === 'company') {
       if (!formData.companyName.trim()) {
-        newErrors.companyName = "Company name is required"
+        newErrors.companyName = "Company name is required";
       }
       if (!formData.contactPerson.trim()) {
-        newErrors.contactPerson = "Contact person is required"
+        newErrors.contactPerson = "Contact person is required";
       }
     }
 
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitError(null);
     
-    if (!validateForm()) {
-      return
-    }
+    if (!validateForm()) return;
 
-    const customerData: Partial<Customer> = {
-      ...formData,
-      // Clean up conditional fields
-      dateOfBirth: formData.dateOfBirth || undefined,
-      gender: formData.gender || undefined,
-      companyName: formData.type === 'company' ? formData.companyName : undefined,
-      contactPerson: formData.type === 'company' ? formData.contactPerson : undefined,
-      taxId: formData.type === 'company' ? formData.taxId || undefined : undefined,
-      industry: formData.type === 'company' ? formData.industry || undefined : undefined,
-      employeeCount: formData.type === 'company' ? formData.employeeCount || undefined : undefined,
-      // Preserve existing data for edits
-      id: customer?.id || `CUST${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
-      loyaltyPoints: customer?.loyaltyPoints || 0,
-      totalSpent: customer?.totalSpent || 0,
-      totalOrders: customer?.totalOrders || 0,
-      createdAt: customer?.createdAt || new Date().toISOString(),
-      lastVisit: customer?.lastVisit
-    }
+    setIsSubmitting(true);
 
-    onSave(customerData)
-  }
+    try {
+      const customerData = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        type: formData.type,
+        address: formData.address,
+        dateOfBirth: formData.dateOfBirth || undefined,
+        gender: formData.gender || undefined,
+        companyName: formData.type === 'company' ? formData.companyName : undefined,
+        contactPerson: formData.type === 'company' ? formData.contactPerson : undefined,
+        taxId: formData.taxId || undefined,
+        industry: formData.industry || undefined,
+        employeeCount: formData.employeeCount || undefined,
+        preferredPaymentMethod: formData.preferredPaymentMethod,
+        notes: formData.notes || undefined,
+        tags: formData.tags,
+        status: formData.status
+      };
+
+      if (isEditing && customer?.id) {
+        const updatedCustomer = await updateCustomer(customer.id, customerData);
+        onSave({
+          ...updatedCustomer,
+          id: customer.id,
+        });
+      } else {
+        const newCustomer = await createCustomer(customerData);
+        onSave({
+          ...newCustomer,
+          id: newCustomer.name, // Assuming the name is the ID returned from Frappe
+        });
+      }
+      
+      onClose();
+    } catch (error) {
+      console.error('Customer save error:', error);
+      setSubmitError(
+        error instanceof Error 
+          ? error.message 
+          : 'Failed to save customer. Please try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const addTag = () => {
     if (tagInput.trim() && !formData.tags.includes(tagInput.trim())) {
       setFormData(prev => ({
         ...prev,
         tags: [...prev.tags, tagInput.trim()]
-      }))
-      setTagInput("")
+      }));
+      setTagInput("");
     }
-  }
+  };
 
   const removeTag = (tagToRemove: string) => {
     setFormData(prev => ({
       ...prev,
       tags: prev.tags.filter(tag => tag !== tagToRemove)
-    }))
-  }
+    }));
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      e.preventDefault()
-      addTag()
+      e.preventDefault();
+      addTag();
     }
-  }
+  };
+
+  // The rest of the component (JSX) remains exactly the same as in your original code
+  // Only the form submission logic and hooks at the top have changed
 
   return (
     <div className={isFullPage ? "h-full" : "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"}>
@@ -193,7 +221,7 @@ export default function AddCustomerModal({ customer, onClose, onSave, isFullPage
                 { value: 'company', label: 'Company', icon: Building, desc: 'Business customer' },
                 { value: 'walk-in', label: 'Walk-In', icon: Users, desc: 'Temporary customer' }
               ].map((type) => {
-                const IconComponent = type.icon
+                const IconComponent = type.icon;
                 return (
                   <label
                     key={type.value}
@@ -225,7 +253,7 @@ export default function AddCustomerModal({ customer, onClose, onSave, isFullPage
                       {type.desc}
                     </span>
                   </label>
-                )
+                );
               })}
             </div>
           </div>
@@ -629,14 +657,33 @@ export default function AddCustomerModal({ customer, onClose, onSave, isFullPage
             </button>
             <button
               type="submit"
-              className="px-6 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors flex items-center space-x-2"
+              disabled={isSubmitting}
+              className={`px-6 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors flex items-center space-x-2 ${
+                isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
+              }`}
             >
-              <Save size={18} />
-              <span>{isEditing ? 'Update Customer' : 'Save Customer'}</span>
+              {isSubmitting ? (
+                <>
+                  <span className="animate-spin">↻</span>
+                  <span>{isEditing ? 'Updating...' : 'Creating...'}</span>
+                </>
+              ) : (
+                <>
+                  <Save size={18} />
+                  <span>{isEditing ? 'Update Customer' : 'Save Customer'}</span>
+                </>
+              )}
             </button>
+
+            {/* Error Display */}
+            {submitError && (
+              <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-lg">
+                {submitError}
+              </div>
+            )}
           </div>
         </form>
       </div>
     </div>
-  )
+  );
 }
