@@ -1,16 +1,44 @@
-"use client"
+"use client";
 
-import { useI18n } from "../hooks/useI18n"
-import { categories } from "../data/mockData"
+import { useFrappeGetDocList } from "frappe-react-sdk";
+import { itemGroupIconMap } from "../utils/iconMap"
+import { useI18n } from "../hooks/useI18n";
 
 interface CategoryTabsProps {
-  selectedCategory: string
-  onCategoryChange: (category: string) => void
-  isMobile?: boolean
+  selectedCategory: string;
+  onCategoryChange: (category: string) => void;
+  isMobile?: boolean;
 }
 
-export default function CategoryTabs({ selectedCategory, onCategoryChange, isMobile = false }: CategoryTabsProps) {
-  const { isRTL } = useI18n()
+export default function CategoryTabs({
+  selectedCategory,
+  onCategoryChange,
+  isMobile = false,
+}: CategoryTabsProps) {
+  const { isRTL } = useI18n();
+
+  const { data: itemGroups, isLoading, error } = useFrappeGetDocList("Item Group", {
+    fields: ["name", "item_group_name"],
+    limit: 100,
+  });
+
+  if (isLoading) return <div>Loading categories...</div>;
+  if (error) return <div>Error loading categories</div>;
+
+  const categories = [
+    {
+      id: "all",
+      name: "All Menu",
+      icon: itemGroupIconMap["All Menu"] ?? "📦",
+      count: itemGroups?.length || 0,
+    },
+    ...itemGroups!.map((group) => ({
+      id: group.name,
+      name: group.item_group_name,
+      icon: itemGroupIconMap[group.item_group_name] ?? "📦",
+      count: 1, // optional: you can later calculate based on items if needed
+    })),
+  ];
 
   return (
     <div className="flex space-x-2 overflow-x-auto py-2 scrollbar-hide">
@@ -34,5 +62,5 @@ export default function CategoryTabs({ selectedCategory, onCategoryChange, isMob
         </button>
       ))}
     </div>
-  )
+  );
 }
