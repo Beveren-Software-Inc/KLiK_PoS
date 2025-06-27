@@ -16,8 +16,9 @@ import {
   Edit,
   Trash2
 } from "lucide-react"
-import { mockCustomers, type Customer } from "../data/mockCustomers"
+import { useCustomers } from "../hooks/useCustomers" // Import the hook
 import AddCustomerModal from "./AddCustomerModal"
+import type { Customer } from "../types"
 
 export default function CustomersPage() {
   const navigate = useNavigate()
@@ -26,41 +27,82 @@ export default function CustomersPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
 
+  // Use the customers hook
+  const { customers, isLoading, error } = useCustomers()
+
   // Filter and search customers
   const filteredCustomers = useMemo(() => {
-    let customers = mockCustomers
+    if (isLoading) return []
+    if (error) return []
+
+    let filtered = customers
 
     // Apply status filter
     if (statusFilter !== "all") {
-      customers = customers.filter(customer => customer.status === statusFilter)
+      filtered = filtered.filter(customer => customer.status === statusFilter)
     }
 
     // Apply search
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
-      customers = customers.filter(customer => 
+      filtered = filtered.filter(customer => 
         customer.name.toLowerCase().includes(query) ||
         customer.email.toLowerCase().includes(query) ||
         customer.phone.includes(searchQuery) ||
-        customer.tags.some(tag => tag.toLowerCase().includes(query))
+        (customer.tags && customer.tags.some(tag => tag.toLowerCase().includes(query)))
       )
     }
 
     // Sort by last visit (most recent first)
-    return customers.sort((a, b) => {
+    return filtered.sort((a, b) => {
       const dateA = a.lastVisit ? new Date(a.lastVisit).getTime() : 0
       const dateB = b.lastVisit ? new Date(b.lastVisit).getTime() : 0
       return dateB - dateA
     })
-  }, [searchQuery, statusFilter])
+  }, [customers, searchQuery, statusFilter, isLoading, error])
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map(word => word.charAt(0).toUpperCase())
-      .join("")
-      .substring(0, 2)
+  // Stats calculation
+  const stats = useMemo(() => {
+    if (isLoading) return { total: 0, active: 0, vip: 0, totalSpent: 0 }
+    
+    const total = customers.length
+    const active = customers.filter(c => c.status === 'active').length
+    const vip = customers.filter(c => c.status === 'vip').length
+    const totalSpent = customers.reduce((sum, c) => sum + (c.totalSpent || 0), 0)
+    
+    return { total, active, vip, totalSpent }
+  }, [customers, isLoading])
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-beveren-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-300">Loading customers...</p>
+        </div>
+      </div>
+    )
   }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-lg max-w-md">
+          <h3 className="text-lg font-medium text-red-800 dark:text-red-200">Error loading customers</h3>
+          <p className="mt-2 text-sm text-red-700 dark:text-red-300">{error.message}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-800"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-AE', {
@@ -76,8 +118,7 @@ export default function CustomersPage() {
       day: 'numeric'
     })
   }
-
-  const getStatusColor = (status: Customer['status']) => {
+    const getStatusColor = (status: Customer['status']) => {
     switch (status) {
       case 'vip':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
@@ -90,14 +131,14 @@ export default function CustomersPage() {
     }
   }
 
-  const stats = useMemo(() => {
-    const total = mockCustomers.length
-    const active = mockCustomers.filter(c => c.status === 'active').length
-    const vip = mockCustomers.filter(c => c.status === 'vip').length
-    const totalSpent = mockCustomers.reduce((sum, c) => sum + c.totalSpent, 0)
-    
-    return { total, active, vip, totalSpent }
-  }, [])
+    const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map(word => word.charAt(0).toUpperCase())
+      .join("")
+      .substring(0, 2)
+  }
+
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">

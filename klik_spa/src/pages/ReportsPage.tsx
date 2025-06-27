@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -21,6 +21,7 @@ import {
 import { mockSalesInvoices } from "../data/mockSalesData";
 import InvoiceViewModal from "../components/InvoiceViewModal";
 import type { SalesInvoice } from "../../types";
+import { useSalesInvoices } from "../hooks/useSalesInvoices"
 
 export default function ReportsPage() {
   const navigate = useNavigate();
@@ -33,6 +34,8 @@ export default function ReportsPage() {
   const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
   const [selectedInvoice, setSelectedInvoice] = useState<SalesInvoice | null>(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+
+  const { invoices, isLoading, error } = useSalesInvoices(); 
 
   const tabs = [
     { id: "invoices", name: "All Invoices", icon: FileText },
@@ -72,28 +75,82 @@ export default function ReportsPage() {
     }
   };
 
-  const filteredInvoices = mockSalesInvoices.filter((invoice) => {
-    const matchesSearch =
-      searchQuery === "" ||
-      invoice.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      invoice.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      invoice.cashier.toLowerCase().includes(searchQuery.toLowerCase());
+  // Update your filteredInvoices to use the hook data
+  const filteredInvoices = useMemo(() => {
+    if (isLoading) return [];
+    if (error) return [];
 
-    const matchesStatus = statusFilter === "all" || invoice.status === statusFilter;
-    const matchesPayment = paymentFilter === "all" || invoice.paymentMethod === paymentFilter;
-    const matchesCashier = cashierFilter === "all" || invoice.cashier === cashierFilter;
+    return invoices.filter((invoice) => {
+      const matchesSearch =
+        searchQuery === "" ||
+        invoice.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        invoice.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (invoice.cashier && invoice.cashier.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    const today = new Date().toISOString().split("T")[0];
-    const matchesDate =
-      dateFilter === "all" ||
-      (dateFilter === "today" && invoice.date === today) ||
-      (dateFilter === "yesterday" && invoice.date === "2024-01-14") ||
-      (dateFilter === "week" && new Date(invoice.date) >= new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+      // const matchesStatus = statusFilter === "all" || invoice.status === statusFilter;
+      // const matchesPayment = paymentFilter === "all" || invoice.paymentMethod === paymentFilter;
+      // const matchesCashier = cashierFilter === "all" || invoice.cashier === cashierFilter;
 
-    return matchesSearch && matchesStatus && matchesPayment && matchesCashier && matchesDate;
-  });
+      // const today = new Date().toISOString().split('T')[0];
+      // const matchesDate =
+      //   dateFilter === "all"
+        // (dateFilter === "today" && invoice.date === today) ||
+        // (dateFilter === "yesterday" && invoice.date === getYesterdayDate()) ||
+        // (dateFilter === "week" && isDateInLastWeek(invoice.date));
 
-  const uniqueCashiers = [...new Set(mockSalesInvoices.map((invoice) => invoice.cashier))];
+      return matchesSearch;
+    });
+  }, [invoices, searchQuery, statusFilter, dateFilter, paymentFilter, cashierFilter, isLoading, error]);
+
+    console.log('Fetched invoices:', filteredInvoices);  // <-- Add this line
+
+  // Helper functions for date filtering
+  const getYesterdayDate = () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    return yesterday.toISOString().split('T')[0];
+  };
+
+  const isDateInLastWeek = (dateString: string) => {
+    const date = new Date(dateString);
+    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    return date >= oneWeekAgo;
+  };
+
+  // Update uniqueCashiers to use real data
+  const uniqueCashiers = useMemo(() => {
+    return [...new Set(invoices.map(invoice => invoice.cashier).filter(Boolean))];
+  }, [invoices]);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-beveren-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-300">Loading invoices...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-lg max-w-md">
+          <h3 className="text-lg font-medium text-red-800 dark:text-red-200">Error loading invoices</h3>
+          <p className="mt-2 text-sm text-red-700 dark:text-red-300">{error.message}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-800"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const handleViewInvoice = (invoice: SalesInvoice) => {
     setSelectedInvoice(invoice);
@@ -102,13 +159,11 @@ export default function ReportsPage() {
 
   const handleRefund = (invoiceId: string) => {
     console.log("Processing refund for:", invoiceId);
-    // Implement refund logic
     setShowInvoiceModal(false);
   };
 
   const handleCancel = (invoiceId: string) => {
     console.log("Cancelling invoice:", invoiceId);
-    // Implement cancel logic
     setShowInvoiceModal(false);
   };
 
