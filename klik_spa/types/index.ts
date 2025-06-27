@@ -173,3 +173,19 @@ export interface Customer {
   lastVisit?: string
   avatar?: string
 }
+
+export interface PaymentMode {
+  mode_of_payment: string;
+  default?: 0 | 1;
+}
+
+export interface POSProfile {
+  name: string;
+  company: string;
+  warehouse: string;
+  currency: string;
+  write_off_account?: string;
+  write_off_cost_center?: string;
+  payment_methods?: PaymentMode[];
+  // Add other fields as needed
+}
