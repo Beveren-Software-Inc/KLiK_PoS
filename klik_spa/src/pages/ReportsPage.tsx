@@ -159,13 +159,11 @@ export default function ReportsPage() {
 
   const handleRefund = (invoiceId: string) => {
     console.log("Processing refund for:", invoiceId);
-    // Implement refund logic
     setShowInvoiceModal(false);
   };
 
   const handleCancel = (invoiceId: string) => {
     console.log("Cancelling invoice:", invoiceId);
-    // Implement cancel logic
     setShowInvoiceModal(false);
   };
 

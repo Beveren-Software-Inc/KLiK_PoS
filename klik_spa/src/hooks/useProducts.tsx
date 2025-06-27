@@ -59,10 +59,10 @@ export function useProducts(): UseProductsReturn {
     id: item.name,
     name: item.item_name || item.name,
     description: item.description || '',
-    price: 200, // Fixed price for now - will be replaced with function later
+    price: 200,
     category: item.item_group || 'General',
     image: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=300&h=300&fit=crop',
-    available: 100, // Fixed quantity for now - will be replaced with function later
+    available: 100,
     sold: 0,
     preparationTime: 10
   }));

@@ -52,7 +52,7 @@ export function useSalesInvoices() {
     id: invoice.name,
     date: invoice.posting_date || new Date().toISOString().split('T')[0],
     time: invoice.posting_time || '00:00:00',
-    cashier: "Cashier Name", // You'll need to fetch this from Users table
+    cashier: "Cashier Name", 
     cashierId: invoice.owner || '',
     customer: invoice.customer_name || '',
     customerId: invoice.customer || '',

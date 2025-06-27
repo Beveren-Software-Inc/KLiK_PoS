@@ -72,7 +72,7 @@ export function useCustomers() {
       gender: (customer.custom_gender as 'male'|'female'|'other') || getRandomGender(),
       loyaltyPoints: customer.custom_loyalty_points || Math.floor(Math.random() * 1000),
       totalSpent: customer.custom_total_spent || Math.floor(Math.random() * 10000) + 500,
-      totalOrders: customer.custom_total_orders ?? 200, // Fixed value as requested
+      totalOrders: customer.custom_total_orders ?? 200,
       preferredPaymentMethod: getRandomPaymentMethod(),
       notes: customer.custom_notes || '',
       tags: customer.custom_tags?.split(',') || getRandomTags(),
@@ -104,7 +104,7 @@ function getRandomBirthDate(): string {
 }
 
 function getRandomRecentDate(): string {
-  const start = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000); // 1 year ago
+  const start = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
   const end = new Date();
   return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime())).toISOString();
 }
@@ -131,7 +131,7 @@ function getRandomStatus(): Customer['status'] {
 
 function getRandomTags(): string[] {
   const allTags = ['regular', 'wholesale', 'corporate', 'family', 'new'];
-  const count = Math.floor(Math.random() * 3) + 1; // 1-3 tags
+  const count = Math.floor(Math.random() * 3) + 1;
   return [...new Set(
     Array(count).fill(0).map(() => allTags[Math.floor(Math.random() * allTags.length)])
   )];
