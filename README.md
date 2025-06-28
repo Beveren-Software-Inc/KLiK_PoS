@@ -115,8 +115,24 @@ src/
 The application can be configured for different environments:
 
 1. **Development**: Uses mock data and development APIs
-2. **Production**: Connects to ERPNext backend
-3. **Offline Mode**: Local storage fallback
+   To fetch data currently:
+   Go to providers -> FrappeProviders -> Change to your local token
+   ```
+     <FrappeProvider
+        url="http://localhost:8000"
+        tokenParams={() => ({
+        useToken: true,
+        token: "api_key:secret_key", 
+        type: "token", 
+      })}
+    >
+      {children}
+    </FrappeProvider>
+   ```
+   Then for Item, Item Group, Sales Invoice, Contact- allow Guest to read.
+   This will change in a few once we move to production.
+3. **Production**: Connects to ERPNext backend
+4. **Offline Mode**: Local storage fallback
 
 ## Contributing
 
