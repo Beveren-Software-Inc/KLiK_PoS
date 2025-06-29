@@ -1,0 +1,70 @@
+import frappe
+from frappe import _
+from erpnext.stock.utils import get_stock_balance
+
+def fetch_item_balance(item_code: str, warehouse: str) -> float:
+    """Get stock balance of an item from a warehouse."""
+    try:
+        return get_stock_balance(item_code, warehouse) or 0
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), f"Error fetching balance for {item_code}")
+        return 0
+
+def fetch_item_price(item_code: str, price_list: str) -> dict:
+    """Get item price from Item Price doctype."""
+    try:
+        price_doc = frappe.get_value(
+            "Item Price",
+            {
+                "item_code": item_code,
+                "price_list": price_list,
+                "selling": 1,
+            },
+            ["price_list_rate", "currency"],
+            as_dict=True
+        )
+        return {
+            "price": price_doc.price_list_rate if price_doc else 0,
+            "currency": price_doc.currency if price_doc else "SAR"
+        }
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), f"Error fetching price for {item_code}")
+        return {
+            "price": 0,
+            "currency": "SAR"
+        }
+
+@frappe.whitelist(allow_guest=True)
+def get_items_with_balance_and_price(warehouse: str, price_list: str = "Standard Selling"):
+    try:
+        items = frappe.get_all(
+    "Item",
+    filters={"disabled": 0, "is_stock_item": 1},
+    fields=["name", "item_name", "description", "item_group", "image"],
+    limit=50,
+   
+    order_by="modified desc"
+)
+        enriched_items = []
+        for item in items:
+            balance = fetch_item_balance(item["name"], warehouse)
+            price_info = fetch_item_price(item["name"], price_list)
+
+            enriched_items.append({
+                "id": item["name"],
+                "name": item.get("item_name") or item["name"],
+                "description": item.get("description", ""),
+                "category": item.get("item_group", "General"),
+                "price": price_info["price"],
+                "currency": price_info["currency"],
+                "available": balance,
+                "image": item.get("image") or "https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=300&h=300&fit=crop",
+                "sold": 0,
+                "preparationTime": 10
+            })
+
+        return enriched_items
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Combined Item Data Error")
+        frappe.throw(_("Something went wrong while fetching item data."))

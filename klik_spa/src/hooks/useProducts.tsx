@@ -1,91 +1,66 @@
-import { useFrappeGetDocList } from "frappe-react-sdk";
+
+// import { useFrappeGetDocList } from "frappe-react-sdk";
 import type { MenuItem } from "../../types";
+import { useEffect, useState } from "react";
 
 interface UseProductsReturn {
-  products: MenuItem[]
-  isLoading: boolean
-  error: string | null
-  refetch: () => void
-  count: number
+  products: MenuItem[];
+  isLoading: boolean;
+  error: string | null;
+  refetch: () => void;
+  count: number;
 }
 
-interface Item {
-  name: string
-  item_name?: string
-  description?: string
-  standard_rate?: number | string
-  item_group?: string
-  image?: string
-  actual_qty?: number | string
-}
+// interface Item {
+//   name: string;
+//   item_name?: string;
+//   description?: string;
+//   standard_rate?: number | string;
+//   item_group?: string;
+//   image?: string;
+//   actual_qty?: number;
+// }
 
 export function useProducts(): UseProductsReturn {
-  const { 
-    data, 
-    error, 
-    isLoading, 
-    mutate 
-  } = useFrappeGetDocList<Item>("Item", {
-    fields: [
-      "name", 
-      "item_name", 
-      "description", 
-     
-      "item_group", 
-  
-    ],
-    filters: [["disabled", "=", 0]],
-    limit: 100,
-    orderBy: {
-      field: "modified",
-      order: "desc",
-    },
-  });
+  const [products, setProducts] = useState<MenuItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
- 
-  // Handle different data formats from Frappe API
-  let itemsArray: Item[] = [];
-  
-  if (data) {
-    if (Array.isArray(data)) {    
-      itemsArray = data;
-    } else {
-      console.warn("⚠️ Unexpected data format:", data);
-      itemsArray = [];
+  const fetchItems = async () => {
+    setIsLoading(true);
+    const warehouse = "Production RM AMC3 - AMCC";
+    const priceList = "Standard Selling";
+
+    try {
+      const response = await fetch(
+        `/api/method/klik_pos.api.item.get_items_with_balance_and_price?warehouse=${encodeURIComponent(warehouse)}&price_list=${encodeURIComponent(priceList)}`
+      );
+      const resData = await response.json();
+
+      if (resData?.message && Array.isArray(resData.message)) {
+        setProducts(resData.message);
+      } else {
+        throw new Error("Invalid response format");
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      console.error("Error fetching products:", error);
+      setErrorMessage(error.message || "Unknown error occurred");
+    } finally {
+      setIsLoading(false);
     }
-  }
+  };
 
-  const products = itemsArray.map((item): MenuItem => ({
-    id: item.name,
-    name: item.item_name || item.name,
-    description: item.description || '',
-    price: 200,
-    category: item.item_group || 'General',
-    image: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=300&h=300&fit=crop',
-    available: 100,
-    sold: 0,
-    preparationTime: 10
-  }));
-
-  // Handle error properly - convert to string
-  let errorMessage: string | null = null;
-  if (error) {
-    if (typeof error === 'string') {
-      errorMessage = error;
-    } else if (error instanceof Error) {
-      errorMessage = error.message;
-    } else if (typeof error === 'object' && error !== null) {
-      errorMessage = error._error_message || error.message || JSON.stringify(error);
-    } else {
-      errorMessage = 'An unknown error occurred';
-    }
-  }
+  useEffect(() => {
+    fetchItems();
+  }, []);
 
   return {
     products,
     isLoading,
     error: errorMessage,
-    refetch: mutate,
+    refetch: fetchItems,
     count: products.length,
   };
 }

@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState } from "react"
 import { X, CreditCard, Banknote, Smartphone, Gift, Printer, Eye, Calculator, Check } from "lucide-react"
 import type { CartItem, GiftCoupon, Customer } from "../../types"
-
+import { usePaymentModes } from "../hooks/usePaymentModes"
+import { useSalesTaxCharges } from "../hooks/useSalesTaxCharges"
 interface PaymentDialogProps {
   isOpen: boolean
   onClose: () => void
@@ -13,7 +14,8 @@ interface PaymentDialogProps {
   onCompletePayment: (paymentData: any) => void
   onHoldOrder: (orderData: any) => void
   isMobile?: boolean
-  isFullPage?: boolean
+  isFullPage?: boolean,
+
 }
 
 interface PaymentMethod {
@@ -24,25 +26,34 @@ interface PaymentMethod {
   enabled: boolean
 }
 
-interface TaxCategory {
-  id: string
-  name: string
-  rate: number
-}
+const getIconAndColor = (label: string): { icon: React.ReactNode; color: string } => {
+  const lowerLabel = label.toLowerCase();
 
-const paymentMethods: PaymentMethod[] = [
-  { id: 'cash', name: 'Cash', icon: <Banknote size={24} />, color: 'bg-green-600', enabled: true },
-  { id: 'card', name: 'Credit/Debit Card', icon: <CreditCard size={24} />, color: 'bg-blue-600', enabled: true },
-  { id: 'mobile', name: 'Mobile Payment', icon: <Smartphone size={24} />, color: 'bg-purple-600', enabled: true },
-  { id: 'giftcard', name: 'Gift Card', icon: <Gift size={24} />, color: 'bg-orange-600', enabled: true },
-]
+  if (lowerLabel.includes("cash")) {
+    return { icon: <Banknote size={24} />, color: "bg-green-600" };
+  }
+  if (lowerLabel.includes("card") || lowerLabel.includes("credit") || lowerLabel.includes("debit") || lowerLabel.includes("bank")) {
+    return { icon: <CreditCard size={24} />, color: "bg-blue-600" };
+  }
+  if (lowerLabel.includes("phone") || lowerLabel.includes("mpesa")) {
+    return { icon: <Smartphone size={24} />, color: "bg-purple-600" };
+  }
+  if (lowerLabel.includes("gift")) {
+    return { icon: <Gift size={24} />, color: "bg-orange-600" };
+  }
+  if (lowerLabel.includes("cheque") || lowerLabel.includes("check")) {
+    return { icon: <Check size={24} />, color: "bg-yellow-600" };
+  }
 
-const taxCategories: TaxCategory[] = [
-    { id: 'exempt', name: 'Exempt', rate: 0 },
-    { id: 'standard', name: 'Standard Rate', rate: 15 },
-    { id: 'reduced', name: 'Reduced Rate', rate: 5 },
-    { id: 'zero', name: 'Zero Rate', rate: 0 },
-]
+  return { icon: <CreditCard size={24} />, color: "bg-gray-600" };
+};
+
+// const taxCategories: TaxCategory[] = [
+//     { id: 'exempt', name: 'Exempt', rate: 0 },
+//     { id: 'standard', name: 'Standard Rate', rate: 15 },
+//     { id: 'reduced', name: 'Reduced Rate', rate: 5 },
+//     { id: 'zero', name: 'Zero Rate', rate: 0 },
+// ]
 
 export default function PaymentDialog({
   isOpen,
@@ -56,10 +67,12 @@ export default function PaymentDialog({
   isFullPage = false
 }: PaymentDialogProps) {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('cash')
-  const [selectedTaxCategory, setSelectedTaxCategory] = useState('zero')
+  const [selectedSalesTaxCharges, setSelectedSalesTaxCharges] = useState('zero')
   const [amountPaid, setAmountPaid] = useState('')
   const [roundOffAmount, setRoundOffAmount] = useState(0)
   const [showPreview, setShowPreview] = useState(false)
+  const { modes, isLoading, error } = usePaymentModes("Test POS Profile");
+  const { salesTaxCharges, isLoading: isTaxLoading, error: taxError } = useSalesTaxCharges();
 
   if (!isOpen) return null
 
@@ -67,13 +80,30 @@ export default function PaymentDialog({
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const couponDiscount = appliedCoupons.reduce((sum, coupon) => sum + coupon.value, 0)
   const taxableAmount = Math.max(0, subtotal - couponDiscount)
-  const selectedTax = taxCategories.find(tax => tax.id === selectedTaxCategory)
+  const selectedTax = salesTaxCharges.find(tax => tax.id === selectedSalesTaxCharges)
+
   const taxAmount = taxableAmount * (selectedTax?.rate || 0) / 100
   const totalBeforeRoundOff = taxableAmount + taxAmount
   const grandTotal = totalBeforeRoundOff + roundOffAmount
   const paidAmount = parseFloat(amountPaid) || 0
   const outstandingAmount = Math.max(0, grandTotal - paidAmount)
 
+    const paymentMethods: PaymentMethod[] = modes.map((mode) => {
+    const { icon, color } = getIconAndColor(mode.type || "Default");
+    return {
+      id: mode.mode_of_payment,
+      name: mode.mode_of_payment,
+      icon,
+      color,
+      enabled: true
+    };
+  });
+
+  if (!isOpen) return null;
+  if (isLoading) return <div className="p-6">Loading payment methods...</div>;
+  if (error) return <div className="p-6 text-red-500">Error: {error}</div>;
+
+  
   const handleRoundOff = () => {
     const rounded = Math.round(totalBeforeRoundOff)
     setRoundOffAmount(rounded - totalBeforeRoundOff)
@@ -85,7 +115,7 @@ export default function PaymentDialog({
       customer: selectedCustomer,
       paymentMethod: selectedPaymentMethod,
       subtotal,
-      taxCategory: selectedTaxCategory,
+      SalesTaxCharges: selectedSalesTaxCharges,
       taxAmount,
       couponDiscount,
       roundOffAmount,
@@ -102,7 +132,7 @@ export default function PaymentDialog({
       items: cartItems,
       customer: selectedCustomer,
       subtotal,
-      taxCategory: selectedTaxCategory,
+      SalesTaxCharges: selectedSalesTaxCharges,
       taxAmount,
       couponDiscount,
       roundOffAmount,
@@ -172,15 +202,15 @@ export default function PaymentDialog({
               </div>
             </div>
 
-            {/* Tax Category */}
+            {/* Sales & Tax Charges */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Tax Category</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Sales & Tax Charges</h2>
               <select
-                value={selectedTaxCategory}
-                onChange={(e) => setSelectedTaxCategory(e.target.value)}
+                value={selectedSalesTaxCharges}
+                onChange={(e) => setSelectedSalesTaxCharges(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               >
-                {taxCategories.map((tax) => (
+                {salesTaxCharges.map((tax) => (
                   <option key={tax.id} value={tax.id}>
                     {tax.name} ({tax.rate}%)
                   </option>
@@ -325,14 +355,14 @@ export default function PaymentDialog({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Tax Category
+                    Sales & Tax Charges
                   </label>
                   <select
-                    value={selectedTaxCategory}
-                    onChange={(e) => setSelectedTaxCategory(e.target.value)}
+                    value={selectedSalesTaxCharges}
+                    onChange={(e) => setSelectedSalesTaxCharges(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                   >
-                    {taxCategories.map((tax) => (
+                    {salesTaxCharges.map((tax) => (
                       <option key={tax.id} value={tax.id}>
                         {tax.name} ({tax.rate}%)
                       </option>
