@@ -11,7 +11,9 @@ interface PaymentDialogProps {
   cartItems: CartItem[]
   appliedCoupons: GiftCoupon[]
   selectedCustomer: Customer | null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onCompletePayment: (paymentData: any) => void
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onHoldOrder: (orderData: any) => void
   isMobile?: boolean
   isFullPage?: boolean,
@@ -48,12 +50,6 @@ const getIconAndColor = (label: string): { icon: React.ReactNode; color: string 
   return { icon: <CreditCard size={24} />, color: "bg-gray-600" };
 };
 
-// const taxCategories: TaxCategory[] = [
-//     { id: 'exempt', name: 'Exempt', rate: 0 },
-//     { id: 'standard', name: 'Standard Rate', rate: 15 },
-//     { id: 'reduced', name: 'Reduced Rate', rate: 5 },
-//     { id: 'zero', name: 'Zero Rate', rate: 0 },
-// ]
 
 export default function PaymentDialog({
   isOpen,
@@ -72,7 +68,7 @@ export default function PaymentDialog({
   const [roundOffAmount, setRoundOffAmount] = useState(0)
   const [showPreview, setShowPreview] = useState(false)
   const { modes, isLoading, error } = usePaymentModes("Test POS Profile");
-  const { salesTaxCharges, isLoading: isTaxLoading, error: taxError } = useSalesTaxCharges();
+  const { salesTaxCharges } = useSalesTaxCharges();
 
   if (!isOpen) return null
 

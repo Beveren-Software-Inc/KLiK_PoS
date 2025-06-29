@@ -28,12 +28,11 @@ export function useProducts(): UseProductsReturn {
 
   const fetchItems = async () => {
     setIsLoading(true);
-    const warehouse = "Production RM AMC3 - AMCC";
     const priceList = "Standard Selling";
 
     try {
       const response = await fetch(
-        `/api/method/klik_pos.api.item.get_items_with_balance_and_price?warehouse=${encodeURIComponent(warehouse)}&price_list=${encodeURIComponent(priceList)}`
+        `/api/method/klik_pos.api.item.get_items_with_balance_and_price?price_list=${encodeURIComponent(priceList)}`
       );
       const resData = await response.json();
 

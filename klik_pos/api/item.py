@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 from erpnext.stock.utils import get_stock_balance
+from klik_pos.klik_pos.utils import get_current_pos_profile
 
 def fetch_item_balance(item_code: str, warehouse: str) -> float:
     """Get stock balance of an item from a warehouse."""
@@ -35,7 +36,10 @@ def fetch_item_price(item_code: str, price_list: str) -> dict:
         }
 
 @frappe.whitelist(allow_guest=True)
-def get_items_with_balance_and_price(warehouse: str, price_list: str = "Standard Selling"):
+def get_items_with_balance_and_price(price_list: str = "Standard Selling"):
+    pos_doc = get_current_pos_profile()
+    warehouse=pos_doc.warehouse
+   
     try:
         items = frappe.get_all(
     "Item",
@@ -68,3 +72,4 @@ def get_items_with_balance_and_price(warehouse: str, price_list: str = "Standard
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Combined Item Data Error")
         frappe.throw(_("Something went wrong while fetching item data."))
+
