@@ -3,7 +3,7 @@
 import { useState, useRef } from "react"
 import { X, CreditCard, Banknote, Smartphone, Gift, Printer, Eye, Calculator, Check } from "lucide-react"
 import type { CartItem, GiftCoupon, Customer } from "../../types"
-
+import { usePaymentModes } from "../hooks/usePaymentModes"
 interface PaymentDialogProps {
   isOpen: boolean
   onClose: () => void
@@ -13,7 +13,8 @@ interface PaymentDialogProps {
   onCompletePayment: (paymentData: any) => void
   onHoldOrder: (orderData: any) => void
   isMobile?: boolean
-  isFullPage?: boolean
+  isFullPage?: boolean,
+
 }
 
 interface PaymentMethod {
@@ -29,14 +30,38 @@ interface TaxCategory {
   name: string
   rate: number
 }
+const getIconAndColor = (type: string): { icon: React.ReactNode; color: string } => {
+  const IconMap: Record<string, JSX.Element> = {
+    Cash: <Banknote size={24} />,
+    Card: <CreditCard size={24} />,
+    Mobile: <Smartphone size={24} />,
+    Gift: <Gift size={24} />
+  }
 
-const paymentMethods: PaymentMethod[] = [
-  { id: 'cash', name: 'Cash', icon: <Banknote size={24} />, color: 'bg-green-600', enabled: true },
-  { id: 'card', name: 'Credit/Debit Card', icon: <CreditCard size={24} />, color: 'bg-blue-600', enabled: true },
-  { id: 'mobile', name: 'Mobile Payment', icon: <Smartphone size={24} />, color: 'bg-purple-600', enabled: true },
-  { id: 'giftcard', name: 'Gift Card', icon: <Gift size={24} />, color: 'bg-orange-600', enabled: true },
-]
+  const ColorMap: Record<string, string> = {
+    Cash: 'bg-green-600',
+    Card: 'bg-blue-600',
+    Mobile: 'bg-purple-600',
+    Gift: 'bg-orange-600'
+  }
 
+  return {
+    icon: IconMap[type] || <CreditCard size={24} />,
+    color: ColorMap[type] || 'bg-gray-600'
+  }
+}
+
+
+// const paymentMethods: PaymentMethod[] = modes.map((mode) => {
+//   const { icon, color } = getIconAndColor(mode.type || "Default")
+//   return {
+//     id: mode.mode_of_payment,
+//     name: mode.mode_of_payment,
+//     icon,
+//     color,
+//     enabled: true
+//   }
+// })
 const taxCategories: TaxCategory[] = [
     { id: 'exempt', name: 'Exempt', rate: 0 },
     { id: 'standard', name: 'Standard Rate', rate: 15 },
@@ -60,6 +85,7 @@ export default function PaymentDialog({
   const [amountPaid, setAmountPaid] = useState('')
   const [roundOffAmount, setRoundOffAmount] = useState(0)
   const [showPreview, setShowPreview] = useState(false)
+  const { modes, isLoading, error } = usePaymentModes("Test POS Profile");
 
   if (!isOpen) return null
 
@@ -74,6 +100,22 @@ export default function PaymentDialog({
   const paidAmount = parseFloat(amountPaid) || 0
   const outstandingAmount = Math.max(0, grandTotal - paidAmount)
 
+    const paymentMethods: PaymentMethod[] = modes.map((mode) => {
+    const { icon, color } = getIconAndColor(mode.type || "Default");
+    return {
+      id: mode.mode_of_payment,
+      name: mode.mode_of_payment,
+      icon,
+      color,
+      enabled: true
+    };
+  });
+
+  if (!isOpen) return null;
+  if (isLoading) return <div className="p-6">Loading payment methods...</div>;
+  if (error) return <div className="p-6 text-red-500">Error: {error}</div>;
+
+  
   const handleRoundOff = () => {
     const rounded = Math.round(totalBeforeRoundOff)
     setRoundOffAmount(rounded - totalBeforeRoundOff)

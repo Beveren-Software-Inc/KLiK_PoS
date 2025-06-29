@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def get_payment_modes(pos_profile):
     try:
         if not pos_profile:
@@ -9,7 +9,7 @@ def get_payment_modes(pos_profile):
 
         payment_modes = frappe.get_all("POS Payment Method",
             filters={"parent": pos_profile},
-            fields=["mode_of_payment", "default", "account", "type", "custom_currency"]
+            fields=["mode_of_payment", "default", "allow_in_returns"]
         )
 
         return {"success": True, "data": payment_modes}
