@@ -19,11 +19,9 @@ export function usePaymentModes(posProfile: string) {
 
     const fetchPaymentModes = async () => {
       setIsLoading(true);
-      posProfile = "Test POS Profile"
       try {
-        const res = await fetch(`/api/method/klik_pos.api.payment.get_payment_modes?pos_profile=${posProfile}`);
+        const res = await fetch(`/api/method/klik_pos.api.payment.get_payment_modes`);
         const data = await res.json();
-            console.log("here",data)
         if (!data.message.success) {
           throw new Error(data.message.error || "Failed to fetch payment modes");
         }

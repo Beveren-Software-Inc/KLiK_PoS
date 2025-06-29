@@ -1,6 +1,9 @@
 import frappe
 from frappe import _
 
+from klik_pos.klik_pos.utils import get_current_pos_profile
+
+
 @frappe.whitelist(allow_guest=True)
 def get_sales_tax_categories():
     try:
@@ -24,3 +27,8 @@ def get_sales_tax_categories():
     except Exception as e:
         frappe.log_error("Tax Fetch Failed", str(e))
         return {"success": False, "error": str(e)}
+
+
+def get_default_sales_tax_charges():
+    pos_doc = get_current_pos_profile()
+    return pos_doc.taxes_and_charges
