@@ -22,8 +22,9 @@ export function useSalesTaxCharges() {
         if (!data.message?.success) {
           throw new Error(data.message?.error || "Failed to fetch tax categories")
         }
-
         setTaxCategories(data.message.data || [])
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         setError(err.message)
       } finally {

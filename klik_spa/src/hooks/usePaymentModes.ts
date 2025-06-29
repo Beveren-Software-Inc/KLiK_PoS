@@ -24,12 +24,13 @@ export function usePaymentModes(posProfile: string) {
         const res = await fetch(`/api/method/klik_pos.api.payment.get_payment_modes?pos_profile=${posProfile}`);
         const data = await res.json();
             console.log("here",data)
-        // if (!data.message.success) {
-        //   throw new Error(data.message.error || "Failed to fetch payment modes");
-        // }
+        if (!data.message.success) {
+          throw new Error(data.message.error || "Failed to fetch payment modes");
+        }
 
         setModes(data.message.data || []);
         setError(null);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         setError(err.message);
         setModes([]);

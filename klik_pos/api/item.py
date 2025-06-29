@@ -10,7 +10,6 @@ def fetch_item_balance(item_code: str, warehouse: str) -> float:
         frappe.log_error(frappe.get_traceback(), f"Error fetching balance for {item_code}")
         return 0
 
-
 def fetch_item_price(item_code: str, price_list: str) -> dict:
     """Get item price from Item Price doctype."""
     try:

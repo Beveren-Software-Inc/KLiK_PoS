@@ -6,7 +6,7 @@ def get_sales_invoices(limit=100, start=0):
     try:
         invoices = frappe.get_all(
             "Sales Invoice",
-            filters={"docstatus": ["!=", 2]},  # Exclude Cancelled
+            filters={"docstatus": ["!=", 2]},  
             fields=[
                 "name",
                 "posting_date",
@@ -41,10 +41,6 @@ def get_sales_invoices(limit=100, start=0):
             "success": False,
             "error": str(e)
         }
-
-
-import frappe
-from frappe import _
 
 @frappe.whitelist(allow_guest=True)
 def get_invoice_details(invoice_id):

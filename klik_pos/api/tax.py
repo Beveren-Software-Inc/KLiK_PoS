@@ -1,4 +1,3 @@
-# klik_pos/api/tax.py
 import frappe
 from frappe import _
 
@@ -14,7 +13,6 @@ def get_sales_tax_categories():
         result = []
 
         for cat in tax_categories:
-            # Optional: Compute tax rate (assuming 'Sales Taxes and Charges' child table exists)
             tax_rate = frappe.db.get_value("Sales Taxes and Charges", {"parent": cat.name}, "rate") or 0.0
             result.append({
                 "id": cat.name,

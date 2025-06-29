@@ -20,9 +20,14 @@ export function useInvoiceDetails(invoiceId: string | null) {
         }
 
         setInvoice(resData.message.data);
-      } catch (err: any) {
-        setError(err.message || "Unknown error");
-      } finally {
+      } catch (err: unknown) {
+            if (err instanceof Error) {
+              setError(err.message);
+            } else {
+              setError("Unknown error");
+            }
+          }
+   finally {
         setIsLoading(false);
       }
     };

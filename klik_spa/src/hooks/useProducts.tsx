@@ -1,5 +1,5 @@
 
-import { useFrappeGetDocList } from "frappe-react-sdk";
+// import { useFrappeGetDocList } from "frappe-react-sdk";
 import type { MenuItem } from "../../types";
 import { useEffect, useState } from "react";
 
@@ -11,15 +11,15 @@ interface UseProductsReturn {
   count: number;
 }
 
-interface Item {
-  name: string;
-  item_name?: string;
-  description?: string;
-  standard_rate?: number | string;
-  item_group?: string;
-  image?: string;
-  actual_qty?: number;
-}
+// interface Item {
+//   name: string;
+//   item_name?: string;
+//   description?: string;
+//   standard_rate?: number | string;
+//   item_group?: string;
+//   image?: string;
+//   actual_qty?: number;
+// }
 
 export function useProducts(): UseProductsReturn {
   const [products, setProducts] = useState<MenuItem[]>([]);
@@ -42,6 +42,8 @@ export function useProducts(): UseProductsReturn {
       } else {
         throw new Error("Invalid response format");
       }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error("Error fetching products:", error);
       setErrorMessage(error.message || "Unknown error occurred");

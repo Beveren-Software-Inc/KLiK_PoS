@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState } from "react"
 import { X, CreditCard, Banknote, Smartphone, Gift, Printer, Eye, Calculator, Check } from "lucide-react"
 import type { CartItem, GiftCoupon, Customer } from "../../types"
 import { usePaymentModes } from "../hooks/usePaymentModes"
@@ -26,11 +26,6 @@ interface PaymentMethod {
   enabled: boolean
 }
 
-interface SalesTaxCharges {
-  id: string
-  name: string
-  rate: number
-}
 const getIconAndColor = (label: string): { icon: React.ReactNode; color: string } => {
   const lowerLabel = label.toLowerCase();
 
@@ -207,9 +202,9 @@ export default function PaymentDialog({
               </div>
             </div>
 
-            {/* Tax Category */}
+            {/* Sales & Tax Charges */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Tax Category</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Sales & Tax Charges</h2>
               <select
                 value={selectedSalesTaxCharges}
                 onChange={(e) => setSelectedSalesTaxCharges(e.target.value)}
@@ -360,7 +355,7 @@ export default function PaymentDialog({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Tax Category
+                    Sales & Tax Charges
                   </label>
                   <select
                     value={selectedSalesTaxCharges}
