@@ -4,6 +4,7 @@ import { useState, useRef } from "react"
 import { X, CreditCard, Banknote, Smartphone, Gift, Printer, Eye, Calculator, Check } from "lucide-react"
 import type { CartItem, GiftCoupon, Customer } from "../../types"
 import { usePaymentModes } from "../hooks/usePaymentModes"
+import { useSalesTaxCharges } from "../hooks/useSalesTaxCharges"
 interface PaymentDialogProps {
   isOpen: boolean
   onClose: () => void
@@ -25,49 +26,39 @@ interface PaymentMethod {
   enabled: boolean
 }
 
-interface TaxCategory {
+interface SalesTaxCharges {
   id: string
   name: string
   rate: number
 }
-const getIconAndColor = (type: string): { icon: React.ReactNode; color: string } => {
-  const IconMap: Record<string, JSX.Element> = {
-    Cash: <Banknote size={24} />,
-    Card: <CreditCard size={24} />,
-    Mobile: <Smartphone size={24} />,
-    Gift: <Gift size={24} />
+const getIconAndColor = (label: string): { icon: React.ReactNode; color: string } => {
+  const lowerLabel = label.toLowerCase();
+
+  if (lowerLabel.includes("cash")) {
+    return { icon: <Banknote size={24} />, color: "bg-green-600" };
+  }
+  if (lowerLabel.includes("card") || lowerLabel.includes("credit") || lowerLabel.includes("debit") || lowerLabel.includes("bank")) {
+    return { icon: <CreditCard size={24} />, color: "bg-blue-600" };
+  }
+  if (lowerLabel.includes("phone") || lowerLabel.includes("mpesa")) {
+    return { icon: <Smartphone size={24} />, color: "bg-purple-600" };
+  }
+  if (lowerLabel.includes("gift")) {
+    return { icon: <Gift size={24} />, color: "bg-orange-600" };
+  }
+  if (lowerLabel.includes("cheque") || lowerLabel.includes("check")) {
+    return { icon: <Check size={24} />, color: "bg-yellow-600" };
   }
 
-  const ColorMap: Record<string, string> = {
-    Cash: 'bg-green-600',
-    Card: 'bg-blue-600',
-    Mobile: 'bg-purple-600',
-    Gift: 'bg-orange-600'
-  }
+  return { icon: <CreditCard size={24} />, color: "bg-gray-600" };
+};
 
-  return {
-    icon: IconMap[type] || <CreditCard size={24} />,
-    color: ColorMap[type] || 'bg-gray-600'
-  }
-}
-
-
-// const paymentMethods: PaymentMethod[] = modes.map((mode) => {
-//   const { icon, color } = getIconAndColor(mode.type || "Default")
-//   return {
-//     id: mode.mode_of_payment,
-//     name: mode.mode_of_payment,
-//     icon,
-//     color,
-//     enabled: true
-//   }
-// })
-const taxCategories: TaxCategory[] = [
-    { id: 'exempt', name: 'Exempt', rate: 0 },
-    { id: 'standard', name: 'Standard Rate', rate: 15 },
-    { id: 'reduced', name: 'Reduced Rate', rate: 5 },
-    { id: 'zero', name: 'Zero Rate', rate: 0 },
-]
+// const taxCategories: TaxCategory[] = [
+//     { id: 'exempt', name: 'Exempt', rate: 0 },
+//     { id: 'standard', name: 'Standard Rate', rate: 15 },
+//     { id: 'reduced', name: 'Reduced Rate', rate: 5 },
+//     { id: 'zero', name: 'Zero Rate', rate: 0 },
+// ]
 
 export default function PaymentDialog({
   isOpen,
@@ -81,11 +72,12 @@ export default function PaymentDialog({
   isFullPage = false
 }: PaymentDialogProps) {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('cash')
-  const [selectedTaxCategory, setSelectedTaxCategory] = useState('zero')
+  const [selectedSalesTaxCharges, setSelectedSalesTaxCharges] = useState('zero')
   const [amountPaid, setAmountPaid] = useState('')
   const [roundOffAmount, setRoundOffAmount] = useState(0)
   const [showPreview, setShowPreview] = useState(false)
   const { modes, isLoading, error } = usePaymentModes("Test POS Profile");
+  const { salesTaxCharges, isLoading: isTaxLoading, error: taxError } = useSalesTaxCharges();
 
   if (!isOpen) return null
 
@@ -93,7 +85,8 @@ export default function PaymentDialog({
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const couponDiscount = appliedCoupons.reduce((sum, coupon) => sum + coupon.value, 0)
   const taxableAmount = Math.max(0, subtotal - couponDiscount)
-  const selectedTax = taxCategories.find(tax => tax.id === selectedTaxCategory)
+  const selectedTax = salesTaxCharges.find(tax => tax.id === selectedSalesTaxCharges)
+
   const taxAmount = taxableAmount * (selectedTax?.rate || 0) / 100
   const totalBeforeRoundOff = taxableAmount + taxAmount
   const grandTotal = totalBeforeRoundOff + roundOffAmount
@@ -127,7 +120,7 @@ export default function PaymentDialog({
       customer: selectedCustomer,
       paymentMethod: selectedPaymentMethod,
       subtotal,
-      taxCategory: selectedTaxCategory,
+      SalesTaxCharges: selectedSalesTaxCharges,
       taxAmount,
       couponDiscount,
       roundOffAmount,
@@ -144,7 +137,7 @@ export default function PaymentDialog({
       items: cartItems,
       customer: selectedCustomer,
       subtotal,
-      taxCategory: selectedTaxCategory,
+      SalesTaxCharges: selectedSalesTaxCharges,
       taxAmount,
       couponDiscount,
       roundOffAmount,
@@ -218,11 +211,11 @@ export default function PaymentDialog({
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Tax Category</h2>
               <select
-                value={selectedTaxCategory}
-                onChange={(e) => setSelectedTaxCategory(e.target.value)}
+                value={selectedSalesTaxCharges}
+                onChange={(e) => setSelectedSalesTaxCharges(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               >
-                {taxCategories.map((tax) => (
+                {salesTaxCharges.map((tax) => (
                   <option key={tax.id} value={tax.id}>
                     {tax.name} ({tax.rate}%)
                   </option>
@@ -370,11 +363,11 @@ export default function PaymentDialog({
                     Tax Category
                   </label>
                   <select
-                    value={selectedTaxCategory}
-                    onChange={(e) => setSelectedTaxCategory(e.target.value)}
+                    value={selectedSalesTaxCharges}
+                    onChange={(e) => setSelectedSalesTaxCharges(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                   >
-                    {taxCategories.map((tax) => (
+                    {salesTaxCharges.map((tax) => (
                       <option key={tax.id} value={tax.id}>
                         {tax.name} ({tax.rate}%)
                       </option>
