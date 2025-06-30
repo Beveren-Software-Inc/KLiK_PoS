@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { X, CreditCard, Banknote, Smartphone, Gift, Printer, Eye, Calculator, Check } from "lucide-react"
 import type { CartItem, GiftCoupon, Customer } from "../../types"
 import { usePaymentModes } from "../hooks/usePaymentModes"
@@ -72,10 +72,17 @@ export default function PaymentDialog({
   const [roundOffAmount, setRoundOffAmount] = useState(0)
   const [showPreview, setShowPreview] = useState(false)
   const { modes, isLoading, error } = usePaymentModes("Test POS Profile");
-  const { salesTaxCharges } = useSalesTaxCharges();
+  const { salesTaxCharges, defaultTax } = useSalesTaxCharges();
+
+  useEffect(() => {
+  if (isOpen && defaultTax && !selectedSalesTaxCharges) {
+    setSelectedSalesTaxCharges(defaultTax);
+  }
+}, [isOpen, defaultTax, selectedSalesTaxCharges]);
+
 
   if (!isOpen) return null
-
+  
   // Calculate totals
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const couponDiscount = appliedCoupons.reduce((sum, coupon) => sum + coupon.value, 0)
@@ -596,3 +603,4 @@ export default function PaymentDialog({
     </div>
   )
 }
+

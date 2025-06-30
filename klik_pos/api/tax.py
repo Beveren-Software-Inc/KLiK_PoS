@@ -14,7 +14,6 @@ def get_sales_tax_categories():
         )
 
         result = []
-
         for cat in tax_categories:
             tax_rate = frappe.db.get_value("Sales Taxes and Charges", {"parent": cat.name}, "rate") or 0.0
             result.append({
@@ -23,10 +22,22 @@ def get_sales_tax_categories():
                 "rate": float(tax_rate)
             })
 
-        return {"success": True, "data": result}
+        default_template = None
+        try:
+            pos_doc = get_current_pos_profile()
+            default_template = pos_doc.taxes_and_charges
+        except Exception:
+            pass
+
+        return {
+            "success": True,
+            "data": result,
+            "default": default_template
+        }
     except Exception as e:
         frappe.log_error("Tax Fetch Failed", str(e))
         return {"success": False, "error": str(e)}
+
 
 
 def get_default_sales_tax_charges():
