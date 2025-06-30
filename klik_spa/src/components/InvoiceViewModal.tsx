@@ -166,8 +166,8 @@ export default function InvoiceViewModal({
 
                 {/* Actions */}
                 <div className="space-y-3">
-                  {displayInvoice.status === "Completed" && (
-                    <ActionButton onClick={() => onRefund(displayInvoice.id)} icon={<RefreshCw />} color="orange" text="Process Return" />
+                  {displayInvoice.status === "Paid" && (
+                    <ActionButton onClick={() => onRefund(displayInvoice.name)} icon={<RefreshCw />} color="orange" text="Process Return" />
                   )}
                   {displayInvoice.status === "Pending" && (
                     <ActionButton onClick={() => onCancel(displayInvoice.id)} icon={<XCircle />} color="red" text="Cancel Order" />

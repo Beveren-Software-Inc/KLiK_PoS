@@ -4,6 +4,7 @@ export const useCustomerActions = () => {
   const { createDoc } = useFrappeCreateDoc();
   const { updateDoc } = useFrappeUpdateDoc();
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const createCustomer = async (customerData: CustomerData) => {
     try {
       const customer = await createDoc('Customer', {

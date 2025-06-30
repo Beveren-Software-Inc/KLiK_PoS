@@ -18,10 +18,12 @@ import {
   List,
   Eye,
 } from "lucide-react";
-import { mockSalesInvoices } from "../data/mockSalesData";
+// import { mockSalesInvoices } from "../data/mockSalesData";
 import InvoiceViewModal from "../components/InvoiceViewModal";
 import type { SalesInvoice } from "../../types";
 import { useSalesInvoices } from "../hooks/useSalesInvoices"
+import { toast } from "react-toastify";
+import { createSalesReturn } from "../services/salesInvoice";
 
 export default function ReportsPage() {
   const navigate = useNavigate();
@@ -102,7 +104,6 @@ export default function ReportsPage() {
     });
   }, [invoices, searchQuery, statusFilter, dateFilter, paymentFilter, cashierFilter, isLoading, error]);
 
-    console.log('Fetched invoices:', filteredInvoices);  // <-- Add this line
 
   // Helper functions for date filtering
   const getYesterdayDate = () => {
@@ -159,8 +160,20 @@ export default function ReportsPage() {
 
   const handleRefund = (invoiceId: string) => {
     console.log("Processing refund for:", invoiceId);
+    handleReturnClick(invoiceId)
     setShowInvoiceModal(false);
   };
+
+
+  const handleReturnClick = async (invoiceName: string) => {
+    try {
+      const result = await createSalesReturn(invoiceName);
+      toast.success(`Invoice returned: ${result.return_invoice}`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      toast.error(error.message || "Failed to return invoice");
+    }
+};
 
   const handleCancel = (invoiceId: string) => {
     console.log("Cancelling invoice:", invoiceId);
@@ -361,7 +374,7 @@ export default function ReportsPage() {
                         <Eye className="w-4 h-4" />
                         <span>View</span>
                       </button>
-                      {invoice.status === "Completed" && (
+                      {invoice.status === "Paid" && (
                         <button className="text-orange-600 hover:text-orange-900">Return</button>
                       )}
                       {invoice.status === "Pending" && (
