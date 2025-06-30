@@ -9,6 +9,7 @@ export interface TaxCategory {
 
 export function useSalesTaxCharges() {
   const [salesTaxCharges, setTaxCategories] = useState<TaxCategory[]>([])
+  const [defaultTax, setDefaultTax] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -22,9 +23,10 @@ export function useSalesTaxCharges() {
         if (!data.message?.success) {
           throw new Error(data.message?.error || "Failed to fetch tax categories")
         }
-        setTaxCategories(data.message.data || [])
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setTaxCategories(data.message.data || [])
+        setDefaultTax(data.message.default || null)
+
       } catch (err: any) {
         setError(err.message)
       } finally {
@@ -35,5 +37,5 @@ export function useSalesTaxCharges() {
     fetchTaxes()
   }, [])
 
-  return { salesTaxCharges, isLoading, error }
+  return { salesTaxCharges, defaultTax, isLoading, error }
 }
