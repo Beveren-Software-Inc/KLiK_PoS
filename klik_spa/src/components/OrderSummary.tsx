@@ -8,6 +8,9 @@ import PaymentDialog from "./PaymentDialog"
 import { mockCustomers, type Customer } from "../data/mockCustomers"
 import AddCustomerModal from "./AddCustomerModal"
 import { createDraftSalesInvoice } from "../services/slaesInvoice"
+import { useCustomers } from "../hooks/useCustomers"
+import { toast } from "react-toastify"
+
 
 interface OrderSummaryProps {
   cartItems: CartItem[]
@@ -37,7 +40,7 @@ export default function OrderSummary({
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false)
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const couponButtonRef = useRef<HTMLButtonElement>(null)
-
+  const { customers, isLoading, error } = useCustomers()
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
   // Calculate coupon discount
@@ -47,7 +50,7 @@ export default function OrderSummary({
   const total = Math.max(0, subtotal - couponDiscount)
 
   // Filtered customers based on search query
-  const filteredCustomers = mockCustomers.filter((customer) =>
+  const filteredCustomers = customers.filter((customer) =>
     customer.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
     customer.email.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
     customer.phone.includes(customerSearchQuery) ||
@@ -72,14 +75,21 @@ export default function OrderSummary({
     console.log('Processing payment:', paymentData)
     setShowPaymentDialog(false)
     // Clear cart or navigate to success page
-    alert('Payment completed successfully!')
+    handleClearCart()
+    toast.success('Invoice submitted & Payment completed successfully!')
   }
 
   const handleHoldOrder = (orderData: any) => {
+    if (!selectedCustomer){
+      toast.error("Kindly select a customer")
+      return;
+    }
     // Creates a draft invoice and saves the order
     console.log('Creating draft invoice:', orderData)
     setShowPaymentDialog(false)
-    alert('Draft invoice created and order held successfully!')
+    createDraftSalesInvoice(orderData)
+    handleClearCart()
+    toast.success('Draft invoice created and order held successfully!')
     
     // In a real app, this would:
     // 1. Create a draft invoice
@@ -421,31 +431,14 @@ export default function OrderSummary({
           <div className={`grid grid-cols-2 gap-3 ${isMobile ? "mb-3" : ""}`}>
             <button
 
-                 onClick={async () => {
-                  try {
-                    const draftInvoice = await createDraftSalesInvoice({
-                      customer: selectedCustomer,
-                      items: cartItems,
-                    });
-
-                    console.log("Draft invoice created:", draftInvoice.invoice_name);
-
-                    // Optional: store invoice in context or pass to payment dialog
-                    handleClearCart()
-                  } catch (error) {
-                    console.error("Failed to create draft invoice:", error);
-                    alert("Failed to create invoice. Try again.");
-                  }
-                }}
-
-              // onClick={() => handleHoldOrder({
-              //   items: cartItems,
-              //   customer: selectedCustomer,
-              //   subtotal,
-              //   total,
-              //   appliedCoupons,
-              //   status: 'held'
-              // })}
+              onClick={() => handleHoldOrder({
+                items: cartItems,
+                customer: selectedCustomer,
+                subtotal,
+                total,
+                appliedCoupons,
+                status: 'held'
+              })}
               className="px-4 py-3 border border-beveren-600 text-beveren-600 dark:text-beveren-400 rounded-xl font-medium hover:bg-beveren-50 dark:hover:bg-beveren-900/20 transition-colors"
             >
               Hold

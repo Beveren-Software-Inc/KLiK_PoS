@@ -1,5 +1,7 @@
 import frappe
 from frappe import _
+import json
+from klik_pos.klik_pos.utils import get_current_pos_profile
 
 @frappe.whitelist(allow_guest=True)
 def get_sales_invoices(limit=100, start=0):
@@ -62,77 +64,30 @@ def get_invoice_details(invoice_id):
 
 
 @frappe.whitelist()
-def create_sales_invoice(data):
-    """
-    Create Sales Invoice from React POS
-    :param data: dict with keys like customer, items, etc.
-    """
-    import json
-    if isinstance(data, str):
-        data = json.loads(data)
-
+def create_and_submit_invoice(data):
     try:
-        invoice = frappe.new_doc("Sales Invoice")
-        invoice.customer = data.get("customer")
-        invoice.due_date = data.get("due_date") or frappe.utils.nowdate()
-
-        for item in data.get("items", []):
-            invoice.append("items", {
-                "item_code": item.get("item_code"),
-                "qty": item.get("qty"),
-                "rate": item.get("rate"),
-            })
-
-        invoice.insert(ignore_permissions=True)
-        invoice.submit()
+        customer, items = parse_invoice_data(data)
+        doc = build_sales_invoice_doc(customer, items, include_payments=True)
+        doc.submit()
 
         return {
             "success": True,
-            "message": "Invoice created successfully",
-            "invoice_name": invoice.name
+            "invoice_name": doc.name,
+            "invoice": doc
         }
 
     except Exception as e:
-        frappe.log_error(frappe.get_traceback(), "POS Invoice Creation Error")
+        frappe.log_error(frappe.get_traceback(), "Submit Invoice Error")
         return {
             "success": False,
             "message": str(e)
         }
-
-
-import json
-
+        
 @frappe.whitelist()
 def create_draft_invoice(data):
-    if isinstance(data, str):
-        data = json.loads(data)
-
-    print("Received data:", data)
-    customer = "Saudi Arabian Oil CO. ( Aramco)"
-    items = data.get("items", [])
-
-    if not customer or not items:
-        frappe.throw(_("Customer and items are required"))
-
     try:
-        doc = frappe.new_doc("Sales Invoice")
-        doc.customer = "Saudi Arabian Oil CO. ( Aramco)"  # Adjust field if needed
-        doc.due_date = frappe.utils.nowdate()
-        doc.custom_delivery_date = frappe.utils.nowdate()
-        doc.is_pos = 1
-        doc.status = "Draft"
-        doc.currency=get_customer_billing_currency(doc.customer)
-        doc.sales_and_taxes_charges="KSA VAT 15%"
-
-        for item in items:
-            doc.append("items", {
-                "item_code": item.get("id"),
-                "qty": item.get("quantity"),
-                "rate": item.get("price"),
-                "income_account":get_income_accounts(item.get("id")),
-                "expense_account":get_expense_accounts(item.get("id"))
-            })
-
+        customer, items = parse_invoice_data(data)
+        doc = build_sales_invoice_doc(customer, items, include_payments=False)
         doc.insert(ignore_permissions=True)
 
         return {
@@ -147,6 +102,47 @@ def create_draft_invoice(data):
             "success": False,
             "message": str(e)
         }
+
+def parse_invoice_data(data):
+    """Sanitize and extract customer and items from request payload."""
+    if isinstance(data, str):
+        data = json.loads(data)
+
+    customer = data.get("customer", {}).get("id")
+    items = data.get("items", [])
+
+    if not customer or not items:
+        frappe.throw(_("Customer and items are required"))
+
+    return customer, items
+
+def build_sales_invoice_doc(customer, items, include_payments=False):
+    doc = frappe.new_doc("Sales Invoice")
+    doc.customer = customer
+    doc.due_date = frappe.utils.nowdate()
+    doc.custom_delivery_date = frappe.utils.nowdate()
+    doc.is_pos = 1
+    doc.currency = get_customer_billing_currency(customer)
+
+    pos_profile = get_current_pos_profile()
+    if pos_profile:
+        doc.sales_and_taxes_charges = pos_profile.taxes_and_charges
+
+    for item in items:
+        doc.append("items", {
+            "item_code": item.get("id"),
+            "qty": item.get("quantity"),
+            "rate": item.get("price"),
+            "income_account": get_income_accounts(item.get("id")),
+            "expense_account": get_expense_accounts(item.get("id"))
+        })
+
+    if include_payments:
+        doc.append("payments", {
+            "mode_of_payment": "Petty Cash Saad"
+        })
+
+    return doc
 
 def get_customer_billing_currency(customer):
     customer_doc = frappe.get_doc("Customer", customer)
@@ -193,3 +189,4 @@ def get_expense_accounts(item_code):
 def get_user_default_company():
     user = frappe.session.user
     return frappe.defaults.get_user_default(user, "Company")
+
