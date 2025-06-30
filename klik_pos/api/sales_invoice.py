@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 import json
-from klik_pos.klik_pos.utils import get_current_pos_profile
+from klik_pos.klik_pos.utils import get_current_pos_profile, get_user_default_company
 
 @frappe.whitelist(allow_guest=True)
 def get_sales_invoices(limit=100, start=0):
@@ -66,8 +66,12 @@ def get_invoice_details(invoice_id):
 @frappe.whitelist()
 def create_and_submit_invoice(data):
     try:
-        customer, items = parse_invoice_data(data)
-        doc = build_sales_invoice_doc(customer, items, include_payments=True)
+        customer, items, amount_paid, sales_and_tax_charges, mode_of_payment = parse_invoice_data(data)
+        doc = build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,mode_of_payment, include_payments=True)
+        doc.base_paid_amount=amount_paid
+        doc.paid_amount=amount_paid
+        doc.outstanding_amount = 0
+        doc.save()
         doc.submit()
 
         return {
@@ -86,8 +90,8 @@ def create_and_submit_invoice(data):
 @frappe.whitelist()
 def create_draft_invoice(data):
     try:
-        customer, items = parse_invoice_data(data)
-        doc = build_sales_invoice_doc(customer, items, include_payments=False)
+        customer, items, amount_paid, sales_and_tax_charges, mode_of_payment = parse_invoice_data(data)
+        doc = build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges, mode_of_payment, include_payments=False)
         doc.insert(ignore_permissions=True)
 
         return {
@@ -108,15 +112,28 @@ def parse_invoice_data(data):
     if isinstance(data, str):
         data = json.loads(data)
 
+    print("My data", str(data))
     customer = data.get("customer", {}).get("id")
     items = data.get("items", [])
-
+    
+    amount_paid = 0.0
+    sales_and_tax_charges = get_current_pos_profile().taxes_and_charges
+    mode_of_payment = None
+    if data.get("amountPaid"):
+        amount_paid=data.get("amountPaid")
+        
+    if data.get("paymentMethod"):
+        mode_of_payment=data.get("paymentMethod")
+        
+    if data.get("SalesTaxCharges"):
+        sales_and_tax_charges=data.get("SalesTaxCharges")
+    
     if not customer or not items:
         frappe.throw(_("Customer and items are required"))
 
-    return customer, items
+    return customer, items, amount_paid, sales_and_tax_charges, mode_of_payment
 
-def build_sales_invoice_doc(customer, items, include_payments=False):
+def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,mode_of_payment, include_payments=False):
     doc = frappe.new_doc("Sales Invoice")
     doc.customer = customer
     doc.due_date = frappe.utils.nowdate()
@@ -126,7 +143,7 @@ def build_sales_invoice_doc(customer, items, include_payments=False):
 
     pos_profile = get_current_pos_profile()
     if pos_profile:
-        doc.sales_and_taxes_charges = pos_profile.taxes_and_charges
+        doc.sales_and_taxes_charges = sales_and_tax_charges
 
     for item in items:
         doc.append("items", {
@@ -139,7 +156,8 @@ def build_sales_invoice_doc(customer, items, include_payments=False):
 
     if include_payments:
         doc.append("payments", {
-            "mode_of_payment": "Petty Cash Saad"
+            "mode_of_payment": mode_of_payment,
+            "amount":amount_paid
         })
 
     return doc
@@ -186,7 +204,3 @@ def get_expense_accounts(item_code):
         frappe.log_error(f"Error fetching expense account for {item_code}: {str(e)[:140]}", "Expense Account Fetch Error")
         return None
     
-def get_user_default_company():
-    user = frappe.session.user
-    return frappe.defaults.get_user_default(user, "Company")
-

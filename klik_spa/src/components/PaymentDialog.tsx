@@ -66,8 +66,8 @@ export default function PaymentDialog({
   isMobile = false,
   isFullPage = false
 }: PaymentDialogProps) {
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('cash')
-  const [selectedSalesTaxCharges, setSelectedSalesTaxCharges] = useState('zero')
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('')
+  const [selectedSalesTaxCharges, setSelectedSalesTaxCharges] = useState('')
   const [amountPaid, setAmountPaid] = useState('')
   const [roundOffAmount, setRoundOffAmount] = useState(0)
   const [showPreview, setShowPreview] = useState(false)
@@ -114,7 +114,10 @@ export default function PaymentDialog({
       toast.error("Kindly select a customer")
       return;
     }
-    
+    if (!selectedPaymentMethod) {
+  toast.error("Please select a payment method");
+  return;
+}
     const paymentData = {
       items: cartItems,
       customer: selectedCustomer,
