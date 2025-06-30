@@ -65,8 +65,10 @@ def get_invoice_details(invoice_id):
 
 @frappe.whitelist()
 def create_and_submit_invoice(data):
+    
     try:
         customer, items, amount_paid, sales_and_tax_charges, mode_of_payment = parse_invoice_data(data)
+        print("==========================",str(sales_and_tax_charges))
         doc = build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,mode_of_payment, include_payments=True)
         doc.base_paid_amount=amount_paid
         doc.paid_amount=amount_paid
@@ -140,10 +142,12 @@ def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,
     doc.custom_delivery_date = frappe.utils.nowdate()
     doc.is_pos = 1
     doc.currency = get_customer_billing_currency(customer)
-
+    
     pos_profile = get_current_pos_profile()
-    if pos_profile:
-        doc.sales_and_taxes_charges = sales_and_tax_charges
+    if sales_and_tax_charges:
+        doc.taxes_and_charges = sales_and_tax_charges
+    else:
+        doc.taxes_and_charges = pos_profile.taxes_and_charges
 
     for item in items:
         doc.append("items", {
