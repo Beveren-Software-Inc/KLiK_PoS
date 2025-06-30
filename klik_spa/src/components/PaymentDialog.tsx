@@ -5,6 +5,10 @@ import { X, CreditCard, Banknote, Smartphone, Gift, Printer, Eye, Calculator, Ch
 import type { CartItem, GiftCoupon, Customer } from "../../types"
 import { usePaymentModes } from "../hooks/usePaymentModes"
 import { useSalesTaxCharges } from "../hooks/useSalesTaxCharges"
+import { createDraftSalesInvoice } from "../services/slaesInvoice"
+import { createSalesInvoice } from "../services/slaesInvoice"
+import { toast } from 'react-toastify';
+
 interface PaymentDialogProps {
   isOpen: boolean
   onClose: () => void
@@ -62,8 +66,8 @@ export default function PaymentDialog({
   isMobile = false,
   isFullPage = false
 }: PaymentDialogProps) {
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('cash')
-  const [selectedSalesTaxCharges, setSelectedSalesTaxCharges] = useState('zero')
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('')
+  const [selectedSalesTaxCharges, setSelectedSalesTaxCharges] = useState('')
   const [amountPaid, setAmountPaid] = useState('')
   const [roundOffAmount, setRoundOffAmount] = useState(0)
   const [showPreview, setShowPreview] = useState(false)
@@ -106,6 +110,14 @@ export default function PaymentDialog({
   }
 
   const handleCompletePayment = () => {
+    if (!selectedCustomer){
+      toast.error("Kindly select a customer")
+      return;
+    }
+    if (!selectedPaymentMethod) {
+  toast.error("Please select a payment method");
+  return;
+}
     const paymentData = {
       items: cartItems,
       customer: selectedCustomer,
@@ -120,10 +132,15 @@ export default function PaymentDialog({
       outstandingAmount,
       appliedCoupons
     }
+    createSalesInvoice(paymentData)
     onCompletePayment(paymentData)
   }
 
   const handleHoldOrder = () => {
+    if (!selectedCustomer){
+      toast.error("Kindly select a customer")
+      return;
+    }
     const orderData = {
       items: cartItems,
       customer: selectedCustomer,
@@ -136,6 +153,7 @@ export default function PaymentDialog({
       appliedCoupons,
       status: 'held'
     }
+    createDraftSalesInvoice(orderData)
     onHoldOrder(orderData)
   }
 
@@ -558,6 +576,7 @@ export default function PaymentDialog({
               Cancel
             </button>
             <button
+                
               onClick={handleHoldOrder}
               className="px-6 py-2 border border-orange-500 text-orange-600 dark:text-orange-400 rounded-lg font-medium hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
             >
