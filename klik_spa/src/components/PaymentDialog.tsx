@@ -5,6 +5,7 @@ import { X, CreditCard, Banknote, Smartphone, Gift, Printer, Eye, Calculator, Ch
 import type { CartItem, GiftCoupon, Customer } from "../../types"
 import { usePaymentModes } from "../hooks/usePaymentModes"
 import { useSalesTaxCharges } from "../hooks/useSalesTaxCharges"
+import { createDraftSalesInvoice } from "../services/slaesInvoice"
 interface PaymentDialogProps {
   isOpen: boolean
   onClose: () => void
@@ -558,7 +559,23 @@ export default function PaymentDialog({
               Cancel
             </button>
             <button
-              onClick={handleHoldOrder}
+                onClick={async () => {
+                                try {
+                                  const draftInvoice = await createDraftSalesInvoice({
+                                    customer: selectedCustomer,
+                                    items: cartItems,
+                                  });
+              
+                                  console.log("Draft invoice created:", draftInvoice.invoice_name);
+              
+                                  // Optional: store invoice in context or pass to payment dialog
+                                 
+                                } catch (error) {
+                                  console.error("Failed to create draft invoice:", error);
+                                  alert("Failed to create invoice. Try again.");
+                                }
+                              }}
+              // onClick={handleHoldOrder}
               className="px-6 py-2 border border-orange-500 text-orange-600 dark:text-orange-400 rounded-lg font-medium hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
             >
               Hold Order

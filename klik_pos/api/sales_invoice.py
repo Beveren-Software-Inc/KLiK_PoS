@@ -59,3 +59,137 @@ def get_invoice_details(invoice_id):
             "success": False,
             "error": str(e)
         }
+
+
+@frappe.whitelist()
+def create_sales_invoice(data):
+    """
+    Create Sales Invoice from React POS
+    :param data: dict with keys like customer, items, etc.
+    """
+    import json
+    if isinstance(data, str):
+        data = json.loads(data)
+
+    try:
+        invoice = frappe.new_doc("Sales Invoice")
+        invoice.customer = data.get("customer")
+        invoice.due_date = data.get("due_date") or frappe.utils.nowdate()
+
+        for item in data.get("items", []):
+            invoice.append("items", {
+                "item_code": item.get("item_code"),
+                "qty": item.get("qty"),
+                "rate": item.get("rate"),
+            })
+
+        invoice.insert(ignore_permissions=True)
+        invoice.submit()
+
+        return {
+            "success": True,
+            "message": "Invoice created successfully",
+            "invoice_name": invoice.name
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "POS Invoice Creation Error")
+        return {
+            "success": False,
+            "message": str(e)
+        }
+
+
+import json
+
+@frappe.whitelist()
+def create_draft_invoice(data):
+    if isinstance(data, str):
+        data = json.loads(data)
+
+    print("Received data:", data)
+    customer = "Saudi Arabian Oil CO. ( Aramco)"
+    items = data.get("items", [])
+
+    if not customer or not items:
+        frappe.throw(_("Customer and items are required"))
+
+    try:
+        doc = frappe.new_doc("Sales Invoice")
+        doc.customer = "Saudi Arabian Oil CO. ( Aramco)"  # Adjust field if needed
+        doc.due_date = frappe.utils.nowdate()
+        doc.custom_delivery_date = frappe.utils.nowdate()
+        doc.is_pos = 1
+        doc.status = "Draft"
+        doc.currency=get_customer_billing_currency(doc.customer)
+        doc.sales_and_taxes_charges="KSA VAT 15%"
+
+        for item in items:
+            doc.append("items", {
+                "item_code": item.get("id"),
+                "qty": item.get("quantity"),
+                "rate": item.get("price"),
+                "income_account":get_income_accounts(item.get("id")),
+                "expense_account":get_expense_accounts(item.get("id"))
+            })
+
+        doc.insert(ignore_permissions=True)
+
+        return {
+            "success": True,
+            "invoice_name": doc.name,
+            "invoice": doc
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Draft Invoice Error")
+        return {
+            "success": False,
+            "message": str(e)
+        }
+
+def get_customer_billing_currency(customer):
+    customer_doc = frappe.get_doc("Customer", customer)
+    return customer_doc.default_currency
+
+def get_income_accounts(item_code):
+    company = get_user_default_company()
+    try:
+        item_doc = frappe.get_doc("Item", item_code)
+        item_defaults = item_doc.get("item_defaults")
+
+        if item_defaults:
+            for default in item_defaults:
+                if default.get("company") == company:
+                    this_company = frappe.get_doc("Company", company)
+                    income_account = this_company.default_income_account
+                    return income_account
+
+        return None
+
+    except Exception as e:
+        frappe.log_error(f"Error fetching income account for {item_code} and {company}: {str(e)[:140]}", "Income Account Fetch Error")
+        return None
+
+def get_expense_accounts(item_code):
+    company = get_user_default_company()
+    try:
+        item_doc = frappe.get_doc("Item", item_code)
+        item_defaults = item_doc.item_defaults
+
+        if item_defaults:
+            for default in item_defaults:
+                if default.get("company") == company:
+                    this_company = frappe.get_doc("Company", company)
+                    expense_account = this_company.default_expense_account
+                    return expense_account
+
+        return None
+
+    except Exception as e:
+        frappe.log_error(f"Error fetching expense account for {item_code}: {str(e)[:140]}", "Expense Account Fetch Error")
+        return None
+    
+def get_user_default_company():
+    user = frappe.session.user
+    return frappe.defaults.get_user_default(user, "Company")

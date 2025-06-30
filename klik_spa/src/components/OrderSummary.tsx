@@ -7,6 +7,7 @@ import GiftCouponPopover from "./GiftCouponPopover"
 import PaymentDialog from "./PaymentDialog"
 import { mockCustomers, type Customer } from "../data/mockCustomers"
 import AddCustomerModal from "./AddCustomerModal"
+import { createDraftSalesInvoice } from "../services/slaesInvoice"
 
 interface OrderSummaryProps {
   cartItems: CartItem[]
@@ -419,14 +420,32 @@ export default function OrderSummary({
           {/* Action Buttons */}
           <div className={`grid grid-cols-2 gap-3 ${isMobile ? "mb-3" : ""}`}>
             <button
-              onClick={() => handleHoldOrder({
-                items: cartItems,
-                customer: selectedCustomer,
-                subtotal,
-                total,
-                appliedCoupons,
-                status: 'held'
-              })}
+
+                 onClick={async () => {
+                  try {
+                    const draftInvoice = await createDraftSalesInvoice({
+                      customer: selectedCustomer,
+                      items: cartItems,
+                    });
+
+                    console.log("Draft invoice created:", draftInvoice.invoice_name);
+
+                    // Optional: store invoice in context or pass to payment dialog
+                    handleClearCart()
+                  } catch (error) {
+                    console.error("Failed to create draft invoice:", error);
+                    alert("Failed to create invoice. Try again.");
+                  }
+                }}
+
+              // onClick={() => handleHoldOrder({
+              //   items: cartItems,
+              //   customer: selectedCustomer,
+              //   subtotal,
+              //   total,
+              //   appliedCoupons,
+              //   status: 'held'
+              // })}
               className="px-4 py-3 border border-beveren-600 text-beveren-600 dark:text-beveren-400 rounded-xl font-medium hover:bg-beveren-50 dark:hover:bg-beveren-900/20 transition-colors"
             >
               Hold
