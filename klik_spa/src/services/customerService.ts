@@ -1,40 +1,37 @@
-import { useFrappeCreateDoc, useFrappeUpdateDoc } from "frappe-react-sdk";
+interface CustomerAddress {
+  street: string;
+  city: string;
+  state?: string;
+  zipCode?: string;
+  country: string;
+}
+
+interface CustomerData {
+  name: string;
+  email: string;
+  phone: string;
+  name_arabic?: string;
+  address: CustomerAddress;
+}
 
 export const useCustomerActions = () => {
-  const { createDoc } = useFrappeCreateDoc();
-  const { updateDoc } = useFrappeUpdateDoc();
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const createCustomer = async (customerData: CustomerData) => {
     try {
-      const customer = await createDoc('Customer', {
-        customer_name: customerData.name,
-        customer_type: "Individual",
-        customer_name_in_arabic: "nknkn",
-        email_id: customerData.email,
-        mobile_no: customerData.phone,
-        custom_country: "Kenya"
+      const response = await fetch('/api/method/klik_pos.api.customer.create_or_update_customer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ customer_data: customerData }),
       });
 
-      await createDoc('Address', {
-        address_title: `${customerData.name} - Primary`,
-        address_type: 'Billing',
-        address_line1: customerData.address.street,
-        city: customerData.address.city,
-        state: customerData.address.state,
-        pincode: customerData.address.zipCode,
-        country: customerData.address.country,
-        is_primary_address: 1,
-        is_shipping_address: 1,
-        links: [{
-          link_doctype: 'Customer',
-          link_name: customer.name,
-          link_title: customerData.name
-        }]
-      });
+      const result = await response.json();
 
-      return customer;
+      if (!result.message || !result.message.success) {
+        throw new Error(result.message?.error || "Customer creation failed");
+      }
 
+      return result.message;
     } catch (error) {
       console.error("❌ Error creating customer:", error);
       throw error;
@@ -43,8 +40,24 @@ export const useCustomerActions = () => {
 
   const updateCustomer = async (customerId: string, customerData: Partial<CustomerData>) => {
     try {
-        console.log("What are the data",customerData)
-      return await updateDoc("Customer", customerId, customerData);
+      const response = await fetch('/api/method/klik_pos.api.customer.update_customer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customer_id: customerId,
+          customer_data: customerData
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!result.message || !result.message.success) {
+        throw new Error(result.message?.error || "Customer update failed");
+      }
+
+      return result.message;
     } catch (error) {
       console.error("❌ Error updating customer:", error);
       throw error;

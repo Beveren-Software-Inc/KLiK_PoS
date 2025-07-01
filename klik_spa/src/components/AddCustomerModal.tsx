@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { X, User, Mail, Phone, MapPin, Calendar, CreditCard, Tag, Save, Building, Users } from "lucide-react";
 import { type Customer } from "../data/mockCustomers";
 import { useCustomerActions } from "../services/customerService";
+import { toast } from "react-toastify";
 
 interface AddCustomerModalProps {
   customer?: Customer | null;
@@ -70,51 +71,73 @@ export default function AddCustomerModal({ customer, onClose, onSave, isFullPage
   }, [customer]);
 
   const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
+  const newErrors: Record<string, string> = {};
+  let updatedName = formData.name;
 
+  // Validate name for individuals
+  if (formData.type === 'individual') {
     if (!formData.name.trim()) {
       newErrors.name = "Name is required";
     }
+  }
 
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Please enter a valid email address";
+  // Validate name and other fields for company
+  if (formData.type === 'company') {
+    if (!formData.companyName.trim()) {
+      newErrors.companyName = "Company name is required";
+    } else {
+      updatedName = formData.companyName.trim();
     }
 
-    if (!formData.phone.trim()) {
-      newErrors.phone = "Phone number is required";
+    if (!formData.contactPerson.trim()) {
+      newErrors.contactPerson = "Contact person is required";
     }
+  }
 
-    if (!formData.address.street.trim()) {
-      newErrors.street = "Street address is required";
-    }
+  // Common validations
+  if (!formData.email.trim()) {
+    newErrors.email = "Email is required";
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    newErrors.email = "Please enter a valid email address";
+  }
 
-    if (!formData.address.city.trim()) {
-      newErrors.city = "City is required";
-    }
+  if (!formData.phone.trim()) {
+    newErrors.phone = "Phone number is required";
+  }
 
-    if (formData.type === 'company') {
-      if (!formData.companyName.trim()) {
-        newErrors.companyName = "Company name is required";
-      }
-      if (!formData.contactPerson.trim()) {
-        newErrors.contactPerson = "Contact person is required";
-      }
-    }
+  if (!formData.address.street.trim()) {
+    newErrors.street = "Street address is required";
+  }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  if (!formData.address.city.trim()) {
+    newErrors.city = "City is required";
+  }
+
+  // Update name if needed
+  if (formData.name !== updatedName) {
+    setFormData(prev => ({ ...prev, name: updatedName }));
+  }
+
+  setErrors(newErrors);
+
+  if (Object.keys(newErrors).length > 0) {
+    const firstErrorKey = Object.keys(newErrors)[0];
+    toast.error(newErrors[firstErrorKey]);
+    return false;
+  }
+
+  return true;
+};
+
 
   const handleSubmit = async (e: React.FormEvent) => {
+    
     e.preventDefault();
     setSubmitError(null);
-    
+
     if (!validateForm()) return;
-
     setIsSubmitting(true);
-
+    
     try {
       const customerData = {
         name: formData.name,
@@ -185,9 +208,6 @@ export default function AddCustomerModal({ customer, onClose, onSave, isFullPage
       addTag();
     }
   };
-
-  // The rest of the component (JSX) remains exactly the same as in your original code
-  // Only the form submission logic and hooks at the top have changed
 
   return (
     <div className={isFullPage ? "h-full" : "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"}>
@@ -266,22 +286,42 @@ export default function AddCustomerModal({ customer, onClose, onSave, isFullPage
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Name field - conditional label */}
+              {/* Name / Company Name input */}
               <div>
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   {formData.type === 'company' ? 'Company Name *' : 'Full Name *'}
                 </label>
+
                 <input
                   type="text"
                   id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  value={formData.type === 'company' ? formData.companyName : formData.name}
+                  onChange={(e) =>
+                    setFormData(prev => ({
+                      ...prev,
+                      [formData.type === 'company' ? 'companyName' : 'name']: e.target.value
+                    }))
+                  }
                   className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
-                    errors.name ? 'border-red-500' : 'border-gray-300'
+                    formData.type === 'company'
+                      ? errors.companyName
+                        ? 'border-red-500'
+                        : 'border-gray-300'
+                      : errors.name
+                        ? 'border-red-500'
+                        : 'border-gray-300'
                   }`}
                   placeholder={formData.type === 'company' ? 'Enter company name' : "Enter customer's full name"}
                 />
-                {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+
+                {formData.type === 'company' && errors.companyName && (
+                  <p className="text-red-500 text-xs mt-1">{errors.companyName}</p>
+                )}
+                {formData.type !== 'company' && errors.name && (
+                  <p className="text-red-500 text-xs mt-1">{errors.name}</p>
+                )}
               </div>
+
 
               {/* Contact Person for Company */}
               {formData.type === 'company' && (
