@@ -52,7 +52,7 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
                 "address": address,
                 "default_currency":doc.default_currency,
                 "company_currency": company_currency,
-                "exchange_rate":get_currency_exchange_rate(company_currency, doc.default_currency)
+                # "exchange_rate":get_currency_exchange_rate(company_currency, doc.default_currency)
             })
 
         return {"success": True, "data": result}
@@ -184,10 +184,10 @@ def update_customer(customer_id, customer_data):
 def get_user_company_and_currency():
     user = frappe.session.user
 
-    default_company = frappe.db.get_value("User", user, "default_company")
+    default_company = frappe.defaults.get_user_default("Company")
     if not default_company:
+     
         default_company = frappe.db.get_single_value("Global Defaults", "default_company")
-
     # Get the default currency for the company
     company_currency = frappe.db.get_value("Company", default_company, "default_currency")
 
