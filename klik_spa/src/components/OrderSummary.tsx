@@ -1,11 +1,11 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { Minus, Plus, CreditCard, X, Tag, Search, UserPlus, User, Building } from "lucide-react"
+import { Minus, Plus, X, Tag, Search, UserPlus, User, Building } from "lucide-react"
 import type { CartItem, GiftCoupon } from "../../types"
 import GiftCouponPopover from "./GiftCouponPopover"
 import PaymentDialog from "./PaymentDialog"
-import { mockCustomers, type Customer } from "../data/mockCustomers"
+// import { mockCustomers, type Customer } from "../data/mockCustomers"
 import AddCustomerModal from "./AddCustomerModal"
 import { createDraftSalesInvoice } from "../services/salesInvoice"
 import { useCustomers } from "../hooks/useCustomers"
@@ -57,6 +57,14 @@ export default function OrderSummary({
     customer.tags.some(tag => tag.toLowerCase().includes(customerSearchQuery.toLowerCase()))
   )
 
+ const validateCustomer = () =>{
+  if(!selectedCustomer){
+    toast.error("Kindly choose customer")
+    return false;
+  }
+  return true
+ }
+
   const handleCustomerSelect = (customer: Customer) => {
     setSelectedCustomer(customer)
     setCustomerSearchQuery(customer.name)
@@ -64,12 +72,11 @@ export default function OrderSummary({
   }
 
   const handleSaveCustomer = (newCustomer: Partial<Customer>) => {
-    // In a real app, this would save to the backend
     console.log('Saving new customer:', newCustomer)
     setShowAddCustomerModal(false)
-    // For now, we'll just close the modal
   }
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleCompletePayment = (paymentData: any) => {
     // In a real app, this would process the payment and create invoice
     console.log('Processing payment:', paymentData)
@@ -79,6 +86,7 @@ export default function OrderSummary({
     toast.success('Invoice submitted & Payment completed successfully!')
   }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleHoldOrder = (orderData: any) => {
     if (!selectedCustomer){
       toast.error("Kindly select a customer")
@@ -453,7 +461,10 @@ export default function OrderSummary({
 
           {/* Pay Button */}
           <button
-            onClick={() => setShowPaymentDialog(true)}
+            onClick={() =>{
+              if(!validateCustomer()) return;
+              setShowPaymentDialog(true)
+            }}
             className={`w-full bg-beveren-600 text-white rounded-2xl font-semibold hover:bg-beveren-700 transition-colors ${isMobile ? "py-4 text-lg" : "py-4"}`}
           >
             Pay ${total.toFixed(2)}
