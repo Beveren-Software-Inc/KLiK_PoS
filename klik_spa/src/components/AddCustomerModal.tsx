@@ -209,9 +209,6 @@ export default function AddCustomerModal({ customer, onClose, onSave, isFullPage
     }
   };
 
-  // The rest of the component (JSX) remains exactly the same as in your original code
-  // Only the form submission logic and hooks at the top have changed
-
   return (
     <div className={isFullPage ? "h-full" : "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"}>
       <div className={isFullPage ? "h-full bg-white dark:bg-gray-800 flex flex-col" : "bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"}>

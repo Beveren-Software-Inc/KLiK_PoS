@@ -14,7 +14,7 @@ import {
   List,
   Eye,
 } from "lucide-react";
-// import { mockSalesInvoices } from "../data/mockSalesData";
+
 import InvoiceViewModal from "../components/InvoiceViewModal";
 import type { SalesInvoice } from "../../types";
 import { useSalesInvoices } from "../hooks/useSalesInvoices"
