@@ -318,7 +318,6 @@ def return_sales_invoice(invoice_name):
             return_doc.append("payments", {
                 "mode_of_payment": p.mode_of_payment,
                 "amount": -abs(p.amount),
-                "base_amount": -abs(p.base_amount) if p.base_amount else -abs(p.amount),
                 "account": p.account,
             })
 

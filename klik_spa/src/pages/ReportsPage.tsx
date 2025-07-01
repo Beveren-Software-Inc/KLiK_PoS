@@ -24,6 +24,7 @@ import type { SalesInvoice } from "../../types";
 import { useSalesInvoices } from "../hooks/useSalesInvoices"
 import { toast } from "react-toastify";
 import { createSalesReturn } from "../services/salesInvoice";
+import { useAllPaymentModes } from "../hooks/usePaymentModes";
 
 export default function ReportsPage() {
   const navigate = useNavigate();
@@ -38,6 +39,8 @@ export default function ReportsPage() {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
   const { invoices, isLoading, error } = useSalesInvoices(); 
+  const { modes } = useAllPaymentModes()
+
 
   const tabs = [
     { id: "invoices", name: "All Invoices", icon: FileText },
@@ -89,9 +92,9 @@ export default function ReportsPage() {
         invoice.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (invoice.cashier && invoice.cashier.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      // const matchesStatus = statusFilter === "all" || invoice.status === statusFilter;
-      // const matchesPayment = paymentFilter === "all" || invoice.paymentMethod === paymentFilter;
-      // const matchesCashier = cashierFilter === "all" || invoice.cashier === cashierFilter;
+      const matchesStatus = statusFilter === "all" || invoice.status === statusFilter;
+      const matchesPayment = paymentFilter === "all" || invoice.paymentMethod === paymentFilter;
+      const matchesCashier = cashierFilter === "all" || invoice.cashier === cashierFilter;
 
       // const today = new Date().toISOString().split('T')[0];
       // const matchesDate =
@@ -100,7 +103,7 @@ export default function ReportsPage() {
         // (dateFilter === "yesterday" && invoice.date === getYesterdayDate()) ||
         // (dateFilter === "week" && isDateInLastWeek(invoice.date));
 
-      return matchesSearch;
+      return matchesSearch && matchesPayment && matchesCashier && matchesStatus;;
     });
   }, [invoices, searchQuery, statusFilter, dateFilter, paymentFilter, cashierFilter, isLoading, error]);
 
@@ -220,25 +223,33 @@ export default function ReportsPage() {
         {showAdvanced && (
           <>
             <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            >
-              <option value="all">All Status</option>
-              <option value="Completed">Completed</option>
-              <option value="Pending">Pending</option>
-              <option value="Cancelled">Cancelled</option>
-              <option value="Refunded">Refunded</option>
-            </select>
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              >
+                <option value="all">All Status</option>
+                <option value="Draft">Draft</option>
+                <option value="Unpaid">Unpaid</option>
+                <option value="Partly Paid">Partly Paid</option>
+                <option value="Paid">Paid</option>
+                <option value="Overdue">Overdue</option>
+                <option value="Return">Return</option>
+                <option value="Cancelled">Cancelled</option>
+              </select>
+
             <select
               value={paymentFilter}
               onChange={(e) => setPaymentFilter(e.target.value)}
               className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
               <option value="all">All Payments</option>
-              <option value="Cash">Cash</option>
-              <option value="Debit Card">Debit Card</option>
+              {modes.map((mode) => (
+                <option key={mode.name} value={mode.name}>
+                  {mode.name}
+                </option>
+              ))}
             </select>
+
           </>
         )}
       </div>
@@ -375,7 +386,9 @@ export default function ReportsPage() {
                         <span>View</span>
                       </button>
                       {invoice.status === "Paid" && (
-                        <button className="text-orange-600 hover:text-orange-900">Return</button>
+                        <button 
+                        onClick={() => handleRefund(invoice.id)}
+                        className="text-orange-600 hover:text-orange-900">Return</button>
                       )}
                       {invoice.status === "Pending" && (
                         <button className="text-red-600 hover:text-red-900">Cancel</button>

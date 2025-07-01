@@ -26,3 +26,20 @@ def get_payment_modes():
     except Exception as e:
         frappe.log_error(title="Get Payment Modes Error", message=str(e))
         return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist()
+def get_all_mode_of_payment():
+    try:
+        mode_of_payments = frappe.get_all(
+            "Mode of Payment",
+            filters={"enabled": 1},
+            fields=["name", "type", "enabled"]
+        )
+        return mode_of_payments
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Fetch Mode of Payment Error")
+        return {"success": False, "message": str(e)}
+
+    
+    
