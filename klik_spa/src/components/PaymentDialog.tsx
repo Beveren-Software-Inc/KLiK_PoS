@@ -5,8 +5,8 @@ import { X, CreditCard, Banknote, Smartphone, Gift, Printer, Eye, Calculator, Ch
 import type { CartItem, GiftCoupon, Customer } from "../../types"
 import { usePaymentModes } from "../hooks/usePaymentModes"
 import { useSalesTaxCharges } from "../hooks/useSalesTaxCharges"
-import { createDraftSalesInvoice } from "../services/slaesInvoice"
-import { createSalesInvoice } from "../services/slaesInvoice"
+import { createDraftSalesInvoice } from "../services/salesInvoice"
+import { createSalesInvoice } from "../services/salesInvoice"
 import { toast } from 'react-toastify';
 
 interface PaymentDialogProps {

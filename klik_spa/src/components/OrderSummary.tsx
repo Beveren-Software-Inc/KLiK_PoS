@@ -7,7 +7,7 @@ import GiftCouponPopover from "./GiftCouponPopover"
 import PaymentDialog from "./PaymentDialog"
 import { mockCustomers, type Customer } from "../data/mockCustomers"
 import AddCustomerModal from "./AddCustomerModal"
-import { createDraftSalesInvoice } from "../services/slaesInvoice"
+import { createDraftSalesInvoice } from "../services/salesInvoice"
 import { useCustomers } from "../hooks/useCustomers"
 import { toast } from "react-toastify"
 

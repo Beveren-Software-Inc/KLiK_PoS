@@ -10,18 +10,17 @@ import {
   Search,
   DollarSign,
   TrendingUp,
-  AlertCircle,
-  CheckCircle,
-  XCircle,
-  Clock,
   Grid3X3,
   List,
   Eye,
 } from "lucide-react";
-import { mockSalesInvoices } from "../data/mockSalesData";
+// import { mockSalesInvoices } from "../data/mockSalesData";
 import InvoiceViewModal from "../components/InvoiceViewModal";
 import type { SalesInvoice } from "../../types";
 import { useSalesInvoices } from "../hooks/useSalesInvoices"
+import { toast } from "react-toastify";
+import { createSalesReturn } from "../services/salesInvoice";
+import { useAllPaymentModes } from "../hooks/usePaymentModes";
 
 export default function ReportsPage() {
   const navigate = useNavigate();
@@ -36,6 +35,8 @@ export default function ReportsPage() {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
   const { invoices, isLoading, error } = useSalesInvoices(); 
+  const { modes } = useAllPaymentModes()
+
 
   const tabs = [
     { id: "invoices", name: "All Invoices", icon: FileText },
@@ -44,20 +45,42 @@ export default function ReportsPage() {
     { id: "returns", name: "Returns & Refunds", icon: RefreshCw },
   ];
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "Completed":
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case "Pending":
-        return <Clock className="w-4 h-4 text-yellow-500" />;
-      case "Cancelled":
-        return <XCircle className="w-4 h-4 text-red-500" />;
-      case "Refunded":
-        return <AlertCircle className="w-4 h-4 text-orange-500" />;
-      default:
-        return null;
-    }
-  };
+
+const filterInvoiceByDate = (invoiceDateStr: string) => {
+  if (dateFilter === "all") return true;
+
+  const invoiceDate = new Date(invoiceDateStr);
+  const today = new Date();
+
+  if (dateFilter === "today") {
+    return invoiceDate.toDateString() === today.toDateString();
+  }
+
+  if (dateFilter === "yesterday") {
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    return invoiceDate.toDateString() === yesterday.toDateString();
+  }
+
+  if (dateFilter === "week") {
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay()); // Sunday as start
+    return invoiceDate >= startOfWeek && invoiceDate <= today;
+  }
+
+  if (dateFilter === "month") {
+    return (
+      invoiceDate.getMonth() === today.getMonth() &&
+      invoiceDate.getFullYear() === today.getFullYear()
+    );
+  }
+
+  if (dateFilter === "year") {
+    return invoiceDate.getFullYear() === today.getFullYear();
+  }
+
+  return true;
+};
 
   const getStatusBadge = (status: string) => {
     const baseClasses = "px-2 py-1 rounded-full text-xs font-medium";
@@ -76,46 +99,25 @@ export default function ReportsPage() {
   };
 
   // Update your filteredInvoices to use the hook data
-  const filteredInvoices = useMemo(() => {
-    if (isLoading) return [];
-    if (error) return [];
+ const filteredInvoices = useMemo(() => {
+  if (isLoading) return [];
+  if (error) return [];
 
-    return invoices.filter((invoice) => {
-      const matchesSearch =
-        searchQuery === "" ||
-        invoice.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        invoice.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (invoice.cashier && invoice.cashier.toLowerCase().includes(searchQuery.toLowerCase()));
+  return invoices.filter((invoice) => {
+    const matchesSearch =
+      searchQuery === "" ||
+      invoice.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      invoice.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (invoice.cashier && invoice.cashier.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      // const matchesStatus = statusFilter === "all" || invoice.status === statusFilter;
-      // const matchesPayment = paymentFilter === "all" || invoice.paymentMethod === paymentFilter;
-      // const matchesCashier = cashierFilter === "all" || invoice.cashier === cashierFilter;
+    const matchesStatus = statusFilter === "all" || invoice.status === statusFilter;
+    const matchesPayment = paymentFilter === "all" || invoice.paymentMethod === paymentFilter;
+    const matchesCashier = cashierFilter === "all" || invoice.cashier === cashierFilter;
+    const matchesDate = filterInvoiceByDate(invoice.date);
 
-      // const today = new Date().toISOString().split('T')[0];
-      // const matchesDate =
-      //   dateFilter === "all"
-        // (dateFilter === "today" && invoice.date === today) ||
-        // (dateFilter === "yesterday" && invoice.date === getYesterdayDate()) ||
-        // (dateFilter === "week" && isDateInLastWeek(invoice.date));
-
-      return matchesSearch;
-    });
-  }, [invoices, searchQuery, statusFilter, dateFilter, paymentFilter, cashierFilter, isLoading, error]);
-
-    console.log('Fetched invoices:', filteredInvoices);  // <-- Add this line
-
-  // Helper functions for date filtering
-  const getYesterdayDate = () => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    return yesterday.toISOString().split('T')[0];
-  };
-
-  const isDateInLastWeek = (dateString: string) => {
-    const date = new Date(dateString);
-    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    return date >= oneWeekAgo;
-  };
+    return matchesSearch && matchesPayment && matchesCashier && matchesStatus && matchesDate;
+  });
+}, [invoices, searchQuery, statusFilter, dateFilter, paymentFilter, cashierFilter, isLoading, error]);
 
   // Update uniqueCashiers to use real data
   const uniqueCashiers = useMemo(() => {
@@ -159,8 +161,20 @@ export default function ReportsPage() {
 
   const handleRefund = (invoiceId: string) => {
     console.log("Processing refund for:", invoiceId);
+    handleReturnClick(invoiceId)
     setShowInvoiceModal(false);
   };
+
+
+  const handleReturnClick = async (invoiceName: string) => {
+    try {
+      const result = await createSalesReturn(invoiceName);
+      toast.success(`Invoice returned: ${result.return_invoice}`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      toast.error(error.message || "Failed to return invoice");
+    }
+};
 
   const handleCancel = (invoiceId: string) => {
     console.log("Cancelling invoice:", invoiceId);
@@ -189,6 +203,8 @@ export default function ReportsPage() {
           <option value="today">Today</option>
           <option value="yesterday">Yesterday</option>
           <option value="week">This Week</option>
+          <option value="month">This Month</option>
+          <option value="year">This Year</option>
         </select>
         {showCashierFilter && (
           <select
@@ -207,25 +223,33 @@ export default function ReportsPage() {
         {showAdvanced && (
           <>
             <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            >
-              <option value="all">All Status</option>
-              <option value="Completed">Completed</option>
-              <option value="Pending">Pending</option>
-              <option value="Cancelled">Cancelled</option>
-              <option value="Refunded">Refunded</option>
-            </select>
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              >
+                <option value="all">All Status</option>
+                <option value="Draft">Draft</option>
+                <option value="Unpaid">Unpaid</option>
+                <option value="Partly Paid">Partly Paid</option>
+                <option value="Paid">Paid</option>
+                <option value="Overdue">Overdue</option>
+                <option value="Return">Return</option>
+                <option value="Cancelled">Cancelled</option>
+              </select>
+
             <select
               value={paymentFilter}
               onChange={(e) => setPaymentFilter(e.target.value)}
               className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
               <option value="all">All Payments</option>
-              <option value="Cash">Cash</option>
-              <option value="Debit Card">Debit Card</option>
+              {modes.map((mode) => (
+                <option key={mode.name} value={mode.name}>
+                  {mode.name}
+                </option>
+              ))}
             </select>
+
           </>
         )}
       </div>
@@ -361,8 +385,10 @@ export default function ReportsPage() {
                         <Eye className="w-4 h-4" />
                         <span>View</span>
                       </button>
-                      {invoice.status === "Completed" && (
-                        <button className="text-orange-600 hover:text-orange-900">Return</button>
+                      {invoice.status === "Paid" && (
+                        <button 
+                        onClick={() => handleRefund(invoice.id)}
+                        className="text-orange-600 hover:text-orange-900">Return</button>
                       )}
                       {invoice.status === "Pending" && (
                         <button className="text-red-600 hover:text-red-900">Cancel</button>

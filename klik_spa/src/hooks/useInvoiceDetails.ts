@@ -14,7 +14,6 @@ export function useInvoiceDetails(invoiceId: string | null) {
       try {
         const response = await fetch(`/api/method/klik_pos.api.sales_invoice.get_invoice_details?invoice_id=${invoiceId}`);
         const resData = await response.json();
-        console.log("here", resData.message.data)
         if (!resData.message.success) {
           throw new Error(resData.error || "Failed to fetch invoice");
         }
