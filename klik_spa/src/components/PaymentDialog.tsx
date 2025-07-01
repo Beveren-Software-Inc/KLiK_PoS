@@ -80,6 +80,15 @@ export default function PaymentDialog({
   }
 }, [isOpen, defaultTax, selectedSalesTaxCharges]);
 
+useEffect(() => {
+  if (isOpen && modes.length > 0) {
+    const defaultMode = modes.find(mode => mode.default === 1);
+    if (defaultMode) {
+      setSelectedPaymentMethod(defaultMode.mode_of_payment);
+    }
+  }
+}, [isOpen, modes]);
+
 
   if (!isOpen) return null
   
