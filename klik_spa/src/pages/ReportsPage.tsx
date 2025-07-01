@@ -10,10 +10,6 @@ import {
   Search,
   DollarSign,
   TrendingUp,
-  AlertCircle,
-  CheckCircle,
-  XCircle,
-  Clock,
   Grid3X3,
   List,
   Eye,
@@ -49,20 +45,42 @@ export default function ReportsPage() {
     { id: "returns", name: "Returns & Refunds", icon: RefreshCw },
   ];
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "Completed":
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case "Pending":
-        return <Clock className="w-4 h-4 text-yellow-500" />;
-      case "Cancelled":
-        return <XCircle className="w-4 h-4 text-red-500" />;
-      case "Refunded":
-        return <AlertCircle className="w-4 h-4 text-orange-500" />;
-      default:
-        return null;
-    }
-  };
+
+const filterInvoiceByDate = (invoiceDateStr: string) => {
+  if (dateFilter === "all") return true;
+
+  const invoiceDate = new Date(invoiceDateStr);
+  const today = new Date();
+
+  if (dateFilter === "today") {
+    return invoiceDate.toDateString() === today.toDateString();
+  }
+
+  if (dateFilter === "yesterday") {
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    return invoiceDate.toDateString() === yesterday.toDateString();
+  }
+
+  if (dateFilter === "week") {
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay()); // Sunday as start
+    return invoiceDate >= startOfWeek && invoiceDate <= today;
+  }
+
+  if (dateFilter === "month") {
+    return (
+      invoiceDate.getMonth() === today.getMonth() &&
+      invoiceDate.getFullYear() === today.getFullYear()
+    );
+  }
+
+  if (dateFilter === "year") {
+    return invoiceDate.getFullYear() === today.getFullYear();
+  }
+
+  return true;
+};
 
   const getStatusBadge = (status: string) => {
     const baseClasses = "px-2 py-1 rounded-full text-xs font-medium";
@@ -81,45 +99,25 @@ export default function ReportsPage() {
   };
 
   // Update your filteredInvoices to use the hook data
-  const filteredInvoices = useMemo(() => {
-    if (isLoading) return [];
-    if (error) return [];
+ const filteredInvoices = useMemo(() => {
+  if (isLoading) return [];
+  if (error) return [];
 
-    return invoices.filter((invoice) => {
-      const matchesSearch =
-        searchQuery === "" ||
-        invoice.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        invoice.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (invoice.cashier && invoice.cashier.toLowerCase().includes(searchQuery.toLowerCase()));
+  return invoices.filter((invoice) => {
+    const matchesSearch =
+      searchQuery === "" ||
+      invoice.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      invoice.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (invoice.cashier && invoice.cashier.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      const matchesStatus = statusFilter === "all" || invoice.status === statusFilter;
-      const matchesPayment = paymentFilter === "all" || invoice.paymentMethod === paymentFilter;
-      const matchesCashier = cashierFilter === "all" || invoice.cashier === cashierFilter;
+    const matchesStatus = statusFilter === "all" || invoice.status === statusFilter;
+    const matchesPayment = paymentFilter === "all" || invoice.paymentMethod === paymentFilter;
+    const matchesCashier = cashierFilter === "all" || invoice.cashier === cashierFilter;
+    const matchesDate = filterInvoiceByDate(invoice.date);
 
-      // const today = new Date().toISOString().split('T')[0];
-      // const matchesDate =
-      //   dateFilter === "all"
-        // (dateFilter === "today" && invoice.date === today) ||
-        // (dateFilter === "yesterday" && invoice.date === getYesterdayDate()) ||
-        // (dateFilter === "week" && isDateInLastWeek(invoice.date));
-
-      return matchesSearch && matchesPayment && matchesCashier && matchesStatus;;
-    });
-  }, [invoices, searchQuery, statusFilter, dateFilter, paymentFilter, cashierFilter, isLoading, error]);
-
-
-  // Helper functions for date filtering
-  const getYesterdayDate = () => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    return yesterday.toISOString().split('T')[0];
-  };
-
-  const isDateInLastWeek = (dateString: string) => {
-    const date = new Date(dateString);
-    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    return date >= oneWeekAgo;
-  };
+    return matchesSearch && matchesPayment && matchesCashier && matchesStatus && matchesDate;
+  });
+}, [invoices, searchQuery, statusFilter, dateFilter, paymentFilter, cashierFilter, isLoading, error]);
 
   // Update uniqueCashiers to use real data
   const uniqueCashiers = useMemo(() => {
@@ -205,6 +203,8 @@ export default function ReportsPage() {
           <option value="today">Today</option>
           <option value="yesterday">Yesterday</option>
           <option value="week">This Week</option>
+          <option value="month">This Month</option>
+          <option value="year">This Year</option>
         </select>
         {showCashierFilter && (
           <select
