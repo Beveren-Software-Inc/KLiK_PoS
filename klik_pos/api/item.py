@@ -73,3 +73,30 @@ def get_items_with_balance_and_price(price_list: str = "Standard Selling"):
         frappe.log_error(frappe.get_traceback(), "Get Combined Item Data Error")
         frappe.throw(_("Something went wrong while fetching item data."))
 
+@frappe.whitelist(allow_guest=True)
+def get_item_groups_for_pos():
+    try:
+        item_groups = frappe.get_all(
+            "Item Group",
+            filters={"is_group": 0},  
+            fields=["name", "item_group_name", "parent_item_group"],
+            limit=100,
+            order_by="modified desc"
+        )
+
+        # Prepare a clean response
+        formatted_groups = []
+        for group in item_groups:
+            formatted_groups.append({
+                "id": group["name"],
+                "name": group.get("item_group_name") or group["name"],
+                "parent": group.get("parent_item_group") or None,
+                "icon": "📦", 
+                "count": 1
+            })
+
+        return formatted_groups
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Item Groups for POS Error")
+        frappe.throw(_("Something went wrong while fetching item group data."))

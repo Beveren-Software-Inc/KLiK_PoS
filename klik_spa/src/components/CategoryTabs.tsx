@@ -1,15 +1,15 @@
+
 "use client";
 
-import { useFrappeGetDocList } from "frappe-react-sdk";
 import { itemGroupIconMap } from "../utils/iconMap";
 import { useI18n } from "../hooks/useI18n";
+import { useItemGroups } from "../hooks/useItemGroups";
 
 interface CategoryTabsProps {
   selectedCategory: string;
   onCategoryChange: (category: string) => void;
   isMobile?: boolean;
 }
-
 
 export default function CategoryTabs({
   selectedCategory,
@@ -19,41 +19,24 @@ export default function CategoryTabs({
   const { isRTL } = useI18n();
 
   const {
-    data: itemGroups,
+    itemGroups,
+    isLoading: isValidating,
     error,
-    isValidating,
-    mutate,
-  } = useFrappeGetDocList("Item Group", {
-    fields: ["name", "item_group_name"],
-    limit: 100,
-    orderBy: {
-      field: "modified",
-      order: "desc",
-    },
-  });
+    count,
+  } = useItemGroups();
 
   if (isValidating) return <div>Loading categories...</div>;
 
-if (error) {
-  console.error("❌ Error fetching item groups:", error);
+  if (error) {
+    console.error("❌ Error fetching item groups:", error);
 
-  let fallbackError = "Unknown error occurred";
-
-  if (typeof error === "string") {
-    fallbackError = error;
-  } else if (error instanceof Error) {
-    fallbackError = error.message;
-  } else if (typeof error === "object" && error !== null) {
-    fallbackError = JSON.stringify(error, null, 2);
+    return (
+      <div className="text-red-600">
+        <p>Error loading categories:</p>
+        <pre className="text-xs bg-red-100 p-2 rounded">{error}</pre>
+      </div>
+    );
   }
-
-  return (
-    <div className="text-red-600">
-      <p>Error loading categories:</p>
-      <pre className="text-xs bg-red-100 p-2 rounded">{fallbackError}</pre>
-    </div>
-  );
-}
 
   if (!itemGroups || itemGroups.length === 0) {
     return <div>No item groups found.</div>;
@@ -64,13 +47,13 @@ if (error) {
       id: "all",
       name: "All Menu",
       icon: itemGroupIconMap["All Menu"] ?? "📦",
-      count: itemGroups.length,
+      count: count,
     },
     ...itemGroups.map((group) => ({
-      id: group.name,
-      name: group.item_group_name || group.name,
-      icon: itemGroupIconMap[group.item_group_name] ?? "📦",
-      count: 1,
+      id: group.id,
+      name: group.name,
+      icon: itemGroupIconMap[group.name] ?? "📦",
+      count: group.count ?? 1,
     })),
   ];
 
