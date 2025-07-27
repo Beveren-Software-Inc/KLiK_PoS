@@ -66,12 +66,13 @@ def get_items_with_balance_and_price(price_list: str = "Standard Selling"):
                 "sold": 0,
                 "preparationTime": 10
             })
-
+        
         return enriched_items
 
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Combined Item Data Error")
         frappe.throw(_("Something went wrong while fetching item data."))
+
 
 @frappe.whitelist(allow_guest=True)
 def get_item_groups_for_pos():

@@ -21,7 +21,6 @@ interface PaymentDialogProps {
   onHoldOrder: (orderData: any) => void
   isMobile?: boolean
   isFullPage?: boolean,
-
 }
 
 interface PaymentMethod {
@@ -30,6 +29,11 @@ interface PaymentMethod {
   icon: React.ReactNode
   color: string
   enabled: boolean
+  amount: number
+}
+
+interface PaymentAmount {
+  [key: string]: number
 }
 
 const getIconAndColor = (label: string): { icon: React.ReactNode; color: string } => {
@@ -54,7 +58,6 @@ const getIconAndColor = (label: string): { icon: React.ReactNode; color: string 
   return { icon: <CreditCard size={24} />, color: "bg-gray-600" };
 };
 
-
 export default function PaymentDialog({
   isOpen,
   onClose,
@@ -66,85 +69,116 @@ export default function PaymentDialog({
   isMobile = false,
   isFullPage = false
 }: PaymentDialogProps) {
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('')
   const [selectedSalesTaxCharges, setSelectedSalesTaxCharges] = useState('')
-  const [amountPaid, setAmountPaid] = useState('')
+  const [paymentAmounts, setPaymentAmounts] = useState<PaymentAmount>({})
   const [roundOffAmount, setRoundOffAmount] = useState(0)
   const [showPreview, setShowPreview] = useState(false)
   const { modes, isLoading, error } = usePaymentModes("Test POS Profile");
   const { salesTaxCharges, defaultTax } = useSalesTaxCharges();
 
-  useEffect(() => {
-  if (isOpen && defaultTax && !selectedSalesTaxCharges) {
-    setSelectedSalesTaxCharges(defaultTax);
-  }
-}, [isOpen, defaultTax, selectedSalesTaxCharges]);
-
-useEffect(() => {
-  if (isOpen && modes.length > 0) {
-    const defaultMode = modes.find(mode => mode.default === 1);
-    if (defaultMode) {
-      setSelectedPaymentMethod(defaultMode.mode_of_payment);
-    }
-  }
-}, [isOpen, modes]);
-
-
-  if (!isOpen) return null
-  
   // Calculate totals
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const couponDiscount = appliedCoupons.reduce((sum, coupon) => sum + coupon.value, 0)
   const taxableAmount = Math.max(0, subtotal - couponDiscount)
   const selectedTax = salesTaxCharges.find(tax => tax.id === selectedSalesTaxCharges)
-
   const taxAmount = taxableAmount * (selectedTax?.rate || 0) / 100
   const totalBeforeRoundOff = taxableAmount + taxAmount
-  const grandTotal = totalBeforeRoundOff + roundOffAmount
-  const paidAmount = parseFloat(amountPaid) || 0
-  const outstandingAmount = Math.max(0, grandTotal - paidAmount)
+  const grandTotal = totalBeforeRoundOff - roundOffAmount
 
-    const paymentMethods: PaymentMethod[] = modes.map((mode) => {
+  // Calculate total paid amount from all payment methods
+  const totalPaidAmount = Object.values(paymentAmounts).reduce((sum, amount) => sum + (amount || 0), 0)
+  const outstandingAmount = Math.max(0, grandTotal - totalPaidAmount)
+
+  useEffect(() => {
+    if (isOpen && defaultTax && !selectedSalesTaxCharges) {
+      setSelectedSalesTaxCharges(defaultTax);
+    }
+  }, [isOpen, defaultTax, selectedSalesTaxCharges]);
+
+  useEffect(() => {
+    if (isOpen && modes.length > 0) {
+      const defaultMode = modes.find(mode => mode.default === 1);
+      if (defaultMode && Object.keys(paymentAmounts).length === 0) {
+        // Set the grand total to the default payment method initially
+        setPaymentAmounts({ [defaultMode.mode_of_payment]: grandTotal });
+      }
+    }
+  }, [isOpen, modes, grandTotal, paymentAmounts]);
+
+  // Update default payment method amount when grand total changes
+  useEffect(() => {
+    if (modes.length > 0 && Object.keys(paymentAmounts).length > 0) {
+      const defaultMode = modes.find(mode => mode.default === 1);
+      if (defaultMode) {
+        const otherPaymentsTotal = Object.entries(paymentAmounts)
+          .filter(([key]) => key !== defaultMode.mode_of_payment)
+          .reduce((sum, [, amount]) => sum + (amount || 0), 0);
+        
+        const remainingAmount = Math.max(0, grandTotal - otherPaymentsTotal);
+        setPaymentAmounts(prev => ({
+          ...prev,
+          [defaultMode.mode_of_payment]: remainingAmount
+        }));
+      }
+    }
+  }, [grandTotal, modes]);
+
+  if (!isOpen) return null
+  if (isLoading) return <div className="p-6">Loading payment methods...</div>;
+  if (error) return <div className="p-6 text-red-500">Error: {error}</div>;
+
+  const paymentMethods: PaymentMethod[] = modes.map((mode) => {
     const { icon, color } = getIconAndColor(mode.type || "Default");
     return {
       id: mode.mode_of_payment,
       name: mode.mode_of_payment,
       icon,
       color,
-      enabled: true
+      enabled: true,
+      amount: paymentAmounts[mode.mode_of_payment] || 0
     };
   });
 
-  if (!isOpen) return null;
-  if (isLoading) return <div className="p-6">Loading payment methods...</div>;
-  if (error) return <div className="p-6 text-red-500">Error: {error}</div>;
+  const handlePaymentAmountChange = (methodId: string, amount: string) => {
+    const numericAmount = parseFloat(amount) || 0;
+    setPaymentAmounts(prev => ({
+      ...prev,
+      [methodId]: numericAmount
+    }));
+  };
 
-  
   const handleRoundOff = () => {
     const rounded = Math.round(totalBeforeRoundOff)
     setRoundOffAmount(rounded - totalBeforeRoundOff)
   }
 
   const handleCompletePayment = () => {
-    if (!selectedCustomer){
+    if (!selectedCustomer) {
       toast.error("Kindly select a customer")
       return;
     }
-    if (!selectedPaymentMethod) {
-  toast.error("Please select a payment method");
-  return;
-}
+
+    // Get active payment methods (those with amounts > 0)
+    const activePaymentMethods = Object.entries(paymentAmounts)
+      .filter(([, amount]) => amount > 0)
+      .map(([method, amount]) => ({ method, amount }));
+
+    if (activePaymentMethods.length === 0) {
+      toast.error("Please enter payment amounts");
+      return;
+    }
+
     const paymentData = {
       items: cartItems,
       customer: selectedCustomer,
-      paymentMethod: selectedPaymentMethod,
+      paymentMethods: activePaymentMethods, // Changed from single paymentMethod to multiple
       subtotal,
       SalesTaxCharges: selectedSalesTaxCharges,
       taxAmount,
       couponDiscount,
       roundOffAmount,
       grandTotal,
-      amountPaid: paidAmount,
+      amountPaid: totalPaidAmount,
       outstandingAmount,
       appliedCoupons
     }
@@ -153,7 +187,7 @@ useEffect(() => {
   }
 
   const handleHoldOrder = () => {
-    if (!selectedCustomer){
+    if (!selectedCustomer) {
       toast.error("Kindly select a customer")
       return;
     }
@@ -209,25 +243,33 @@ useEffect(() => {
           <div className="p-4 space-y-6">
             {/* Payment Methods */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Payment Method</h2>
-              <div className="grid grid-cols-2 gap-3">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Payment Methods</h2>
+              <div className="space-y-3">
                 {paymentMethods.map((method) => (
-                  <button
-                    key={method.id}
-                    onClick={() => setSelectedPaymentMethod(method.id)}
-                    className={`p-3 rounded-lg border-2 transition-all ${
-                      selectedPaymentMethod === method.id
-                        ? 'border-beveren-500 bg-beveren-50 dark:bg-beveren-900/20'
-                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className={`w-10 h-10 rounded-lg ${method.color} text-white flex items-center justify-center mx-auto mb-2`}>
-                      <div className="scale-75">
-                        {method.icon}
+                  <div key={method.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <div className={`w-10 h-10 rounded-lg ${method.color} text-white flex items-center justify-center`}>
+                        <div className="scale-75">
+                          {method.icon}
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900 dark:text-white">{method.name}</p>
                       </div>
                     </div>
-                    <p className="font-medium text-gray-900 dark:text-white text-xs text-center">{method.name}</p>
-                  </button>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Amount
+                      </label>
+                      <input
+                        type="number"
+                        value={method.amount || ''}
+                        onChange={(e) => handlePaymentAmountChange(method.id, e.target.value)}
+                        placeholder="0.00"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
@@ -249,20 +291,6 @@ useEffect(() => {
               <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                 Tax Amount: {formatCurrency(taxAmount)}
               </div>
-            </div>
-
-            {/* Amount Paid */}
-            <div>
-              <label className="block text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Amount Paid
-              </label>
-              <input
-                type="number"
-                value={amountPaid}
-                onChange={(e) => setAmountPaid(e.target.value)}
-                placeholder="0.00"
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-lg"
-              />
             </div>
 
             {/* Totals */}
@@ -294,13 +322,17 @@ useEffect(() => {
                 </div>
               </div>
               <div className="flex justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Total Paid</span>
+                <span className="font-medium text-blue-600 dark:text-blue-400">{formatCurrency(totalPaidAmount)}</span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Outstanding</span>
                 <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(outstandingAmount)}</span>
               </div>
-              {paidAmount > grandTotal && (
+              {totalPaidAmount > grandTotal && (
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Change</span>
-                  <span className="font-medium text-blue-600 dark:text-blue-400">{formatCurrency(paidAmount - grandTotal)}</span>
+                  <span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(totalPaidAmount - grandTotal)}</span>
                 </div>
               )}
             </div>
@@ -356,28 +388,40 @@ useEffect(() => {
           <div className="w-2/3 p-6 overflow-y-auto custom-scrollbar space-y-6">
             {/* Payment Methods */}
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Payment Method</h3>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                {paymentMethods.map((method) => (
-                  <button
-                    key={method.id}
-                    onClick={() => setSelectedPaymentMethod(method.id)}
-                    className={`p-3 rounded-lg border-2 transition-all ${
-                      selectedPaymentMethod === method.id
-                        ? 'border-beveren-500 bg-beveren-50 dark:bg-beveren-900/20'
-                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className={`w-8 h-8 rounded-md ${method.color} text-white flex items-center justify-center mx-auto mb-2`}>
-                      <div className="scale-75">
-                        {method.icon}
-                      </div>
-                    </div>
-                    <p className="font-medium text-gray-900 dark:text-white text-xs text-center">{method.name}</p>
-                  </button>
-                ))}
-              </div>
+  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Payment Methods</h3>
+  <div className="flex space-x-4 overflow-x-auto pb-2">
+    {paymentMethods.map((method) => (
+      <div
+        key={method.id}
+        className="min-w-[200px] border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-beveren-300 transition-colors"
+      >
+        <div className="flex items-center space-x-3 mb-3">
+          <div className={`w-8 h-8 rounded-md ${method.color} text-white flex items-center justify-center`}>
+            <div className="scale-75">
+              {method.icon}
             </div>
+          </div>
+          <div className="flex-1">
+            <p className="font-medium text-gray-900 dark:text-white text-sm">{method.name}</p>
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Amount
+          </label>
+          <input
+            type="number"
+            value={method.amount || ''}
+            onChange={(e) => handlePaymentAmountChange(method.id, e.target.value)}
+            placeholder="0.00"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+          />
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
+
 
             {/* Tax Section */}
             <div>
@@ -415,18 +459,6 @@ useEffect(() => {
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Payment Summary</h3>
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Amount Paid
-                    </label>
-                    <input
-                      type="number"
-                      value={amountPaid}
-                      onChange={(e) => setAmountPaid(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    />
-                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Round Off
@@ -478,7 +510,7 @@ useEffect(() => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Total Paid</span>
-                    <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(paidAmount)}</span>
+                    <span className="font-medium text-blue-600 dark:text-blue-400">{formatCurrency(totalPaidAmount)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Outstanding Amount</span>
@@ -486,10 +518,10 @@ useEffect(() => {
                       {formatCurrency(outstandingAmount)}
                     </span>
                   </div>
-                  {paidAmount > grandTotal && (
+                  {totalPaidAmount > grandTotal && (
                     <div className="flex justify-between">
                       <span className="text-gray-600 dark:text-gray-400">Change</span>
-                      <span className="font-bold text-blue-600 dark:text-blue-400">{formatCurrency(paidAmount - grandTotal)}</span>
+                      <span className="font-bold text-green-600 dark:text-green-400">{formatCurrency(totalPaidAmount - grandTotal)}</span>
                     </div>
                   )}
                 </div>
@@ -573,6 +605,21 @@ useEffect(() => {
                     <span className="text-gray-900 dark:text-white">{formatCurrency(grandTotal)}</span>
                   </div>
                 </div>
+                
+                {/* Payment Methods Used */}
+                {Object.entries(paymentAmounts).filter(([, amount]) => amount > 0).length > 0 && (
+                  <div className="border-t border-gray-200 dark:border-gray-600 pt-2 mt-2">
+                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Payment Methods:</p>
+                    {Object.entries(paymentAmounts)
+                      .filter(([, amount]) => amount > 0)
+                      .map(([method, amount]) => (
+                        <div key={method} className="flex justify-between text-xs">
+                          <span className="text-gray-600 dark:text-gray-400">{method}</span>
+                          <span className="text-gray-900 dark:text-white">{formatCurrency(amount)}</span>
+                        </div>
+                      ))}
+                  </div>
+                )}
               </div>
 
               <div className="text-center mt-4 pt-2 border-t border-gray-200 dark:border-gray-600">
@@ -592,7 +639,6 @@ useEffect(() => {
               Cancel
             </button>
             <button
-                
               onClick={handleHoldOrder}
               className="px-6 py-2 border border-orange-500 text-orange-600 dark:text-orange-400 rounded-lg font-medium hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
             >
@@ -612,4 +658,3 @@ useEffect(() => {
     </div>
   )
 }
-
