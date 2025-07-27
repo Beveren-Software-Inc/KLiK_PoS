@@ -21,7 +21,7 @@ export default function RetailSidebar() {
   }
 
   return (
-    <div className="w-20 bg-white dark:bg-gray-800 shadow-lg flex flex-col border-r border-gray-200 dark:border-gray-700">
+<div className="h-screen w-20 bg-white dark:bg-gray-800 shadow-lg flex flex-col border-r border-gray-200 dark:border-gray-700 z-50">
       {/* Logo Section - Fixed height to match other sections */}
       <div className="h-20 flex items-center justify-center border-b border-gray-100 dark:border-gray-700">
         <img src="/beveren-logo-180.png" alt="KLIK POS" className="w-12 h-12 rounded-full object-cover" />
