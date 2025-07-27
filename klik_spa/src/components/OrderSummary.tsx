@@ -50,12 +50,15 @@ export default function OrderSummary({
   const total = Math.max(0, subtotal - couponDiscount)
 
   // Filtered customers based on search query
-  const filteredCustomers = customers.filter((customer) =>
-    customer.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
-    customer.email.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
-    customer.phone.includes(customerSearchQuery) ||
-    customer.tags.some(tag => tag.toLowerCase().includes(customerSearchQuery.toLowerCase()))
-  )
+const filteredCustomers = customerSearchQuery.trim() === ""
+  ? customers
+  : customers.filter((customer) =>
+      customer.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+      customer.email.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+      customer.phone.includes(customerSearchQuery) ||
+      customer.tags.some(tag => tag.toLowerCase().includes(customerSearchQuery.toLowerCase()))
+    )
+
 
  const validateCustomer = () =>{
   if(!selectedCustomer){
@@ -99,11 +102,7 @@ export default function OrderSummary({
     handleClearCart()
     toast.success('Draft invoice created and order held successfully!')
     
-    // In a real app, this would:
-    // 1. Create a draft invoice
-    // 2. Save order to held orders database
-    // 3. Optionally clear the current cart
-    // 4. Navigate to held orders view or show confirmation
+  
   }
 
   const handleClearCart = () => {
@@ -166,7 +165,7 @@ export default function OrderSummary({
                     setCustomerSearchQuery(e.target.value)
                     setShowCustomerDropdown(e.target.value.length > 0)
                   }}
-                  onFocus={() => setShowCustomerDropdown(customerSearchQuery.length > 0)}
+                  onFocus={() => setShowCustomerDropdown(true)}
                   className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
                 
