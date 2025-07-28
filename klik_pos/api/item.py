@@ -101,3 +101,36 @@ def get_item_groups_for_pos():
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Item Groups for POS Error")
         frappe.throw(_("Something went wrong while fetching item group data."))
+
+
+@frappe.whitelist()
+def get_batch_nos_with_qty(item_code):
+    """
+    Returns a list of dicts with batch numbers and their actual quantities
+    for a given item code and warehouse.
+    """
+    pos_doc = get_current_pos_profile()
+    warehouse = pos_doc.warehouse
+
+    if not item_code or not warehouse:
+        return []
+    # frappe.throw(str(item_code))
+    # Query batches with quantity > 0 from tabBatch and tabBatch Stock (Bin-like)
+    batch_qty_data = frappe.db.sql("""
+        SELECT
+            b.batch_id AS batch_id,
+            bs.batch_qty AS qty
+        FROM
+            `tabBatch` b
+        INNER JOIN
+            `tabBatch` bs ON bs.batch_id = b.name
+        WHERE
+            b.item = %(item_code)s
+            AND bs.batch_qty > 0
+        ORDER BY
+            b.batch_id ASC
+    """, {
+        "item_code": item_code,
+        "warehouse": warehouse
+    }, as_dict=True)
+    return batch_qty_data

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Minus, Plus, X, Tag, Search, UserPlus, User, Building } from "lucide-react"
 import type { CartItem, GiftCoupon } from "../../types"
 import GiftCouponPopover from "./GiftCouponPopover"
@@ -10,6 +10,9 @@ import AddCustomerModal from "./AddCustomerModal"
 import { createDraftSalesInvoice } from "../services/salesInvoice"
 import { useCustomers } from "../hooks/useCustomers"
 import { toast } from "react-toastify"
+import { useBatchData } from "../hooks/useProducts"
+import { getBatches } from "../utils/batch"; // or wherever you put it
+
 
 // Extended CartItem interface to include discount properties
 interface ExtendedCartItem extends CartItem {
@@ -58,6 +61,10 @@ export default function OrderSummary({
     serialNumber: string;
     availableQuantity: number;
   }>>({})
+// const { getBatches } = useBatchData();
+
+const [itemBatches, setItemBatches] = useState<Record<string, { batch_no: string; qty: number }[]>>({});
+
   
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
 
@@ -212,6 +219,37 @@ export default function OrderSummary({
     }
     setExpandedItems(newExpanded)
   }
+
+
+
+useEffect(() => {
+  const fetchAndSetBatches = async () => {
+    const newBatches = { ...itemBatches };
+
+    for (const item of cartItems) {
+      const key = `${item.item_code}`;
+      if (!newBatches[key]) {
+        try {
+          const batches = await getBatches(item.id);
+          console.log("hapa pia", batches)
+          if (Array.isArray(batches)) {
+            newBatches[key] = batches;
+          }
+        } catch (err) {
+          console.error("Error fetching batches", err);
+        }
+      }
+    }
+
+    setItemBatches(newBatches);
+  };
+
+  if (cartItems.length) {
+    fetchAndSetBatches();
+  }
+}, [cartItems]);
+
+
 
   return (
     <div
@@ -527,18 +565,33 @@ export default function OrderSummary({
                           </div>
 
                           {/* Batch Number */}
-                          <div>
-                            <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-xs" : "text-xs"} mb-1`}>
-                              Batch No.
-                            </label>
-                            <input
-                              type="text"
-                              value={itemDiscount.batchNumber || ''}
-                              onChange={(e) => updateItemDiscount(item.id, 'batchNumber', e.target.value)}
-                              placeholder="Enter batch number"
-                              className={`w-full ${isMobile ? "text-sm" : "text-xs"} px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
-                            />
-                          </div>
+        <select
+                value={itemDiscount.batchNumber || ''}
+                onChange={(e) => {
+                  const selectedBatch = e.target.value;
+                  const selectedQty = itemBatches[item.item_code]?.find(b => b.batch_no === selectedBatch)?.qty || 0;
+                  updateItemDiscount(item.id, 'batchNumber', selectedBatch);
+                  updateItemDiscount(item.id, 'availableQuantity', selectedQty);
+                }}
+                className={`w-full ${isMobile ? "text-sm" : "text-xs"} px-2 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent 
+                  bg-white text-gray-900 appearance-none`} // Removed dark mode classes
+                style={{
+                  backgroundColor: 'white',
+                  color: '#111827', // Tailwind's gray-900
+                }}
+              >
+            <option value="" disabled></option>
+                {itemBatches[item.item_code]?.map((batch) => (
+                  <option
+                    key={batch.batch_no}
+                    value={batch.batch_no}
+                    style={{ backgroundColor: 'white', color: '#111827' }}
+                  >
+                    {batch.batch_id} - {batch.qty}
+              </option>
+                ))}
+              </select>
+
                         </div>
 
                         {/* Right Column */}
@@ -573,19 +626,6 @@ export default function OrderSummary({
                             />
                           </div>
 
-                          {/* Available Quantity (Batch) */}
-                          <div>
-                            <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-xs" : "text-xs"} mb-1`}>
-                              Available Qty (Batch)
-                            </label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={itemDiscount.availableQuantity || 150}
-                              onChange={(e) => updateItemDiscount(item.id, 'availableQuantity', parseInt(e.target.value) || 0)}
-                              className={`w-full ${isMobile ? "text-sm" : "text-xs"} px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
-                            />
-                          </div>
                         </div>
                       </div>
 
