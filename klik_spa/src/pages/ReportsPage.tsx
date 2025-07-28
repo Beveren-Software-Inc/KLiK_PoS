@@ -21,6 +21,7 @@ import { useSalesInvoices } from "../hooks/useSalesInvoices"
 import { toast } from "react-toastify";
 import { createSalesReturn } from "../services/salesInvoice";
 import { useAllPaymentModes } from "../hooks/usePaymentModes";
+import RetailSidebar from "../components/RetailSidebar";
 
 export default function ReportsPage() {
   const navigate = useNavigate();
@@ -861,19 +862,16 @@ const filterInvoiceByDate = (invoiceDateStr: string) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+      <RetailSidebar/>
+      <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+<div className="fixed top-0 left-20 right-0 z-50 bg-beveren-50 dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+        <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <button
-                onClick={() => navigate(-1)}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-              </button>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Sales Reports</h1>
+              
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Closing Entry</h1>
             </div>
             <button className="flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors">
               <Download className="w-4 h-4" />
@@ -918,6 +916,7 @@ const filterInvoiceByDate = (invoiceDateStr: string) => {
         onRefund={handleRefund}
         onCancel={handleCancel}
       />
+      </div>
     </div>
   );
 }

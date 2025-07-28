@@ -20,6 +20,7 @@ import {
 } from "lucide-react"
 import { mockDashboardStats, mockSalesInvoices } from "../data/mockSalesData"
 import type { SalesInvoice, DashboardStats } from "../../types"
+import RetailSidebar from "../components/RetailSidebar"
 
 export default function DashboardPage() {
   const navigate = useNavigate()
@@ -72,18 +73,16 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+      
+      <RetailSidebar/>
+      <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+      <div className="fixed top-0 left-20 right-0 z-50 bg-beveren-50 dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <button
-                onClick={() => navigate(-1)}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-              </button>
+              
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Sales Dashboard</h1>
             </div>
             <div className="flex items-center space-x-2 sm:space-x-3">
@@ -107,7 +106,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <div className="max-w-7xl px-6 sm:px-6 py-6 sm:py-8 mt-15">
         {/* Enhanced Filters */}
         {showFilters && (
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-6 sm:mb-8">
@@ -538,6 +537,7 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   )

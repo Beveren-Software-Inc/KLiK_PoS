@@ -14,11 +14,13 @@ import {
   ArrowLeft,
   Eye,
   Edit,
-  Trash2
+  Trash2,
+  Divide
 } from "lucide-react"
 import { useCustomers } from "../hooks/useCustomers" // Import the hook
 import AddCustomerModal from "./AddCustomerModal"
 import type { Customer } from "../types"
+import RetailSidebar from "./RetailSidebar"
 
 export default function CustomersPage() {
   const navigate = useNavigate()
@@ -141,37 +143,37 @@ export default function CustomersPage() {
 
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center space-x-4 mb-4">
-            <button
-              onClick={() => navigate('/pos')}
-              className="flex items-center space-x-2 text-gray-600 hover:text-beveren-600 dark:text-gray-300 dark:hover:text-beveren-400 transition-colors group"
-              type="button"
-            >
-              <div className="p-2 rounded-lg bg-gray-100 group-hover:bg-beveren-50 dark:bg-gray-800 dark:group-hover:bg-beveren-900 transition-colors">
-                <ArrowLeft size={20} />
-              </div>
-              <span className="font-medium">Back to POS</span>
-            </button>
-          </div>
-          
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Customers</h1>
-              <p className="text-gray-600 dark:text-gray-300 mt-2">Manage your customer database</p>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+      <RetailSidebar/>
+      <div>
+       <div className="mb-8">
+        <div className="fixed top-0 left-20 right-0 z-50 bg-beveren-50  dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Customers</h1>
             </div>
-            <button
+            <div className="flex items-center space-x-2 sm:space-x-3">
+             
+             <button
               onClick={() => setShowAddModal(true)}
               className="mt-4 sm:mt-0 bg-beveren-600 text-white px-6 py-3 rounded-lg hover:bg-beveren-700 transition-colors flex items-center space-x-2"
             >
               <Plus size={20} />
               <span>Add Customer</span>
             </button>
+            </div>
           </div>
         </div>
+        </div>
+          
+       </div>
+       <div className=" mx-auto px-4 sm:px-6 lg:px-8 mt-25">
+          {/* <div className=" mx-auto px-4 sm:px-6 lg:px-8"> */}
+
+        {/* Header */}
+       
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -396,6 +398,7 @@ export default function CustomersPage() {
           }}
         />
       )}
+      </div>
     </div>
   )
 }
