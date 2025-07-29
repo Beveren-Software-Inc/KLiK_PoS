@@ -14,6 +14,7 @@ import MobilePaymentPage from "../components/MobilePaymentPage";
 import ProtectedRoute from "../components/ProtectedRoute";
 import App from "../App";
 import HomePage from "../pages/HomePage";
+import InvoiceHistoryPage from "../pages/InvoiceHistory";
 
 const router = createBrowserRouter([
   {
@@ -39,6 +40,10 @@ const router = createBrowserRouter([
       {
         path: "reports",
         element: <ProtectedRoute element={<ReportsPage />} />,
+      },
+      {
+        path: "invoice",
+        element: <ProtectedRoute element={<InvoiceHistoryPage />} />,
       },
       {
         path: "customers",

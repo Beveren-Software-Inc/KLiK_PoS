@@ -8,7 +8,7 @@ def get_sales_invoices(limit=100, start=0):
     try:
         invoices = frappe.get_all(
             "Sales Invoice",
-            filters={"docstatus": ["!=", 2]},  
+            filters={},  
             fields=[
                 "name",
                 "posting_date",
