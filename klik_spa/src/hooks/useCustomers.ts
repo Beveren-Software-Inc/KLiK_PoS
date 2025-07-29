@@ -128,3 +128,41 @@ function getRandomTags(): string[] {
   const count = Math.floor(Math.random() * 3) + 1;
   return [...new Set(Array(count).fill(0).map(() => allTags[Math.floor(Math.random() * allTags.length)]))];
 }
+
+
+
+export function useCustomerDetails(customerId: string | null) {
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!customerId) return;
+
+    const fetchCustomer = async () => {
+      setIsLoading(true);
+      try {
+        const response = await fetch(`/api/method/klik_pos.api.customer.get_customer_info?customer_name=${customerId}`);
+        const resData = await response.json();
+        console.log("logss", resData.message)
+        // if (!resData.message.success) {
+        //   throw new Error(resData.error || "Failed to fetch customer");
+        // }
+
+        setCustomer(resData.message);
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError("Unknown error");
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCustomer();
+  }, [customerId]);
+
+  return { customer, isLoading, error };
+}

@@ -25,6 +25,7 @@ import { toast } from "react-toastify";
 import { createSalesReturn } from "../services/salesInvoice";
 import { useAllPaymentModes } from "../hooks/usePaymentModes";
 import RetailSidebar from "../components/RetailSidebar";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 // import InvoiceViewPage from "./InvoiceViewPage";
 
 export default function InvoiceHistoryPage() {
@@ -429,12 +430,19 @@ export default function InvoiceHistoryPage() {
                         </button>
                       )}
                       {invoice.status === "Paid" && (
-                        <button
-                          onClick={() => handleRefund(invoice.id)}
-                          className="text-orange-600 hover:text-orange-900"
-                        >
-                          Return
-                        </button>
+                        <ConfirmDialog
+                            title="Process Return?"
+                            description="Are you sure you want to process a return for this invoice?"
+                            onConfirm={() => handleReturn(invoice.name)}
+                            trigger={
+                            <button
+                                className="flex items-center space-x-2 px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
+                            >
+                                <RefreshCw size={20} />
+                                <span>Return</span>
+                            </button>
+                            }
+                        />
                       )}
                       {["Draft", "Unpaid"].includes(invoice.status) && (
                         <button
@@ -524,7 +532,7 @@ export default function InvoiceHistoryPage() {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-6 py-8 mt-16">
+        <div className="max-w-7xl mx-auto px-6 py-8 mt-16 ml-20">
           {/* Status Tabs */}
           <div className="mb-8">
             <div className="border-b border-gray-200 dark:border-gray-700">

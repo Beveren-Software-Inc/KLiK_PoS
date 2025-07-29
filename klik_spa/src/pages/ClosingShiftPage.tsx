@@ -1,18 +1,17 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft,
   FileText,
   Users,
   CreditCard,
   RefreshCw,
-  Download,
   Search,
   DollarSign,
   TrendingUp,
   Grid3X3,
   List,
   Eye,
+  MonitorX
 } from "lucide-react";
 
 import InvoiceViewModal from "../components/InvoiceViewModal";
@@ -23,8 +22,8 @@ import { createSalesReturn } from "../services/salesInvoice";
 import { useAllPaymentModes } from "../hooks/usePaymentModes";
 import RetailSidebar from "../components/RetailSidebar";
 
-export default function ReportsPage() {
-  const navigate = useNavigate();
+export default function ClosingShiftPage() {
+  // const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("invoices");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -871,17 +870,17 @@ const filterInvoiceByDate = (invoiceDateStr: string) => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Closing Entry</h1>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Closing Shift</h1>
             </div>
             <button className="flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors">
-              <Download className="w-4 h-4" />
-              <span>Export</span>
+              <MonitorX className="w-4 h-4" />
+              <span>Close</span>
             </button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8 mt-15">
+      <div className="max-w-7xl mx-auto px-6 py-8 mt-15 ml-20">
         {/* Tabs */}
         <div className="mb-8">
           <div className="border-b border-gray-200 dark:border-gray-700">

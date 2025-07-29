@@ -2,7 +2,7 @@ import { createBrowserRouter } from "react-router-dom";
 import LoginPage from "../pages/LoginPage";
 import POSPage from "../pages/POSPage";
 import DashboardPage from "../pages/DashboardPage";
-import ReportsPage from "../pages/ReportsPage";
+import ClosingShiftPage from "../pages/ClosingShiftPage";
 import SettingsPage from "../components/SettingsPage";
 import PaymentPage from "../pages/PaymentPage";
 import CustomersPage from "../components/CustomersPage";
@@ -16,6 +16,7 @@ import App from "../App";
 import HomePage from "../pages/HomePage";
 import InvoiceHistoryPage from "../pages/InvoiceHistory";
 import InvoiceViewPage from "../pages/InvoiceViewPage";
+import CustomerDetailsPage from "../pages/CustomerPageDetails";
 
 const router = createBrowserRouter([
   {
@@ -40,7 +41,7 @@ const router = createBrowserRouter([
       },
       {
         path: "reports",
-        element: <ProtectedRoute element={<ReportsPage />} />,
+        element: <ProtectedRoute element={<ClosingShiftPage />} />,
       },
       {
         path: "invoice",
@@ -56,7 +57,7 @@ const router = createBrowserRouter([
       },
       {
         path: "customers/:id",
-        element: <ProtectedRoute element={<CustomerDetailPage />} />,
+        element: <ProtectedRoute element={<CustomerDetailsPage />} />,
       },
       {
         path: "cart",

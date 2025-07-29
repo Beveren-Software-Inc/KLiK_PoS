@@ -141,6 +141,12 @@ export default function CustomersPage() {
       .substring(0, 2)
   }
 
+  const handleViewCustomer = (customer:any) => {
+      // setSelectedInvoice(invoice);
+      // setShowInvoiceModal(true);
+      navigate(`/invoice/${customer}`);
+  
+    };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
@@ -169,12 +175,10 @@ export default function CustomersPage() {
         </div>
           
        </div>
-       <div className=" mx-auto px-4 sm:px-6 lg:px-8 mt-25">
+       <div className=" mx-auto px-4 sm:px-6 lg:px-8 mt-25 ml-20">
           {/* <div className=" mx-auto px-4 sm:px-6 lg:px-8"> */}
-
         {/* Header */}
        
-
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
