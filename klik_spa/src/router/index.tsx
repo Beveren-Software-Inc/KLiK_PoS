@@ -15,6 +15,7 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import App from "../App";
 import HomePage from "../pages/HomePage";
 import InvoiceHistoryPage from "../pages/InvoiceHistory";
+import InvoiceViewPage from "../pages/InvoiceViewPage";
 
 const router = createBrowserRouter([
   {
@@ -44,6 +45,10 @@ const router = createBrowserRouter([
       {
         path: "invoice",
         element: <ProtectedRoute element={<InvoiceHistoryPage />} />,
+      },
+      {
+        path: "invoice/:id",
+        element: <ProtectedRoute element={<InvoiceViewPage />} />,
       },
       {
         path: "customers",

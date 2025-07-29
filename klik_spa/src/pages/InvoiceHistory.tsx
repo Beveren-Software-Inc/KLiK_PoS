@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft,
   FileText,
   Clock,
   CheckCircle,
@@ -12,7 +11,6 @@ import {
   Download,
   Search,
   DollarSign,
-  TrendingUp,
   Grid3X3,
   List,
   Eye,
@@ -27,6 +25,7 @@ import { toast } from "react-toastify";
 import { createSalesReturn } from "../services/salesInvoice";
 import { useAllPaymentModes } from "../hooks/usePaymentModes";
 import RetailSidebar from "../components/RetailSidebar";
+// import InvoiceViewPage from "./InvoiceViewPage";
 
 export default function InvoiceHistoryPage() {
   const navigate = useNavigate();
@@ -52,6 +51,7 @@ export default function InvoiceHistoryPage() {
     { id: "Return", name: "Returns", icon: RefreshCw, color: "text-purple-600" },
     { id: "Cancelled", name: "Cancelled", icon: XCircle, color: "text-red-500" },
   ];
+
 
   const filterInvoiceByDate = (invoiceDateStr: string) => {
     if (dateFilter === "all") return true;
@@ -172,8 +172,10 @@ export default function InvoiceHistoryPage() {
   }
 
   const handleViewInvoice = (invoice: SalesInvoice) => {
-    setSelectedInvoice(invoice);
-    setShowInvoiceModal(true);
+    // setSelectedInvoice(invoice);
+    // setShowInvoiceModal(true);
+    navigate(`/invoice/${invoice.id}`);
+
   };
 
   const handleEditInvoice = (invoiceId: string) => {
@@ -196,6 +198,7 @@ export default function InvoiceHistoryPage() {
   const handleReturnClick = async (invoiceName: string) => {
     try {
       const result = await createSalesReturn(invoiceName);
+      navigate(`/invoice/${result.return_invoice}`)
       toast.success(`Invoice returned: ${result.return_invoice}`);
     } catch (error: any) {
       toast.error(error.message || "Failed to return invoice");
@@ -558,6 +561,7 @@ export default function InvoiceHistoryPage() {
         </div>
 
         {/* Invoice View Modal */}
+       
         <InvoiceViewModal
           invoice={selectedInvoice}
           isOpen={showInvoiceModal}

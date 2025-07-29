@@ -71,26 +71,33 @@ export interface SalesInvoiceItem {
 }
 
 export interface SalesInvoice {
-  id: string
-  date: string
-  time: string
-  cashier: string
-  cashierId: string
-  customer: string
-  customerId: string | null
-  items: SalesInvoiceItem[]
-  subtotal: number
-  giftCardDiscount: number
-  giftCardCode: string | null
-  taxAmount: number
-  totalAmount: number
-  paymentMethod: "Cash" | "Debit Card"
-  amountPaid: number
-  changeGiven: number
-  status: "Completed" | "Pending" | "Cancelled" | "Refunded"
-  refundAmount: number
-  notes: string
+  id: string;
+  date: string;
+  name: string;
+  time: string;
+  cashier: string;
+  cashierId: string;
+  customer: string;
+  customerId: string | null;
+  items: SalesInvoiceItem[];
+  subtotal: number;
+  giftCardDiscount: number;
+  giftCardCode: string | null;
+  taxAmount: number;
+  totalAmount: number;
+  paymentMethod: "Cash" | "Debit Card";
+  amountPaid: number;
+  changeGiven: number;
+  status: "Completed" | "Pending" | "Cancelled" | "Refunded";
+  refundAmount: number;
+  notes: string;
+  customer_address_doc?: AddressDoc;
+  company_address_doc?: AddressDoc;
+  company: string;
+  posting_date: string; 
+  posting_time: string;
 }
+
 
 export interface DashboardStats {
   todaySales: {
@@ -189,3 +196,17 @@ export interface POSProfile {
   payment_methods?: PaymentMode[];
   // Add other fields as needed
 }
+
+export type AddressDoc = {
+  name: string;
+  address_line1: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  phone?: string;
+  email_id?: string;
+  display?: string;
+  county:string;
+  // ... add more as needed
+};

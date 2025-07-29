@@ -1,0 +1,490 @@
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom"; // ✅ import this
+
+import {
+  ArrowLeft,
+  Printer,
+  MailPlus,
+  MessageCirclePlus,
+  MessageSquarePlus,
+  Edit,
+  RefreshCw,
+  User,
+  Phone,
+  Mail,
+  MapPin,
+  Calendar,
+  DollarSign,
+  Package,
+  FileText,
+  CheckCircle,
+  AlertTriangle,
+} from "lucide-react";
+
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog"
+
+
+import RetailSidebar from "../components/RetailSidebar";
+import { useInvoiceDetails } from "../hooks/useInvoiceDetails";
+import { createSalesReturn } from "../services/salesInvoice";
+import { toast } from "react-toastify";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+
+export default function InvoiceViewPage() {
+  const { id: invoiceId } = useParams(); // ✅ extract ID from URL
+
+  const { invoice, isLoading, error } = useInvoiceDetails(invoiceId);
+    const navigate = useNavigate()
+
+  // Mock customer data - you may want to create a separate hook for this
+  const mockCustomer = {
+    name: invoice?.customer || "",
+    email: "john.doe@email.com", // This should come from invoice data or separate API
+    phone: "+1234567890", // This should come from invoice data or separate API
+    address: "123 Main Street, City, State 12345", // This should come from invoice data or separate API
+    totalOrders: 15,
+    totalSpent: 2450.00,
+    lastOrder: "2024-01-10"
+  };
+
+  useEffect(() => {
+    // Extract invoice ID from URL or get it from props/context
+    // For now, using a placeholder - replace with your actual routing logic
+    const urlParams = new URLSearchParams(window.location.search);
+    const idFromUrl = urlParams.get('id');
+    if (idFromUrl) {
+      setInvoiceId(idFromUrl);
+    }
+  }, []);
+
+  const handleBackClick = () => {
+    console.log("Navigate back to invoice history");
+    navigate(`/invoice`)
+    // You can replace this with your navigation logic
+  };
+
+  const formatCurrency = (amount) => `$${amount?.toFixed(2) || '0.00'}`;
+
+  const getStatusBadge = (status) => {
+    const baseClasses = "px-3 py-1 rounded-full text-sm font-medium flex items-center space-x-1";
+    switch (status) {
+      case "Completed":
+      case "Paid":
+        return `${baseClasses} bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400`;
+      case "Pending":
+      case "Unpaid":
+        return `${baseClasses} bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400`;
+      case "Cancelled":
+        return `${baseClasses} bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400`;
+      case "Refunded":
+        return `${baseClasses} bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400`;
+      default:
+        return baseClasses;
+    }
+  };
+
+     
+
+  const handleReturn = async(invoiceName: string) => {
+      try {
+          const result = await createSalesReturn(invoiceName);
+          console.log(result.return_invoice)
+          navigate(`/invoice/${result.return_invoice}`)
+          toast.success(`Invoice returned: ${result.return_invoice}`);
+        } catch (error: any) {
+          toast.error(error.message || "Failed to return invoice");
+        
+      // Add return logic here
+    }
+  };
+
+  const handleEditCustomer = () => {
+    console.log("Edit customer:", mockCustomer.name);
+    // Navigate to customer edit page
+  };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+        <RetailSidebar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Loading invoice...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+        <RetailSidebar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <p className="text-red-600 dark:text-red-400">Error loading invoice: {error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // No invoice found
+  if (!invoice) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+        <RetailSidebar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600 dark:text-gray-400">Invoice not found</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+      <RetailSidebar />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="fixed top-0 left-20 right-0 z-50 bg-beveren-50 dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+          <div className="max-w-7xl mx-auto px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={handleBackClick}
+                  className="p-2 text-gray-600 dark:text-gray-400 hover:bg-beveren-200 dark:hover:bg-gray-700 rounded-lg"
+                >
+                  <ArrowLeft size={20} />
+                </button>
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                    Invoice {invoice.name || invoice.id}
+                  </h1>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {invoice.posting_date} at {invoice.posting_time}
+                  </p>
+                </div>
+                <div className={getStatusBadge(invoice.status)}>
+                  <CheckCircle size={16} />
+                  <span>{invoice.status}</span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center space-x-3">
+                <button
+                  className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"
+                  title="Print"
+                  onClick={() => window.print()}
+                >
+                  <Printer size={20} />
+                </button>
+
+                <button
+                  className="p-2 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900 rounded-lg"
+                  title="Email"
+                  onClick={() => {
+                    const subject = encodeURIComponent("Your Invoice");
+                    const body = encodeURIComponent(`Dear ${mockCustomer?.name},\n\nHere is your invoice total: ${formatCurrency(invoice.grand_total)}\n\nThank you.`);
+                    window.open(`mailto:${mockCustomer?.email}?subject=${subject}&body=${body}`);
+                  }}
+                >
+                  <MailPlus size={20} />
+                </button>
+
+                <button
+                  className="p-2 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900 rounded-lg"
+                  title="WhatsApp"
+                  onClick={() => {
+                    const msg = encodeURIComponent(`Here is your invoice total: ${formatCurrency(invoice.grand_total)}`);
+                    window.open(`https://wa.me/${mockCustomer?.phone}?text=${msg}`, "_blank");
+                  }}
+                >
+                  <MessageCirclePlus size={20} />
+                </button>
+
+                <button
+                  className="p-2 text-purple-600 hover:bg-purple-100 dark:text-purple-400 dark:hover:bg-purple-900 rounded-lg"
+                  title="Text Message"
+                  onClick={() => window.open(`tel:${mockCustomer?.phone}`)}
+                >
+                  <MessageSquarePlus size={20} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 pt-20 pb-20 overflow-auto">
+          <div className="max-w-7xl mx-auto px-6 py-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Invoice Details - 70% */}
+              <div className="lg:col-span-2">
+                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  {/* Invoice Header */}
+                  <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">INVOICE</h2>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">#{invoice.name || invoice.id}</p>
+                      </div>
+                      <div className="text-right">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{invoice.company}</h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{invoice.company_address_doc?.address_line1}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{invoice.company_address_doc?.county}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{invoice.company_address_doc?.phone}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Invoice Info */}
+                  <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-600">
+                    <div className="grid grid-cols-2 gap-8">
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Bill To:</h4>
+                        <p className="text-sm text-gray-900 dark:text-white font-medium">{invoice.customer}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{invoice.customer_address_doc?.address_line1}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{invoice.customer_address_doc?.email_id}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{invoice.customer_address_doc?.phone}</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600 dark:text-gray-400">Date:</span>
+                            <span className="text-sm text-gray-900 dark:text-white">{invoice.posting_date}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600 dark:text-gray-400">Time:</span>
+                            <span className="text-sm text-gray-900 dark:text-white">{invoice.posting_time}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600 dark:text-gray-400">Cashier:</span>
+                            <span className="text-sm text-gray-900 dark:text-white">{invoice.cashier}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600 dark:text-gray-400">Payment:</span>
+                            <span className="text-sm text-gray-900 dark:text-white">{invoice.paymentMethod}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Items Table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Item
+                          </th>
+                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Qty
+                          </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Price
+                          </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Total
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                        {invoice.items?.map((item, index) => (
+                          <tr key={index}>
+                            <td className="px-6 py-4">
+                              <div>
+                                <div className="text-sm font-medium text-gray-900 dark:text-white">{item.item_name}</div>
+                                <div className="text-sm text-gray-500 dark:text-gray-400">Code: {item.item_code}</div>
+                                <div className="text-sm text-gray-500 dark:text-gray-400 capitalize">{item.category}</div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-center text-sm text-gray-900 dark:text-white">
+                              {item.qty}
+                            </td>
+                            <td className="px-6 py-4 text-right text-sm text-gray-900 dark:text-white">
+                              {formatCurrency(item.rate)}
+                            </td>
+                            <td className="px-6 py-4 text-right text-sm font-medium text-gray-900 dark:text-white">
+                              {formatCurrency(item.amount)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Totals */}
+                  <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700">
+                    <div className="flex justify-end">
+                      <div className="w-64 space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
+                          <span className="text-gray-900 dark:text-white">{formatCurrency(invoice.total)}</span>
+                        </div>
+                        {invoice.giftCardDiscount > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">Gift Card Discount:</span>
+                            <span className="text-green-600 dark:text-green-400">-{formatCurrency(invoice.giftCardDiscount)}</span>
+                          </div>
+                        )}
+                        <hr className="border-gray-300 dark:border-gray-600" />
+                        <div className="flex justify-between text-lg font-bold">
+                          <span className="text-gray-900 dark:text-white">Total:</span>
+                          <span className="text-gray-900 dark:text-white">{formatCurrency(invoice.grand_total)}</span>
+                        </div>
+                        {invoice.status === "Refunded" && invoice.refundAmount && (
+                          <div className="flex justify-between text-sm border-t border-gray-300 dark:border-gray-600 pt-2">
+                            <span className="text-red-600 dark:text-red-400">Refunded Amount:</span>
+                            <span className="text-red-600 dark:text-red-400">{formatCurrency(invoice.refundAmount)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Gift Card Section */}
+                  {invoice.giftCardCode && (
+                    <div className="px-6 py-4 bg-purple-50 dark:bg-purple-900/20 border-t border-gray-200 dark:border-gray-600">
+                      <h4 className="text-sm font-medium text-purple-900 dark:text-purple-100 mb-2">Gift Card Applied:</h4>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-purple-700 dark:text-purple-300">Code: {invoice.giftCardCode}</span>
+                        <span className="text-sm font-semibold text-purple-900 dark:text-purple-100">-{formatCurrency(invoice.giftCardDiscount)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Notes */}
+                  {invoice.notes && (
+                    <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-600">
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Notes:</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{invoice.notes}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Customer Details - 30% */}
+              <div className="lg:col-span-1">
+                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
+                        <User size={20} />
+                        <span>Customer Details</span>
+                      </h3>
+                      <button
+                        onClick={handleEditCustomer}
+                        className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg"
+                        title="Edit Customer"
+                      >
+                        <Edit size={16} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="px-6 py-4 space-y-4">
+                    <div>
+                      <h4 className="text-lg font-medium text-gray-900 dark:text-white">{invoice.customer}</h4>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-3 text-sm">
+                        <Mail className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-600 dark:text-gray-400">{mockCustomer.email}</span>
+                      </div>
+                      <div className="flex items-center space-x-3 text-sm">
+                        <Phone className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-600 dark:text-gray-400">{mockCustomer.phone}</span>
+                      </div>
+                      <div className="flex items-start space-x-3 text-sm">
+                        <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
+                        <span className="text-gray-600 dark:text-gray-400">{mockCustomer.address}</span>
+                      </div>
+                    </div>
+
+                    <hr className="border-gray-200 dark:border-gray-600" />
+
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-white">Customer Stats</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                          <div className="flex items-center space-x-2">
+                            <Package className="w-4 h-4 text-beveren-600" />
+                            <div>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Total Orders</p>
+                              <p className="text-lg font-semibold text-gray-900 dark:text-white">{mockCustomer.totalOrders}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                          <div className="flex items-center space-x-2">
+                            <DollarSign className="w-4 h-4 text-green-600" />
+                            <div>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Total Spent</p>
+                              <p className="text-lg font-semibold text-gray-900 dark:text-white">{formatCurrency(mockCustomer.totalSpent)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2 text-sm">
+                        <Calendar className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-600 dark:text-gray-400">Last Order: {mockCustomer.lastOrder}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Fixed Footer with Return Button */}
+            {(invoice.status === "Paid" || invoice.status === "Completed") && (
+                    <div className="fixed bottom-0 left-20 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-6 py-4">
+                        <div className="max-w-7xl mx-auto flex justify-end">
+                        <ConfirmDialog
+                            title="Process Return?"
+                            description="Are you sure you want to process a return for this invoice?"
+                            onConfirm={() => handleReturn(invoice.name)}
+                            trigger={
+                            <button
+                                className="flex items-center space-x-2 px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
+                            >
+                                <RefreshCw size={20} />
+                                <span>Process Return</span>
+                            </button>
+                            }
+                        />
+                        </div>
+                    </div>
+                    )}
+
+      </div>
+    </div>
+  );
+}
