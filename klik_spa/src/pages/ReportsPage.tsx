@@ -881,7 +881,7 @@ const filterInvoiceByDate = (invoiceDateStr: string) => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-6 py-8 mt-15">
         {/* Tabs */}
         <div className="mb-8">
           <div className="border-b border-gray-200 dark:border-gray-700">

@@ -1,4 +1,4 @@
-import { CreditCard, FileText, Grid3X3, Settings, BarChart3, Users } from "lucide-react"
+import { Receipt, FileText, Grid3X3, Settings, BarChart3, Users } from "lucide-react"
 import { useNavigate, useLocation } from "react-router-dom"
 
 export default function RetailSidebar() {
@@ -10,7 +10,7 @@ export default function RetailSidebar() {
     { icon: BarChart3, path: "/dashboard", label: "Dashboard" },
     { icon: Users, path: "/customers", label: "Customers" },
     { icon: FileText, path: "/reports", label: "Reports" },
-    { icon: CreditCard, path: "/payments", label: "Payments" },
+    { icon: Receipt, path: "/invoice", label: "InvoiceHistory" },
   ]
 
   const isActive = (path: string) => {
