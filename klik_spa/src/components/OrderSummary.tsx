@@ -231,7 +231,6 @@ useEffect(() => {
       if (!newBatches[key]) {
         try {
           const batches = await getBatches(item.id);
-          console.log("hapa pia", batches)
           if (Array.isArray(batches)) {
             newBatches[key] = batches;
           }

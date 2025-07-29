@@ -68,7 +68,6 @@ def create_and_submit_invoice(data):
     
     try:
         customer, items, amount_paid, sales_and_tax_charges, mode_of_payment = parse_invoice_data(data)
-        print("==========================",str(sales_and_tax_charges))
         doc = build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,mode_of_payment, include_payments=True)
         doc.base_paid_amount=amount_paid
         doc.paid_amount=amount_paid
@@ -93,7 +92,7 @@ def create_and_submit_invoice(data):
 def create_draft_invoice(data):
     try:
         customer, items, amount_paid, sales_and_tax_charges, mode_of_payment = parse_invoice_data(data)
-        doc = build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges, mode_of_payment, include_payments=False)
+        doc = build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges, mode_of_payment, include_payments=True)
         doc.insert(ignore_permissions=True)
 
         return {
@@ -124,8 +123,8 @@ def parse_invoice_data(data):
     if data.get("amountPaid"):
         amount_paid=data.get("amountPaid")
         
-    if data.get("paymentMethod"):
-        mode_of_payment=data.get("paymentMethod")
+    if data.get("paymentMethods"):
+        mode_of_payment=data.get("paymentMethods")
         
     if data.get("SalesTaxCharges"):
         sales_and_tax_charges=data.get("SalesTaxCharges")
@@ -134,15 +133,14 @@ def parse_invoice_data(data):
         frappe.throw(_("Customer and items are required"))
 
     return customer, items, amount_paid, sales_and_tax_charges, mode_of_payment
-
-def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,mode_of_payment, include_payments=False):
+def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges, mode_of_payment, include_payments=False):
     doc = frappe.new_doc("Sales Invoice")
     doc.customer = customer
     doc.due_date = frappe.utils.nowdate()
     doc.custom_delivery_date = frappe.utils.nowdate()
     doc.is_pos = 1
     doc.currency = get_customer_billing_currency(customer)
-    
+
     pos_profile = get_current_pos_profile()
     if sales_and_tax_charges:
         doc.taxes_and_charges = sales_and_tax_charges
@@ -158,13 +156,47 @@ def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,
             "expense_account": get_expense_accounts(item.get("id"))
         })
 
-    if include_payments:
-        doc.append("payments", {
-            "mode_of_payment": mode_of_payment,
-            "amount":amount_paid
-        })
+    print("Here is it", mode_of_payment)
+
+    if include_payments and isinstance(mode_of_payment, list):
+        for payment in mode_of_payment:
+            doc.append("payments", {
+                "mode_of_payment": payment["method"],
+                "amount": payment["amount"]
+            })
 
     return doc
+
+# def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,mode_of_payment, include_payments=False):
+#     doc = frappe.new_doc("Sales Invoice")
+#     doc.customer = customer
+#     doc.due_date = frappe.utils.nowdate()
+#     doc.custom_delivery_date = frappe.utils.nowdate()
+#     doc.is_pos = 1
+#     doc.currency = get_customer_billing_currency(customer)
+    
+#     pos_profile = get_current_pos_profile()
+#     if sales_and_tax_charges:
+#         doc.taxes_and_charges = sales_and_tax_charges
+#     else:
+#         doc.taxes_and_charges = pos_profile.taxes_and_charges
+
+#     for item in items:
+#         doc.append("items", {
+#             "item_code": item.get("id"),
+#             "qty": item.get("quantity"),
+#             "rate": item.get("price"),
+#             "income_account": get_income_accounts(item.get("id")),
+#             "expense_account": get_expense_accounts(item.get("id"))
+#         })
+#     print("Here si it", mode_of_payment)
+#     if include_payments:
+#         doc.append("payments", {
+#             "mode_of_payment": mode_of_payment,
+#             "amount":amount_paid
+#         })
+
+#     return doc
 
 def get_customer_billing_currency(customer):
     customer_doc = frappe.get_doc("Customer", customer)
