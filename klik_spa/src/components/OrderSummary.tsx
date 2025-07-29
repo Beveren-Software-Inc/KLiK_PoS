@@ -152,7 +152,7 @@ const [itemBatches, setItemBatches] = useState<Record<string, { batch_no: string
     setShowPaymentDialog(false)
     // Clear cart or navigate to success page
     handleClearCart()
-    toast.success('Invoice submitted & Payment completed successfully!')
+    // toast.success('Invoice submitted & Payment completed successfully!')
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -231,7 +231,6 @@ useEffect(() => {
       if (!newBatches[key]) {
         try {
           const batches = await getBatches(item.id);
-          console.log("hapa pia", batches)
           if (Array.isArray(batches)) {
             newBatches[key] = batches;
           }
