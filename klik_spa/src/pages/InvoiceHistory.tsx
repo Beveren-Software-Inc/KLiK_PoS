@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft,
   FileText,
   Clock,
   CheckCircle,
@@ -12,7 +11,6 @@ import {
   Download,
   Search,
   DollarSign,
-  TrendingUp,
   Grid3X3,
   List,
   Eye,
@@ -27,6 +25,8 @@ import { toast } from "react-toastify";
 import { createSalesReturn } from "../services/salesInvoice";
 import { useAllPaymentModes } from "../hooks/usePaymentModes";
 import RetailSidebar from "../components/RetailSidebar";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+// import InvoiceViewPage from "./InvoiceViewPage";
 
 export default function InvoiceHistoryPage() {
   const navigate = useNavigate();
@@ -52,6 +52,7 @@ export default function InvoiceHistoryPage() {
     { id: "Return", name: "Returns", icon: RefreshCw, color: "text-purple-600" },
     { id: "Cancelled", name: "Cancelled", icon: XCircle, color: "text-red-500" },
   ];
+
 
   const filterInvoiceByDate = (invoiceDateStr: string) => {
     if (dateFilter === "all") return true;
@@ -172,8 +173,10 @@ export default function InvoiceHistoryPage() {
   }
 
   const handleViewInvoice = (invoice: SalesInvoice) => {
-    setSelectedInvoice(invoice);
-    setShowInvoiceModal(true);
+    // setSelectedInvoice(invoice);
+    // setShowInvoiceModal(true);
+    navigate(`/invoice/${invoice.id}`);
+
   };
 
   const handleEditInvoice = (invoiceId: string) => {
@@ -196,6 +199,7 @@ export default function InvoiceHistoryPage() {
   const handleReturnClick = async (invoiceName: string) => {
     try {
       const result = await createSalesReturn(invoiceName);
+      navigate(`/invoice/${result.return_invoice}`)
       toast.success(`Invoice returned: ${result.return_invoice}`);
     } catch (error: any) {
       toast.error(error.message || "Failed to return invoice");
@@ -426,12 +430,19 @@ export default function InvoiceHistoryPage() {
                         </button>
                       )}
                       {invoice.status === "Paid" && (
-                        <button
-                          onClick={() => handleRefund(invoice.id)}
-                          className="text-orange-600 hover:text-orange-900"
-                        >
-                          Return
-                        </button>
+                        <ConfirmDialog
+                            title="Process Return?"
+                            description="Are you sure you want to process a return for this invoice?"
+                            onConfirm={() => handleReturn(invoice.name)}
+                            trigger={
+                            <button
+                                className="flex items-center space-x-2 px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
+                            >
+                                <RefreshCw size={20} />
+                                <span>Return</span>
+                            </button>
+                            }
+                        />
                       )}
                       {["Draft", "Unpaid"].includes(invoice.status) && (
                         <button
@@ -521,7 +532,7 @@ export default function InvoiceHistoryPage() {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-6 py-8 mt-16">
+        <div className="max-w-7xl mx-auto px-6 py-8 mt-16 ml-20">
           {/* Status Tabs */}
           <div className="mb-8">
             <div className="border-b border-gray-200 dark:border-gray-700">
@@ -558,6 +569,7 @@ export default function InvoiceHistoryPage() {
         </div>
 
         {/* Invoice View Modal */}
+       
         <InvoiceViewModal
           invoice={selectedInvoice}
           isOpen={showInvoiceModal}

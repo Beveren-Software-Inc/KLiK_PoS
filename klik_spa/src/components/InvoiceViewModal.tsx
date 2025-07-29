@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import type { SalesInvoice } from "../../types";
 import { useInvoiceDetails } from "../hooks/useInvoiceDetails";
+import { createSalesReturn } from "../services/salesInvoice";
+import { toast } from "react-toastify";
 
 interface InvoiceViewModalProps {
   invoice: SalesInvoice | null;
@@ -52,6 +54,16 @@ export default function InvoiceViewModal({
         return "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400";
     }
   };
+
+   const handleReturnClick = async (invoiceName: string) => {
+      try {
+        const result = await createSalesReturn(invoiceName);
+        console.log(result)
+        toast.success(`Invoice returned: ${result.return_invoice}`);
+      } catch (error: any) {
+        toast.error(error.message || "Failed to return invoice");
+      }
+    };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -167,7 +179,12 @@ export default function InvoiceViewModal({
                 {/* Actions */}
                 <div className="space-y-3">
                   {displayInvoice.status === "Paid" && (
-                    <ActionButton onClick={() => onRefund(displayInvoice.name)} icon={<RefreshCw />} color="orange" text="Process Return" />
+                  <ActionButton
+                    onClick={() => handleReturnClick(displayInvoice.name)}
+                    icon={<RefreshCw />}
+                    color="orange"
+                    text="Process Returns"
+                  />
                   )}
                   {displayInvoice.status === "Pending" && (
                     <ActionButton onClick={() => onCancel(displayInvoice.id)} icon={<XCircle />} color="red" text="Cancel Order" />

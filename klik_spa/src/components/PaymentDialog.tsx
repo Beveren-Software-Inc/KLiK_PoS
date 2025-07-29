@@ -9,6 +9,7 @@ import { createDraftSalesInvoice } from "../services/salesInvoice"
 import { createSalesInvoice } from "../services/salesInvoice"
 import { toast } from 'react-toastify';
 import PrintPreview  from "../utils/posPreview"
+import { useNavigate } from "react-router-dom"
 
 
 interface PaymentDialogProps {
@@ -37,6 +38,7 @@ interface PaymentMethod {
 interface PaymentAmount {
   [key: string]: number
 }
+
 
 const getIconAndColor = (label: string): { icon: React.ReactNode; color: string } => {
   const lowerLabel = label.toLowerCase();
@@ -81,7 +83,7 @@ export default function PaymentDialog({
 const [submittedInvoice, setSubmittedInvoice] = useState<any>(null); // you can define a better type
 // const [showPreview, setShowPreview] = useState(false)
 const [invoiceData, setInvoiceData] = useState(null)
-
+const navigate = useNavigate()
 
   // Calculate totals
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
@@ -96,6 +98,7 @@ const [invoiceData, setInvoiceData] = useState(null)
   const totalPaidAmount = Object.values(paymentAmounts).reduce((sum, amount) => sum + (amount || 0), 0)
   const outstandingAmount = Math.max(0, grandTotal - totalPaidAmount)
 
+  
   useEffect(() => {
     if (isOpen && defaultTax && !selectedSalesTaxCharges) {
       setSelectedSalesTaxCharges(defaultTax);
@@ -226,6 +229,12 @@ const handleCompletePayment = async () => {
     toast.error("Failed to submit invoice");
   }
 };
+
+  const handleViewInvoice = (invoice: SalesInvoice) => {
+    console.log("Helkos", invoice.name)
+      navigate(`/invoice/${invoice.name}`);
+  
+    };
 
 const DebugPrintPreview = ({ invoice }: { invoice: any }) => {
   console.log("DebugPrintPreview received invoice:", invoice);
@@ -477,6 +486,14 @@ const DebugPrintPreview = ({ invoice }: { invoice: any }) => {
         onClick={() => window.open(`tel:${selectedCustomer?.phone}`)}
       >
         <MessageSquarePlus />
+      </button>
+
+      <button
+        className="p-2 text-purple-600 hover:bg-purple-100 dark:text-purple-400 dark:hover:bg-purple-900 rounded-lg"
+        title="View Full"
+        onClick={()=>handleViewInvoice(invoiceData)}
+      >
+        <Eye />
       </button>
     </div>
   ) : (
