@@ -120,6 +120,7 @@ export default function CustomerDetailsPage() {
   };
 
   const handleViewInvoice = (invoice: SalesInvoice) => {
+    navigate(`/invoice/${invoice.id}`)
     setSelectedInvoice(invoice);
     setShowInvoiceModal(true);
   };

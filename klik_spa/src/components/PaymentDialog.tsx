@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X, CreditCard, Banknote, Smartphone, Gift, Printer, Eye, Calculator, Check, MessageCirclePlus, MailPlus,MessageSquarePlus } from "lucide-react"
+import { X, CreditCard, Banknote, Smartphone, Gift, Printer, Eye, Calculator, Check, MessageCirclePlus, MailPlus, MessageSquarePlus, Loader2 } from "lucide-react"
 import type { CartItem, GiftCoupon, Customer } from "../../types"
 import { usePaymentModes } from "../hooks/usePaymentModes"
 import { useSalesTaxCharges } from "../hooks/useSalesTaxCharges"
@@ -77,6 +77,8 @@ export default function PaymentDialog({
   const [paymentAmounts, setPaymentAmounts] = useState<PaymentAmount>({})
   const [roundOffAmount, setRoundOffAmount] = useState(0)
   const [showPreview, setShowPreview] = useState(false)
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false) // New loading state
+  const [isHoldingOrder, setIsHoldingOrder] = useState(false) // New loading state for hold order
   const { modes, isLoading, error } = usePaymentModes("Test POS Profile");
   const { salesTaxCharges, defaultTax } = useSalesTaxCharges();
   const [invoiceSubmitted, setInvoiceSubmitted] = useState(false);
@@ -150,8 +152,8 @@ const navigate = useNavigate()
   });
 
   const handlePaymentAmountChange = (methodId: string, amount: string) => {
-    // Prevent changes if invoice is submitted
-    if (invoiceSubmitted) return;
+    // Prevent changes if invoice is submitted or processing
+    if (invoiceSubmitted || isProcessingPayment) return;
     
     const numericAmount = parseFloat(amount) || 0;
     setPaymentAmounts(prev => ({
@@ -160,27 +162,24 @@ const navigate = useNavigate()
     }));
   };
 
-  // const handleNewOrder = (data: string) =>{
-  //   onCompletePayment(data)
-  // }
   const handleRoundOff = () => {
-    // Prevent changes if invoice is submitted
-    if (invoiceSubmitted) return;
+    // Prevent changes if invoice is submitted or processing
+    if (invoiceSubmitted || isProcessingPayment) return;
     
     const rounded = Math.round(totalBeforeRoundOff)
     setRoundOffAmount(rounded - totalBeforeRoundOff)
   }
 
   const handleSalesTaxChange = (value: string) => {
-    // Prevent changes if invoice is submitted
-    if (invoiceSubmitted) return;
+    // Prevent changes if invoice is submitted or processing
+    if (invoiceSubmitted || isProcessingPayment) return;
     
     setSelectedSalesTaxCharges(value);
   };
 
   const handleRoundOffChange = (value: string) => {
-    // Prevent changes if invoice is submitted
-    if (invoiceSubmitted) return;
+    // Prevent changes if invoice is submitted or processing
+    if (invoiceSubmitted || isProcessingPayment) return;
     
     setRoundOffAmount(parseFloat(value) || 0);
   };
@@ -200,6 +199,7 @@ const handleCompletePayment = async () => {
     return;
   }
 
+  setIsProcessingPayment(true); // Start loading
 
   const paymentData = {
     items: cartItems,
@@ -218,15 +218,17 @@ const handleCompletePayment = async () => {
 
   try {
     const response = await createSalesInvoice(paymentData);
-    // toast.success("Invoice submitted successfully");
     console.log(response.invoice.custom_invoice_qr_code)
     setInvoiceSubmitted(true);
     setSubmittedInvoice(response); // Save full invoice doc if returned
     setShowPreview(true)
     setInvoiceData(response.invoice)
+    toast.success("Invoice submitted successfully!");
     // onCompletePayment(paymentData);
   } catch (err) {
     toast.error("Failed to submit invoice");
+  } finally {
+    setIsProcessingPayment(false); // End loading
   }
 };
 
@@ -236,11 +238,14 @@ const handleCompletePayment = async () => {
   
     };
 
-  const handleHoldOrder = () => {
+  const handleHoldOrder = async () => {
     if (!selectedCustomer) {
       toast.error("Kindly select a customer")
       return;
     }
+
+    setIsHoldingOrder(true); // Start loading
+
     const orderData = {
       items: cartItems,
       customer: selectedCustomer,
@@ -253,8 +258,16 @@ const handleCompletePayment = async () => {
       appliedCoupons,
       status: 'held'
     }
-    createDraftSalesInvoice(orderData)
-    onHoldOrder(orderData)
+
+    try {
+      await createDraftSalesInvoice(orderData);
+      toast.success("Order held successfully!");
+      onHoldOrder(orderData);
+    } catch (err) {
+      toast.error("Failed to hold order");
+    } finally {
+      setIsHoldingOrder(false); // End loading
+    }
   }
 
   const formatCurrency = (amount: number) => {
@@ -284,6 +297,7 @@ const handleCompletePayment = async () => {
               <button
                 onClick={onClose}
                 className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                disabled={isProcessingPayment || isHoldingOrder}
               >
                 <X size={20} />
               </button>
@@ -296,7 +310,7 @@ const handleCompletePayment = async () => {
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Payment Methods</h2>
               <div className="space-y-3">
                 {paymentMethods.map((method) => (
-                  <div key={method.id} className={`border border-gray-200 dark:border-gray-700 rounded-lg p-4 ${invoiceSubmitted ? 'bg-gray-50 dark:bg-gray-800' : ''}`}>
+                  <div key={method.id} className={`border border-gray-200 dark:border-gray-700 rounded-lg p-4 ${invoiceSubmitted || isProcessingPayment ? 'bg-gray-50 dark:bg-gray-800' : ''}`}>
                     <div className="flex items-center space-x-3 mb-3">
                       <div className={`w-10 h-10 rounded-lg ${method.color} text-white flex items-center justify-center`}>
                         <div className="scale-75">
@@ -316,8 +330,8 @@ const handleCompletePayment = async () => {
                         value={method.amount || ''}
                         onChange={(e) => handlePaymentAmountChange(method.id, e.target.value)}
                         placeholder="0.00"
-                        disabled={invoiceSubmitted}
-                        className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${invoiceSubmitted ? 'cursor-not-allowed opacity-50' : ''}`}
+                        disabled={invoiceSubmitted || isProcessingPayment}
+                        className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
                       />
                     </div>
                   </div>
@@ -331,8 +345,8 @@ const handleCompletePayment = async () => {
               <select
                 value={selectedSalesTaxCharges}
                 onChange={(e) => handleSalesTaxChange(e.target.value)}
-                disabled={invoiceSubmitted}
-                className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${invoiceSubmitted ? 'cursor-not-allowed opacity-50' : ''}`}
+                disabled={invoiceSubmitted || isProcessingPayment}
+                className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
               >
                 {salesTaxCharges.map((tax) => (
                   <option key={tax.id} value={tax.id}>
@@ -393,22 +407,37 @@ const handleCompletePayment = async () => {
             <div className="space-y-3 pt-6">
               <button
                 onClick={handleCompletePayment}
-                disabled={outstandingAmount > 0 || invoiceSubmitted}
-                className="w-full bg-green-600 text-white py-4 rounded-lg font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors"
+                disabled={outstandingAmount > 0 || invoiceSubmitted || isProcessingPayment}
+                className="w-full bg-green-600 text-white py-4 rounded-lg font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
               >
-                Complete Payment
+                {isProcessingPayment ? (
+                  <>
+                    <Loader2 size={20} className="animate-spin" />
+                    <span>Processing Payment...</span>
+                  </>
+                ) : (
+                  <span>Complete Payment</span>
+                )}
               </button>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={handleHoldOrder}
-                  disabled={invoiceSubmitted}
-                  className={`py-3 px-4 border border-orange-500 text-orange-600 dark:text-orange-400 rounded-lg font-medium hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors ${invoiceSubmitted ? 'cursor-not-allowed opacity-50' : ''}`}
+                  disabled={invoiceSubmitted || isProcessingPayment || isHoldingOrder}
+                  className={`py-3 px-4 border border-orange-500 text-orange-600 dark:text-orange-400 rounded-lg font-medium hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors flex items-center justify-center space-x-2 ${invoiceSubmitted || isProcessingPayment || isHoldingOrder ? 'cursor-not-allowed opacity-50' : ''}`}
                 >
-                  Hold Order
+                  {isHoldingOrder ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Holding...</span>
+                    </>
+                  ) : (
+                    <span>Hold Order</span>
+                  )}
                 </button>
                 <button
                   onClick={onClose}
-                  className="py-3 px-4 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  disabled={isProcessingPayment || isHoldingOrder}
+                  className="py-3 px-4 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -482,7 +511,8 @@ const handleCompletePayment = async () => {
   ) : (
     <button
       onClick={onClose}
-      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+      disabled={isProcessingPayment || isHoldingOrder}
+      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
     >
       <X size={24} />
     </button>
@@ -501,7 +531,7 @@ const handleCompletePayment = async () => {
     {paymentMethods.map((method) => (
       <div
         key={method.id}
-        className={`min-w-[50%] sm:min-w-[300px] md:min-w-[350px] border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-beveren-300 transition-colors flex-shrink-0 ${invoiceSubmitted ? 'bg-gray-50 dark:bg-gray-800' : ''}`}
+        className={`min-w-[50%] sm:min-w-[300px] md:min-w-[350px] border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-beveren-300 transition-colors flex-shrink-0 ${invoiceSubmitted || isProcessingPayment ? 'bg-gray-50 dark:bg-gray-800' : ''}`}
       >
         <div className="flex items-center space-x-3 mb-3">
           <div className={`w-8 h-8 rounded-md ${method.color} text-white flex items-center justify-center`}>
@@ -522,8 +552,8 @@ const handleCompletePayment = async () => {
             value={method.amount || ''}
             onChange={(e) => handlePaymentAmountChange(method.id, e.target.value)}
             placeholder="0.00"
-            disabled={invoiceSubmitted}
-            className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm ${invoiceSubmitted ? 'cursor-not-allowed opacity-50' : ''}`}
+            disabled={invoiceSubmitted || isProcessingPayment}
+            className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
           />
         </div>
       </div>
@@ -542,8 +572,8 @@ const handleCompletePayment = async () => {
                   <select
                     value={selectedSalesTaxCharges}
                     onChange={(e) => handleSalesTaxChange(e.target.value)}
-                    disabled={invoiceSubmitted}
-                    className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${invoiceSubmitted ? 'cursor-not-allowed opacity-50' : ''}`}
+                    disabled={invoiceSubmitted || isProcessingPayment}
+                    className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
                   >
                     {salesTaxCharges.map((tax) => (
                       <option key={tax.id} value={tax.id}>
@@ -577,13 +607,13 @@ const handleCompletePayment = async () => {
                         type="number"
                         value={roundOffAmount.toFixed(2)}
                         onChange={(e) => handleRoundOffChange(e.target.value)}
-                        disabled={invoiceSubmitted}
-                        className={`flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${invoiceSubmitted ? 'cursor-not-allowed opacity-50' : ''}`}
+                        disabled={invoiceSubmitted || isProcessingPayment}
+                        className={`flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
                       />
                       <button
                         onClick={handleRoundOff}
-                        disabled={invoiceSubmitted}
-                        className={`px-3 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors ${invoiceSubmitted ? 'cursor-not-allowed opacity-50' : ''}`}
+                        disabled={invoiceSubmitted || isProcessingPayment}
+                        className={`px-3 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
                         title="Auto Round"
                       >
                         <Calculator size={16} />
@@ -763,9 +793,8 @@ const handleCompletePayment = async () => {
             </button>
 
             <button
-              onClick={handleCompletePayment}
-              disabled={outstandingAmount > 0}
-              className="px-8 py-2 bg-gray-600 text-white rounded-lg font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors flex items-center space-x-2"
+              onClick={onClose}
+              className="px-8 py-2 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700 transition-colors flex items-center space-x-2"
             >
               <Check size={16} />
               <span>Return</span>
@@ -778,24 +807,41 @@ const handleCompletePayment = async () => {
           <div className="flex justify-end space-x-4">
             <button
               onClick={onClose}
-              className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              disabled={isProcessingPayment || isHoldingOrder}
+              className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               onClick={handleHoldOrder}
-              disabled={invoiceSubmitted}
-              className={`px-6 py-2 border border-orange-500 text-orange-600 dark:text-orange-400 rounded-lg font-medium hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors ${invoiceSubmitted ? 'cursor-not-allowed opacity-50' : ''}`}
+              disabled={invoiceSubmitted || isProcessingPayment || isHoldingOrder}
+              className={`px-6 py-2 border border-orange-500 text-orange-600 dark:text-orange-400 rounded-lg font-medium hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors flex items-center space-x-2 ${invoiceSubmitted || isProcessingPayment || isHoldingOrder ? 'cursor-not-allowed opacity-50' : ''}`}
             >
-              Hold Order
+              {isHoldingOrder ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Holding...</span>
+                </>
+              ) : (
+                <span>Hold Order</span>
+              )}
             </button>
             <button
               onClick={handleCompletePayment}
-              disabled={outstandingAmount > 0 || invoiceSubmitted}
+              disabled={outstandingAmount > 0 || invoiceSubmitted || isProcessingPayment}
               className="px-8 py-2 bg-green-600 text-white rounded-lg font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors flex items-center space-x-2"
             >
-              <Check size={16} />
-              <span>Complete Payment</span>
+              {isProcessingPayment ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Processing...</span>
+                </>
+              ) : (
+                <>
+                  <Check size={16} />
+                  <span>Complete Payment</span>
+                </>
+              )}
             </button>
           </div>
         </div>
