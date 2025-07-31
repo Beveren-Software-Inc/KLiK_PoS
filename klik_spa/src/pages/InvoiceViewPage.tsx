@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom"; // ✅ import this
 
 import {
@@ -21,57 +21,30 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-import {
-  AlertDialog,
-  AlertDialogTrigger,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
-} from "@/components/ui/alert-dialog"
-
 
 import RetailSidebar from "../components/RetailSidebar";
 import { useInvoiceDetails } from "../hooks/useInvoiceDetails";
 import { createSalesReturn } from "../services/salesInvoice";
 import { toast } from "react-toastify";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { DisplayPrintPreview, handlePrintInvoice } from "../utils/invoicePrint"
 
 export default function InvoiceViewPage() {
-  const { id: invoiceId } = useParams(); // ✅ extract ID from URL
+  // const { id: invoiceId } = useParams(); // ✅ extract ID from URL
 
+  const { id } = useParams()
+  const invoiceId = id ?? ""
+  
   const { invoice, isLoading, error } = useInvoiceDetails(invoiceId);
     const navigate = useNavigate()
 
-  // Mock customer data - you may want to create a separate hook for this
-  const mockCustomer = {
-    name: invoice?.customer || "",
-    email: "john.doe@email.com", // This should come from invoice data or separate API
-    phone: "+1234567890", // This should come from invoice data or separate API
-    address: "123 Main Street, City, State 12345", // This should come from invoice data or separate API
-    totalOrders: 15,
-    totalSpent: 2450.00,
-    lastOrder: "2024-01-10"
-  };
-
-  useEffect(() => {
-    // Extract invoice ID from URL or get it from props/context
-    // For now, using a placeholder - replace with your actual routing logic
-    const urlParams = new URLSearchParams(window.location.search);
-    const idFromUrl = urlParams.get('id');
-    if (idFromUrl) {
-      setInvoiceId(idFromUrl);
-    }
-  }, []);
 
   const handleBackClick = () => {
     console.log("Navigate back to invoice history");
     navigate(`/invoice`)
     // You can replace this with your navigation logic
   };
+
 
   const formatCurrency = (amount) => `$${amount?.toFixed(2) || '0.00'}`;
 
@@ -109,7 +82,7 @@ export default function InvoiceViewPage() {
   };
 
   const handleEditCustomer = () => {
-    console.log("Edit customer:", mockCustomer.name);
+    // console.log("Edit customer:", mockCustomer.name);
     // Navigate to customer edit page
   };
 
@@ -167,7 +140,7 @@ export default function InvoiceViewPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
       <RetailSidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden ml-20">
         {/* Header */}
         <div className="fixed top-0 left-20 right-0 z-50 bg-beveren-50 dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
           <div className="max-w-7xl mx-auto px-6 py-4">
@@ -195,10 +168,14 @@ export default function InvoiceViewPage() {
 
               {/* Action Buttons */}
               <div className="flex items-center space-x-3">
+                <div className="sr-only">
+                                    <DisplayPrintPreview invoice={invoice} />
+
+                </div>
                 <button
                   className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"
                   title="Print"
-                  onClick={() => window.print()}
+                  onClick={() => handlePrintInvoice(invoice)}
                 >
                   <Printer size={20} />
                 </button>
@@ -208,8 +185,8 @@ export default function InvoiceViewPage() {
                   title="Email"
                   onClick={() => {
                     const subject = encodeURIComponent("Your Invoice");
-                    const body = encodeURIComponent(`Dear ${mockCustomer?.name},\n\nHere is your invoice total: ${formatCurrency(invoice.grand_total)}\n\nThank you.`);
-                    window.open(`mailto:${mockCustomer?.email}?subject=${subject}&body=${body}`);
+                    const body = encodeURIComponent(`Dear ${invoice.customer_name},\n\nHere is your invoice total: ${formatCurrency(invoice.grand_total)}\n\nThank you.`);
+                    window.open(`mailto:${invoice.customer_address_doc?.email_id}?subject=${subject}&body=${body}`);
                   }}
                 >
                   <MailPlus size={20} />
@@ -415,15 +392,15 @@ export default function InvoiceViewPage() {
                     <div className="space-y-3">
                       <div className="flex items-center space-x-3 text-sm">
                         <Mail className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-600 dark:text-gray-400">{mockCustomer.email}</span>
+                        <span className="text-gray-600 dark:text-gray-400">{invoice.customer_address_doc?.email_id}</span>
                       </div>
                       <div className="flex items-center space-x-3 text-sm">
                         <Phone className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-600 dark:text-gray-400">{mockCustomer.phone}</span>
+                        <span className="text-gray-600 dark:text-gray-400">{invoice.customer_address_doc?.phone}</span>
                       </div>
                       <div className="flex items-start space-x-3 text-sm">
                         <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
-                        <span className="text-gray-600 dark:text-gray-400">{mockCustomer.address}</span>
+                        <span className="text-gray-600 dark:text-gray-400">{invoice.customer_address_doc?.address_line1}</span>
                       </div>
                     </div>
 
@@ -437,7 +414,7 @@ export default function InvoiceViewPage() {
                             <Package className="w-4 h-4 text-beveren-600" />
                             <div>
                               <p className="text-sm text-gray-600 dark:text-gray-400">Total Orders</p>
-                              <p className="text-lg font-semibold text-gray-900 dark:text-white">{mockCustomer.totalOrders}</p>
+                              <p className="text-lg font-semibold text-gray-900 dark:text-white">{invoice.customer_address_doc?.email_id}</p>
                             </div>
                           </div>
                         </div>
@@ -446,14 +423,14 @@ export default function InvoiceViewPage() {
                             <DollarSign className="w-4 h-4 text-green-600" />
                             <div>
                               <p className="text-sm text-gray-600 dark:text-gray-400">Total Spent</p>
-                              <p className="text-lg font-semibold text-gray-900 dark:text-white">{formatCurrency(mockCustomer.totalSpent)}</p>
+                              <p className="text-lg font-semibold text-gray-900 dark:text-white">{invoice.customer_address_doc?.email_id}</p>
                             </div>
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center space-x-2 text-sm">
                         <Calendar className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-600 dark:text-gray-400">Last Order: {mockCustomer.lastOrder}</span>
+                        <span className="text-gray-600 dark:text-gray-400">Last Order: {invoice.customer_address_doc?.email_id}</span>
                       </div>
                     </div>
                   </div>

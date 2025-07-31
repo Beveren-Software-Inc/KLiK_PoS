@@ -46,13 +46,15 @@ export interface GiftCoupon {
 export interface Invoice {
   invoiceId: string
   dateTime: string
-  items: Array<{
+  item: Array<{
     itemCode: string
     nameEn: string
     nameAr: string
     qty: number
     unitPrice: number
     lineTotal: number
+    rate: number
+    amount: number
   }>
   subtotal: number
   vat: number
@@ -88,7 +90,7 @@ export interface SalesInvoice {
   paymentMethod: "Cash" | "Debit Card";
   amountPaid: number;
   changeGiven: number;
-  status: "Completed" | "Pending" | "Cancelled" | "Refunded";
+  status: "Completed" | "Pending" | "Cancelled" | "Refunded" | "Paid" | "Unpaid" | "Overdue";
   refundAmount: number;
   notes: string;
   customer_address_doc?: AddressDoc;
@@ -159,6 +161,12 @@ export interface Customer {
   id: string
   name: string
   email: string
+  email_id:string
+  customer_name:string
+  mobile_no: string
+  territory: string
+  customer_group:string
+  customer_type:string
   phone: string
   address: {
     street: string

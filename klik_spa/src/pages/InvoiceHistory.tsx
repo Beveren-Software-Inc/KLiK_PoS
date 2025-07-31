@@ -53,7 +53,7 @@ export default function InvoiceHistoryPage() {
     { id: "Cancelled", name: "Cancelled", icon: XCircle, color: "text-red-500" },
   ];
 
-
+console.log("Hizo zote", invoices)
   const filterInvoiceByDate = (invoiceDateStr: string) => {
     if (dateFilter === "all") return true;
 
@@ -198,7 +198,9 @@ export default function InvoiceHistoryPage() {
 
   const handleReturnClick = async (invoiceName: string) => {
     try {
+       console.log("Name", invoiceName)
       const result = await createSalesReturn(invoiceName);
+     
       navigate(`/invoice/${result.return_invoice}`)
       toast.success(`Invoice returned: ${result.return_invoice}`);
     } catch (error: any) {
@@ -433,7 +435,7 @@ export default function InvoiceHistoryPage() {
                         <ConfirmDialog
                             title="Process Return?"
                             description="Are you sure you want to process a return for this invoice?"
-                            onConfirm={() => handleReturn(invoice.name)}
+                            onConfirm={() => handleRefund(invoice.id)}
                             trigger={
                             <button
                                 className="flex items-center space-x-2 px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"

@@ -489,7 +489,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Transactions</h3>
               <button
-                onClick={() => navigate("/reports")}
+                onClick={() => navigate("/closing_shift")}
                 className="text-sm text-beveren-600 dark:text-beveren-400 hover:underline"
               >
                 View All Reports

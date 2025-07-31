@@ -40,7 +40,7 @@ const router = createBrowserRouter([
         element: <ProtectedRoute element={<DashboardPage />} />,
       },
       {
-        path: "reports",
+        path: "closing_shift",
         element: <ProtectedRoute element={<ClosingShiftPage />} />,
       },
       {

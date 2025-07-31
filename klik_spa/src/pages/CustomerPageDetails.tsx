@@ -15,7 +15,8 @@ import {
   Edit,
   ArrowLeft,
   Clock,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from "lucide-react";
 
 import InvoiceViewModal from "../components/InvoiceViewModal";
@@ -25,6 +26,7 @@ import { toast } from "react-toastify";
 import { createSalesReturn } from "../services/salesInvoice";
 import RetailSidebar from "../components/RetailSidebar";
 import { useCustomerDetails } from "../hooks/useCustomers";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 
 export default function CustomerDetailsPage() {
   const navigate = useNavigate();
@@ -38,33 +40,11 @@ export default function CustomerDetailsPage() {
   const { customer, isLoadingC, errorC } = useCustomerDetails(customerId);
   const { invoices, isLoading, error } = useSalesInvoices();
 
-  // Debug logging
-  console.log("Customer data:", customer);
-  console.log("Loading state:", isLoadingC);
-  console.log("Error state:", errorC);
-
-  // Filter invoices for this customer
-  const customerInvoices = useMemo(() => {
-    if (isLoading || error || !customer) return [];
-    
-    return invoices.filter((invoice) => {
-      // Filter by customer name using the actual API field
-      const isCustomerInvoice = invoice.customer === customer.customer_name;
-      
-      if (!isCustomerInvoice) return false;
-
-      const matchesSearch =
-        searchQuery === "" ||
-        invoice.id.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchesStatus = statusFilter === "all" || invoice.status === statusFilter;
-      
-      const matchesDate = filterInvoiceByDate(invoice.date);
-
-      return matchesSearch && matchesStatus && matchesDate;
-    });
-  }, [invoices, searchQuery, statusFilter, dateFilter, isLoading, error, customer]);
-
+  console.log("Invoices", invoices)
+  console.log("📊 Total invoices available:", invoices.length);
+  console.log("🔄 Loading state:", isLoading);
+  console.log("❌ Error state:", error);
+  
   const filterInvoiceByDate = (invoiceDateStr: string) => {
     if (dateFilter === "all") return true;
 
@@ -94,6 +74,29 @@ export default function CustomerDetailsPage() {
 
     return true;
   };
+  // Filter invoices for this customer
+  const customerInvoices = useMemo(() => {
+    if (isLoading || error || !customer) return [];
+    
+    return invoices.filter((invoice) => {
+      // Filter by customer name using the actual API field
+      const isCustomerInvoice = invoice.customer === customer.customer_name;
+      
+      if (!isCustomerInvoice) return false;
+
+      const matchesSearch =
+        searchQuery === "" ||
+        invoice.id.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesStatus = statusFilter === "all" || invoice.status === statusFilter;
+      
+      const matchesDate = filterInvoiceByDate(invoice.date);
+
+      return matchesSearch && matchesStatus && matchesDate;
+    });
+  }, [invoices, searchQuery, statusFilter, dateFilter, isLoading, error, customer]);
+
+
 
   const getStatusBadge = (status: string) => {
     const baseClasses = "px-2 py-1 rounded-full text-xs font-medium";
@@ -117,18 +120,23 @@ export default function CustomerDetailsPage() {
   };
 
   const handleViewInvoice = (invoice: SalesInvoice) => {
+    navigate(`/invoice/${invoice.id}`)
     setSelectedInvoice(invoice);
     setShowInvoiceModal(true);
   };
 
   const handleRefund = (invoiceId: string) => {
     handleReturnClick(invoiceId);
+
     setShowInvoiceModal(false);
   };
 
-  const handleReturnClick = async (invoiceName: string) => {
+ const handleReturnClick = async (invoiceName: string) => {
     try {
+       console.log("Name", invoiceName)
       const result = await createSalesReturn(invoiceName);
+     
+      navigate(`/invoice/${result.return_invoice}`)
       toast.success(`Invoice returned: ${result.return_invoice}`);
     } catch (error: any) {
       toast.error(error.message || "Failed to return invoice");
@@ -476,12 +484,19 @@ export default function CustomerDetailsPage() {
                                 <span>View</span>
                               </button>
                               {invoice.status === "Paid" && (
-                                <button 
-                                  onClick={() => handleRefund(invoice.id)}
-                                  className="text-orange-600 hover:text-orange-900"
-                                >
-                                  Return
-                                </button>
+                            <ConfirmDialog
+                                  title="Process Return?"
+                                  description="Are you sure you want to process a return for this invoice?"
+                                  onConfirm={() => handleRefund(invoice.id)}
+                                  trigger={
+                                  <button
+                                      className="flex items-center space-x-2 px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
+                                  >
+                                <RefreshCw size={20} />
+                                <span>Return</span>
+                            </button>
+                            }
+                        />
                               )}
                             </div>
                           </td>
