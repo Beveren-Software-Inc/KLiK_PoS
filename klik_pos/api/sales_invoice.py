@@ -31,7 +31,6 @@ def get_sales_invoices(limit=100, start=0):
         for inv in invoices:
             full_name = frappe.db.get_value("User", inv["owner"], "full_name") or inv["owner"]
             inv["cashier_name"] = full_name
-
         return {
             "success": True,
             "data": invoices
@@ -50,9 +49,36 @@ def get_invoice_details(invoice_id):
         invoice = frappe.get_doc("Sales Invoice", invoice_id)
         invoice_data = invoice.as_dict()
 
+        # Get full company address doc
+        company_address_doc = None
+        if invoice.company_address:
+            company_address_doc = frappe.get_doc("Address", invoice.company_address).as_dict()
+
+        # Get full customer address doc
+        customer_address_doc = None
+        if invoice.customer_address:
+            customer_address_doc = frappe.get_doc("Address", invoice.customer_address).as_dict()
+        else:
+            # fallback to primary address linked to customer
+            primary_address = frappe.db.get_value(
+                "Dynamic Link",
+                {
+                    "link_doctype": "Customer",
+                    "link_name": invoice.customer,
+                    "parenttype": "Address"
+                },
+                "parent"
+            )
+            if primary_address:
+                customer_address_doc = frappe.get_doc("Address", primary_address).as_dict()
+
         return {
             "success": True,
-            "data": invoice_data
+            "data": {
+                **invoice_data,
+                "company_address_doc": company_address_doc,
+                "customer_address_doc": customer_address_doc
+            }
         }
 
     except Exception as e:
@@ -61,6 +87,7 @@ def get_invoice_details(invoice_id):
             "success": False,
             "error": str(e)
         }
+
 
 
 @frappe.whitelist()

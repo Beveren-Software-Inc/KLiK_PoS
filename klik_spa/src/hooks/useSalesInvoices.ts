@@ -8,15 +8,15 @@ export function useSalesInvoices() {
   const [error, setError] = useState<string | null>(null);
 
 const fetchInvoices = async () => {
+
   setIsLoading(true); // ✅ MUST ENABLE THIS
   try {
     
     const response = await fetch(
-      "api/method/klik_pos.api.sales_invoice.get_sales_invoices"
+      "/api/method/klik_pos.api.sales_invoice.get_sales_invoices"
     );
-   
     const resData = await response.json();
-  
+    
     const rawInvoices = resData.message.data;
     
     const transformed: SalesInvoice[] = rawInvoices.map((invoice: any) => ({
@@ -49,7 +49,7 @@ const fetchInvoices = async () => {
         invoice.status === "Refunded" ? invoice.base_grand_total || 0 : 0,
       notes: invoice.remarks || "",
     }));
-
+    // console.log("Transformed", transformed)
     setInvoices(transformed);
     setError(null); // Reset error if successful
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

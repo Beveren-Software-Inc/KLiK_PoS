@@ -143,7 +143,7 @@ export default function RetailPOSLayout() {
       <RetailSidebar />
 
       {/* Menu Section - Takes remaining space minus cart width */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden ml-20">
         <MenuGrid
           items={filteredItems}
           selectedCategory={selectedCategory}

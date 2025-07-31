@@ -10,7 +10,7 @@ import { createSalesInvoice } from "../services/salesInvoice"
 import { toast } from 'react-toastify';
 import PrintPreview  from "../utils/posPreview"
 import { useNavigate } from "react-router-dom"
-
+import { DisplayPrintPreview, handlePrintInvoice } from "../utils/invoicePrint"
 
 interface PaymentDialogProps {
   isOpen: boolean
@@ -236,15 +236,6 @@ const handleCompletePayment = async () => {
   
     };
 
-const DebugPrintPreview = ({ invoice }: { invoice: any }) => {
-  console.log("DebugPrintPreview received invoice:", invoice);
-  return (
-    <div className="border p-2 m-2">
-      <PrintPreview invoice={invoice} />
-    </div>
-  );
-};
-
   const handleHoldOrder = () => {
     if (!selectedCustomer) {
       toast.error("Kindly select a customer")
@@ -434,15 +425,7 @@ const DebugPrintPreview = ({ invoice }: { invoice: any }) => {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
-        {/* <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Payment Processing</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-          >
-            <X size={24} />
-          </button>
-        </div> */}
+       
 
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
   <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Payment Processing</h2>
@@ -452,7 +435,7 @@ const DebugPrintPreview = ({ invoice }: { invoice: any }) => {
       <button
         className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"
         title="Print"
-        onClick={() => window.print()}
+        onClick={() =>handlePrintInvoice(invoiceData)}
       >
         <Printer size={20} />
       </button>
@@ -667,7 +650,7 @@ const DebugPrintPreview = ({ invoice }: { invoice: any }) => {
       <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 text-center">Print Format Preview:</h5>
       <div className="border border-gray-300 dark:border-gray-600 rounded p-2 bg-gray-50 dark:bg-gray-700">
         {/* Debug version - remove after testing */}
-        <DebugPrintPreview invoice={invoiceData} />
+        <DisplayPrintPreview invoice={invoiceData} />
         
         {/* Or use regular version */}
         {/* <PrintPreview invoice={invoiceData} /> */}

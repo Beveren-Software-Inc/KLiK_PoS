@@ -144,7 +144,6 @@ export function useCustomerDetails(customerId: string | null) {
       try {
         const response = await fetch(`/api/method/klik_pos.api.customer.get_customer_info?customer_name=${customerId}`);
         const resData = await response.json();
-        console.log("logss", resData.message)
         // if (!resData.message.success) {
         //   throw new Error(resData.error || "Failed to fetch customer");
         // }

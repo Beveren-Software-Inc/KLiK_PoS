@@ -222,3 +222,20 @@ def get_currency_exchange_rate(from_currency: str, to_currency: str, transaction
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Error fetching exchange rate")
         return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist()
+def get_customer_info(customer_name: str):
+    """Fetch customer document by customer name."""
+    customer = frappe.get_doc("Customer", customer_name)
+    return {
+        "name": customer.name,
+        "customer_name": customer.customer_name,
+        "customer_group": customer.customer_group,
+        "territory": customer.territory,
+        "customer_type": customer.customer_type,
+        "customer_primary_contact": customer.customer_primary_contact,
+        "customer_primary_address": customer.customer_primary_address,
+        "email_id": customer.email_id,
+        "mobile_no": customer.mobile_no,
+    }
