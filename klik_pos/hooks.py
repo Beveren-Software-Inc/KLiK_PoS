@@ -21,6 +21,15 @@ app_license = "mit"
 # 	}
 # ]
 
+add_to_apps_screen = [
+	{
+		"name": "klik_pos",
+ 		"logo": "/assets/klik_pos/logo.png",
+ 		"title": "KLIK POS",
+ 		"route": "/klik_pos",
+	}
+]
+
 # Includes in <head>
 # ------------------
 
@@ -243,4 +252,4 @@ app_license = "mit"
 # }
 
 
-website_route_rules = [{'from_route': '/klik_spa/<path:app_path>', 'to_route': 'klik_spa'}, {'from_route': '/klik_spa/<path:app_path>', 'to_route': 'klik_spa'},]
+website_route_rules = [{'from_route': '/klik_pos/<path:app_path>', 'to_route': 'klik_spa'}, {'from_route': '/klik_pos', 'to_route': 'klik_spa'}]
