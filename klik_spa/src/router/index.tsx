@@ -85,6 +85,8 @@ const router = createBrowserRouter([
       },
     ],
   },
-]);
+], {
+  basename: "/klik_pos"
+});
 
 export default router;

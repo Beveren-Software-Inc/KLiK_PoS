@@ -22,12 +22,15 @@ class ERPNextAPI {
   private sessionId: string | null = null;
 
   constructor() {
-    // In development, use the proxy. In production, use the full URL
+    // When served from Frappe itself (production), use empty baseUrl for same-origin requests
+    // In development with Vite dev server, use full URL
     const isDevelopment = (import.meta as any).env?.DEV;
+    const isServedFromFrappe = !isDevelopment && window.location.pathname.startsWith('/klik_pos');
+    
     this.config = {
-      baseUrl: isDevelopment 
-        ? '' // Use relative URL for proxy in development
-        : ((import.meta as any).env?.VITE_ERPNEXT_BASE_URL || 'https://m-alnakheel-test.frappe.cloud'),
+      baseUrl: isServedFromFrappe 
+        ? '' // Use relative URL for same-origin requests when served from Frappe
+        : ((import.meta as any).env?.VITE_ERPNEXT_BASE_URL || 'http://localhost:8000'),
       apiKey: (import.meta as any).env?.VITE_API_KEY || '',
       apiSecret: (import.meta as any).env?.VITE_API_SECRET || ''
     };
