@@ -10,6 +10,8 @@ export const DisplayPrintPreview = ({ invoice }: { invoice: any }) => {
 };
 
 export const handlePrintInvoice = (invoiceData: any) => {
+
+
   if (!invoiceData) {
     toast.error("No invoice data available for printing");
     return;
@@ -69,5 +71,7 @@ export const handlePrintInvoice = (invoiceData: any) => {
 
   window.print();
   document.body.innerHTML = originalContents;
-  window.location.reload();
+  // window.location.reload();
+  window.location.href = '/klik_pos/pos';
+
 };
