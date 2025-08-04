@@ -160,7 +160,6 @@ const filterInvoiceByDate = (invoiceDateStr: string) => {
   };
 
   const handleRefund = (invoiceId: string) => {
-    console.log("Processing refund for:", invoiceId);
     handleReturnClick(invoiceId)
     setShowInvoiceModal(false);
   };
