@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react"
-import { getPOSProfile } from "../utils/getPOSProfile.js"
-import { getPrintFormatHTML } from "../utils/getPrintHTML.js"
+import { getPrintFormatHTML } from "./getPrintHTML.js"
 
 type PrintPreviewProps = {
   invoice: {
