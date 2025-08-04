@@ -40,10 +40,6 @@ export default function CustomerDetailsPage() {
   const { customer, isLoadingC, errorC } = useCustomerDetails(customerId);
   const { invoices, isLoading, error } = useSalesInvoices();
 
-  console.log("Invoices", invoices)
-  console.log("📊 Total invoices available:", invoices.length);
-  console.log("🔄 Loading state:", isLoading);
-  console.log("❌ Error state:", error);
   
   const filterInvoiceByDate = (invoiceDateStr: string) => {
     if (dateFilter === "all") return true;
@@ -133,7 +129,6 @@ export default function CustomerDetailsPage() {
 
  const handleReturnClick = async (invoiceName: string) => {
     try {
-       console.log("Name", invoiceName)
       const result = await createSalesReturn(invoiceName);
      
       navigate(`/invoice/${result.return_invoice}`)
@@ -517,7 +512,6 @@ export default function CustomerDetailsPage() {
           onClose={() => setShowInvoiceModal(false)}
           onRefund={handleRefund}
           onCancel={(invoiceId) => {
-            console.log("Cancelling invoice:", invoiceId);
             setShowInvoiceModal(false);
           }}
         />

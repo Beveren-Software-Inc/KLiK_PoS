@@ -53,7 +53,6 @@ export default function InvoiceHistoryPage() {
     { id: "Cancelled", name: "Cancelled", icon: XCircle, color: "text-red-500" },
   ];
 
-console.log("Hizo zote", invoices)
   const filterInvoiceByDate = (invoiceDateStr: string) => {
     if (dateFilter === "all") return true;
 
@@ -185,20 +184,17 @@ console.log("Hizo zote", invoices)
 
   const handleDeleteInvoice = (invoiceId: string) => {
     if (window.confirm("Are you sure you want to delete this invoice?")) {
-      console.log("Deleting invoice:", invoiceId);
       toast.success("Invoice deleted successfully");
     }
   };
 
   const handleRefund = (invoiceId: string) => {
-    console.log("Processing refund for:", invoiceId);
     handleReturnClick(invoiceId);
     setShowInvoiceModal(false);
   };
 
   const handleReturnClick = async (invoiceName: string) => {
     try {
-       console.log("Name", invoiceName)
       const result = await createSalesReturn(invoiceName);
      
       navigate(`/invoice/${result.return_invoice}`)

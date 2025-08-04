@@ -40,7 +40,6 @@ export default function InvoiceViewPage() {
 
 
   const handleBackClick = () => {
-    console.log("Navigate back to invoice history");
     navigate(`/invoice`)
     // You can replace this with your navigation logic
   };
@@ -71,7 +70,6 @@ export default function InvoiceViewPage() {
   const handleReturn = async(invoiceName: string) => {
       try {
           const result = await createSalesReturn(invoiceName);
-          console.log(result.return_invoice)
           navigate(`/invoice/${result.return_invoice}`)
           toast.success(`Invoice returned: ${result.return_invoice}`);
         } catch (error: any) {
@@ -82,7 +80,6 @@ export default function InvoiceViewPage() {
   };
 
   const handleEditCustomer = () => {
-    // console.log("Edit customer:", mockCustomer.name);
     // Navigate to customer edit page
   };
 

@@ -7,14 +7,11 @@ export default function HomePage() {
   const { isAuthenticated, loading } = useAuth()
 
   useEffect(() => {
-    console.log("HomePage auth state:", { isAuthenticated, loading })
     
     if (!loading) {
       if (isAuthenticated) {
-        console.log("Redirecting to /pos")
         navigate('/pos', { replace: true })
       } else {
-        console.log("Redirecting to /login")
         navigate('/login', { replace: true })
       }
     }
