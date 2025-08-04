@@ -12,6 +12,7 @@ import { useCustomers } from "../hooks/useCustomers"
 import { toast } from "react-toastify"
 import { useBatchData } from "../hooks/useProducts"
 import { getBatches } from "../utils/batch"; // or wherever you put it
+import { useNavigate } from "react-router-dom"
 
 
 // Extended CartItem interface to include discount properties
@@ -52,6 +53,8 @@ export default function OrderSummary({
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const couponButtonRef = useRef<HTMLButtonElement>(null)
   const { customers, isLoading, error } = useCustomers()
+  const navigate = useNavigate()
+
   
   // State for item-level discounts and details
   const [itemDiscounts, setItemDiscounts] = useState<Record<string, {
@@ -150,9 +153,7 @@ const [itemBatches, setItemBatches] = useState<Record<string, { batch_no: string
     // In a real app, this would process the payment and create invoice
     console.log('Processing payment:', paymentData)
     setShowPaymentDialog(false)
-    // Clear cart or navigate to success page
     handleClearCart()
-    // toast.success('Invoice submitted & Payment completed successfully!')
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -348,58 +349,90 @@ useEffect(() => {
       )}
 
       {/* Mobile Customer Search */}
-      {isMobile && (
-        <div className="flex-shrink-0 p-4 border-b border-gray-100 dark:border-gray-700">
-          <div className="flex items-center space-x-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Search customers..."
-                value={customerSearchQuery}
-                onChange={(e) => {
-                  setCustomerSearchQuery(e.target.value)
-                  setShowCustomerDropdown(e.target.value.length > 0)
-                }}
-                className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
+
+        {isMobile && (
+          <div className="flex-shrink-0 p-4 border-b border-gray-100 dark:border-gray-700">
+            <div className="flex items-center space-x-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search customers..." // Fixed typo: "customeer" -> "customers"
+                  value={customerSearchQuery}
+                  onChange={(e) => {
+                    setCustomerSearchQuery(e.target.value)
+                    setShowCustomerDropdown(e.target.value.length > 0)
+                  }}
+                  onFocus={() => setShowCustomerDropdown(true)}
+                  className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+                
+                {/* ADD THIS MISSING DROPDOWN - This was missing in mobile version */}
+                {showCustomerDropdown && filteredCustomers.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+                    {filteredCustomers.slice(0, 8).map((customer) => (
+                      <button
+                        key={customer.id}
+                        onClick={() => handleCustomerSelect(customer)}
+                        className="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
+                      >
+                        <div className="flex items-center space-x-2">
+                          {getCustomerTypeIcon(customer)}
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-gray-900 dark:text-white text-sm truncate">
+                              {customer.name}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                              {customer.email} • {customer.phone}
+                            </div>
+                          </div>
+                          {customer.status === 'vip' && (
+                            <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300 rounded">
+                              VIP
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => setShowAddCustomerModal(true)}
+                className="p-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors"
+              >
+                <UserPlus size={16} />
+              </button>
             </div>
-            <button
-              onClick={() => setShowAddCustomerModal(true)}
-              className="p-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors"
-            >
-              <UserPlus size={16} />
-            </button>
-          </div>
-          
-          {selectedCustomer && (
-            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  {getCustomerTypeIcon(selectedCustomer)}
-                  <div>
-                    <div className="font-medium text-gray-900 dark:text-white text-sm">
-                      {selectedCustomer.name}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {selectedCustomer.loyaltyPoints} points
+            
+            {selectedCustomer && (
+              <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    {getCustomerTypeIcon(selectedCustomer)}
+                    <div>
+                      <div className="font-medium text-gray-900 dark:text-white text-sm">
+                        {selectedCustomer.name}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {selectedCustomer.loyaltyPoints} points
+                      </div>
                     </div>
                   </div>
+                  <button
+                    onClick={() => {
+                      setSelectedCustomer(null)
+                      setCustomerSearchQuery("")
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X size={14} />
+                  </button>
                 </div>
-                <button
-                  onClick={() => {
-                    setSelectedCustomer(null)
-                    setCustomerSearchQuery("")
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X size={14} />
-                </button>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
 
       {/* Cart Items - Scrollable on Mobile */}
       <div className={`${isMobile ? "flex-1 overflow-y-auto custom-scrollbar p-4" : "flex-1 overflow-y-auto p-6 cart-scroll"}`}>
@@ -767,27 +800,32 @@ useEffect(() => {
           {/* Action Buttons */}
           <div className={`grid grid-cols-2 gap-3 ${isMobile ? "mb-3" : ""}`}>
             <button
-              onClick={() => handleHoldOrder({
-                items: cartItems.map(item => ({
-                  ...item,
-                  discountedPrice: getDiscountedPrice(item),
-                  itemDiscount: itemDiscounts[item.id] || {},
-                  originalPrice: item.price,
-                  finalAmount: getDiscountedPrice(item) * item.quantity
-                })),
-                customer: selectedCustomer,
-                subtotal,
-                total,
-                appliedCoupons,
-                itemDiscounts,
-                totalItemDiscount,
-                totalSavings: totalItemDiscount + couponDiscount,
-                status: 'held'
-              })}
-              className="px-4 py-3 border border-beveren-600 text-beveren-600 dark:text-beveren-400 rounded-xl font-medium hover:bg-beveren-50 dark:hover:bg-beveren-900/20 transition-colors"
-            >
-              Hold
-            </button>
+  onClick={() => {
+    handleHoldOrder({
+      items: cartItems.map(item => ({
+        ...item,
+        discountedPrice: getDiscountedPrice(item),
+        itemDiscount: itemDiscounts[item.id] || {},
+        originalPrice: item.price,
+        finalAmount: getDiscountedPrice(item) * item.quantity
+      })),
+      customer: selectedCustomer,
+      subtotal,
+      total,
+      appliedCoupons,
+      itemDiscounts,
+      totalItemDiscount,
+      totalSavings: totalItemDiscount + couponDiscount,
+      status: 'held'
+    })
+
+    // Navigate home
+    navigate('/')
+  }}
+  className="px-4 py-3 border border-beveren-600 text-beveren-600 dark:text-beveren-400 rounded-xl font-medium hover:bg-beveren-50 dark:hover:bg-beveren-900/20 transition-colors"
+>
+  Hold
+</button>
             <button
               onClick={handleClearCart}
               className="px-4 py-3 border border-red-500 text-red-600 dark:text-red-400 rounded-xl font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
