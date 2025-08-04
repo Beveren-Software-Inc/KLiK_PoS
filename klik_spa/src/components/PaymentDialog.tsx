@@ -233,7 +233,7 @@ const handleCompletePayment = async () => {
 };
 
   const handleViewInvoice = (invoice: SalesInvoice) => {
-    console.log("Helkos", invoice.name)
+    // console.log("Helkos", invoice.name)
       navigate(`/invoice/${invoice.name}`);
   
     };
@@ -293,156 +293,252 @@ const handleCompletePayment = async () => {
           {/* Mobile Header - Only show if not full page */}
           {!isFullPage && (
             <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
-              <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Payment</h1>
-              <button
-                onClick={onClose}
-                className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-                disabled={isProcessingPayment || isHoldingOrder}
-              >
-                <X size={20} />
-              </button>
+              <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {invoiceSubmitted ? "Invoice Complete" : "Payment"}
+              </h1>
+              {invoiceSubmitted ? (
+                <div className="flex items-center space-x-2">
+                  <button
+                    className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"
+                    title="Print"
+                    onClick={() => handlePrintInvoice(invoiceData)}
+                  >
+                    <Printer size={16} />
+                  </button>
+                  <button
+                    className="p-2 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900 rounded-lg"
+                    title="Email"
+                    onClick={() => {
+                      const subject = encodeURIComponent("Your Invoice");
+                      const body = encodeURIComponent(`Dear ${selectedCustomer?.name},\n\nHere is your invoice total: ${formatCurrency(grandTotal)}\n\nThank you.`);
+                      window.open(`mailto:${selectedCustomer?.email}?subject=${subject}&body=${body}`);
+                    }}
+                  >
+                    <MailPlus size={16} />
+                  </button>
+                  <button
+                    className="p-2 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900 rounded-lg"
+                    title="WhatsApp"
+                    onClick={() => {
+                      const msg = encodeURIComponent(`Here is your invoice total: ${formatCurrency(grandTotal)}`);
+                      window.open(`https://wa.me/${selectedCustomer?.phone}?text=${msg}`, "_blank");
+                    }}
+                  >
+                    <MessageCirclePlus size={16} />
+                  </button>
+                  <button
+                    className="p-2 text-purple-600 hover:bg-purple-100 dark:text-purple-400 dark:hover:bg-purple-900 rounded-lg"
+                    title="View Full"
+                    onClick={() => handleViewInvoice(invoiceData)}
+                  >
+                    <Eye size={16} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={onClose}
+                  className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  disabled={isProcessingPayment || isHoldingOrder}
+                >
+                  <X size={20} />
+                </button>
+              )}
             </div>
           )}
 
           <div className="p-4 space-y-6">
-            {/* Payment Methods */}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Payment Methods</h2>
-              <div className="space-y-3">
-                {paymentMethods.map((method) => (
-                  <div key={method.id} className={`border border-gray-200 dark:border-gray-700 rounded-lg p-4 ${invoiceSubmitted || isProcessingPayment ? 'bg-gray-50 dark:bg-gray-800' : ''}`}>
-                    <div className="flex items-center space-x-3 mb-3">
-                      <div className={`w-10 h-10 rounded-lg ${method.color} text-white flex items-center justify-center`}>
-                        <div className="scale-75">
-                          {method.icon}
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900 dark:text-white">{method.name}</p>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Amount
-                      </label>
-                      <input
-                        type="number"
-                        value={method.amount || ''}
-                        onChange={(e) => handlePaymentAmountChange(method.id, e.target.value)}
-                        placeholder="0.00"
-                        disabled={invoiceSubmitted || isProcessingPayment}
-                        className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
-                      />
+            {/* Show invoice preview if submitted, otherwise show payment form */}
+            {invoiceSubmitted ? (
+              // Invoice Preview Section - Mobile
+              <div className="space-y-4">
+               
+
+                {/* Print Preview */}
+                {invoiceData && (
+                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                    <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 text-center">Print Format Preview:</h5>
+                    <div className="border border-gray-300 dark:border-gray-600 rounded p-2 bg-white dark:bg-gray-800">
+                      <DisplayPrintPreview invoice={invoiceData} />
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Sales & Tax Charges */}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Sales & Tax Charges</h2>
-              <select
-                value={selectedSalesTaxCharges}
-                onChange={(e) => handleSalesTaxChange(e.target.value)}
-                disabled={invoiceSubmitted || isProcessingPayment}
-                className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
-              >
-                {salesTaxCharges.map((tax) => (
-                  <option key={tax.id} value={tax.id}>
-                    {tax.name} ({tax.rate}%)
-                  </option>
-                ))}
-              </select>
-              <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                Tax Amount: {formatCurrency(taxAmount)}
-              </div>
-            </div>
-
-            {/* Totals */}
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
-                <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(subtotal)}</span>
-              </div>
-              {couponDiscount > 0 && (
-                <div className="flex justify-between text-green-600 dark:text-green-400">
-                  <span>Discount</span>
-                  <span>-{formatCurrency(couponDiscount)}</span>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Tax ({selectedTax?.rate}%)</span>
-                <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(taxAmount)}</span>
-              </div>
-              {roundOffAmount !== 0 && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Round Off</span>
-                  <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(roundOffAmount)}</span>
-                </div>
-              )}
-              <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
-                <div className="flex justify-between">
-                  <span className="text-lg font-bold text-gray-900 dark:text-white">Grand Total</span>
-                  <span className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrency(grandTotal)}</span>
-                </div>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Total Paid</span>
-                <span className="font-medium text-blue-600 dark:text-blue-400">{formatCurrency(totalPaidAmount)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Outstanding</span>
-                <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(outstandingAmount)}</span>
-              </div>
-              {totalPaidAmount > grandTotal && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Change</span>
-                  <span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(totalPaidAmount - grandTotal)}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Action Buttons */}
-            <div className="space-y-3 pt-6">
-              <button
-                onClick={handleCompletePayment}
-                disabled={outstandingAmount > 0 || invoiceSubmitted || isProcessingPayment}
-                className="w-full bg-green-600 text-white py-4 rounded-lg font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
-              >
-                {isProcessingPayment ? (
-                  <>
-                    <Loader2 size={20} className="animate-spin" />
-                    <span>Processing Payment...</span>
-                  </>
-                ) : (
-                  <span>Complete Payment</span>
                 )}
-              </button>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={handleHoldOrder}
-                  disabled={invoiceSubmitted || isProcessingPayment || isHoldingOrder}
-                  className={`py-3 px-4 border border-orange-500 text-orange-600 dark:text-orange-400 rounded-lg font-medium hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors flex items-center justify-center space-x-2 ${invoiceSubmitted || isProcessingPayment || isHoldingOrder ? 'cursor-not-allowed opacity-50' : ''}`}
-                >
-                  {isHoldingOrder ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>Holding...</span>
-                    </>
-                  ) : (
-                    <span>Hold Order</span>
-                  )}
-                </button>
-                <button
-                  onClick={onClose}
-                  disabled={isProcessingPayment || isHoldingOrder}
-                  className="py-3 px-4 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Cancel
-                </button>
+
+                {/* Action Buttons for completed invoice */}
+                <div className="space-y-3 pt-4">
+                  <button
+                    onClick={() => {
+                      // Reset form and create new order
+                      onCompletePayment({});
+                    }}
+                    className="w-full bg-beveren-600 text-white py-4 rounded-lg font-semibold hover:bg-beveren-700 transition-colors"
+                  >
+                    New Order
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className="w-full bg-gray-600 text-white py-3 rounded-lg font-medium hover:bg-gray-700 transition-colors flex items-center justify-center space-x-2"
+                  >
+                    <Check size={16} />
+                    <span>Return</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              // Payment Form - Mobile (Original content)
+              <>
+                {/* Payment Methods */}
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Payment Methods</h2>
+                  
+                  {/* Horizontal scrollable container */}
+                  <div className="flex space-x-3 overflow-x-auto pb-2">
+                    {paymentMethods.map((method) => (
+                      <div
+                        key={method.id}
+                        className={`min-w-[280px] max-w-[280px] flex-shrink-0 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-beveren-300 transition-colors ${invoiceSubmitted || isProcessingPayment ? 'bg-gray-50 dark:bg-gray-800' : ''}`}
+                      >
+                        <div className="flex items-center space-x-3 mb-3">
+                          <div className={`w-10 h-10 rounded-lg ${method.color} text-white flex items-center justify-center`}>
+                            <div className="scale-75">
+                              {method.icon}
+                            </div>
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900 dark:text-white text-sm">{method.name}</p>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Amount
+                          </label>
+                          <input
+                            type="number"
+                            value={method.amount || ''}
+                            onChange={(e) => handlePaymentAmountChange(method.id, e.target.value)}
+                            placeholder="0.00"
+                            disabled={invoiceSubmitted || isProcessingPayment}
+                            className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Round Off */}
+                <div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Round Off
+                      </label>
+                      <div className="flex space-x-2">
+                        <input
+                          type="number"
+                          value={roundOffAmount.toFixed(2)}
+                          onChange={(e) => handleRoundOffChange(e.target.value)}
+                          disabled={invoiceSubmitted || isProcessingPayment}
+                          className={`flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
+                        />
+                        <button
+                          onClick={handleRoundOff}
+                          disabled={invoiceSubmitted || isProcessingPayment}
+                          className={`px-3 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
+                          title="Auto Round"
+                        >
+                          <Calculator size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Totals */}
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(subtotal)}</span>
+                  </div>
+                  {couponDiscount > 0 && (
+                    <div className="flex justify-between text-green-600 dark:text-green-400">
+                      <span>Discount</span>
+                      <span>-{formatCurrency(couponDiscount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Tax ({selectedTax?.rate}%)</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(taxAmount)}</span>
+                  </div>
+                  {roundOffAmount !== 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Round Off</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(roundOffAmount)}</span>
+                    </div>
+                  )}
+                  <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
+                    <div className="flex justify-between">
+                      <span className="text-lg font-bold text-gray-900 dark:text-white">Grand Total</span>
+                      <span className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrency(grandTotal)}</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Total Paid</span>
+                    <span className="font-medium text-blue-600 dark:text-blue-400">{formatCurrency(totalPaidAmount)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Outstanding</span>
+                    <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(outstandingAmount)}</span>
+                  </div>
+                  {totalPaidAmount > grandTotal && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Change</span>
+                      <span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(totalPaidAmount - grandTotal)}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="space-y-3 pt-6">
+                  <button
+                    onClick={handleCompletePayment}
+                    disabled={outstandingAmount > 0 || invoiceSubmitted || isProcessingPayment}
+                    className="w-full bg-green-600 text-white py-4 rounded-lg font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
+                  >
+                    {isProcessingPayment ? (
+                      <>
+                        <Loader2 size={20} className="animate-spin" />
+                        <span>Processing Payment...</span>
+                      </>
+                    ) : (
+                      <span>Complete Payment</span>
+                    )}
+                  </button>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={handleHoldOrder}
+                      disabled={invoiceSubmitted || isProcessingPayment || isHoldingOrder}
+                      className={`py-3 px-4 border border-orange-500 text-orange-600 dark:text-orange-400 rounded-lg font-medium hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors flex items-center justify-center space-x-2 ${invoiceSubmitted || isProcessingPayment || isHoldingOrder ? 'cursor-not-allowed opacity-50' : ''}`}
+                    >
+                      {isHoldingOrder ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          <span>Holding...</span>
+                        </>
+                      ) : (
+                        <span>Hold Order</span>
+                      )}
+                    </button>
+                    <button
+                      onClick={onClose}
+                      disabled={isProcessingPayment || isHoldingOrder}
+                      className="py-3 px-4 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -464,8 +560,12 @@ const handleCompletePayment = async () => {
       <button
         className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"
         title="Print"
-        onClick={() =>handlePrintInvoice(invoiceData)}
-      >
+        onClick={() => {
+        handlePrintInvoice(invoiceData);
+        navigate('/');
+      }}
+    >
+
         <Printer size={20} />
       </button>
 
