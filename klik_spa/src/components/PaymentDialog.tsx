@@ -103,7 +103,6 @@ const navigate = useNavigate()
   const totalPaidAmount = Object.values(paymentAmounts).reduce((sum, amount) => sum + (amount || 0), 0)
   
   const outstandingAmount = Math.max(0, grandTotal - (totalPaidAmount + Math.abs(roundOffAmount)))
-  console.log("Paid amount",outstandingAmount)
   
   useEffect(() => {
     if (isOpen && defaultTax && !selectedSalesTaxCharges) {
@@ -160,7 +159,6 @@ const navigate = useNavigate()
     if (invoiceSubmitted || isProcessingPayment) return;
     
     const numericAmount = parseFloat(amount) || 0;
-    console.log("Hapa", numericAmount)
     setPaymentAmounts(prev => ({
       ...prev,
       [methodId]: numericAmount
@@ -247,7 +245,6 @@ const handleCompletePayment = async () => {
 
   try {
     const response = await createSalesInvoice(paymentData);
-    console.log(response.invoice.custom_invoice_qr_code)
     setInvoiceSubmitted(true);
     setSubmittedInvoice(response); // Save full invoice doc if returned
     setShowPreview(true)
@@ -262,7 +259,6 @@ const handleCompletePayment = async () => {
 };
 
   const handleViewInvoice = (invoice: SalesInvoice) => {
-    // console.log("Helkos", invoice.name)
       navigate(`/invoice/${invoice.name}`);
   
     };
