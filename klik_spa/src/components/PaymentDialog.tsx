@@ -85,6 +85,8 @@ export default function PaymentDialog({
 const [submittedInvoice, setSubmittedInvoice] = useState<any>(null); // you can define a better type
 // const [showPreview, setShowPreview] = useState(false)
 const [invoiceData, setInvoiceData] = useState(null)
+const [roundOffInput, setRoundOffInput] = useState(roundOffAmount.toFixed(2));
+
 const navigate = useNavigate()
 
   // Calculate totals
@@ -94,12 +96,14 @@ const navigate = useNavigate()
   const selectedTax = salesTaxCharges.find(tax => tax.id === selectedSalesTaxCharges)
   const taxAmount = taxableAmount * (selectedTax?.rate || 0) / 100
   const totalBeforeRoundOff = taxableAmount + taxAmount
-  const grandTotal = totalBeforeRoundOff - roundOffAmount
+  // const grandTotal = totalBeforeRoundOff - roundOffAmount
+  const grandTotal = totalBeforeRoundOff
 
   // Calculate total paid amount from all payment methods
   const totalPaidAmount = Object.values(paymentAmounts).reduce((sum, amount) => sum + (amount || 0), 0)
-  const outstandingAmount = Math.max(0, grandTotal - totalPaidAmount)
-
+  
+  const outstandingAmount = Math.max(0, grandTotal - (totalPaidAmount + Math.abs(roundOffAmount)))
+  console.log("Paid amount",outstandingAmount)
   
   useEffect(() => {
     if (isOpen && defaultTax && !selectedSalesTaxCharges) {
@@ -156,19 +160,32 @@ const navigate = useNavigate()
     if (invoiceSubmitted || isProcessingPayment) return;
     
     const numericAmount = parseFloat(amount) || 0;
+    console.log("Hapa", numericAmount)
     setPaymentAmounts(prev => ({
       ...prev,
       [methodId]: numericAmount
     }));
   };
 
-  const handleRoundOff = () => {
-    // Prevent changes if invoice is submitted or processing
-    if (invoiceSubmitted || isProcessingPayment) return;
-    
-    const rounded = Math.round(totalBeforeRoundOff)
-    setRoundOffAmount(rounded - totalBeforeRoundOff)
+ const handleRoundOff = () => {
+  if (invoiceSubmitted || isProcessingPayment) return;
+
+  const rounded = Math.floor(totalBeforeRoundOff);
+  const difference = Math.abs(rounded - totalBeforeRoundOff);
+
+  setRoundOffAmount(difference);
+  setRoundOffInput(difference.toFixed(2));  // ✅ update the input display as well
+
+  const defaultMode = modes.find(mode => mode.default === 1);
+
+  if (defaultMode) {
+    setPaymentAmounts(prev => ({
+      ...prev,
+      [defaultMode.mode_of_payment]: rounded
+    }));
   }
+};
+
 
   const handleSalesTaxChange = (value: string) => {
     // Prevent changes if invoice is submitted or processing
@@ -177,12 +194,24 @@ const navigate = useNavigate()
     setSelectedSalesTaxCharges(value);
   };
 
-  const handleRoundOffChange = (value: string) => {
-    // Prevent changes if invoice is submitted or processing
-    if (invoiceSubmitted || isProcessingPayment) return;
-    
-    setRoundOffAmount(parseFloat(value) || 0);
-  };
+const handleRoundOffChange = (value: string) => {
+  setRoundOffInput(value);
+
+  const parsed = parseFloat(value);
+  if (!isNaN(parsed)) {
+    setRoundOffAmount(parsed);
+
+    const defaultMode = modes.find(mode => mode.default === 1);
+
+    if (defaultMode) {
+      setPaymentAmounts(prev => ({
+        ...prev,
+        [defaultMode.mode_of_payment]: parseFloat((grandTotal - parsed).toFixed(2)),
+      }));
+    }
+  }
+};
+
 
 const handleCompletePayment = async () => {
   if (!selectedCustomer) {
@@ -413,7 +442,7 @@ const handleCompletePayment = async () => {
                           </label>
                           <input
                             type="number"
-                            value={method.amount || ''}
+                            value={(method.amount).toFixed(2) || ''}
                             onChange={(e) => handlePaymentAmountChange(method.id, e.target.value)}
                             placeholder="0.00"
                             disabled={invoiceSubmitted || isProcessingPayment}
@@ -435,7 +464,7 @@ const handleCompletePayment = async () => {
                       <div className="flex space-x-2">
                         <input
                           type="number"
-                          value={roundOffAmount.toFixed(2)}
+                          value={roundOffInput}
                           onChange={(e) => handleRoundOffChange(e.target.value)}
                           disabled={invoiceSubmitted || isProcessingPayment}
                           className={`flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
@@ -649,8 +678,12 @@ const handleCompletePayment = async () => {
           </label>
           <input
             type="number"
-            value={method.amount || ''}
-            onChange={(e) => handlePaymentAmountChange(method.id, e.target.value)}
+            value={(method.amount).toFixed(2) || ''}
+            onChange={(e) => {
+              const raw = parseFloat(e.target.value);
+              const formatted = isNaN(raw) ? '' : raw.toFixed(2);
+              handlePaymentAmountChange(method.id, formatted);
+            }}
             placeholder="0.00"
             disabled={invoiceSubmitted || isProcessingPayment}
             className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
@@ -705,7 +738,7 @@ const handleCompletePayment = async () => {
                     <div className="flex space-x-2">
                       <input
                         type="number"
-                        value={roundOffAmount.toFixed(2)}
+                        value={roundOffInput}
                         onChange={(e) => handleRoundOffChange(e.target.value)}
                         disabled={invoiceSubmitted || isProcessingPayment}
                         className={`flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
