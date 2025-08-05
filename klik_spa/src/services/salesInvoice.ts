@@ -73,8 +73,9 @@ import { getCSRFToken } from "../utils/csrf";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function createDraftSalesInvoice(data: any) {
-  const csrfToken = getCSRFToken();
-
+  // const csrfToken = getCSRFToken();
+const csrfToken = window.klick_pos_context?.boot?.csrf_token;
+console.log("Hapa",csrfToken)
   const response = await fetch('/api/method/klik_pos.api.sales_invoice.create_draft_invoice', {
     method: 'POST',
     headers: {
@@ -99,7 +100,11 @@ export async function createDraftSalesInvoice(data: any) {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function createSalesInvoice(data: any) {
-  const csrfToken = getCSRFToken();
+  // const csrfToken = window.klick_pos_context?.boot?.csrf_token;
+  // const csrfToken = await getCSRFToken();///document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+const csrfToken = window.csrf_token;
+
+console.log("Hapa shitty",csrfToken)
 
   const response = await fetch('/api/method/klik_pos.api.sales_invoice.create_and_submit_invoice', {
     method: 'POST',

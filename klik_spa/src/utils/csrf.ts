@@ -1,6 +1,3 @@
-
-// utils/csrf.ts
-
-export function getCSRFToken(): string {
-  return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+export function getCSRFToken(): string | null {
+  return typeof window !== "undefined" ? window.csrf_token ?? null : null;
 }
