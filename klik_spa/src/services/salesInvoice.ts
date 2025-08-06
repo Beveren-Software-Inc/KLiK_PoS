@@ -74,15 +74,15 @@ import { getCSRFToken } from "../utils/csrf";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function createDraftSalesInvoice(data: any) {
   // const csrfToken = getCSRFToken();
-const csrfToken = window.klick_pos_context?.boot?.csrf_token;
-console.log("Hapa",csrfToken)
+const csrfToken = window.csrf_token;
   const response = await fetch('/api/method/klik_pos.api.sales_invoice.create_draft_invoice', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Frappe-CSRF-Token': csrfToken
     },
-    body: JSON.stringify({ data })
+    body: JSON.stringify({ data }),
+    credentials: 'include'
   });
 
   const result = await response.json();
@@ -128,7 +128,7 @@ const csrfToken = window.csrf_token;
 }
 
 export async function createSalesReturn(invoiceName: string) {
-  const csrfToken = getCSRFToken();
+  const csrfToken = window.csrf_token;
 
   const response = await fetch('/api/method/klik_pos.api.sales_invoice.return_sales_invoice', {
     method: 'POST',
@@ -137,6 +137,7 @@ export async function createSalesReturn(invoiceName: string) {
       'X-Frappe-CSRF-Token': csrfToken
     },
     body: JSON.stringify({ invoice_name: invoiceName }),
+    credentials: 'include'
   });
 
   const result = await response.json();
