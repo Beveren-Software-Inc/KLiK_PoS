@@ -14,9 +14,6 @@ export default function MainPOSScreen() {
   const [currentUser, setCurrentUser] = useState(null)
   const [userLoading, setUserLoading] = useState(true)
   const [userError, setUserError] = useState(null)
-
-
-
   
   // Check POS opening status
   const { 
@@ -70,24 +67,20 @@ useEffect(() => {
     fetchCurrentUser()
   }, [])
 
-
+console.log("People", currentUser)
 
   // Check opening entry status when component mounts
   useEffect(() => {
     if (!statusLoading && !statusError) {
       if (hasOpenEntry === true) {
-        // User has an open entry, POS is ready
         setPosReady(true)
         setShowOpeningModal(false)
       } else if (hasOpenEntry === false) {
-        // No open entry, need to create one
         setPosReady(false)
         setShowOpeningModal(true)
       }
     } else if (statusError) {
-      // Handle error - you might want to show an error message
       console.error('Error checking POS opening status:', statusError)
-      // For now, show the opening modal to let user try
       setPosReady(false)
       setShowOpeningModal(true)
     }
