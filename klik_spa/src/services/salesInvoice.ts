@@ -104,15 +104,14 @@ export async function createSalesInvoice(data: any) {
   // const csrfToken = await getCSRFToken();///document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 const csrfToken = window.csrf_token;
 
-console.log("Hapa shitty",csrfToken)
-
   const response = await fetch('/api/method/klik_pos.api.sales_invoice.create_and_submit_invoice', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Frappe-CSRF-Token': csrfToken
     },
-    body: JSON.stringify({ data })
+    body: JSON.stringify({ data }),
+    credentials: 'include'
   });
 
   const result = await response.json();

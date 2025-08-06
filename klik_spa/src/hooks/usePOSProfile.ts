@@ -1,4 +1,5 @@
 import { useFrappeGetDoc } from "frappe-react-sdk";
+import { useEffect, useState } from "react"
 
 interface PaymentMode {
   mode_of_payment: string;
@@ -45,4 +46,45 @@ export function usePOSProfile(profileName: string): UsePOSProfileReturn {
     refetch: mutate,
   };
 }
+
+
+export function usePOSProfiles() {
+  const [profiles, setProfiles] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchPOSProfiles = async () => {
+      try {
+        setLoading(true)
+
+        const response = await fetch("/api/method/klik_pos.api.pos_profile.get_pos_profiles_for_user", {
+          method: "GET",
+          headers: {
+            "Accept": "application/json",
+            // "X-Frappe-CSRF-Token": (window as any).csrf_token || "",
+          },
+          credentials: "include",
+        })
+
+        const data = await response.json()
+        if (response.ok && data.message) {
+          setProfiles(data.message)
+        } else {
+          throw new Error(data._server_messages || "Failed to fetch POS Profiles")
+        }
+      } catch (err: any) {
+        console.error("Error loading POS Profiles:", err)
+        setError(err.message || "Unknown error")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchPOSProfiles()
+  }, [])
+
+  return { profiles, loading, error }
+}
+
 
