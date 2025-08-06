@@ -1,16 +1,17 @@
-import { CreditCard, FileText, Grid3X3, Settings, BarChart3, Users } from "lucide-react"
+import { Receipt, FileText, Grid3X3, Settings, BarChart3, Users } from "lucide-react"
 import { useNavigate, useLocation } from "react-router-dom"
 
 export default function BottomNavigation() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const menuItems = [
+   const menuItems = [
     { icon: Grid3X3, path: "/pos", label: "POS" },
+     { icon: Receipt, path: "/invoice", label: "InvoiceHistory" },
+     { icon: Users, path: "/customers", label: "Customers" },
     { icon: BarChart3, path: "/dashboard", label: "Dashboard" },
-    { icon: Users, path: "/customers", label: "Customers" },
-    { icon: FileText, path: "/reports", label: "Reports" },
-    { icon: Settings, path: "/settings", label: "Settings" },
+    { icon: FileText, path: "/closing_shift", label: "Closing Shift" },
+    
   ]
 
   const isActive = (path: string) => {
