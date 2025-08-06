@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { X, CreditCard, Banknote, Wallet, AlertCircle, CheckCircle2 } from 'lucide-react';
-import erpnextAPI from '../services/erpnext-api';
-import { usePOSOpeningStatus } from '../hooks/usePOSOpeningEntry';
 import { useCreatePOSOpeningEntry } from '../services/opeiningEntry';
 import { usePaymentModes } from "../hooks/usePaymentModes"
 import { usePOSProfiles } from '../hooks/usePOSProfile';
@@ -37,13 +35,12 @@ const POSOpeningModal: React.FC<POSOpeningModalProps> = ({
   onSuccess,
   currentUser
 }) => {
-  const [step, setStep] = useState<'checking' | 'form' | 'creating' | 'success'>('checking');
+  const [step, setStep] = useState<'form' | 'creating' | 'success'>('form');
   const [selectedProfile, setSelectedProfile] = useState<string>('');
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [error, setError] = useState<string>('');
   
   // Use your existing hooks
-  const { hasOpenEntry, isLoading: statusLoading, error: statusError, refetch } = usePOSOpeningStatus();
   const { createOpeningEntry, isCreating, error: createError, success } = useCreatePOSOpeningEntry();
   const { profiles: posProfiles, loading: profilesLoading, error: profilesError } = usePOSProfiles();
   
@@ -119,7 +116,7 @@ const POSOpeningModal: React.FC<POSOpeningModalProps> = ({
         mode_of_payment: method.mode_of_payment,
         opening_amount: method.opening_amount || 0
       }));
-
+      console.log("Opening balance data:", openingBalance);
       await createOpeningEntry(openingBalance);
       
     } catch (err: any) {
@@ -152,28 +149,13 @@ const POSOpeningModal: React.FC<POSOpeningModalProps> = ({
 
   // Initialize when modal opens
   useEffect(() => {
-    if (isOpen && currentUser) {
-      setStep('checking');
-      setError('');
-      refetch(); // Check current status
-    }
-  }, [isOpen, currentUser, refetch]);
-
-  // Handle status check results
-  useEffect(() => {
-    if (!statusLoading && !statusError) {
-      if (hasOpenEntry === true) {
-        // User already has an open entry
-        onSuccess();
-      } else if (hasOpenEntry === false) {
-        // No open entry, show form
-        setStep('form');
-      }
-    } else if (statusError) {
-      setError(statusError);
+    if (isOpen) {
       setStep('form');
+      setError('');
+      setSelectedProfile('');
+      setPaymentMethods([]);
     }
-  }, [statusLoading, statusError, hasOpenEntry, onSuccess]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -181,9 +163,8 @@ const POSOpeningModal: React.FC<POSOpeningModalProps> = ({
   const isLoadingPaymentModes = selectedProfile && paymentModesLoading;
   
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-hidden">
-        {/* Header */}
+    <div className="fixed inset-0 bg-beveren-300 bg-opacity-10 flex items-center justify-center z-50 p-4">
+<div className="bg-white rounded-lg shadow-xl max-w-xl w-full max-h-[90vh] overflow-hidden">        {/* Header */}
         <div className="bg-beveren-600 text-white px-6 py-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">POS Opening Entry</h2>
           <button
@@ -197,13 +178,6 @@ const POSOpeningModal: React.FC<POSOpeningModalProps> = ({
 
         {/* Content */}
         <div className="p-6 relative">
-          {step === 'checking' && (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Checking for existing opening entries...</p>
-            </div>
-          )}
-
           {step === 'form' && (
             <div className="space-y-6">
               {/* POS Profile Selection */}
@@ -217,14 +191,23 @@ const POSOpeningModal: React.FC<POSOpeningModalProps> = ({
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   disabled={profilesLoading || isLoadingPaymentModes}
                 >
-                  {posProfiles.length === 0 && (
-                    <option value="">Loading profiles...</option>
-                  )}
-                  {posProfiles.map((profile) => (
-                    <option key={profile.name} value={profile.name}>
-                      {profile.name}
+                  {(!posProfiles || posProfiles.length === 0) && (
+                    <option value="">
+                      {profilesLoading ? 'Loading profiles...' : 'No profiles available'}
                     </option>
-                  ))}
+                  )}
+                  {posProfiles && Array.isArray(posProfiles) && posProfiles.map((profile, index) => {
+                    console.log("Rendering profile option:", profile);
+                    // Handle both string arrays and object arrays
+                    const profileName = typeof profile === 'string' ? profile : profile?.name;
+                    const profileDisplay = typeof profile === 'string' ? profile : (profile?.name || `Profile ${index + 1}`);
+                    
+                    return (
+                      <option key={profileName || index} value={profileName}>
+                        {profileDisplay}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -273,7 +256,14 @@ const POSOpeningModal: React.FC<POSOpeningModalProps> = ({
                     <div className="flex justify-between items-center font-semibold">
                       <span>Total Opening Balance:</span>
                       <span className="text-green-600">
-                        {posProfiles.find(p => p.name === selectedProfile)?.currency || 'USD'} {totalAmount.toFixed(2)}
+                        {(() => {
+                          const profile = posProfiles?.find(p => {
+                            const pName = typeof p === 'string' ? p : p?.name;
+                            return pName === selectedProfile;
+                          });
+                          const currency = typeof profile === 'string' ? 'USD' : (profile?.currency || 'USD');
+                          return `${currency} ${totalAmount.toFixed(2)}`;
+                        })()}
                       </span>
                     </div>
                   </div>
@@ -305,7 +295,7 @@ const POSOpeningModal: React.FC<POSOpeningModalProps> = ({
                     !selectedProfile || 
                     paymentMethods.length === 0
                   }
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  className="flex-1 px-4 py-2 bg-beveren-700 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
                 >
                   {profilesLoading ? 'Loading...' : 
                    isCreating ? 'Creating...' : 

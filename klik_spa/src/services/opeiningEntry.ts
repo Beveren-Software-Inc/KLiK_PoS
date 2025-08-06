@@ -22,7 +22,7 @@ export function useCreatePOSOpeningEntry(): UseCreateOpeningReturn {
     setIsCreating(true);
     setError(null);
     setSuccess(false);
-
+    console.log("Opening", openingBalance)
     try {
       const res = await fetch("/api/method/klik_pos.api.pos_entry.create_opening_entry", {
         method: "POST",

@@ -13,7 +13,7 @@ export function usePOSOpeningStatus() {
     try {
       const res = await fetch("/api/method/klik_pos.api.pos_entry.open_pos");
       const data = await res.json();
-
+        console.log("POS kk", data)
       if (typeof data.message === "boolean") {
         setHasOpenEntry(data.message);
       } else {

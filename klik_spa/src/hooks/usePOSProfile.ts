@@ -58,7 +58,7 @@ export function usePOSProfiles() {
       try {
         setLoading(true)
 
-        const response = await fetch("/api/method/klik_pos.api.pos.get_pos_profiles_for_user", {
+        const response = await fetch("/api/method/klik_pos.api.pos_profile.get_pos_profiles_for_user", {
           method: "GET",
           headers: {
             "Accept": "application/json",
@@ -68,7 +68,6 @@ export function usePOSProfiles() {
         })
 
         const data = await response.json()
-
         if (response.ok && data.message) {
           setProfiles(data.message)
         } else {

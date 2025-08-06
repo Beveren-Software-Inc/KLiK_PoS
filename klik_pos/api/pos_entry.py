@@ -10,7 +10,7 @@ from frappe.utils import now_datetime, today
 def open_pos():
     """Check if the current user has an open POS Opening Entry."""
     user = frappe.session.user
-    pos_profile = get_current_pos_profile()
+    pos_profile = get_current_pos_profile().name
 
     if not pos_profile:
         return False
@@ -20,42 +20,35 @@ def open_pos():
         "pos_profile": pos_profile,
         "user": user,
         "docstatus": 1,  # Submitted
-        "pos_closing_entry": ["is", "null"]
+        "pos_closing_entry": None
     })
 
     return True if open_entry else False
 
 
 @frappe.whitelist()
-def create_opening_entry(data):
+def create_opening_entry():
     """
     Create a POS Opening Entry with balance details only.
-    
-    Args (JSON):
-        {
-            "pos_profile": "POS - BEVEREN",  // optional
-            "balance_details": [
-                {
-                    "mode_of_payment": "Cash",
-                    "opening_amount": 4000
-                },
-                ...
-            ]
-        }
     """
-    
-    data = json.loads(data)
+    import json
+
+    data = frappe.local.form_dict
+    if isinstance(data, str):
+        data = json.loads(data)
+
     user = frappe.session.user
 
-    company = frappe.db.get_value("User Default", {"parent": user, "defkey": "company"}, "defvalue")
+    pos_profile = get_current_pos_profile().name
+    
+    company = frappe.defaults.get_user_default("Company")
+
     if not company:
         frappe.throw(_("No default company found for user {0}").format(user))
-
-    pos_profile = data.get("pos_profile") or get_current_pos_profile(user=user)
     if not pos_profile:
         frappe.throw(_("POS Profile could not be determined"))
 
-    balance_details = data.get("balance_details", [])
+    balance_details = data.get("balance_details") or data.get("opening_balance", [])
     if not balance_details:
         frappe.throw(_("At least one balance detail (mode of payment) is required"))
 
@@ -63,12 +56,12 @@ def create_opening_entry(data):
         "pos_profile": pos_profile,
         "user": user,
         "docstatus": 1,
-        "pos_closing_entry": ["is", "null"]
+        "pos_closing_entry": None
     })
     if existing:
         frappe.throw(_("You already have an open POS Opening Entry."))
 
-    # Create new POS Opening Entry
+    # Create the POS Opening Entry
     doc = frappe.new_doc("POS Opening Entry")
     doc.user = user
     doc.company = company
