@@ -1,15 +1,3 @@
-// import { useI18n } from "../hooks/useI18n"
-// import RetailPOSLayout from "../components/RetailPOSLayout"
-
-// export default function MainPOSScreen() {
-//   const { isRTL } = useI18n()
-
-//   return (
-//     <div className={`min-h-screen bg-gray-50 ${isRTL ? "rtl" : "ltr"}`}>
-//       <RetailPOSLayout />
-//     </div>
-//   )
-// }
 
 
 import { useState, useEffect } from 'react'
@@ -17,11 +5,18 @@ import { useI18n } from "../hooks/useI18n"
 import { usePOSOpeningStatus } from '../hooks/usePOSOpeningEntry'
 import RetailPOSLayout from "../components/RetailPOSLayout"
 import POSOpeningModal from '../components/PosOpeningEntryDialog'
+import erpnextAPI from '../services/erpnext-api'
 
 export default function MainPOSScreen() {
   const { isRTL } = useI18n()
   const [showOpeningModal, setShowOpeningModal] = useState(false)
   const [posReady, setPosReady] = useState(false)
+  const [currentUser, setCurrentUser] = useState(null)
+  const [userLoading, setUserLoading] = useState(true)
+  const [userError, setUserError] = useState(null)
+
+
+
   
   // Check POS opening status
   const { 
@@ -31,7 +26,52 @@ export default function MainPOSScreen() {
     refetch 
   } = usePOSOpeningStatus()
 
-const currentUser = "Administrator"
+useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        setUserLoading(true)
+        setUserError(null)
+        
+        erpnextAPI.initializeSession()
+        
+        const userProfile = await erpnextAPI.getCurrentUserProfile()
+        
+        if (userProfile) {
+          setCurrentUser({
+            name: userProfile.name,
+            email: userProfile.email || userProfile.name,
+            full_name: userProfile.full_name || userProfile.first_name + ' ' + (userProfile.last_name || ''),
+            role: userProfile.role_profile_name || 'User',
+            user_image: userProfile.user_image
+          })
+        } else {
+          // Fallback to basic user info
+          const basicUser = await erpnextAPI.getCurrentUser()
+          if (basicUser) {
+            setCurrentUser({
+              name: basicUser,
+              email: basicUser,
+              full_name: basicUser,
+              role: 'User'
+            })
+          } else {
+            // No user found, might need to login
+            setUserError('No user session found')
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching current user:', error)
+        setUserError(error.message || 'Failed to fetch user')
+      } finally {
+        setUserLoading(false)
+      }
+    }
+
+    fetchCurrentUser()
+  }, [])
+
+
+
   // Check opening entry status when component mounts
   useEffect(() => {
     if (!statusLoading && !statusError) {
@@ -105,7 +145,7 @@ const currentUser = "Administrator"
         isOpen={showOpeningModal}
         onClose={handleOpeningClose}
         onSuccess={handleOpeningSuccess}
-        currentUser={currentUser}
+        currentUser={currentUser?.name}
       />
     </div>
   )
