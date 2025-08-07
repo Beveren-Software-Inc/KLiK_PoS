@@ -14,12 +14,14 @@ interface UseItemGroupsReturn {
   error: string | null;
   refetch: () => void;
   count: number;
+  total_item_count: number;
 }
 
 export function useItemGroups(): UseItemGroupsReturn {
   const [itemGroups, setItemGroups] = useState<ItemGroup[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [totalItemCount, setTotalItemCount] = useState<number>(0); // <-- track total
 
   const fetchItemGroups = async () => {
     setIsLoading(true);
@@ -27,9 +29,13 @@ export function useItemGroups(): UseItemGroupsReturn {
       const response = await fetch(`/api/method/klik_pos.api.item.get_item_groups_for_pos`);
       const resData = await response.json();
 
-      // ✅ No `.data`, directly use resData.message
-      if (resData?.message && Array.isArray(resData.message)) {
-        setItemGroups(resData.message);
+      if (
+        resData?.message &&
+        Array.isArray(resData.message.groups) &&
+        typeof resData.message.total_items === "number"
+      ) {
+        setItemGroups(resData.message.groups);
+        setTotalItemCount(resData.message.total_items);
       } else {
         throw new Error("Invalid response format");
       }
@@ -48,6 +54,7 @@ export function useItemGroups(): UseItemGroupsReturn {
   return {
     itemGroups,
     isLoading,
+    total_item_count: totalItemCount, // ✅ returned here
     error: errorMessage,
     refetch: fetchItemGroups,
     count: itemGroups.length,

@@ -3,9 +3,8 @@ import PrintPreview  from "../utils/posPreview"
 
 export const DisplayPrintPreview = ({ invoice }: { invoice: any }) => {
   return (
-    <div className="border p-2 m-2 print-preview-container">
       <PrintPreview invoice={invoice} />
-    </div>
+    
   );
 };
 

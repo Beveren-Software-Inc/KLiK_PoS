@@ -18,12 +18,14 @@ export default function CategoryTabs({
 }: CategoryTabsProps) {
   const { isRTL } = useI18n();
 
-  const {
-    itemGroups,
-    isLoading: isValidating,
-    error,
-    count,
-  } = useItemGroups();
+ const {
+  itemGroups,
+  isLoading: isValidating,
+  error,
+  count,
+  total_item_count,
+} = useItemGroups();
+
 
   if (isValidating) return <div>Loading categories...</div>;
 
@@ -47,7 +49,7 @@ export default function CategoryTabs({
       id: "all",
       name: "All Menu",
       icon: itemGroupIconMap["All Menu"] ?? "📦",
-      count: count,
+      count: total_item_count
     },
     ...itemGroups.map((group) => ({
       id: group.id,

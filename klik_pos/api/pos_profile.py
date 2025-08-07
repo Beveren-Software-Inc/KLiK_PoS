@@ -2,6 +2,8 @@
 
 import frappe
 from frappe import _
+from klik_pos.klik_pos.utils import get_current_pos_profile
+
 
 @frappe.whitelist()
 def get_pos_profiles_for_user():
@@ -34,3 +36,15 @@ def get_pos_profiles_for_user():
                     pos_profiles.append(p.name)
 
     return pos_profiles
+
+@frappe.whitelist()
+def get_pos_details():
+    pos = get_current_pos_profile()
+    business_type = pos.custom_business_type
+    print_format = pos.custom_pos_printformat
+
+    details = {
+        "business_type": business_type,
+        "print_format": print_format
+    }
+    return details

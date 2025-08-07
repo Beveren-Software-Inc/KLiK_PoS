@@ -94,8 +94,8 @@ def get_invoice_details(invoice_id):
 def create_and_submit_invoice(data):
     
     try:
-        customer, items, amount_paid, sales_and_tax_charges, mode_of_payment = parse_invoice_data(data)
-        doc = build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,mode_of_payment, include_payments=True)
+        customer, items, amount_paid, sales_and_tax_charges, mode_of_payment,business_type = parse_invoice_data(data)
+        doc = build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,mode_of_payment,business_type, include_payments=True)
         doc.base_paid_amount=amount_paid
         doc.paid_amount=amount_paid
         doc.outstanding_amount = 0
@@ -118,8 +118,8 @@ def create_and_submit_invoice(data):
 @frappe.whitelist()
 def create_draft_invoice(data):
     try:
-        customer, items, amount_paid, sales_and_tax_charges, mode_of_payment = parse_invoice_data(data)
-        doc = build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges, mode_of_payment, include_payments=True)
+        customer, items, amount_paid, sales_and_tax_charges, mode_of_payment, business_type = parse_invoice_data(data)
+        doc = build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges, mode_of_payment,business_type, include_payments=True)
         doc.insert(ignore_permissions=True)
 
         return {
@@ -146,6 +146,7 @@ def parse_invoice_data(data):
     
     amount_paid = 0.0
     sales_and_tax_charges = get_current_pos_profile().taxes_and_charges
+    business_type = data.get("businessType")
     mode_of_payment = None
     if data.get("amountPaid"):
         amount_paid=data.get("amountPaid")
@@ -159,21 +160,25 @@ def parse_invoice_data(data):
     if not customer or not items:
         frappe.throw(_("Customer and items are required"))
 
-    return customer, items, amount_paid, sales_and_tax_charges, mode_of_payment
-def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges, mode_of_payment, include_payments=False):
+    return customer, items, amount_paid, sales_and_tax_charges, mode_of_payment, business_type
+
+def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges, mode_of_payment,business_type, include_payments=False):
     doc = frappe.new_doc("Sales Invoice")
     doc.customer = customer
     doc.due_date = frappe.utils.nowdate()
     doc.custom_delivery_date = frappe.utils.nowdate()
-    doc.is_pos = 1
     doc.currency = get_customer_billing_currency(customer)
+    doc.is_pos = 1 if business_type=="B2C" else 0
 
     pos_profile = get_current_pos_profile()
+
+    # Set taxes and charges template
     if sales_and_tax_charges:
         doc.taxes_and_charges = sales_and_tax_charges
     else:
         doc.taxes_and_charges = pos_profile.taxes_and_charges
 
+    # Populate items
     for item in items:
         doc.append("items", {
             "item_code": item.get("id"),
@@ -183,8 +188,26 @@ def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,
             "expense_account": get_expense_accounts(item.get("id"))
         })
 
-    print("Here is it", mode_of_payment)
+    # If taxes_and_charges is set, populate taxes manually
+    if doc.taxes_and_charges:
 
+        tax_doc = get_tax_template(doc.taxes_and_charges)
+        if tax_doc:
+            for tax in tax_doc.taxes:
+                doc.append("taxes", {
+                    "charge_type": tax.charge_type,
+                    "account_head": tax.account_head,
+                    "description": tax.description,
+                    "cost_center": tax.cost_center,
+                    "rate": tax.rate,
+                    "row_id": tax.row_id,
+                    "tax_amount": tax.tax_amount,
+                    "included_in_print_rate": tax.included_in_print_rate,
+                    # "add_deduct_tax": tax.add_deduct_tax,
+                    # "category": tax.category
+                })
+
+    # Add payments if required
     if include_payments and isinstance(mode_of_payment, list):
         for payment in mode_of_payment:
             doc.append("payments", {
@@ -193,37 +216,19 @@ def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,
             })
 
     return doc
+def get_tax_template(template_name):
+    """
+    Custom helper function to fetch Sales Taxes and Charges Template.
+    Returns the full template document or raises an error if not found.
+    """
+    if not template_name:
+        return None
 
-# def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,mode_of_payment, include_payments=False):
-#     doc = frappe.new_doc("Sales Invoice")
-#     doc.customer = customer
-#     doc.due_date = frappe.utils.nowdate()
-#     doc.custom_delivery_date = frappe.utils.nowdate()
-#     doc.is_pos = 1
-#     doc.currency = get_customer_billing_currency(customer)
-    
-#     pos_profile = get_current_pos_profile()
-#     if sales_and_tax_charges:
-#         doc.taxes_and_charges = sales_and_tax_charges
-#     else:
-#         doc.taxes_and_charges = pos_profile.taxes_and_charges
+    try:
+        return frappe.get_doc("Sales Taxes and Charges Template", template_name)
+    except frappe.DoesNotExistError:
+        frappe.throw(f"Tax Template '{template_name}' not found")
 
-#     for item in items:
-#         doc.append("items", {
-#             "item_code": item.get("id"),
-#             "qty": item.get("quantity"),
-#             "rate": item.get("price"),
-#             "income_account": get_income_accounts(item.get("id")),
-#             "expense_account": get_expense_accounts(item.get("id"))
-#         })
-#     print("Here si it", mode_of_payment)
-#     if include_payments:
-#         doc.append("payments", {
-#             "mode_of_payment": mode_of_payment,
-#             "amount":amount_paid
-#         })
-
-#     return doc
 
 def get_customer_billing_currency(customer):
     customer_doc = frappe.get_doc("Customer", customer)

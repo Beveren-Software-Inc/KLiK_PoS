@@ -221,7 +221,16 @@ const [itemBatches, setItemBatches] = useState<Record<string, { batch_no: string
     setExpandedItems(newExpanded)
   }
 
-
+useEffect(() => {
+  if (customers.length === 1 && !selectedCustomer && !isLoading) {
+    const singleCustomer = customers[0];
+    setSelectedCustomer(singleCustomer);
+    setCustomerSearchQuery(singleCustomer.name);
+    setShowCustomerDropdown(false);
+    
+    // toast.info(`Automatically selected customer: ${singleCustomer.name}`);
+  }
+}, [customers, selectedCustomer, isLoading]);
 
 useEffect(() => {
   const fetchAndSetBatches = async () => {
@@ -842,7 +851,7 @@ useEffect(() => {
             }}
             className={`w-full bg-beveren-600 text-white rounded-2xl font-semibold hover:bg-beveren-700 transition-colors ${isMobile ? "py-4 text-lg" : "py-4"}`}
           >
-            Pay ${total.toFixed(2)}
+            Checkout ${total.toFixed(2)}
           </button>
         </div>
       )}
