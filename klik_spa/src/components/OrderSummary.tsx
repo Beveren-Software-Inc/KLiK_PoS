@@ -222,14 +222,12 @@ const [itemBatches, setItemBatches] = useState<Record<string, { batch_no: string
   }
 
 useEffect(() => {
-  // Auto-select customer if there's only one customer and none is currently selected
   if (customers.length === 1 && !selectedCustomer && !isLoading) {
     const singleCustomer = customers[0];
     setSelectedCustomer(singleCustomer);
     setCustomerSearchQuery(singleCustomer.name);
     setShowCustomerDropdown(false);
     
-    // // Optional: Show a toast notification
     // toast.info(`Automatically selected customer: ${singleCustomer.name}`);
   }
 }, [customers, selectedCustomer, isLoading]);
@@ -853,7 +851,7 @@ useEffect(() => {
             }}
             className={`w-full bg-beveren-600 text-white rounded-2xl font-semibold hover:bg-beveren-700 transition-colors ${isMobile ? "py-4 text-lg" : "py-4"}`}
           >
-            Pay ${total.toFixed(2)}
+            Checkout ${total.toFixed(2)}
           </button>
         </div>
       )}

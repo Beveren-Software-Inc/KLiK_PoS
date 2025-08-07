@@ -88,3 +88,42 @@ export function usePOSProfiles() {
 }
 
 
+export function usePOSDetails() {
+  const [posDetails, setPOSDetails] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchPOSDetails = async () => {
+      try {
+        setLoading(true)
+
+        const response = await fetch("/api/method/klik_pos.api.pos_profile.get_pos_details", {
+          method: "GET",
+          headers: {
+            "Accept": "application/json",
+          },
+          credentials: "include",
+        })
+
+        const data = await response.json()
+
+        if (response.ok && data.message) {
+          setPOSDetails(data.message)
+        } else {
+          throw new Error(data._server_messages || "Failed to fetch POS details")
+        }
+      } catch (err: any) {
+        console.error("Error loading POS details:", err)
+        setError(err.message || "Unknown error")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchPOSDetails()
+  }, [])
+
+  return { posDetails, loading, error }
+}
+
