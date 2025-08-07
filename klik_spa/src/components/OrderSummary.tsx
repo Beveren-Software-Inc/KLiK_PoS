@@ -221,7 +221,18 @@ const [itemBatches, setItemBatches] = useState<Record<string, { batch_no: string
     setExpandedItems(newExpanded)
   }
 
-
+useEffect(() => {
+  // Auto-select customer if there's only one customer and none is currently selected
+  if (customers.length === 1 && !selectedCustomer && !isLoading) {
+    const singleCustomer = customers[0];
+    setSelectedCustomer(singleCustomer);
+    setCustomerSearchQuery(singleCustomer.name);
+    setShowCustomerDropdown(false);
+    
+    // // Optional: Show a toast notification
+    // toast.info(`Automatically selected customer: ${singleCustomer.name}`);
+  }
+}, [customers, selectedCustomer, isLoading]);
 
 useEffect(() => {
   const fetchAndSetBatches = async () => {

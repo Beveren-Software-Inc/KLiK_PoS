@@ -2,28 +2,39 @@ import frappe
 from frappe import _
 import json
 from erpnext.setup.utils import get_exchange_rate
+from klik_pos.klik_pos.utils import get_current_pos_profile
+
 
 @frappe.whitelist(allow_guest=True)
 def get_customers(limit: int = 100, start: int = 0, search: str = ""):
     """
     Fetch customers with structured primary contact & address details.
+    If a default customer is set in POS Profile, only return that.
     """
-    company, company_currency = get_user_company_and_currency()
     try:
+        pos_profile = get_current_pos_profile()
+        default_customer = pos_profile.customer
+        company, company_currency = get_user_company_and_currency()
+        
+        result = []
         filters = {}
-        if search:
+
+        if default_customer:
+            filters["name"] = default_customer
+        elif search:
             filters["customer_name"] = ["like", f"%{search}%"]
 
         customer_names = frappe.get_all(
             "Customer",
             filters=filters,
-            fields=["name", "customer_name", "customer_type", "customer_group", "territory", "default_currency"],
+            fields=[
+                "name", "customer_name", "customer_type",
+                "customer_group", "territory", "default_currency"
+            ],
             order_by="modified desc",
             limit=limit,
             start=start,
         )
-
-        result = []
 
         for cust in customer_names:
             doc = frappe.get_doc("Customer", cust.name)
@@ -50,16 +61,17 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
                 "territory": doc.territory,
                 "contact": contact,
                 "address": address,
-                "default_currency":doc.default_currency,
+                "default_currency": doc.default_currency,
                 "company_currency": company_currency,
-                # "exchange_rate":get_currency_exchange_rate(company_currency, doc.default_currency)
+                # "exchange_rate": get_currency_exchange_rate(company_currency, doc.default_currency)
             })
 
         return {"success": True, "data": result}
 
-    except Exception as e:
+    except Exception:
         frappe.log_error(frappe.get_traceback(), "Error fetching customers")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": _("Something went wrong while fetching customers.")}
+
 
 @frappe.whitelist()
 def create_or_update_customer(customer_data):
@@ -211,14 +223,7 @@ def get_currency_exchange_rate(from_currency: str, to_currency: str, transaction
 
         rate = get_exchange_rate(from_currency, to_currency, transaction_date)
         return rate
-        # return {
-        #     "success": True,
-        #     "from_currency": from_currency,
-        #     "to_currency": to_currency,
-        #     "exchange_rate": rate,
-        #     "date": transaction_date or frappe.utils.nowdate()
-        # }
-
+      
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Error fetching exchange rate")
         return {"success": False, "error": str(e)}
