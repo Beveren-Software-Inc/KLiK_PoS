@@ -3,6 +3,11 @@ from frappe import _
 from erpnext.stock.utils import get_stock_balance
 from klik_pos.klik_pos.utils import get_current_pos_profile
 
+def pos_details():
+    pos = get_current_pos_profile
+    customer = pos.customer
+    
+    
 def fetch_item_balance(item_code: str, warehouse: str) -> float:
     """Get stock balance of an item from a warehouse."""
     try:
@@ -77,69 +82,49 @@ def get_items_with_balance_and_price(price_list: str = "Standard Selling"):
 @frappe.whitelist(allow_guest=True)
 def get_item_groups_for_pos():
     try:
-        item_groups = frappe.get_all(
-            "Item Group",
-            filters={"is_group": 0},  
-            fields=["name", "item_group_name", "parent_item_group"],
-            limit=100,
-            order_by="modified desc"
-        )
-        total_item_count = frappe.db.count("Item", filters={"disabled": 0, "is_stock_item": 1})
+        pos_profile = get_current_pos_profile()
+
         formatted_groups = []
+        total_item_count = frappe.db.count("Item", filters={"disabled": 0, "is_stock_item": 1})
+
+        # Check if the POS Profile has child item groups
+        if pos_profile.item_groups:
+            item_group_names = [d.item_group for d in pos_profile.item_groups if d.item_group]
+
+            item_groups = frappe.get_all(
+                "Item Group",
+                filters={"name": ["in", item_group_names], "is_group": 0},
+                fields=["name", "item_group_name", "parent_item_group"],
+            )
+        else:
+            # Fallback: fetch all leaf item groups
+            item_groups = frappe.get_all(
+                "Item Group",
+                filters={"is_group": 0},
+                fields=["name", "item_group_name", "parent_item_group"],
+                limit=100,
+                order_by="modified desc"
+            )
+
         for group in item_groups:
-            # Get count of items in this group
             item_count = frappe.db.count("Item", filters={"item_group": group["name"]})
 
             formatted_groups.append({
                 "id": group["name"],
                 "name": group.get("item_group_name") or group["name"],
                 "parent": group.get("parent_item_group") or None,
-                "icon": "📦", 
+                "icon": "📦",
                 "count": item_count,
-                # "total_item_count":total_item_count
             })
 
         return {
-                    "groups": formatted_groups,
-                    "total_items": total_item_count  # <-- outside the array
-                }
-
+            "groups": formatted_groups,
+            "total_items": total_item_count
+        }
 
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Item Groups for POS Error")
         frappe.throw(_("Something went wrong while fetching item group data."))
-
-
-# @frappe.whitelist(allow_guest=True)
-# def get_item_groups_for_pos():
-#     try:
-#         item_groups = frappe.get_all(
-#             "Item Group",
-#             filters={"is_group": 0},  
-#             fields=["name", "item_group_name", "parent_item_group"],
-#             limit=100,
-#             order_by="modified desc"
-#         )
-
-#         # Prepare a clean response
-#         formatted_groups = []
-#         for group in item_groups:
-#             formatted_groups.append({
-#                 "id": group["name"],
-#                 "name": group.get("item_group_name") or group["name"],
-#                 "parent": group.get("parent_item_group") or None,
-#                 "icon": "📦", 
-#                 "count": 1
-#             })
-            
-#             item = frappe.get_all("Item", filters={"item_group":group["name"]})
-
-#         return formatted_groups
-
-#     except Exception as e:
-#         frappe.log_error(frappe.get_traceback(), "Get Item Groups for POS Error")
-#         frappe.throw(_("Something went wrong while fetching item group data."))
-
 
 @frappe.whitelist()
 def get_batch_nos_with_qty(item_code):
