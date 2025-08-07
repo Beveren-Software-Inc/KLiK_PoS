@@ -45,7 +45,7 @@ def get_items_with_balance_and_price(price_list: str = "Standard Selling"):
     "Item",
     filters={"disabled": 0, "is_stock_item": 1},
     fields=["name", "item_name", "description", "item_group", "image"],
-    limit=50,
+    # limit=1000,
    
     order_by="modified desc"
 )
@@ -84,23 +84,61 @@ def get_item_groups_for_pos():
             limit=100,
             order_by="modified desc"
         )
-
-        # Prepare a clean response
+        total_item_count = frappe.db.count("Item", filters={"disabled": 0, "is_stock_item": 1})
         formatted_groups = []
         for group in item_groups:
+            # Get count of items in this group
+            item_count = frappe.db.count("Item", filters={"item_group": group["name"]})
+
             formatted_groups.append({
                 "id": group["name"],
                 "name": group.get("item_group_name") or group["name"],
                 "parent": group.get("parent_item_group") or None,
                 "icon": "📦", 
-                "count": 1
+                "count": item_count,
+                # "total_item_count":total_item_count
             })
 
-        return formatted_groups
+        return {
+                    "groups": formatted_groups,
+                    "total_items": total_item_count  # <-- outside the array
+                }
+
 
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Item Groups for POS Error")
         frappe.throw(_("Something went wrong while fetching item group data."))
+
+
+# @frappe.whitelist(allow_guest=True)
+# def get_item_groups_for_pos():
+#     try:
+#         item_groups = frappe.get_all(
+#             "Item Group",
+#             filters={"is_group": 0},  
+#             fields=["name", "item_group_name", "parent_item_group"],
+#             limit=100,
+#             order_by="modified desc"
+#         )
+
+#         # Prepare a clean response
+#         formatted_groups = []
+#         for group in item_groups:
+#             formatted_groups.append({
+#                 "id": group["name"],
+#                 "name": group.get("item_group_name") or group["name"],
+#                 "parent": group.get("parent_item_group") or None,
+#                 "icon": "📦", 
+#                 "count": 1
+#             })
+            
+#             item = frappe.get_all("Item", filters={"item_group":group["name"]})
+
+#         return formatted_groups
+
+#     except Exception as e:
+#         frappe.log_error(frappe.get_traceback(), "Get Item Groups for POS Error")
+#         frappe.throw(_("Something went wrong while fetching item group data."))
 
 
 @frappe.whitelist()
