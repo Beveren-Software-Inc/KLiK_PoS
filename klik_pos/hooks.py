@@ -21,6 +21,25 @@ app_license = "mit"
 # 	}
 # ]
 
+
+fixtures = [
+    {
+        "doctype": "Custom Field",
+        "filters": [
+            [
+                "name",
+                "in",
+                (
+                    "POS Profile-custom_klik_pos_settings",
+                    "POS Profile-custom_business_type",
+                    "POS Profile-custom_pos_printformat",
+                    "POS Profile-custom_column_break_7pdsa"
+                ),
+            ]
+        ],
+    }
+]
+
 add_to_apps_screen = [
 	{
 		"name": "klik_pos",
