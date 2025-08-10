@@ -5,6 +5,8 @@ export interface TaxCategory {
   id: string
   name: string
   rate: number
+  is_inclusive: boolean
+  type: "inclusive" | "exclusive"
 }
 
 export function useSalesTaxCharges() {

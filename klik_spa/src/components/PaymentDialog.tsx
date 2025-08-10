@@ -1,6 +1,8 @@
+
+
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { X, CreditCard, Banknote, Smartphone, Gift, Printer, Eye, Calculator, Check, MessageCirclePlus, MailPlus, MessageSquarePlus, Loader2 } from "lucide-react"
 import type { CartItem, GiftCoupon, Customer } from "../../types"
 import { usePaymentModes } from "../hooks/usePaymentModes"
@@ -87,25 +89,51 @@ export default function PaymentDialog({
   // Hooks
   const { modes, isLoading, error } = usePaymentModes("Test POS Profile");
   const { salesTaxCharges, defaultTax } = useSalesTaxCharges();
-  const { posDetails, loading: posLoading } = usePOSDetails(); // Get POS details
+  const { posDetails, loading: posLoading } = usePOSDetails();
   const navigate = useNavigate()
 
   // Determine if this is B2B business type
   const isB2B = posDetails?.business_type === 'B2B';
   const isB2C = posDetails?.business_type === 'B2C';
 
-  // Calculate totals
-  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
-  const couponDiscount = appliedCoupons.reduce((sum, coupon) => sum + coupon.value, 0)
-  const taxableAmount = Math.max(0, subtotal - couponDiscount)
-  const selectedTax = salesTaxCharges.find(tax => tax.id === selectedSalesTaxCharges)
-  const taxAmount = taxableAmount * (selectedTax?.rate || 0) / 100
-  const totalBeforeRoundOff = taxableAmount + taxAmount
-  const grandTotal = totalBeforeRoundOff
+  // Calculate totals with memoization for performance
+  const calculations = useMemo(() => {
+    const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    const couponDiscount = appliedCoupons.reduce((sum, coupon) => sum + coupon.value, 0)
+    const taxableAmount = Math.max(0, subtotal - couponDiscount)
+    
+    const selectedTax = salesTaxCharges.find(tax => tax.id === selectedSalesTaxCharges)
+    const taxRate = selectedTax?.rate || 0
+    const isInclusive = selectedTax?.is_inclusive || false
+    
+    let taxAmount: number
+    let grandTotal: number
+    
+    if (isInclusive) {
+      // For inclusive tax: tax is already included in the taxable amount
+      // Tax amount = taxable_amount * tax_rate / (100 + tax_rate)
+      taxAmount = taxableAmount * taxRate / (100 + taxRate)
+      grandTotal = taxableAmount // Grand total remains the same as taxable amount
+    } else {
+      // For exclusive tax: tax is added to the taxable amount
+      taxAmount = taxableAmount * taxRate / 100
+      grandTotal = taxableAmount + taxAmount
+    }
+    
+    return {
+      subtotal,
+      couponDiscount,
+      taxableAmount,
+      taxAmount,
+      grandTotal: grandTotal + roundOffAmount,
+      selectedTax,
+      isInclusive
+    }
+  }, [cartItems, appliedCoupons, selectedSalesTaxCharges, salesTaxCharges, roundOffAmount])
 
   // Calculate total paid amount from all payment methods (only for B2C)
   const totalPaidAmount = isB2C ? Object.values(paymentAmounts).reduce((sum, amount) => sum + (amount || 0), 0) : 0
-  const outstandingAmount = isB2C ? Math.max(0, grandTotal - (totalPaidAmount + Math.abs(roundOffAmount))) : grandTotal
+  const outstandingAmount = isB2C ? Math.max(0, calculations.grandTotal - totalPaidAmount) : calculations.grandTotal
   
   useEffect(() => {
     if (isOpen && defaultTax && !selectedSalesTaxCharges) {
@@ -118,10 +146,10 @@ export default function PaymentDialog({
     if (isOpen && modes.length > 0 && isB2C) {
       const defaultMode = modes.find(mode => mode.default === 1);
       if (defaultMode && Object.keys(paymentAmounts).length === 0) {
-        setPaymentAmounts({ [defaultMode.mode_of_payment]: grandTotal });
+        setPaymentAmounts({ [defaultMode.mode_of_payment]: calculations.grandTotal });
       }
     }
-  }, [isOpen, modes, grandTotal, paymentAmounts, isB2C]);
+  }, [isOpen, modes, calculations.grandTotal, paymentAmounts, isB2C]);
 
   // Update default payment method amount when grand total changes (B2C only)
   useEffect(() => {
@@ -132,14 +160,14 @@ export default function PaymentDialog({
           .filter(([key]) => key !== defaultMode.mode_of_payment)
           .reduce((sum, [, amount]) => sum + (amount || 0), 0);
         
-        const remainingAmount = Math.max(0, grandTotal - otherPaymentsTotal);
+        const remainingAmount = Math.max(0, calculations.grandTotal - otherPaymentsTotal);
         setPaymentAmounts(prev => ({
           ...prev,
           [defaultMode.mode_of_payment]: remainingAmount
         }));
       }
     }
-  }, [grandTotal, modes, isB2C]);
+  }, [calculations.grandTotal, modes, isB2C]);
 
   if (!isOpen) return null
   if (isLoading || posLoading) return <div className="p-6">Loading...</div>;
@@ -170,8 +198,9 @@ export default function PaymentDialog({
   const handleRoundOff = () => {
     if (invoiceSubmitted || isProcessingPayment) return;
 
-    const rounded = Math.floor(totalBeforeRoundOff);
-    const difference = Math.abs(rounded - totalBeforeRoundOff);
+    const totalBeforeRoundOff = calculations.isInclusive ? calculations.taxableAmount : calculations.taxableAmount + calculations.taxAmount;
+    const rounded = Math.round(totalBeforeRoundOff);
+    const difference = rounded - totalBeforeRoundOff;
 
     setRoundOffAmount(difference);
     setRoundOffInput(difference.toFixed(2));
@@ -202,9 +231,10 @@ export default function PaymentDialog({
       if (isB2C) {
         const defaultMode = modes.find(mode => mode.default === 1);
         if (defaultMode) {
+          const newGrandTotal = (calculations.isInclusive ? calculations.taxableAmount : calculations.taxableAmount + calculations.taxAmount) + parsed;
           setPaymentAmounts(prev => ({
             ...prev,
-            [defaultMode.mode_of_payment]: parseFloat((grandTotal - parsed).toFixed(2)),
+            [defaultMode.mode_of_payment]: parseFloat(newGrandTotal.toFixed(2)),
           }));
         }
       }
@@ -237,14 +267,15 @@ export default function PaymentDialog({
       paymentMethods: isB2C ? Object.entries(paymentAmounts)
         .filter(([, amount]) => amount > 0)
         .map(([method, amount]) => ({ method, amount })) : [],
-      subtotal,
+      subtotal: calculations.subtotal,
       SalesTaxCharges: selectedSalesTaxCharges,
-      taxAmount,
-      couponDiscount,
+      taxAmount: calculations.taxAmount,
+      taxType: calculations.isInclusive ? 'inclusive' : 'exclusive',
+      couponDiscount: calculations.couponDiscount,
       roundOffAmount,
-      grandTotal,
+      grandTotal: calculations.grandTotal,
       amountPaid: isB2C ? totalPaidAmount : 0,
-      outstandingAmount: isB2B ? grandTotal : outstandingAmount,
+      outstandingAmount: isB2B ? calculations.grandTotal : outstandingAmount,
       appliedCoupons,
       businessType: posDetails?.business_type
     };
@@ -281,12 +312,13 @@ export default function PaymentDialog({
     const orderData = {
       items: cartItems,
       customer: selectedCustomer,
-      subtotal,
+      subtotal: calculations.subtotal,
       SalesTaxCharges: selectedSalesTaxCharges,
-      taxAmount,
-      couponDiscount,
+      taxAmount: calculations.taxAmount,
+      taxType: calculations.isInclusive ? 'inclusive' : 'exclusive',
+      couponDiscount: calculations.couponDiscount,
       roundOffAmount,
-      grandTotal,
+      grandTotal: calculations.grandTotal,
       appliedCoupons,
       status: 'held',
       businessType: posDetails?.business_type
@@ -391,13 +423,23 @@ export default function PaymentDialog({
                   </div>
                 )}
 
-                {/* Business Type Indicator */}
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                  <p className="text-sm text-blue-800 dark:text-blue-200">
-                    <span className="font-semibold">Business Type:</span> {posDetails?.business_type || 'Loading...'}
-                    {isB2B && <span className="ml-2 text-xs">(Payment will be processed later)</span>}
-                  </p>
-                </div>
+                {/* Tax Type Indicator */}
+                {calculations.selectedTax && (
+                  <div className={`border rounded-lg p-3 ${
+                    calculations.isInclusive 
+                      ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' 
+                      : 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800'
+                  }`}>
+                    <p className={`text-sm ${
+                      calculations.isInclusive 
+                        ? 'text-blue-800 dark:text-blue-200' 
+                        : 'text-orange-800 dark:text-orange-200'
+                    }`}>
+                      <span className="font-semibold">Tax Type:</span> {calculations.isInclusive ? 'Inclusive' : 'Exclusive'} ({calculations.selectedTax.rate}%)
+                      {calculations.isInclusive && <span className="ml-2 text-xs">(Tax already included in item prices)</span>}
+                    </p>
+                  </div>
+                )}
 
                 {/* Round Off */}
                 <div>
@@ -429,17 +471,25 @@ export default function PaymentDialog({
                 <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-3">
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
-                    <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(subtotal)}</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(calculations.subtotal)}</span>
                   </div>
-                  {couponDiscount > 0 && (
+                  {calculations.couponDiscount > 0 && (
                     <div className="flex justify-between text-green-600 dark:text-green-400">
                       <span>Discount</span>
-                      <span>-{formatCurrency(couponDiscount)}</span>
+                      <span>-{formatCurrency(calculations.couponDiscount)}</span>
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Tax ({selectedTax?.rate}%)</span>
-                    <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(taxAmount)}</span>
+                    <span className="text-gray-600 dark:text-gray-400">
+                      Tax ({calculations.selectedTax?.rate}% {calculations.isInclusive ? 'Incl.' : 'Excl.'})
+                    </span>
+                    <span className={`font-medium ${
+                      calculations.isInclusive 
+                        ? 'text-blue-600 dark:text-blue-400' 
+                        : 'text-gray-900 dark:text-white'
+                    }`}>
+                      {calculations.isInclusive ? `(${formatCurrency(calculations.taxAmount)})` : formatCurrency(calculations.taxAmount)}
+                    </span>
                   </div>
                   {roundOffAmount !== 0 && (
                     <div className="flex justify-between">
@@ -450,7 +500,7 @@ export default function PaymentDialog({
                   <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
                     <div className="flex justify-between">
                       <span className="text-lg font-bold text-gray-900 dark:text-white">Grand Total</span>
-                      <span className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrency(grandTotal)}</span>
+                      <span className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrency(calculations.grandTotal)}</span>
                     </div>
                   </div>
                   
@@ -464,10 +514,10 @@ export default function PaymentDialog({
                         <span className="text-gray-600 dark:text-gray-400">Outstanding</span>
                         <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(outstandingAmount)}</span>
                       </div>
-                      {totalPaidAmount > grandTotal && (
+                      {totalPaidAmount > calculations.grandTotal && (
                         <div className="flex justify-between">
                           <span className="text-gray-600 dark:text-gray-400">Change</span>
-                          <span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(totalPaidAmount - grandTotal)}</span>
+                          <span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(totalPaidAmount - calculations.grandTotal)}</span>
                         </div>
                       )}
                     </>
@@ -476,10 +526,11 @@ export default function PaymentDialog({
                   {isB2B && (
                     <div className="flex justify-between">
                       <span className="text-gray-600 dark:text-gray-400">Outstanding Amount</span>
-                      <span className="font-medium text-orange-600 dark:text-orange-400">{formatCurrency(grandTotal)}</span>
+                      <span className="font-medium text-orange-600 dark:text-orange-400">{formatCurrency(calculations.grandTotal)}</span>
                     </div>
                   )}
                 </div>
+
 
                 {/* Action Buttons */}
                 <div className="space-y-3 pt-6">
@@ -492,7 +543,7 @@ export default function PaymentDialog({
                         : 'bg-green-600 hover:bg-green-700 text-white'
                     }`}
                   >
-                    {isProcessingPayment ? (
+                                        {isProcessingPayment ? (
                       <>
                         <Loader2 size={20} className="animate-spin" />
                         <span>{getActionButtonText()}</span>
@@ -544,86 +595,150 @@ export default function PaymentDialog({
           </h2>
       
         
-          {invoiceSubmitted ? (
-            <div className="flex items-center space-x-3">
-              {/* ... action buttons remain the same ... */}
-            </div>
-          ) : (
-            <button
-              onClick={onClose}
-              disabled={isProcessingPayment || isHoldingOrder}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <X size={24} />
-            </button>
-          )}
-        </div>
+           {invoiceSubmitted ? (
+    <div className="flex items-center space-x-3">
+      <button
+        className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"
+        title="Print"
+        onClick={() => {
+        handlePrintInvoice(invoiceData);
+        navigate('/');
+      }}
+    >
+
+        <Printer size={20} />
+      </button>
+
+       <button
+        className="p-2 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900 rounded-lg"
+        title="Email"
+        onClick={() => {
+          const subject = encodeURIComponent("Your Invoice");
+          const body = encodeURIComponent(`Dear ${selectedCustomer?.name},\n\nHere is your invoice total: ${formatCurrency(grandTotal)}\n\nThank you.`);
+          window.open(`mailto:${selectedCustomer?.email}?subject=${subject}&body=${body}`);
+        }}
+      >
+        <MailPlus size={20} />
+      </button>
+
+      <button
+        className="p-2 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900 rounded-lg"
+        title="WhatsApp"
+        onClick={() => {
+          const msg = encodeURIComponent(`Here is your invoice total: ${formatCurrency(grandTotal)}`);
+          window.open(`https://wa.me/${selectedCustomer?.phone}?text=${msg}`, "_blank");
+        }}
+      >
+        <MessageCirclePlus size={20} />
+      </button>
+
+      <button
+        className="p-2 text-purple-600 hover:bg-purple-100 dark:text-purple-400 dark:hover:bg-purple-900 rounded-lg"
+        title="Text Message"
+        onClick={() => window.open(`tel:${selectedCustomer?.phone}`)}
+      >
+        <MessageSquarePlus />
+      </button>
+
+      <button
+        className="p-2 text-purple-600 hover:bg-purple-100 dark:text-purple-400 dark:hover:bg-purple-900 rounded-lg"
+        title="View Full"
+        onClick={()=>handleViewInvoice(invoiceData)}
+      >
+        <Eye />
+      </button>
+    </div>
+  ) : (
+    <button
+      onClick={onClose}
+      disabled={isProcessingPayment || isHoldingOrder}
+      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <X size={24} />
+    </button>
+  )}
+</div>
+
 
         {/* Main Content */}
         <div className="flex flex-1 min-h-0">
           {/* Left Section */}
           <div className="w-2/3 p-6 overflow-y-auto custom-scrollbar space-y-6">
-            {/* Business Type Indicator */}
-            {/* <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">
-                    Business Type: {posDetails?.business_type || 'Loading...'}
-                  </p>
-                  {isB2B && (
-                    <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">
-                      Payment will be processed separately. This will create an invoice with outstanding amount.
+            {/* Tax Type Indicator */}
+            {/* {calculations.selectedTax && (
+              <div className={`border rounded-lg p-4 ${
+                calculations.isInclusive 
+                  ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' 
+                  : 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className={`text-sm font-semibold ${
+                      calculations.isInclusive 
+                        ? 'text-blue-800 dark:text-blue-200' 
+                        : 'text-orange-800 dark:text-orange-200'
+                    }`}>
+                      Tax Type: {calculations.isInclusive ? 'Inclusive' : 'Exclusive'} ({calculations.selectedTax.rate}%)
                     </p>
-                  )}
-                </div>
-                <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  isB2B 
-                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100'
-                    : 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'
-                }`}>
-                  {posDetails?.business_type || 'Loading...'}
+                    {calculations.isInclusive ? (
+                      <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">
+                        Tax is already included in item prices. Grand total remains unchanged.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-orange-600 dark:text-orange-300 mt-1">
+                        Tax will be added to the subtotal to calculate grand total.
+                      </p>
+                    )}
+                  </div>
+                  <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    calculations.isInclusive 
+                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100'
+                      : 'bg-orange-100 text-orange-800 dark:bg-orange-800 dark:text-orange-100'
+                  }`}>
+                    {calculations.isInclusive ? 'INCLUSIVE' : 'EXCLUSIVE'}
+                  </div>
                 </div>
               </div>
-            </div> */}
+            )} */}
 
-            {/* Payment Methods - Only show for B2C */}
-            {(isB2C || isB2B) && (
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Payment Methods</h3>
-                <div className="flex space-x-4 overflow-x-auto pb-2">
-                  {paymentMethods.map((method) => (
-                    <div
-                      key={method.id}
-                      className={`min-w-[50%] sm:min-w-[300px] md:min-w-[350px] border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-beveren-300 transition-colors flex-shrink-0 ${invoiceSubmitted || isProcessingPayment ? 'bg-gray-50 dark:bg-gray-800' : ''}`}
-                    >
-                      <div className="flex items-center space-x-3 mb-3">
-                        <div className={`w-8 h-8 rounded-md ${method.color} text-white flex items-center justify-center`}>
-                          <div className="scale-75">{method.icon}</div>
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-900 dark:text-white text-sm">{method.name}</p>
-                        </div>
+            {/* Payment Methods - Show for both B2C and B2B but disable for B2B */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Payment Methods {isB2B && <span className="text-sm text-gray-500">(For reference only)</span>}
+              </h3>
+              <div className="flex space-x-4 overflow-x-auto pb-2">
+                {paymentMethods.map((method) => (
+                  <div
+                    key={method.id}
+                    className={`min-w-[50%] sm:min-w-[300px] md:min-w-[350px] border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-beveren-300 transition-colors flex-shrink-0 ${invoiceSubmitted || isProcessingPayment || isB2B ? 'bg-gray-50 dark:bg-gray-800' : ''}`}
+                  >
+                    <div className="flex items-center space-x-3 mb-3">
+                      <div className={`w-8 h-8 rounded-md ${method.color} text-white flex items-center justify-center`}>
+                        <div className="scale-75">{method.icon}</div>
                       </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
-                        <input
-                          type="number"
-                          value={(method.amount).toFixed(2) || ''}
-                          onChange={(e) => {
-                            const raw = parseFloat(e.target.value);
-                            const formatted = isNaN(raw) ? '' : raw.toFixed(2);
-                            handlePaymentAmountChange(method.id, formatted);
-                          }}
-                          placeholder="0.00"
-                          disabled={invoiceSubmitted || isProcessingPayment}
-                          className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
-                        />
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900 dark:text-white text-sm">{method.name}</p>
                       </div>
                     </div>
-                  ))}
-                </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
+                      <input
+                        type="number"
+                        value={(method.amount).toFixed(2) || ''}
+                        onChange={(e) => {
+                          const raw = parseFloat(e.target.value);
+                          const formatted = isNaN(raw) ? '' : raw.toFixed(2);
+                          handlePaymentAmountChange(method.id, formatted);
+                        }}
+                        placeholder="0.00"
+                        disabled={invoiceSubmitted || isProcessingPayment || isB2B}
+                        className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm ${invoiceSubmitted || isProcessingPayment || isB2B ? 'cursor-not-allowed opacity-50' : ''}`}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
 
             {/* Tax Section */}
             <div>
@@ -641,17 +756,21 @@ export default function PaymentDialog({
                   >
                     {salesTaxCharges.map((tax) => (
                       <option key={tax.id} value={tax.id}>
-                        {tax.name} ({tax.rate}%)
+                        {tax.name} ({tax.rate}% {tax.is_inclusive ? 'Incl.' : 'Excl.'})
                       </option>
                     ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Tax Amount
+                    Tax Amount {calculations.isInclusive && '(Included)'}
                   </label>
-                  <div className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white font-medium">
-                    {formatCurrency(taxAmount)}
+                  <div className={`px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg font-medium ${
+                    calculations.isInclusive 
+                      ? 'text-blue-600 dark:text-blue-400' 
+                      : 'text-gray-900 dark:text-white'
+                  }`}>
+                    {calculations.isInclusive ? `(${formatCurrency(calculations.taxAmount)})` : formatCurrency(calculations.taxAmount)}
                   </div>
                 </div>
               </div>
@@ -691,17 +810,25 @@ export default function PaymentDialog({
                 <div className="border-t border-gray-200 dark:border-gray-600 pt-3 space-y-2">
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
-                    <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(subtotal)}</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(calculations.subtotal)}</span>
                   </div>
-                  {couponDiscount > 0 && (
+                  {calculations.couponDiscount > 0 && (
                     <div className="flex justify-between text-green-600 dark:text-green-400">
                       <span>Coupon Discount</span>
-                      <span>-{formatCurrency(couponDiscount)}</span>
+                      <span>-{formatCurrency(calculations.couponDiscount)}</span>
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Tax ({selectedTax?.rate}%)</span>
-                    <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(taxAmount)}</span>
+                    <span className="text-gray-600 dark:text-gray-400">
+                      Tax ({calculations.selectedTax?.rate}% {calculations.isInclusive ? 'Incl.' : 'Excl.'})
+                    </span>
+                    <span className={`font-medium ${
+                      calculations.isInclusive 
+                        ? 'text-blue-600 dark:text-blue-400' 
+                        : 'text-gray-900 dark:text-white'
+                    }`}>
+                      {calculations.isInclusive ? `(${formatCurrency(calculations.taxAmount)})` : formatCurrency(calculations.taxAmount)}
+                    </span>
                   </div>
                   {roundOffAmount !== 0 && (
                     <div className="flex justify-between">
@@ -712,11 +839,11 @@ export default function PaymentDialog({
                   <div className="border-t border-gray-200 dark:border-gray-600 pt-2">
                     <div className="flex justify-between">
                       <span className="text-xl font-bold text-gray-900 dark:text-white">Grand Total</span>
-                      <span className="text-xl font-bold text-gray-900 dark:text-white">{formatCurrency(grandTotal)}</span>
+                      <span className="text-xl font-bold text-gray-900 dark:text-white">{formatCurrency(calculations.grandTotal)}</span>
                     </div>
                   </div>
                   
-                  {(isB2C || isB2B) &&  (
+                  {isB2C && (
                     <>
                       <div className="flex justify-between">
                         <span className="text-gray-600 dark:text-gray-400">Total Paid</span>
@@ -728,21 +855,21 @@ export default function PaymentDialog({
                           {formatCurrency(outstandingAmount)}
                         </span>
                       </div>
-                      {totalPaidAmount > grandTotal && (
+                      {totalPaidAmount > calculations.grandTotal && (
                         <div className="flex justify-between">
                           <span className="text-gray-600 dark:text-gray-400">Change</span>
-                          <span className="font-bold text-green-600 dark:text-green-400">{formatCurrency(totalPaidAmount - grandTotal)}</span>
+                          <span className="font-bold text-green-600 dark:text-green-400">{formatCurrency(totalPaidAmount - calculations.grandTotal)}</span>
                         </div>
                       )}
                     </>
                   )}
 
-                  {/* {isB2B && (
+                  {isB2B && (
                     <div className="flex justify-between">
                       <span className="text-gray-600 dark:text-gray-400">Outstanding Amount</span>
-                      <span className="font-bold text-orange-600 dark:text-orange-400">{formatCurrency(grandTotal)}</span>
+                      <span className="font-bold text-orange-600 dark:text-orange-400">{formatCurrency(calculations.grandTotal)}</span>
                     </div>
-                  )} */}
+                  )}
                 </div>
               </div>
             </div>
@@ -798,17 +925,25 @@ export default function PaymentDialog({
                 <div className="border-t border-gray-200 dark:border-gray-600 pt-2 space-y-1 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
-                    <span className="text-gray-900 dark:text-white">{formatCurrency(subtotal)}</span>
+                    <span className="text-gray-900 dark:text-white">{formatCurrency(calculations.subtotal)}</span>
                   </div>
-                  {couponDiscount > 0 && (
+                  {calculations.couponDiscount > 0 && (
                     <div className="flex justify-between text-green-600 dark:text-green-400">
                       <span>Discount</span>
-                      <span>-{formatCurrency(couponDiscount)}</span>
+                      <span>-{formatCurrency(calculations.couponDiscount)}</span>
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Tax ({selectedTax?.rate}%)</span>
-                    <span className="text-gray-900 dark:text-white">{formatCurrency(taxAmount)}</span>
+                    <span className="text-gray-600 dark:text-gray-400">
+                      Tax ({calculations.selectedTax?.rate}% {calculations.isInclusive ? 'Incl.' : 'Excl.'})
+                    </span>
+                    <span className={`${
+                      calculations.isInclusive 
+                        ? 'text-blue-600 dark:text-blue-400' 
+                        : 'text-gray-900 dark:text-white'
+                    }`}>
+                      {calculations.isInclusive ? `(${formatCurrency(calculations.taxAmount)})` : formatCurrency(calculations.taxAmount)}
+                    </span>
                   </div>
                   {roundOffAmount !== 0 && (
                     <div className="flex justify-between">
@@ -819,12 +954,12 @@ export default function PaymentDialog({
                   <div className="border-t border-gray-200 dark:border-gray-600 pt-1">
                     <div className="flex justify-between font-bold">
                       <span className="text-gray-900 dark:text-white">Total</span>
-                      <span className="text-gray-900 dark:text-white">{formatCurrency(grandTotal)}</span>
+                      <span className="text-gray-900 dark:text-white">{formatCurrency(calculations.grandTotal)}</span>
                     </div>
                   </div>
 
-                  {/* Payment Methods Used - Only show for B2C */}
-                  {(isB2C || isB2B) && Object.entries(paymentAmounts).filter(([, amount]) => amount > 0).length > 0 && (
+                  {/* Payment Methods Used - Only show for B2C with actual amounts */}
+                  {isB2C && Object.entries(paymentAmounts).filter(([, amount]) => amount > 0).length > 0 && (
                     <div className="border-t border-gray-200 dark:border-gray-600 pt-2 mt-2">
                       <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Payment Methods:</p>
                       {Object.entries(paymentAmounts)
@@ -843,10 +978,23 @@ export default function PaymentDialog({
                     <div className="border-t border-gray-200 dark:border-gray-600 pt-2 mt-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-orange-600 dark:text-orange-400 font-medium">Outstanding Amount:</span>
-                        <span className="text-orange-600 dark:text-orange-400 font-bold">{formatCurrency(grandTotal)}</span>
+                        <span className="text-orange-600 dark:text-orange-400 font-bold">{formatCurrency(calculations.grandTotal)}</span>
                       </div>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         Payment to be collected separately
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Tax Type Note */}
+                  {calculations.selectedTax && (
+                    <div className="border-t border-gray-200 dark:border-gray-600 pt-2 mt-2">
+                      <p className={`text-xs ${
+                        calculations.isInclusive 
+                          ? 'text-blue-500 dark:text-blue-400' 
+                          : 'text-orange-500 dark:text-orange-400'
+                      }`}>
+                        Tax is {calculations.isInclusive ? 'inclusive' : 'exclusive'} of item prices
                       </p>
                     </div>
                   )}
@@ -886,13 +1034,6 @@ export default function PaymentDialog({
               >
                 New Order
               </button>
-              {/* <button
-                onClick={onClose}
-                className="px-8 py-2 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700 transition-colors flex items-center space-x-2"
-              >
-                <Check size={16} />
-                <span>Return</span>
-              </button> */}
             </div>
           </div>
         ) : (
@@ -901,14 +1042,14 @@ export default function PaymentDialog({
               <button
                 onClick={onClose}
                 disabled={isProcessingPayment || isHoldingOrder}
-                className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                className="px-6 py-2 border border-orange-500 text-orange-600 dark:text-orange-400 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleHoldOrder}
                 disabled={invoiceSubmitted || isProcessingPayment || isHoldingOrder}
-                className={`px-6 py-2 border border-orange-500 text-orange-600 dark:text-orange-400 rounded-lg font-medium hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors flex items-center space-x-2 ${invoiceSubmitted || isProcessingPayment || isHoldingOrder ? 'cursor-not-allowed opacity-50' : ''}`}
+                className={`px-6 py-2 border  border-gray-300 dark:border-gray-600 text-gray-700 rounded-lg font-medium hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors flex items-center space-x-2 ${invoiceSubmitted || isProcessingPayment || isHoldingOrder ? 'cursor-not-allowed opacity-50' : ''}`}
               >
                 {isHoldingOrder ? (
                   <>
@@ -924,7 +1065,7 @@ export default function PaymentDialog({
                 disabled={isActionButtonDisabled()}
                 className={`px-8 py-2 rounded-lg font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center space-x-2 ${
                   isB2B 
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                    ? 'bg-beveren-500 hover:bg-blue-700 text-white' 
                     : 'bg-green-600 hover:bg-green-700 text-white'
                 }`}
               >
@@ -945,5 +1086,4 @@ export default function PaymentDialog({
         )}
       </div>
     </div>
-  )
-}
+  )}
