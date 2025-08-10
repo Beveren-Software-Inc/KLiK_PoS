@@ -29,10 +29,26 @@ def fetch_item_price(item_code: str, price_list: str) -> dict:
             ["price_list_rate", "currency"],
             as_dict=True
         )
-        return {
-            "price": price_doc.price_list_rate if price_doc else 0,
-            "currency": price_doc.currency if price_doc else "SAR"
-        }
+        if price_doc:
+            symbol = frappe.db.get_value("Currency", price_doc.currency, "symbol") or price_doc.currency
+            return {
+                "price": price_doc.price_list_rate,
+                "currency": price_doc.currency,
+                "currency_symbol": symbol
+            }
+        else:
+            default_currency = "SAR"
+            default_symbol = frappe.db.get_value("Currency", default_currency, "symbol") or default_currency
+            return {
+                "price": 0,
+                "currency": default_currency,
+                "currency_symbol": default_symbol
+            }
+            
+        # return {
+        #     "price": price_doc.price_list_rate if price_doc else 0,
+        #     "currency": price_doc.currency if price_doc else "SAR"
+        # }
     except Exception:
         frappe.log_error(frappe.get_traceback(), f"Error fetching price for {item_code}")
         return {
@@ -66,6 +82,7 @@ def get_items_with_balance_and_price(price_list: str = "Standard Selling"):
                 "category": item.get("item_group", "General"),
                 "price": price_info["price"],
                 "currency": price_info["currency"],
+                "currency_symbol":price_info["currency_symbol"],
                 "available": balance,
                 "image": item.get("image") or "https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=300&h=300&fit=crop",
                 "sold": 0,
