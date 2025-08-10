@@ -52,7 +52,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const parsedUser = JSON.parse(userData)
         setUser(parsedUser)
-        console.log("User restored from localStorage:", parsedUser)
       } catch (error) {
         console.error("Error parsing user data:", error)
         localStorage.removeItem("erpnext_token")

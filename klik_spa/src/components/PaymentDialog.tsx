@@ -136,9 +136,10 @@ export default function PaymentDialog({
   }, [cartItems, appliedCoupons, selectedSalesTaxCharges, salesTaxCharges, roundOffAmount])
 
   // Calculate total paid amount from all payment methods (only for B2C)
-  const totalPaidAmount = isB2C ? Object.values(paymentAmounts).reduce((sum, amount) => sum + (amount || 0), 0) : 0
-  const outstandingAmount = isB2C ? Math.max(0, calculations.grandTotal - totalPaidAmount) : calculations.grandTotal
-  
+ // Calculate total paid amount from all payment methods (for both B2C and B2B)
+const totalPaidAmount = Object.values(paymentAmounts).reduce((sum, amount) => sum + (amount || 0), 0)
+const outstandingAmount = Math.max(0, calculations.grandTotal - totalPaidAmount)
+
   useEffect(() => {
     if (isOpen && defaultTax && !selectedSalesTaxCharges) {
       setSelectedSalesTaxCharges(defaultTax);
@@ -146,32 +147,40 @@ export default function PaymentDialog({
   }, [isOpen, defaultTax, selectedSalesTaxCharges]);
 
   // Only set up payment amounts for B2C
-  useEffect(() => {
-    if (isOpen && modes.length > 0 && isB2C) {
-      const defaultMode = modes.find(mode => mode.default === 1);
-      if (defaultMode && Object.keys(paymentAmounts).length === 0) {
-        setPaymentAmounts({ [defaultMode.mode_of_payment]: calculations.grandTotal });
-      }
+ // Set up payment amounts for both B2C and B2B
+useEffect(() => {
+  if (isOpen && modes.length > 0) {
+    const defaultMode = modes.find(mode => mode.default === 1);
+    if (defaultMode && Object.keys(paymentAmounts).length === 0) {
+      // For B2B, default to 0 (pay later option)
+      // For B2C, default to full amount (immediate payment)
+      const defaultAmount = isB2B ? 0 : calculations.grandTotal;
+      setPaymentAmounts({ [defaultMode.mode_of_payment]: defaultAmount });
     }
-  }, [isOpen, modes, calculations.grandTotal, paymentAmounts, isB2C]);
+  }
+}, [isOpen, modes, calculations.grandTotal, paymentAmounts, isB2B, isB2C]);
 
   // Update default payment method amount when grand total changes (B2C only)
-  useEffect(() => {
-    if (modes.length > 0 && Object.keys(paymentAmounts).length > 0 && isB2C) {
-      const defaultMode = modes.find(mode => mode.default === 1);
-      if (defaultMode) {
-        const otherPaymentsTotal = Object.entries(paymentAmounts)
-          .filter(([key]) => key !== defaultMode.mode_of_payment)
-          .reduce((sum, [, amount]) => sum + (amount || 0), 0);
-        
-        const remainingAmount = Math.max(0, calculations.grandTotal - otherPaymentsTotal);
-        setPaymentAmounts(prev => ({
-          ...prev,
-          [defaultMode.mode_of_payment]: remainingAmount
-        }));
-      }
+ // Update default payment method amount when grand total changes
+useEffect(() => {
+  if (modes.length > 0 && Object.keys(paymentAmounts).length > 0) {
+    const defaultMode = modes.find(mode => mode.default === 1);
+    if (defaultMode) {
+      const otherPaymentsTotal = Object.entries(paymentAmounts)
+        .filter(([key]) => key !== defaultMode.mode_of_payment)
+        .reduce((sum, [, amount]) => sum + (amount || 0), 0);
+      
+      // For B2B, allow flexible payment amounts (can be 0 for pay later)
+      // For B2C, require full payment by default
+      const remainingAmount = isB2C ? Math.max(0, calculations.grandTotal - otherPaymentsTotal) : 0;
+      
+      setPaymentAmounts(prev => ({
+        ...prev,
+        [defaultMode.mode_of_payment]: remainingAmount
+      }));
     }
-  }, [calculations.grandTotal, modes, isB2C]);
+  }
+}, [calculations.grandTotal, modes, isB2C, isB2B]);
 
   if (!isOpen) return null
   if (isLoading || posLoading) return <div className="p-6">Loading...</div>;
@@ -189,16 +198,15 @@ export default function PaymentDialog({
     };
   });
 
-  const handlePaymentAmountChange = (methodId: string, amount: string) => {
-    if (invoiceSubmitted || isProcessingPayment || isB2B) return;
-    
-    const numericAmount = parseFloat(amount) || 0;
-    setPaymentAmounts(prev => ({
-      ...prev,
-      [methodId]: numericAmount
-    }));
-  };
-
+ const handlePaymentAmountChange = (methodId: string, amount: string) => {
+  if (invoiceSubmitted || isProcessingPayment) return;
+  
+  const numericAmount = parseFloat(amount) || 0;
+  setPaymentAmounts(prev => ({
+    ...prev,
+    [methodId]: numericAmount
+  }));
+};
   const handleRoundOff = () => {
     if (invoiceSubmitted || isProcessingPayment) return;
 
@@ -209,15 +217,16 @@ export default function PaymentDialog({
     setRoundOffAmount(difference);
     setRoundOffInput(difference.toFixed(2));
 
-    if (isB2C) {
-      const defaultMode = modes.find(mode => mode.default === 1);
-      if (defaultMode) {
-        setPaymentAmounts(prev => ({
-          ...prev,
-          [defaultMode.mode_of_payment]: rounded
-        }));
-      }
-    }
+    // For B2C, update payment amount; for B2B, keep flexible
+if (isB2C) {
+  const defaultMode = modes.find(mode => mode.default === 1);
+  if (defaultMode) {
+    setPaymentAmounts(prev => ({
+      ...prev,
+      [defaultMode.mode_of_payment]: rounded
+    }));
+  }
+}
   };
 
   const handleSalesTaxChange = (value: string) => {
@@ -232,7 +241,7 @@ export default function PaymentDialog({
     if (!isNaN(parsed)) {
       setRoundOffAmount(parsed);
 
-      if (isB2C) {
+      if (isB2C || isB2B) {
         const defaultMode = modes.find(mode => mode.default === 1);
         if (defaultMode) {
           const newGrandTotal = (calculations.isInclusive ? calculations.taxableAmount : calculations.taxableAmount + calculations.taxAmount) + parsed;
@@ -252,25 +261,33 @@ export default function PaymentDialog({
     }
 
     // For B2B, we don't need payment validation
-    if (isB2C) {
-      const activePaymentMethods = Object.entries(paymentAmounts)
-        .filter(([, amount]) => amount > 0)
-        .map(([method, amount]) => ({ method, amount }));
+    // For B2C, validate payment completion
+if (isB2C) {
+  const activePaymentMethods = Object.entries(paymentAmounts)
+    .filter(([, amount]) => amount > 0)
+    .map(([method, amount]) => ({ method, amount }));
 
-      if (activePaymentMethods.length === 0) {
-        toast.error("Please enter payment amounts");
-        return;
-      }
-    }
+  if (activePaymentMethods.length === 0) {
+    toast.error("Please enter payment amounts");
+    return;
+  }
+
+  if (outstandingAmount > 0) {
+    toast.error("Please complete the payment before proceeding");
+    return;
+  }
+}
+
+// For B2B, no payment validation required - can be partial or zero payment
 
     setIsProcessingPayment(true);
 
     const paymentData = {
       items: cartItems,
       customer: selectedCustomer,
-      paymentMethods: isB2C ? Object.entries(paymentAmounts)
+      paymentMethods: Object.entries(paymentAmounts)
         .filter(([, amount]) => amount > 0)
-        .map(([method, amount]) => ({ method, amount })) : [],
+        .map(([method, amount]) => ({ method, amount })),
       subtotal: calculations.subtotal,
       SalesTaxCharges: selectedSalesTaxCharges,
       taxAmount: calculations.taxAmount,
@@ -278,8 +295,8 @@ export default function PaymentDialog({
       couponDiscount: calculations.couponDiscount,
       roundOffAmount,
       grandTotal: calculations.grandTotal,
-      amountPaid: isB2C ? totalPaidAmount : 0,
-      outstandingAmount: isB2B ? calculations.grandTotal : outstandingAmount,
+      amountPaid: totalPaidAmount,
+      outstandingAmount: outstandingAmount,
       appliedCoupons,
       businessType: posDetails?.business_type
     };
@@ -352,12 +369,23 @@ export default function PaymentDialog({
   })
 
   // Get the appropriate button text and validation
-  const getActionButtonText = () => {
-    if (isProcessingPayment) {
-      return isB2B ? "Submitting Invoice..." : "Processing Payment...";
+const getActionButtonText = () => {
+  if (isProcessingPayment) {
+    return isB2B ? "Submitting Invoice..." : "Processing Payment...";
+  }
+  
+  if (isB2B) {
+    if (totalPaidAmount === 0) {
+      return "Submit Invoice (Pay Later)";
+    } else if (outstandingAmount > 0) {
+      return "Submit Invoice (Partial Payment)";
+    } else {
+      return "Submit Invoice (Paid)";
     }
-    return isB2B ? "Submit Invoice" : "Complete Payment";
-  };
+  }
+  
+  return "Complete Payment";
+};
 
   const isActionButtonDisabled = () => {
     if (invoiceSubmitted || isProcessingPayment) return true;
@@ -390,7 +418,7 @@ export default function PaymentDialog({
             ) : (
               <>
                 {/* Payment Methods - Only show for B2C */}
-                {isB2C && (
+                {(isB2C || isB2B) && (
                   <div>
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Payment Methods</h2>
                     <div className="flex space-x-3 overflow-x-auto pb-2">
@@ -505,7 +533,7 @@ export default function PaymentDialog({
                     </div>
                   </div>
                   
-                  {isB2C && (
+                  {(isB2C || isB2B) && (
                     <>
                       <div className="flex justify-between">
                         <span className="text-gray-600 dark:text-gray-400">Total Paid</span>
@@ -587,7 +615,7 @@ export default function PaymentDialog({
 
   // Desktop view with similar modifications
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+<div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
@@ -732,7 +760,7 @@ export default function PaymentDialog({
                           handlePaymentAmountChange(method.id, formatted);
                         }}
                         placeholder="0.00"
-                        disabled={invoiceSubmitted || isProcessingPayment || isB2B}
+                        disabled={invoiceSubmitted || isProcessingPayment}
                         className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm ${invoiceSubmitted || isProcessingPayment || isB2B ? 'cursor-not-allowed opacity-50' : ''}`}
                       />
                     </div>
@@ -844,7 +872,7 @@ export default function PaymentDialog({
                     </div>
                   </div>
                   
-                  {isB2C && (
+                  {(isB2C || isB2C) && (
                     <>
                       <div className="flex justify-between">
                         <span className="text-gray-600 dark:text-gray-400">Total Paid</span>
@@ -960,7 +988,7 @@ export default function PaymentDialog({
                   </div>
 
                   {/* Payment Methods Used - Only show for B2C with actual amounts */}
-                  {isB2C && Object.entries(paymentAmounts).filter(([, amount]) => amount > 0).length > 0 && (
+                  {(isB2C || isB2B) && Object.entries(paymentAmounts).filter(([, amount]) => amount > 0).length > 0 && (
                     <div className="border-t border-gray-200 dark:border-gray-600 pt-2 mt-2">
                       <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Payment Methods:</p>
                       {Object.entries(paymentAmounts)
