@@ -30,7 +30,7 @@ export default function RetailSidebar() {
           onClick={() => navigate("/")}
         >
           <img
-            src="/beveren-logo-180.png"
+            src="/assets/klik_pos/klik_spa/beveren-logo-180.png"
             alt="KLIK POS"
             className="w-12 h-12 rounded-full object-cover"
           />

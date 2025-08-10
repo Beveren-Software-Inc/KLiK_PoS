@@ -116,7 +116,6 @@ def get_item_groups_for_pos():
                 "icon": "📦",
                 "count": item_count,
             })
-
         return {
             "groups": formatted_groups,
             "total_items": total_item_count
