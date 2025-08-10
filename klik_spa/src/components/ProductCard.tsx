@@ -13,6 +13,10 @@ export default function ProductCard({ item, onAddToCart, isMobile = false }: Pro
   const { t } = useI18n()
   const isOutOfStock = item.available <= 0
 
+  // Format price based on currency
+  const formattedPrice = `${item.currency_symbol}${item.price.toFixed(2)}`
+
+console.log("here for currency_symbol",item.currency_symbol )
   return (
     <div
       className={`bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden transition-all duration-200 ${
@@ -56,7 +60,7 @@ export default function ProductCard({ item, onAddToCart, isMobile = false }: Pro
             {item.category}
           </p>
           <span className={`font-bold text-beveren-600 dark:text-beveren-400 ${isMobile ? "text-xs" : "text-sm"}`}>
-            ${item.price.toFixed(2)}
+            {formattedPrice}
           </span>
         </div>
       </div>
