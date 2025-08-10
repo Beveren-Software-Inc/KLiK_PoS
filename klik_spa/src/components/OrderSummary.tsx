@@ -13,6 +13,8 @@ import { toast } from "react-toastify"
 import { useBatchData } from "../hooks/useProducts"
 import { getBatches } from "../utils/batch"; // or wherever you put it
 import { useNavigate } from "react-router-dom"
+import { usePOSDetails } from "../hooks/usePOSProfile"
+
 
 
 // Extended CartItem interface to include discount properties
@@ -54,8 +56,11 @@ export default function OrderSummary({
   const couponButtonRef = useRef<HTMLButtonElement>(null)
   const { customers, isLoading, error } = useCustomers()
   const navigate = useNavigate()
+  const { posDetails, loading: posLoading } = usePOSDetails();
 
   
+  const currency = posDetails?.currency
+  const currency_symbol = posDetails?.currency_symbol
   // State for item-level discounts and details
   const [itemDiscounts, setItemDiscounts] = useState<Record<string, {
     discountPercentage: number;
@@ -505,15 +510,16 @@ useEffect(() => {
                         {discountedPrice < item.price ? (
                           <div className="flex items-center space-x-2">
                             <span className="text-gray-400 line-through text-xs">
-                              ${item.price.toFixed(2)}
-                            </span>
+                            {currency_symbol}{item.price.toFixed(2)}
+                          </span>
+
                             <span className="text-beveren-600 dark:text-beveren-400 font-semibold">
-                              ${discountedPrice.toFixed(2)} each
+                              {currency_symbol}{discountedPrice.toFixed(2)} each
                             </span>
                           </div>
                         ) : (
                           <div className="text-beveren-600 dark:text-beveren-400 font-semibold">
-                            ${item.price.toFixed(2)} each
+                            {currency_symbol}{item.price.toFixed(2)} each
                           </div>
                         )}
                       </div>
@@ -543,15 +549,15 @@ useEffect(() => {
                       {discountedTotal < originalTotal ? (
                         <div>
                           <p className="text-gray-400 line-through text-xs">
-                            ${originalTotal.toFixed(2)}
+                            {currency_symbol}{originalTotal.toFixed(2)}
                           </p>
                           <p className={`text-beveren-600 dark:text-beveren-400 font-semibold ${isMobile ? "text-base" : "text-sm"}`}>
-                            ${discountedTotal.toFixed(2)}
+                          {currency_symbol}{discountedTotal.toFixed(2)}
                           </p>
                         </div>
                       ) : (
                         <p className={`text-beveren-600 dark:text-beveren-400 font-semibold ${isMobile ? "text-base" : "text-sm"}`}>
-                          ${discountedTotal.toFixed(2)}
+                          {currency_symbol}{discountedTotal.toFixed(2)}
                         </p>
                       )}
                     </div>
@@ -606,33 +612,37 @@ useEffect(() => {
                           </div>
 
                           {/* Batch Number */}
-        <select
-                value={itemDiscount.batchNumber || ''}
-                onChange={(e) => {
-                  const selectedBatch = e.target.value;
-                  const selectedQty = itemBatches[item.item_code]?.find(b => b.batch_no === selectedBatch)?.qty || 0;
-                  updateItemDiscount(item.id, 'batchNumber', selectedBatch);
-                  updateItemDiscount(item.id, 'availableQuantity', selectedQty);
-                }}
-                className={`w-full ${isMobile ? "text-sm" : "text-xs"} px-2 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent 
-                  bg-white text-gray-900 appearance-none`} // Removed dark mode classes
-                style={{
-                  backgroundColor: 'white',
-                  color: '#111827', // Tailwind's gray-900
-                }}
-              >
-            <option value="" disabled></option>
-                {itemBatches[item.item_code]?.map((batch) => (
-                  <option
-                    key={batch.batch_no}
-                    value={batch.batch_no}
-                    style={{ backgroundColor: 'white', color: '#111827' }}
-                  >
-                    {batch.batch_id} - {batch.qty}
-              </option>
-                ))}
-              </select>
-
+                           <div>
+                            <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-xs" : "text-xs"} mb-1`}>
+                              Batch
+                            </label>
+                      <select
+                              value={itemDiscount.batchNumber || ''}
+                              onChange={(e) => {
+                                const selectedBatch = e.target.value;
+                                const selectedQty = itemBatches[item.item_code]?.find(b => b.batch_no === selectedBatch)?.qty || 0;
+                                updateItemDiscount(item.id, 'batchNumber', selectedBatch);
+                                updateItemDiscount(item.id, 'availableQuantity', selectedQty);
+                              }}
+                              className={`w-full ${isMobile ? "text-sm" : "text-xs"} px-2 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent 
+                                bg-white text-gray-900 appearance-none`} // Removed dark mode classes
+                              style={{
+                                backgroundColor: 'white',
+                                color: '#111827', // Tailwind's gray-900
+                              }}
+                            >
+                          <option value="" disabled></option>
+                              {itemBatches[item.item_code]?.map((batch) => (
+                                <option
+                                  key={batch.batch_no}
+                                  value={batch.batch_no}
+                                  style={{ backgroundColor: 'white', color: '#111827' }}
+                                >
+                                  {batch.batch_id} - {batch.qty}
+                            </option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
 
                         {/* Right Column */}
@@ -729,7 +739,7 @@ useEffect(() => {
             <div className="flex justify-between text-sm">
               <span className="font-medium text-gray-700 dark:text-gray-300">Original Subtotal</span>
               <span className="font-semibold text-gray-900 dark:text-white">
-                ${cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2)}
+                {currency_symbol}{cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2)}
               </span>
             </div>
 
@@ -740,14 +750,14 @@ useEffect(() => {
                   <Tag size={14} className="mr-1" />
                   Item Discounts
                 </span>
-                <span className="font-semibold">-${totalItemDiscount.toFixed(2)}</span>
+                <span className="font-semibold">-{currency_symbol}{totalItemDiscount.toFixed(2)}</span>
               </div>
             )}
 
             {/* Subtotal after item discounts */}
             <div className="flex justify-between text-sm">
               <span className="font-medium text-gray-700 dark:text-gray-300">Subtotal</span>
-              <span className="font-semibold text-gray-900 dark:text-white">${subtotal.toFixed(2)}</span>
+              <span className="font-semibold text-gray-900 dark:text-white">{currency_symbol}{subtotal.toFixed(2)}</span>
             </div>
 
             {/* Gift Coupons */}
@@ -793,14 +803,14 @@ useEffect(() => {
 
             <div className="flex justify-between font-bold text-lg pt-3 border-t border-gray-100 dark:border-gray-700">
               <span className="text-gray-900 dark:text-white">Total</span>
-              <span className="text-gray-900 dark:text-white">${total.toFixed(2)}</span>
+              <span className="text-gray-900 dark:text-white">{currency_symbol}{total.toFixed(2)}</span>
             </div>
 
             {/* Total Savings Summary */}
             {(totalItemDiscount + couponDiscount) > 0 && (
               <div className="text-center py-2 px-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
                 <span className="text-sm font-medium text-green-800 dark:text-green-300">
-                  Total Savings: ${(totalItemDiscount + couponDiscount).toFixed(2)}
+                  Total Savings: {currency_symbol}{(totalItemDiscount + couponDiscount).toFixed(2)}
                 </span>
               </div>
             )}
@@ -851,7 +861,7 @@ useEffect(() => {
             }}
             className={`w-full bg-beveren-600 text-white rounded-2xl font-semibold hover:bg-beveren-700 transition-colors ${isMobile ? "py-4 text-lg" : "py-4"}`}
           >
-            Checkout ${total.toFixed(2)}
+            Checkout {currency_symbol}{total.toFixed(2)}
           </button>
         </div>
       )}
