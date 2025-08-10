@@ -67,8 +67,6 @@ useEffect(() => {
     fetchCurrentUser()
   }, [])
 
-console.log("People", currentUser)
-
   // Check opening entry status when component mounts
   useEffect(() => {
     if (!statusLoading && !statusError) {

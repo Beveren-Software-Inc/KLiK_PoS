@@ -16,8 +16,7 @@ export default function ProductCard({ item, onAddToCart, isMobile = false }: Pro
   // Format price based on currency
   const formattedPrice = `${item.currency_symbol}${item.price.toFixed(2)}`
 
-console.log("here for currency_symbol",item.currency_symbol )
-  return (
+return (
     <div
       className={`bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden transition-all duration-200 ${
         isOutOfStock
@@ -67,3 +66,4 @@ console.log("here for currency_symbol",item.currency_symbol )
     </div>
   )
 }
+

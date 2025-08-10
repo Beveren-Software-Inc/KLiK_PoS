@@ -40,7 +40,6 @@ export default function CategoryTabs({
     );
   }
 
-  console.log("Here making it", itemGroups)
   if (!itemGroups || itemGroups.length === 0) {
     return <div>No item groups found.</div>;
   }

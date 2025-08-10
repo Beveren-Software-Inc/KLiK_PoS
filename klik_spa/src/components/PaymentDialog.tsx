@@ -95,6 +95,8 @@ export default function PaymentDialog({
   // Determine if this is B2B business type
   const isB2B = posDetails?.business_type === 'B2B';
   const isB2C = posDetails?.business_type === 'B2C';
+  const print_receipt_on_order_complete = posDetails?.print_receipt_on_order_complete
+  const currencySymbol = posDetails?.currency_symbol
 
   // Calculate totals with memoization for performance
   const calculations = useMemo(() => {
@@ -109,16 +111,18 @@ export default function PaymentDialog({
     let taxAmount: number
     let grandTotal: number
     
-    if (isInclusive) {
-      // For inclusive tax: tax is already included in the taxable amount
-      // Tax amount = taxable_amount * tax_rate / (100 + tax_rate)
-      taxAmount = taxableAmount * taxRate / (100 + taxRate)
-      grandTotal = taxableAmount // Grand total remains the same as taxable amount
-    } else {
-      // For exclusive tax: tax is added to the taxable amount
-      taxAmount = taxableAmount * taxRate / 100
-      grandTotal = taxableAmount + taxAmount
-    }
+   if (isInclusive) {
+  // For inclusive tax: tax is already included in the taxable amount
+  taxAmount = taxableAmount * taxRate / (100 + taxRate)
+  taxAmount = parseFloat(taxAmount.toFixed(2)) // Ensure 2 decimal places
+  grandTotal = taxableAmount
+} else {
+  // For exclusive tax: tax is added to the taxable amount
+  taxAmount = taxableAmount * taxRate / 100
+  taxAmount = parseFloat(taxAmount.toFixed(2)) // Ensure 2 decimal places
+  grandTotal = taxableAmount + taxAmount
+}
+
     
     return {
       subtotal,
@@ -336,10 +340,7 @@ export default function PaymentDialog({
   }
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-AE', {
-      style: 'currency',
-      currency: 'AED'
-    }).format(amount)
+   return `${currencySymbol} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
   }
 
   const currentDate = new Date().toLocaleDateString('en-US', {

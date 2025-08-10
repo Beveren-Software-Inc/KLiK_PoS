@@ -169,6 +169,7 @@ def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,
     doc.custom_delivery_date = frappe.utils.nowdate()
     doc.currency = get_customer_billing_currency(customer)
     doc.is_pos = 1 if business_type=="B2C" else 0
+    doc.update_stock = 1
 
     pos_profile = get_current_pos_profile()
 
@@ -271,72 +272,6 @@ def get_expense_accounts(item_code):
     except Exception as e:
         frappe.log_error(f"Error fetching expense account for {item_code}: {str(e)[:140]}", "Expense Account Fetch Error")
         return None
- 
-# import frappe
-# from frappe.model.mapper import get_mapped_doc
-
-# @frappe.whitelist()
-# def return_sales_invoice(invoice_name):
-#     try:
-#         original_invoice = frappe.get_doc("Sales Invoice", invoice_name)
-
-#         if original_invoice.docstatus != 1:
-#             frappe.throw("Only submitted invoices can be returned.")
-
-#         if original_invoice.is_return:
-#             frappe.throw("This invoice is already a return.")
-
-#         return_doc = get_mapped_doc("Sales Invoice", invoice_name, {
-#             "Sales Invoice": {
-#                 "doctype": "Sales Invoice",
-#                 "field_map": {
-#                     "name": "return_against"
-#                 },
-#                 "validation": {
-#                     "docstatus": ["=", 1]
-#                 }
-#             },
-#             "Sales Invoice Item": {
-#                 "doctype": "Sales Invoice Item",
-#                 "field_map": {
-#                     "name": "prevdoc_detail_docname"
-#                 },
-#             },
-#             "Sales Invoice Payment": {
-#                 "doctype": "Sales Invoice Payment"
-#             }
-#         })
-
-#         return_doc.is_return = 1
-#         return_doc.posting_date = frappe.utils.nowdate()
-
-#         # ✅ Make item qty negative
-#         for item in return_doc.items:
-#             item.qty = -abs(item.qty)
-
-#         # # ✅ Make payment amount negative
-#         for payment in return_doc.payments:
-#              payment.amount = -abs(payment.amount)
-            
-#              print("====", str(payment.amount))
-#         payments = original_invoice.payments
-        
-#         return_doc.payments = []
-
-#         return_doc.save()
-#         return_doc.submit()
-
-#         return {
-#             "success": True,
-#             "return_invoice": return_doc.name
-#         }
-
-#     except Exception as e:
-#         frappe.log_error(frappe.get_traceback(), "Return Invoice Error")
-#         return {
-#             "success": False,
-#             "message": str(e)
-#         }
 
 
 from frappe.model.mapper import get_mapped_doc
