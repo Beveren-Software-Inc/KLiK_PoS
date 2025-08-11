@@ -39,9 +39,10 @@ export default function ClosingShiftPage() {
 
 
   const tabs = [
-    { id: "invoices", name: "All Invoices", icon: FileText },
-    { id: "cashiers", name: "Cashier Sales", icon: Users },
     { id: "payments", name: "Payment Methods", icon: CreditCard },
+    { id: "invoices", name: "All Invoices", icon: FileText },
+    // { id: "cashiers", name: "Cashier Sales", icon: Users },
+    
     { id: "returns", name: "Returns & Refunds", icon: RefreshCw },
   ];
 
@@ -205,7 +206,7 @@ const filterInvoiceByDate = (invoiceDateStr: string) => {
           <option value="month">This Month</option>
           <option value="year">This Year</option>
         </select>
-        {showCashierFilter && (
+        {/* {showCashierFilter && (
           <select
             value={cashierFilter}
             onChange={(e) => setCashierFilter(e.target.value)}
@@ -218,7 +219,7 @@ const filterInvoiceByDate = (invoiceDateStr: string) => {
               </option>
             ))}
           </select>
-        )}
+        )} */}
         {showAdvanced && (
           <>
             <select
@@ -879,7 +880,7 @@ const filterInvoiceByDate = (invoiceDateStr: string) => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8 mt-15 ml-20">
+        <div className="flex-1 px-6 py-8 mt-16 ml-20 flex flex-col items-center">
         {/* Tabs */}
         <div className="mb-8">
           <div className="border-b border-gray-200 dark:border-gray-700">

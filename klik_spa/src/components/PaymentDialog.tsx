@@ -11,7 +11,6 @@ import { usePOSDetails } from "../hooks/usePOSProfile"
 import { createDraftSalesInvoice } from "../services/salesInvoice"
 import { createSalesInvoice } from "../services/salesInvoice"
 import { toast } from 'react-toastify';
-import PrintPreview  from "../utils/posPreview"
 import { useNavigate } from "react-router-dom"
 import { DisplayPrintPreview, handlePrintInvoice } from "../utils/invoicePrint"
 
@@ -85,6 +84,7 @@ export default function PaymentDialog({
   const [submittedInvoice, setSubmittedInvoice] = useState<any>(null);
   const [invoiceData, setInvoiceData] = useState(null)
   const [roundOffInput, setRoundOffInput] = useState(roundOffAmount.toFixed(2));
+  const [isAutoPrinting, setIsAutoPrinting] = useState(false);
 
   // Hooks
   const { modes, isLoading, error } = usePaymentModes("Test POS Profile");
@@ -140,6 +140,7 @@ export default function PaymentDialog({
 const totalPaidAmount = Object.values(paymentAmounts).reduce((sum, amount) => sum + (amount || 0), 0)
 const outstandingAmount = Math.max(0, calculations.grandTotal - totalPaidAmount)
 
+
   useEffect(() => {
     if (isOpen && defaultTax && !selectedSalesTaxCharges) {
       setSelectedSalesTaxCharges(defaultTax);
@@ -152,9 +153,7 @@ useEffect(() => {
   if (isOpen && modes.length > 0) {
     const defaultMode = modes.find(mode => mode.default === 1);
     if (defaultMode && Object.keys(paymentAmounts).length === 0) {
-      // For B2B, default to 0 (pay later option)
-      // For B2C, default to full amount (immediate payment)
-      const defaultAmount = isB2B ? 0 : calculations.grandTotal;
+      const defaultAmount = parseFloat((calculations.grandTotal).toFixed(2));
       setPaymentAmounts({ [defaultMode.mode_of_payment]: defaultAmount });
     }
   }
@@ -181,6 +180,19 @@ useEffect(() => {
     }
   }
 }, [calculations.grandTotal, modes, isB2C, isB2B]);
+
+// Auto-print when invoice is submitted and auto-print is enabled
+// Auto-print when invoice is submitted and auto-print is enabled
+useEffect(() => {
+  if (invoiceSubmitted && invoiceData && print_receipt_on_order_complete) {
+    setIsAutoPrinting(true);
+    // Small delay to ensure the preview is rendered
+    setTimeout(() => {
+      handlePrintInvoice(invoiceData);
+      setIsAutoPrinting(false);
+    }, 500);
+  }
+}, [invoiceSubmitted, invoiceData, print_receipt_on_order_complete]);
 
   if (!isOpen) return null
   if (isLoading || posLoading) return <div className="p-6">Loading...</div>;
@@ -386,6 +398,7 @@ const getActionButtonText = () => {
   
   return "Complete Payment";
 };
+
 
   const isActionButtonDisabled = () => {
     if (invoiceSubmitted || isProcessingPayment) return true;
@@ -626,6 +639,12 @@ const getActionButtonText = () => {
         
            {invoiceSubmitted ? (
     <div className="flex items-center space-x-3">
+      {isAutoPrinting && (
+      <div className="flex items-center space-x-2 text-blue-600">
+        <Loader2 size={16} className="animate-spin" />
+        <span className="text-sm">Printing...</span>
+      </div>
+    )}
       <button
         className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"
         title="Print"
@@ -694,78 +713,54 @@ const getActionButtonText = () => {
           {/* Left Section */}
           <div className="w-2/3 p-6 overflow-y-auto custom-scrollbar space-y-6">
             {/* Tax Type Indicator */}
-            {/* {calculations.selectedTax && (
-              <div className={`border rounded-lg p-4 ${
-                calculations.isInclusive 
-                  ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' 
-                  : 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className={`text-sm font-semibold ${
-                      calculations.isInclusive 
-                        ? 'text-blue-800 dark:text-blue-200' 
-                        : 'text-orange-800 dark:text-orange-200'
-                    }`}>
-                      Tax Type: {calculations.isInclusive ? 'Inclusive' : 'Exclusive'} ({calculations.selectedTax.rate}%)
-                    </p>
-                    {calculations.isInclusive ? (
-                      <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">
-                        Tax is already included in item prices. Grand total remains unchanged.
-                      </p>
-                    ) : (
-                      <p className="text-xs text-orange-600 dark:text-orange-300 mt-1">
-                        Tax will be added to the subtotal to calculate grand total.
-                      </p>
-                    )}
-                  </div>
-                  <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    calculations.isInclusive 
-                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100'
-                      : 'bg-orange-100 text-orange-800 dark:bg-orange-800 dark:text-orange-100'
-                  }`}>
-                    {calculations.isInclusive ? 'INCLUSIVE' : 'EXCLUSIVE'}
-                  </div>
-                </div>
-              </div>
-            )} */}
 
             {/* Payment Methods - Show for both B2C and B2B but disable for B2B */}
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                Payment Methods {isB2B && <span className="text-sm text-gray-500">(For reference only)</span>}
+                Payment Methods 
               </h3>
               <div className="flex space-x-4 overflow-x-auto pb-2">
-                {paymentMethods.map((method) => (
-                  <div
-                    key={method.id}
-                    className={`min-w-[50%] sm:min-w-[300px] md:min-w-[350px] border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-beveren-300 transition-colors flex-shrink-0 ${invoiceSubmitted || isProcessingPayment || isB2B ? 'bg-gray-50 dark:bg-gray-800' : ''}`}
-                  >
-                    <div className="flex items-center space-x-3 mb-3">
-                      <div className={`w-8 h-8 rounded-md ${method.color} text-white flex items-center justify-center`}>
-                        <div className="scale-75">{method.icon}</div>
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900 dark:text-white text-sm">{method.name}</p>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
-                      <input
-                        type="number"
-                        value={(method.amount).toFixed(2) || ''}
-                        onChange={(e) => {
-                          const raw = parseFloat(e.target.value);
-                          const formatted = isNaN(raw) ? '' : raw.toFixed(2);
-                          handlePaymentAmountChange(method.id, formatted);
-                        }}
-                        placeholder="0.00"
-                        disabled={invoiceSubmitted || isProcessingPayment}
-                        className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm ${invoiceSubmitted || isProcessingPayment || isB2B ? 'cursor-not-allowed opacity-50' : ''}`}
-                      />
-                    </div>
-                  </div>
-                ))}
+                  {paymentMethods.map((method) => (
+  <div
+    key={method.id}
+    className={`min-w-[50%] sm:min-w-[300px] md:min-w-[350px] border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-beveren-300 transition-colors flex-shrink-0 ${invoiceSubmitted || isProcessingPayment || isB2B ? 'bg-gray-50 dark:bg-gray-800' : ''}`}
+  >
+    <div className="flex items-center space-x-3 mb-3">
+      <div className={`w-8 h-8 rounded-md ${method.color} text-white flex items-center justify-center`}>
+        <div className="scale-75">{method.icon}</div>
+      </div>
+      <div className="flex-1">
+        <p className="font-medium text-gray-900 dark:text-white text-sm">{method.name}</p>
+      </div>
+    </div>
+    <div>
+      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
+      <input
+        type="number"
+        step="0.01"
+        value={method.amount || ''}
+        onChange={(e) => {
+          const inputValue = e.target.value;
+          // Just store the raw number without formatting during typing
+          const numValue = inputValue === '' ? 0 : parseFloat(inputValue);
+          handlePaymentAmountChange(method.id, isNaN(numValue) ? 0 : numValue);
+        }}
+        onBlur={(e) => {
+          // Format to 2 decimal places only when user leaves the field
+          const numValue = parseFloat(e.target.value);
+          if (!isNaN(numValue)) {
+            const formatted = parseFloat(numValue.toFixed(2));
+            handlePaymentAmountChange(method.id, formatted);
+          }
+        }}
+        placeholder="0.00"
+        disabled={invoiceSubmitted || isProcessingPayment}
+        className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
+      />
+    </div>
+  </div>
+))}
+
               </div>
             </div>
 
@@ -872,7 +867,7 @@ const getActionButtonText = () => {
                     </div>
                   </div>
                   
-                  {(isB2C || isB2C) && (
+                  {(isB2C || isB2B) && (
                     <>
                       <div className="flex justify-between">
                         <span className="text-gray-600 dark:text-gray-400">Total Paid</span>

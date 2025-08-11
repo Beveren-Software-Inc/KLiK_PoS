@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { getPrintFormatHTML } from "./getPrintHTML.js"
+import { usePOSDetails } from "../hooks/usePOSProfile.js"
 
 type PrintPreviewProps = {
   invoice: {
@@ -12,11 +13,15 @@ export default function PrintPreview({ invoice }: PrintPreviewProps) {
   const [html, setHtml] = useState("")
   const [style, setStyle] = useState("")
   const [loading, setLoading] = useState(true)
+   const { posDetails, loading: posLoading } = usePOSDetails();
+
+  const printFormat = posDetails?.print_format ?? "Sales Invoice"
+
 
   useEffect(() => {
     const fetchPrintHTML = async () => {
       try {
-        const printFormat = "Sales Invoice"
+        // const printFormat = "Sales Invoice"
         const { html, style } = await getPrintFormatHTML(invoice, printFormat)
         setHtml(html)
         setStyle(style)
