@@ -89,27 +89,46 @@ export default function InvoiceHistoryPage() {
     return true;
   };
 
-  const getStatusBadge = (status: string) => {
-    const baseClasses = "px-2 py-1 rounded-full text-xs font-medium";
-    switch (status) {
-      case "Paid":
-        return `${baseClasses} bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400`;
-      case "Unpaid":
-        return `${baseClasses} bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400`;
-      case "Partly Paid":
-        return `${baseClasses} bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400`;
-      case "Overdue":
-        return `${baseClasses} bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400`;
-      case "Draft":
-        return `${baseClasses} bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400`;
-      case "Return":
-        return `${baseClasses} bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400`;
-      case "Cancelled":
-        return `${baseClasses} bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400`;
-      default:
-        return baseClasses;
-    }
-  };
+  
+const getStatusBadge = (status: string) => {
+  const baseClasses = "px-2 py-1 rounded-full text-xs font-medium";
+  const normalized = status?.toLowerCase() || "";
+
+  switch (normalized) {
+    // Payment statuses
+    case "paid":
+      return `${baseClasses} bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400`;
+    case "unpaid":
+      return `${baseClasses} bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400`;
+    case "partly paid":
+      return `${baseClasses} bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400`;
+    case "overdue":
+      return `${baseClasses} bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400`;
+    case "draft":
+      return `${baseClasses} bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400`;
+    case "return":
+      return `${baseClasses} bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400`;
+    case "cancelled":
+      return `${baseClasses} bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400`;
+
+    // ZATCA submission statuses
+    case "pending":
+      return `${baseClasses} bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400`;
+    case "reported":
+      return `${baseClasses} bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400`;
+    case "not reported":
+      return `${baseClasses} bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400`;
+    case "cleared":
+      return `${baseClasses} bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400`;
+    case "not cleared":
+      return `${baseClasses} bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400`;
+
+    default:
+      return `${baseClasses} bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400`; // Neutral fallback
+  }
+};
+
+
 
   const filteredInvoices = useMemo(() => {
     if (isLoading) return [];
@@ -368,6 +387,9 @@ export default function InvoiceHistoryPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Status
                 </th>
+                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Zatca Status
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Actions
                 </th>
@@ -409,6 +431,9 @@ export default function InvoiceHistoryPage() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={getStatusBadge(invoice.status)}>{invoice.status}</span>
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={getStatusBadge(invoice.custom_zatca_submit_status)}>{invoice.custom_zatca_submit_status}</span>
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
                       <button
@@ -442,7 +467,7 @@ export default function InvoiceHistoryPage() {
                             }
                         />
                       )}
-                      {["Draft", "Unpaid"].includes(invoice.status) && (
+                      {/* {["Draft", "Unpaid"].includes(invoice.status) && (
                         <button
                           onClick={() => handleDeleteInvoice(invoice.id)}
                           className="text-red-600 hover:text-red-900 flex items-center space-x-1"
@@ -450,7 +475,7 @@ export default function InvoiceHistoryPage() {
                           <Trash2 className="w-4 h-4" />
                           <span>Delete</span>
                         </button>
-                      )}
+                      )} */}
                     </div>
                   </td>
                 </tr>
@@ -511,6 +536,7 @@ export default function InvoiceHistoryPage() {
   );
 
   return (
+    
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
       <RetailSidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -530,7 +556,7 @@ export default function InvoiceHistoryPage() {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-6 py-8 mt-16 ml-20">
+        <div className="flex-1 px-6 py-8 mt-16 ml-20 flex flex-col items-center">
           {/* Status Tabs */}
           <div className="mb-8">
             <div className="border-b border-gray-200 dark:border-gray-700">

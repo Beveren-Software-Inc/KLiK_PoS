@@ -263,8 +263,6 @@ useEffect(() => {
   }
 }, [cartItems]);
 
-
-
   return (
     <div
       className={`${isMobile ? "h-full flex flex-col" : "h-full flex flex-col"} bg-white dark:bg-gray-800 ${!isMobile ? "border-l" : ""} border-gray-200 dark:border-gray-700`}

@@ -47,6 +47,14 @@ const fetchInvoices = async () => {
           | "Refunded") || "Completed",
       refundAmount:
         invoice.status === "Refunded" ? invoice.base_grand_total || 0 : 0,
+      custom_zatca_submit_status:
+        (invoice.custom_zatca_submit_status as
+          | "Pending"
+          | "Reported"
+          | "Not Reported"
+          | "Cleared"
+          | "Not Cleared") || "Draft",
+      
       notes: invoice.remarks || "",
     }));
     // console.log("Transformed", transformed)

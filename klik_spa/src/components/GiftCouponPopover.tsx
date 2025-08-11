@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from "react"
 import { Tag, X, Check, Gift } from "lucide-react"
 import type { GiftCoupon } from "../../types"
 import { availableCoupons } from "../data/mockData"
+import { usePOSDetails } from "../hooks/usePOSProfile"
+
 
 interface GiftCouponPopoverProps {
   onApplyCoupon: (coupon: GiftCoupon) => void
@@ -24,6 +26,9 @@ export default function GiftCouponPopover({
   const [giftCardCode, setGiftCardCode] = useState("")
   const [error, setError] = useState("")
   const popoverRef = useRef<HTMLDivElement>(null)
+    const { posDetails, loading: posLoading } = usePOSDetails();
+const currency = posDetails?.currency
+const currency_symbol = posDetails?.currency_symbol
 
   // Close popover when clicking outside
   useEffect(() => {
@@ -152,7 +157,7 @@ export default function GiftCouponPopover({
               />
               {couponAmount && (
                 <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-green-600 dark:text-green-400 font-medium">
-                  -${couponAmount.toFixed(2)}
+                  -{currency_symbol}{couponAmount.toFixed(2)}
                 </div>
               )}
             </div>
@@ -185,7 +190,7 @@ export default function GiftCouponPopover({
               />
               {giftCardAmount && (
                 <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-green-600 dark:text-green-400 font-medium">
-                  -${giftCardAmount.toFixed(2)}
+                  -{currency_symbol}{giftCardAmount.toFixed(2)}
                 </div>
               )}
             </div>
@@ -219,7 +224,7 @@ export default function GiftCouponPopover({
                   }`}
                 >
                   <div className="font-medium">{coupon.code}</div>
-                  <div className="text-green-600 dark:text-green-400">-${coupon.value.toFixed(2)}</div>
+                  <div className="text-green-600 dark:text-green-400">-{currency_symbol}{coupon.value.toFixed(2)}</div>
                 </button>
               )
             })}

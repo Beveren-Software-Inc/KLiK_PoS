@@ -245,7 +245,6 @@ class ERPNextAPI {
         throw new Error('No logged user found');
       }
 
-      console.log('Current user from auth:', currentUser);
 
       // Then fetch the full User document
       const response = await fetch(`${this.config.baseUrl}/api/resource/User/${currentUser}`, {
@@ -259,7 +258,6 @@ class ERPNextAPI {
       }
 
       const data = await response.json();
-      console.log('User profile data:', data);
       return data.data;
     } catch (error) {
       console.error('Get user profile error:', error);
