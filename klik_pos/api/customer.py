@@ -65,7 +65,7 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
                 "company_currency": company_currency,
                 # "exchange_rate": get_currency_exchange_rate(company_currency, doc.default_currency)
             })
-
+        print("Results", result)
         return {"success": True, "data": result}
 
     except Exception:
