@@ -267,11 +267,10 @@ if (isB2C) {
   };
 
   const handleCompletePayment = async () => {
-    if (!selectedCustomer) {
+    if (!selectedCustomer || !selectedCustomer.name) {
       toast.error("Kindly select a customer");
       return;
     }
-
     // For B2B, we don't need payment validation
     // For B2C, validate payment completion
 if (isB2C) {
@@ -315,6 +314,7 @@ if (isB2C) {
 
     try {
       const response = await createSalesInvoice(paymentData);
+      console.log("Data", paymentData)
       setInvoiceSubmitted(true);
       setSubmittedInvoice(response);
       setShowPreview(true)
@@ -424,11 +424,108 @@ const getActionButtonText = () => {
 
           <div className="p-4 space-y-6">
             {invoiceSubmitted ? (
-              // Invoice preview section - same as before
-              <div className="space-y-4">
-                {/* ... invoice preview content ... */}
-              </div>
-            ) : (
+  <div className="space-y-4">
+    {/* Action Buttons for Mobile */}
+    <div className="flex items-center justify-center space-x-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+      <div className="text-green-600 dark:text-green-400 text-center">
+        <p className="font-semibold">
+          {isB2B ? "Invoice Submitted Successfully!" : "Payment Completed Successfully!"}
+        </p>
+        <p className="text-sm opacity-75">Total: {formatCurrency(calculations.grandTotal)}</p>
+      </div>
+    </div>
+
+    {/* Action Buttons Row */}
+    <div className="flex flex-wrap gap-2 justify-center">
+      {isAutoPrinting && (
+        <div className="flex items-center space-x-2 text-blue-600 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+          <Loader2 size={16} className="animate-spin" />
+          <span className="text-sm">Printing...</span>
+        </div>
+      )}
+      
+      <button
+        className="flex items-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+        title="Print"
+        onClick={() => {
+          handlePrintInvoice(invoiceData);
+          navigate('/');
+        }}
+      >
+        <Printer size={18} />
+        <span>Print</span>
+      </button>
+
+      <button
+        className="flex items-center space-x-2 px-4 py-2 bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/30 transition-colors"
+        title="Email"
+        onClick={() => {
+          const subject = encodeURIComponent("Your Invoice");
+          const body = encodeURIComponent(`Dear ${selectedCustomer?.name},\n\nHere is your invoice total: ${formatCurrency(calculations.grandTotal)}\n\nThank you.`);
+          window.open(`mailto:${selectedCustomer?.email}?subject=${subject}&body=${body}`);
+        }}
+      >
+        <MailPlus size={18} />
+        <span>Email</span>
+      </button>
+
+      <button
+        className="flex items-center space-x-2 px-4 py-2 bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/30 transition-colors"
+        title="WhatsApp"
+        onClick={() => {
+          const msg = encodeURIComponent(`Here is your invoice total: ${formatCurrency(calculations.grandTotal)}`);
+          window.open(`https://wa.me/${selectedCustomer?.phone}?text=${msg}`, "_blank");
+        }}
+      >
+        <MessageCirclePlus size={18} />
+        <span>WhatsApp</span>
+      </button>
+
+      <button
+        className="flex items-center space-x-2 px-4 py-2 bg-purple-100 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/30 transition-colors"
+        title="Text Message"
+        onClick={() => window.open(`tel:${selectedCustomer?.phone}`)}
+      >
+        <MessageSquarePlus size={18} />
+        <span>SMS</span>
+      </button>
+
+      <button
+        className="flex items-center space-x-2 px-4 py-2 bg-purple-100 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/30 transition-colors"
+        title="View Full Invoice"
+        onClick={() => handleViewInvoice(invoiceData)}
+      >
+        <Eye size={18} />
+        <span>View</span>
+      </button>
+    </div>
+
+    {/* Invoice Preview for Mobile */}
+    {invoiceData && (
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 p-4">
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 text-center">
+          Invoice Preview:
+        </h4>
+        <div className="border border-gray-300 dark:border-gray-600 rounded p-3 bg-gray-50 dark:bg-gray-700 max-h-64 overflow-y-auto">
+          <DisplayPrintPreview invoice={invoiceData} />
+        </div>
+      </div>
+    )}
+
+    {/* New Order Button */}
+    <div className="pt-4">
+      <button
+        onClick={() => {
+          onCompletePayment(null);
+          navigate('/');
+        }}
+        className="w-full py-3 bg-beveren-600 text-white rounded-lg font-medium hover:bg-beveren-700 transition-colors"
+      >
+        Start New Order
+      </button>
+    </div>
+  </div>
+)  : (
               <>
                 {/* Payment Methods - Only show for B2C */}
                 {(isB2C || isB2B) && (
@@ -466,22 +563,7 @@ const getActionButtonText = () => {
                 )}
 
                 {/* Tax Type Indicator */}
-                {calculations.selectedTax && (
-                  <div className={`border rounded-lg p-3 ${
-                    calculations.isInclusive 
-                      ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' 
-                      : 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800'
-                  }`}>
-                    <p className={`text-sm ${
-                      calculations.isInclusive 
-                        ? 'text-blue-800 dark:text-blue-200' 
-                        : 'text-orange-800 dark:text-orange-200'
-                    }`}>
-                      <span className="font-semibold">Tax Type:</span> {calculations.isInclusive ? 'Inclusive' : 'Exclusive'} ({calculations.selectedTax.rate}%)
-                      {calculations.isInclusive && <span className="ml-2 text-xs">(Tax already included in item prices)</span>}
-                    </p>
-                  </div>
-                )}
+                
 
                 {/* Round Off */}
                 <div>
