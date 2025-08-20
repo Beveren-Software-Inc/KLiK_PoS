@@ -11,6 +11,7 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
     Fetch customers with structured primary contact & address details.
     If a default customer is set in POS Profile, only return that.
     """
+    
     try:
         pos_profile = get_current_pos_profile()
         default_customer = pos_profile.customer
