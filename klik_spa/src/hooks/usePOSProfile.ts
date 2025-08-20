@@ -107,7 +107,6 @@ export function usePOSDetails() {
         })
 
         const data = await response.json()
-
         if (response.ok && data.message) {
           setPOSDetails(data.message)
         } else {
