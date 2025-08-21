@@ -219,27 +219,52 @@ useEffect(() => {
     [methodId]: numericAmount
   }));
 };
-  const handleRoundOff = () => {
-    if (invoiceSubmitted || isProcessingPayment) return;
+const handleRoundOff = () => {
+  if (invoiceSubmitted || isProcessingPayment) return;
 
-    const totalBeforeRoundOff = calculations.isInclusive ? calculations.taxableAmount : calculations.taxableAmount + calculations.taxAmount;
-    const rounded = Math.round(totalBeforeRoundOff);
-    const difference = rounded - totalBeforeRoundOff;
+  const totalBeforeRoundOff = calculations.isInclusive ? calculations.taxableAmount : calculations.taxableAmount + calculations.taxAmount;
+  
+  // Change this line: use Math.floor instead of Math.round to always round DOWN
+  const rounded = Math.floor(totalBeforeRoundOff);
+  
+  // The difference will now be negative (business loss)
+  const difference = rounded - totalBeforeRoundOff;
 
-    setRoundOffAmount(difference);
-    setRoundOffInput(difference.toFixed(2));
+  setRoundOffAmount(difference);
+  setRoundOffInput(difference.toFixed(2));
 
-    // For B2C, update payment amount; for B2B, keep flexible
-if (isB2C) {
-  const defaultMode = modes.find(mode => mode.default === 1);
-  if (defaultMode) {
-    setPaymentAmounts(prev => ({
-      ...prev,
-      [defaultMode.mode_of_payment]: rounded
-    }));
+  // For B2C, update payment amount; for B2B, keep flexible
+  if (isB2C) {
+    const defaultMode = modes.find(mode => mode.default === 1);
+    if (defaultMode) {
+      setPaymentAmounts(prev => ({
+        ...prev,
+        [defaultMode.mode_of_payment]: rounded
+      }));
+    }
   }
-}
-  };
+};
+//   const handleRoundOff = () => {
+//     if (invoiceSubmitted || isProcessingPayment) return;
+
+//     const totalBeforeRoundOff = calculations.isInclusive ? calculations.taxableAmount : calculations.taxableAmount + calculations.taxAmount;
+//     const rounded = Math.round(totalBeforeRoundOff);
+//     const difference = rounded - totalBeforeRoundOff;
+
+//     setRoundOffAmount(difference);
+//     setRoundOffInput(difference.toFixed(2));
+
+//     // For B2C, update payment amount; for B2B, keep flexible
+// if (isB2C) {
+//   const defaultMode = modes.find(mode => mode.default === 1);
+//   if (defaultMode) {
+//     setPaymentAmounts(prev => ({
+//       ...prev,
+//       [defaultMode.mode_of_payment]: rounded
+//     }));
+//   }
+// }
+//   };
 
   const handleSalesTaxChange = (value: string) => {
     if (invoiceSubmitted || isProcessingPayment) return;

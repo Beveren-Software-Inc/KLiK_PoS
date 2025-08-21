@@ -175,3 +175,19 @@ def create_closing_entry(data):
         "name": doc.name,
         "message": _("POS Closing Entry created successfully.")
     }
+
+def validate_opening_entry(doc, method):
+    exists = frappe.db.exists(
+        "POS Opening Entry",
+        {
+            "user": doc.user,
+            "status": "Open",
+        }
+    )
+    if exists:
+        cashier_name = frappe.db.get_value("User", doc.user, "full_name") or doc.user
+        frappe.throw(
+            _("Cashier {0} already has an open entry: {1}").format(
+                cashier_name, exists
+            )
+        )

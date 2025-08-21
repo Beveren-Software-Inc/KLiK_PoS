@@ -49,6 +49,24 @@ add_to_apps_screen = [
 	}
 ]
 
+doc_events = {
+	"Sales Invoice": {
+        "validate": [
+            "klik_pos.api.sales_invoice.set_base_roundoff_amount",
+            "klik_pos.api.sales_invoice.set_grand_total_with_roundoff",
+         
+        ],
+    },
+ "POS Opening Entry": {
+        "validate": [
+            "klik_pos.api.pos_entry.validate_opening_entry",
+        ],
+}
+}
+
+override_doctype_class = {
+	"Sales Invoice": "klik_pos.api.sales_invoice.CustomSalesInvoice",
+}
 # Includes in <head>
 # ------------------
 
