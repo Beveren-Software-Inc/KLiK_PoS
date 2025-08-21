@@ -33,7 +33,12 @@ fixtures = [
                     "POS Profile-custom_klik_pos_settings",
                     "POS Profile-custom_business_type",
                     "POS Profile-custom_pos_printformat",
-                    "POS Profile-custom_column_break_7pdsa"
+                    "POS Profile-custom_column_break_7pdsa",
+                    "Sales Invoice-custom_roundoff_account",
+                    "Sales Invoice-custom_base_roundoff_amount",
+                    "Sales Invoice-custom_column_break_vtq6c",
+                    "Sales Invoice-custom_roundoff_amount",
+                    "Sales Invoice-custom_roundoff",
                 ),
             ]
         ],
