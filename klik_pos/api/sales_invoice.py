@@ -92,31 +92,6 @@ def get_invoice_details(invoice_id):
         }
 
 
-
-# @frappe.whitelist()
-# def create_and_submit_invoice(data):
-    
-#     try:
-#         customer, items, amount_paid, sales_and_tax_charges, mode_of_payment,business_type = parse_invoice_data(data)
-#         doc = build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,mode_of_payment,business_type, include_payments=True)
-#         doc.base_paid_amount=amount_paid
-#         doc.paid_amount=amount_paid
-#         doc.outstanding_amount = 0
-#         doc.save()
-#         doc.submit()
-
-#         return {
-#             "success": True,
-#             "invoice_name": doc.name,
-#             "invoice": doc
-#         }
-
-#     except Exception as e:
-#         frappe.log_error(frappe.get_traceback(), "Submit Invoice Error")
-#         return {
-#             "success": False,
-#             "message": str(e)
-#         }
         
 @frappe.whitelist()
 def create_and_submit_invoice(data):
@@ -134,11 +109,15 @@ def create_and_submit_invoice(data):
         doc.outstanding_amount = 0
         doc.save()
         doc.submit()
+        payment_entry = None
+        if business_type == "B2B" and mode_of_payment and amount_paid > 0:
+            payment_entry = create_payment_entry(doc, mode_of_payment, amount_paid)
 
         return {
             "success": True,
             "invoice_name": doc.name,
-            "invoice": doc
+            "invoice": doc,
+            "payment_entry": payment_entry.name if payment_entry else None
         }
 
     except Exception as e:
@@ -147,26 +126,7 @@ def create_and_submit_invoice(data):
             "success": False,
             "message": str(e)
         }
-        
-# @frappe.whitelist()
-# def create_draft_invoice(data):
-#     try:
-#         customer, items, amount_paid, sales_and_tax_charges, mode_of_payment, business_type = parse_invoice_data(data)
-#         doc = build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges, mode_of_payment,business_type, include_payments=True)
-#         doc.insert(ignore_permissions=True)
 
-#         return {
-#             "success": True,
-#             "invoice_name": doc.name,
-#             "invoice": doc
-#         }
-
-#     except Exception as e:
-#         frappe.log_error(frappe.get_traceback(), "Draft Invoice Error")
-#         return {
-#             "success": False,
-#             "message": str(e)
-#         }
 @frappe.whitelist()
 def create_draft_invoice(data):
     try:
@@ -192,32 +152,6 @@ def create_draft_invoice(data):
         }
 
 
-# def parse_invoice_data(data):
-#     """Sanitize and extract customer and items from request payload."""
-#     if isinstance(data, str):
-#         data = json.loads(data)
-
-#     print("My data", str(data))
-#     customer = data.get("customer", {}).get("id")
-#     items = data.get("items", [])
-    
-#     amount_paid = 0.0
-#     sales_and_tax_charges = get_current_pos_profile().taxes_and_charges
-#     business_type = data.get("businessType")
-#     mode_of_payment = None
-#     if data.get("amountPaid"):
-#         amount_paid=data.get("amountPaid")
-        
-#     if data.get("paymentMethods"):
-#         mode_of_payment=data.get("paymentMethods")
-        
-#     if data.get("SalesTaxCharges"):
-#         sales_and_tax_charges=data.get("SalesTaxCharges")
-    
-#     if not customer or not items:
-#         frappe.throw(_("Customer and items are required"))
-
-#     return customer, items, amount_paid, sales_and_tax_charges, mode_of_payment, business_type
 def parse_invoice_data(data):
     """Sanitize and extract customer and items from request payload including round-off."""
     if isinstance(data, str):
@@ -254,61 +188,7 @@ def parse_invoice_data(data):
 
     return customer, items, amount_paid, sales_and_tax_charges, mode_of_payment, business_type, roundoff_amount
 
-# def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges, mode_of_payment,business_type, include_payments=False):
-#     doc = frappe.new_doc("Sales Invoice")
-#     doc.customer = customer
-#     doc.due_date = frappe.utils.nowdate()
-#     doc.custom_delivery_date = frappe.utils.nowdate()
-#     doc.currency = get_customer_billing_currency(customer)
-#     doc.is_pos = 1 if business_type=="B2C" else 0
-#     doc.update_stock = 1
 
-#     pos_profile = get_current_pos_profile()
-
-#     # Set taxes and charges template
-#     if sales_and_tax_charges:
-#         doc.taxes_and_charges = sales_and_tax_charges
-#     else:
-#         doc.taxes_and_charges = pos_profile.taxes_and_charges
-
-#     # Populate items
-#     for item in items:
-#         doc.append("items", {
-#             "item_code": item.get("id"),
-#             "qty": item.get("quantity"),
-#             "rate": item.get("price"),
-#             "income_account": get_income_accounts(item.get("id")),
-#             "expense_account": get_expense_accounts(item.get("id"))
-#         })
-
-#     # If taxes_and_charges is set, populate taxes manually
-#     if doc.taxes_and_charges:
-
-#         tax_doc = get_tax_template(doc.taxes_and_charges)
-#         if tax_doc:
-#             for tax in tax_doc.taxes:
-#                 doc.append("taxes", {
-#                     "charge_type": tax.charge_type,
-#                     "account_head": tax.account_head,
-#                     "description": tax.description,
-#                     "cost_center": tax.cost_center,
-#                     "rate": tax.rate,
-#                     "row_id": tax.row_id,
-#                     "tax_amount": tax.tax_amount,
-#                     "included_in_print_rate": tax.included_in_print_rate,
-#                     # "add_deduct_tax": tax.add_deduct_tax,
-#                     # "category": tax.category
-#                 })
-
-#     # Add payments if required
-#     if include_payments and isinstance(mode_of_payment, list):
-#         for payment in mode_of_payment:
-#             doc.append("payments", {
-#                 "mode_of_payment": payment["method"],
-#                 "amount": payment["amount"]
-#             })
-
-#     return doc
 def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges, mode_of_payment, business_type, roundoff_amount=0.0, include_payments=False):
     doc = frappe.new_doc("Sales Invoice")
     doc.customer = customer
@@ -363,18 +243,7 @@ def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,
     # Add round-off entry to taxes if present and not zero
     if roundoff_amount != 0:
         conversion_rate = doc.conversion_rate or 1
-        # doc.append("taxes", {
-        #     "charge_type": "Actual",
-        #     "account_head": roundoff_account,
-        #     "description": "Round Off Adjustment",
-        #     "tax_amount": flt(roundoff_amount),
-        #     "base_tax_amount": flt(roundoff_amount * conversion_rate),
-        #     "add_deduct_tax": "Add" if roundoff_amount > 0 else "Deduct",
-        #     "category": "Total",
-        #     "included_in_print_rate": 0,
-        #     "cost_center": doc.cost_center or frappe.get_cached_value("Company", doc.company, "cost_center")
-        # })
-
+       
     # Add payments if required
     if include_payments and isinstance(mode_of_payment, list):
         for payment in mode_of_payment:
@@ -585,70 +454,6 @@ def custom_calculate_totals(self):
 
 	self.set_rounded_total()
  
-# def custom_calculate_totals_with_roundoff(self):
-    
-#     """Custom totals calculation that handles round-off amounts"""
-#     # if self.doc.get("taxes"):
-#     #     self.doc.grand_total = flt(self.doc.get("taxes")[-1].total) + flt(
-#     #         self.doc.get("grand_total_diff")
-#     #     )
-#     # else:
-#     self.doc.grand_total = 500
-
-    # if self.doc.get("taxes"):
-    #     self.doc.total_taxes_and_charges = flt(
-    #         self.doc.grand_total - self.doc.net_total - flt(self.doc.get("grand_total_diff")),
-    #         self.doc.precision("total_taxes_and_charges"),
-    #     )
-    # else:
-    #     self.doc.total_taxes_and_charges = 0.0
-
-    # # Apply Round-off Amount (similar to retention logic)
-    # if (self.doc.doctype == "Sales Invoice" 
-    #     and self.doc.custom_roundoff_account 
-    #     and self.doc.custom_roundoff_amount):
-    #     # Add round-off amount to grand total (can be negative for write-offs)
-    #     self.doc.grand_total -= self.doc.custom_roundoff_amount
-        
-    #     # Create write-off entry for round-off amount
-    #     self.create_roundoff_writeoff_entry()
-
-    # self._set_in_company_currency(self.doc, ["total_taxes_and_charges", "rounding_adjustment"])
-    # if self.doc.doctype in [
-    #     "Quotation",
-    #     "Sales Order", 
-    #     "Delivery Note",
-    #     "Sales Invoice",
-    #     "POS Invoice",
-    # ]:
-    #     self.doc.base_grand_total = (
-    #         flt(self.doc.grand_total * self.doc.conversion_rate, self.doc.precision("base_grand_total"))
-    #         if self.doc.total_taxes_and_charges
-    #         else self.doc.base_net_total
-    #     )
-        
-    # else:
-    #     self.doc.taxes_and_charges_added = self.doc.taxes_and_charges_deducted = 0.0
-    #     for tax in self.doc.get("taxes"):
-    #         if tax.category in ["Valuation and Total", "Total"]:
-    #             if tax.add_deduct_tax == "Add":
-    #                 self.doc.taxes_and_charges_added += flt(tax.tax_amount_after_discount_amount)
-    #             else:
-    #                 self.doc.taxes_and_charges_deducted += flt(tax.tax_amount_after_discount_amount)
-
-    #     self.doc.round_floats_in(self.doc, ["taxes_and_charges_added", "taxes_and_charges_deducted"])
-
-    #     self.doc.base_grand_total = (
-    #         flt(self.doc.grand_total * self.doc.conversion_rate)
-    #         if (self.doc.taxes_and_charges_added or self.doc.taxes_and_charges_deducted)
-    #         else self.doc.base_net_total
-    #     )
-
-    #     self._set_in_company_currency(self.doc, ["taxes_and_charges_added", "taxes_and_charges_deducted"])
-
-    # self.doc.round_floats_in(self.doc, ["grand_total", "base_grand_total"])
-    # self.set_rounded_total()
-
 
 def create_roundoff_writeoff_entry(self):
     """Create a write-off entry for round-off amount"""
@@ -743,3 +548,87 @@ class CustomSalesInvoice(SalesInvoice):
 @erpnext.allow_regional
 def make_regional_gl_entries(gl_entries, doc):
 	return gl_entries
+
+
+def create_payment_entry(sales_invoice, mode_of_payment, amount_paid):
+    """
+    Create Payment Entry for B2B Sales Invoice
+    """
+    try:
+        # Get company and customer details
+        company = sales_invoice.company
+        customer = sales_invoice.customer
+        
+        # Create Payment Entry
+        payment_entry = frappe.new_doc("Payment Entry")
+        payment_entry.payment_type = "Receive"
+        payment_entry.party_type = "Customer"
+        payment_entry.party = customer
+        payment_entry.company = company
+        payment_entry.posting_date = frappe.utils.nowdate()
+        
+        # Set paid amount
+        payment_entry.paid_amount = amount_paid
+        payment_entry.received_amount = amount_paid
+        payment_entry.source_exchange_rate = 1
+        payment_entry.target_exchange_rate = 1
+        
+        # Get default accounts
+        company_doc = frappe.get_doc("Company", company)
+        
+        # Set party account (Customer's receivable account)
+        payment_entry.party_account = get_customer_receivable_account(customer, company)
+        
+        # Handle multiple payment methods
+        if isinstance(mode_of_payment, list) and len(mode_of_payment) > 0:
+            first_payment = mode_of_payment[0]
+            mode_of_payment_doc = frappe.get_doc("Mode of Payment", first_payment["method"])
+            
+            for account in mode_of_payment_doc.accounts:
+                if account.company == company:
+                    payment_entry.paid_to = account.default_account
+                    break
+            
+            if not payment_entry.paid_to:
+                payment_entry.paid_to = company_doc.default_cash_account
+            
+            payment_entry.mode_of_payment = first_payment["method"]
+            
+            # Add reference to Sales Invoice
+            payment_entry.append("references", {
+                "reference_doctype": "Sales Invoice",
+                "reference_name": sales_invoice.name,
+                "allocated_amount": amount_paid
+            })
+            
+        else:
+            payment_entry.paid_to = company_doc.default_cash_account
+            payment_entry.mode_of_payment = "Cash"
+            
+            # Add reference to Sales Invoice
+            payment_entry.append("references", {
+                "reference_doctype": "Sales Invoice",
+                "reference_name": sales_invoice.name,
+                "allocated_amount": amount_paid
+            })
+        
+        payment_entry.paid_from_account_currency = sales_invoice.currency
+        payment_entry.paid_to_account_currency = sales_invoice.currency
+        
+        payment_entry.save()
+        payment_entry.submit()
+        
+        return payment_entry
+        
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), f"Error creating payment entry for invoice {sales_invoice.name}")
+        frappe.throw(f"Failed to create payment entry: {str(e)}")
+
+def get_customer_receivable_account(customer, company):
+    """Get customer's receivable account using ERPNext utility"""
+    try:
+        from erpnext.accounts.party import get_party_account
+        return get_party_account("Customer", customer, company)
+    except Exception as e:
+        frappe.log_error(f"Error getting receivable account for customer {customer}: {str(e)}")
+        return frappe.db.get_value("Company", company, "default_receivable_account")
