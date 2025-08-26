@@ -53,6 +53,7 @@ def get_pos_details():
         "custom_use_scanner_fully":pos.custom_use_scanner_fully,
         "custom_allow_credit_sales":pos.custom_allow_credit_sales,
         "custom_allow_return":pos.custom_allow_return,
+        "custom_hide_expected_amount":pos.custom_hide_expected_amount,
         
     }
     return details

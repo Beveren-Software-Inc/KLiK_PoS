@@ -11,7 +11,9 @@ import {
   Grid3X3,
   List,
   Eye,
-  MonitorX
+  MonitorX,
+  EyeOff,
+  X
 } from "lucide-react";
 
 import InvoiceViewModal from "../components/InvoiceViewModal";
@@ -21,6 +23,9 @@ import { toast } from "react-toastify";
 import { createSalesReturn } from "../services/salesInvoice";
 import { useAllPaymentModes } from "../hooks/usePaymentModes";
 import RetailSidebar from "../components/RetailSidebar";
+import { usePOSDetails } from "../hooks/usePOSProfile";
+import { usePaymentModes } from "../hooks/usePaymentModes";
+import { useCreatePOSClosingEntry } from "../services/closingEntry";
 
 export default function ClosingShiftPage() {
   // const navigate = useNavigate();
@@ -33,9 +38,17 @@ export default function ClosingShiftPage() {
   const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
   const [selectedInvoice, setSelectedInvoice] = useState<SalesInvoice | null>(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [showCloseModal, setShowCloseModal] = useState(false);
+  const [closingAmounts, setClosingAmounts] = useState({});
+  const { createClosingEntry, isCreating, error: closingError, success } = useCreatePOSClosingEntry();
+const navigate = useNavigate();
 
   const { invoices, isLoading, error } = useSalesInvoices(); 
   const { modes } = useAllPaymentModes()
+  const { posDetails, loading: posLoading } = usePOSDetails();
+  // const { modes, isLoading, error } = usePaymentModes("Test POS Profile");
+
+  const hideExpectedAmount = posDetails?.custom_hide_expected_amount || false;
 
 
   const tabs = [
@@ -206,20 +219,7 @@ const filterInvoiceByDate = (invoiceDateStr: string) => {
           <option value="month">This Month</option>
           <option value="year">This Year</option>
         </select>
-        {/* {showCashierFilter && (
-          <select
-            value={cashierFilter}
-            onChange={(e) => setCashierFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-          >
-            <option value="all">All Cashiers</option>
-            {uniqueCashiers.map((cashier) => (
-              <option key={cashier} value={cashier}>
-                {cashier}
-              </option>
-            ))}
-          </select>
-        )} */}
+   
         {showAdvanced && (
           <>
             <select
@@ -602,138 +602,271 @@ const filterInvoiceByDate = (invoiceDateStr: string) => {
     );
   };
 
-  const renderPaymentsTab = () => {
-    const paymentStats = filteredInvoices.reduce(
-      (acc, invoice) => {
-        if (invoice.paymentMethod === "Cash") {
-          acc.cash.amount += invoice.totalAmount;
-          acc.cash.transactions += 1;
-        } else {
-          acc.card.amount += invoice.totalAmount;
-          acc.card.transactions += 1;
-        }
-        acc.giftCards.amount += invoice.giftCardDiscount;
-        if (invoice.giftCardDiscount > 0) {
-          acc.giftCards.transactions += 1;
-        }
-        return acc;
-      },
-      {
-        cash: { amount: 0, transactions: 0 },
-        card: { amount: 0, transactions: 0 },
-        giftCards: { amount: 0, transactions: 0 },
-      },
-    );
+// Add these state variables at the top of your ClosingShiftPage component, with your other useState declarations:
+// const [showCloseModal, setShowCloseModal] = useState(false);
+// const [closingAmounts, setClosingAmounts] = useState({});
 
-    const total = paymentStats.cash.amount + paymentStats.card.amount;
+// Add these state variables at the top of your ClosingShiftPage component, with your other useState declarations:
+// const [showCloseModal, setShowCloseModal] = useState(false);
+// const [closingAmounts, setClosingAmounts] = useState({});
+// Add these state variables at the top of your ClosingShiftPage component, with your other useState declarations:
+// const [showCloseModal, setShowCloseModal] = useState(false);
+// const [closingAmounts, setClosingAmounts] = useState({});
+// Add these state variables at the top of your ClosingShiftPage component, with your other useState declarations:
+// const [showCloseModal, setShowCloseModal] = useState(false);
+// const [closingAmounts, setClosingAmounts] = useState({});
 
-    return (
-      <div className="space-y-6">
-        {renderFilters(true, false)}
+const renderPaymentsTab = () => {
+  // USING REAL DATA FROM YOUR BACKEND
+  const paymentStats = modes.reduce((acc, mode) => {
+    acc[mode.name] = {
+      name: mode.name,
+      openingAmount: mode.openingAmount || 0,  // From your backend
+      amount: mode.amount || 0,                // From your backend
+      transactions: mode.transactions || 0     // From your backend
+    };
+    return acc;
+  }, {});
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+  // DUMMY DATA (COMMENTED OUT) - Used for testing:
+  /*
+  const paymentStats = {
+    "Cash": {
+      name: "Cash",
+      openingAmount: 500.00,
+      amount: 195.75,      // Total cash sales today
+      transactions: 3      // Number of cash transactions
+    },
+    "Credit Card": {
+      name: "Credit Card", 
+      openingAmount: 0.00,
+      amount: 89.99,       // Total credit card sales
+      transactions: 1      // Number of credit card transactions
+    }
+  };
+  */
+
+  const total = Object.values(paymentStats).reduce((sum, stat) => sum + stat.amount, 0);
+
+  const handleClosingAmountChange = (modeName, value) => {
+    setClosingAmounts(prev => ({
+      ...prev,
+      [modeName]: parseFloat(value) || 0
+    }));
+  };
+
+   const handleFinalClose = async () => {
+    console.log("Closing shift with amounts:", closingAmounts);
+
+    try {
+      const res = await createClosingEntry(closingAmounts);
+       
+      // if (res?.message?.name) {
+      //   // success
+        setShowCloseModal(false);
+        navigate(`/`); // redirect to home
+      // } else {
+      //   console.error("Failed to close shift:", res);
+      // }
+    } catch (err) {
+      console.error("Error closing shift:", err);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {renderFilters(true, false)}
+
+      <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 ${hideExpectedAmount ? 'blur-sm' : ''}`}>
+        {Object.values(paymentStats).map((stat) => (
+          <div key={stat.name} className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900 dark:text-white">Cash Payments</h3>
-              <div className="text-2xl">💵</div>
+              <h3 className="font-semibold text-gray-900 dark:text-white">{stat.name}</h3>
+              {stat.name.toLowerCase().includes('cash') ? (
+                <div className="text-2xl">💵</div>
+              ) : (
+                <CreditCard className="w-8 h-8 text-beveren-600" />
+              )}
             </div>
             <div className="space-y-2">
               <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                ${paymentStats.cash.amount.toFixed(2)}
+                ${stat.amount.toFixed(2)}
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                {paymentStats.cash.transactions} transactions
+                {stat.transactions} transactions
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                {total > 0 ? ((paymentStats.cash.amount / total) * 100).toFixed(1) : 0}% of total
+                {total > 0 ? ((stat.amount / total) * 100).toFixed(1) : 0}% of total
               </div>
             </div>
           </div>
+        ))}
+      </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900 dark:text-white">Card Payments</h3>
-              <CreditCard className="w-8 h-8 text-beveren-600" />
-            </div>
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                ${paymentStats.card.amount.toFixed(2)}
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                {paymentStats.card.transactions} transactions
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                {total > 0 ? ((paymentStats.card.amount / total) * 100).toFixed(1) : 0}% of total
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900 dark:text-white">Gift Cards Used</h3>
-              <div className="text-2xl">🎁</div>
-            </div>
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                ${paymentStats.giftCards.amount.toFixed(2)}
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                {paymentStats.giftCards.transactions} transactions
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Customer savings</div>
-            </div>
+      {hideExpectedAmount && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+          <div className="flex items-center space-x-2">
+            <EyeOff className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+            <p className="text-yellow-800 dark:text-yellow-200 font-medium">
+              Payment amounts are hidden for security. Click "Close" to view detailed breakdown.
+            </p>
           </div>
         </div>
+      )}
 
-        {/* Payment Method Breakdown Chart */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Payment Distribution</h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-4 h-4 bg-green-500 rounded"></div>
-                <span className="text-sm text-gray-700 dark:text-gray-300">Cash</span>
-              </div>
-              <div className="text-right">
-                <div className="font-semibold text-gray-900 dark:text-white">
-                  ${paymentStats.cash.amount.toFixed(2)}
+      {/* Payment Method Breakdown Chart */}
+      <div className={`bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 ${hideExpectedAmount ? 'blur-sm' : ''}`}>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Payment Distribution</h3>
+        <div className="space-y-4">
+          {Object.values(paymentStats).map((stat, index) => {
+            const colors = ['bg-green-500', 'bg-beveren-600', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500'];
+            const color = colors[index % colors.length];
+            
+            return (
+              <div key={stat.name} className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className={`w-4 h-4 ${color} rounded`}></div>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">{stat.name}</span>
                 </div>
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  {total > 0 ? ((paymentStats.cash.amount / total) * 100).toFixed(1) : 0}%
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-4 h-4 bg-beveren-600 rounded"></div>
-                <span className="text-sm text-gray-700 dark:text-gray-300">Debit Card</span>
-              </div>
-              <div className="text-right">
-                <div className="font-semibold text-gray-900 dark:text-white">
-                  ${paymentStats.card.amount.toFixed(2)}
-                </div>
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  {total > 0 ? ((paymentStats.card.amount / total) * 100).toFixed(1) : 0}%
+                <div className="text-right">
+                  <div className="font-semibold text-gray-900 dark:text-white">
+                    ${stat.amount.toFixed(2)}
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    {total > 0 ? ((stat.amount / total) * 100).toFixed(1) : 0}%
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="mt-4">
-              <div className="flex rounded-lg overflow-hidden h-3">
-                <div
-                  className="bg-green-500"
-                  style={{ width: `${total > 0 ? (paymentStats.cash.amount / total) * 100 : 0}%` }}
-                ></div>
-                <div
-                  className="bg-beveren-600"
-                  style={{ width: `${total > 0 ? (paymentStats.card.amount / total) * 100 : 0}%` }}
-                ></div>
-              </div>
+            );
+          })}
+          <div className="mt-4">
+            <div className="flex rounded-lg overflow-hidden h-3">
+              {Object.values(paymentStats).map((stat, index) => {
+                const colors = ['bg-green-500', 'bg-beveren-600', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500'];
+                const color = colors[index % colors.length];
+                const width = total > 0 ? (stat.amount / total) * 100 : 0;
+                
+                return (
+                  <div
+                    key={stat.name}
+                    className={color}
+                    style={{ width: `${width}%` }}
+                  ></div>
+                );
+              })}
             </div>
           </div>
         </div>
       </div>
-    );
-  };
+
+      {/* Close Shift Modal */}
+      {showCloseModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Close Shift - Payment Methods</h2>
+              <button
+                onClick={() => setShowCloseModal(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {Object.values(paymentStats).map((stat) => (
+                <div key={stat.name} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold text-gray-900 dark:text-white">{stat.name}</h3>
+                    {stat.name.toLowerCase().includes('cash') ? (
+                      <div className="text-2xl">💵</div>
+                    ) : (
+                      <CreditCard className="w-6 h-6 text-beveren-600" />
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                        Opening Amount
+                      </label>
+                      <div className="text-lg font-medium text-gray-900 dark:text-white">
+                        ${stat.openingAmount.toFixed(2)}
+                      </div>
+                    </div>
+                    <div className={hideExpectedAmount ? 'blur-sm' : ''}>
+                      <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                        Sales Amount
+                      </label>
+                      <div className="text-lg font-medium text-green-600">
+                        ${stat.amount.toFixed(2)}
+                      </div>
+                    </div>
+                    <div className={hideExpectedAmount ? 'blur-sm' : ''}>
+                      <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                        Expected Amount
+                      </label>
+                      <div className="text-lg font-medium text-blue-600">
+                        ${(stat.openingAmount + stat.amount).toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Closing Amount *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="Enter closing amount"
+                      value={closingAmounts[stat.name] || ''}
+                      onChange={(e) => handleClosingAmountChange(stat.name, e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                    {closingAmounts[stat.name] && (
+                      <div className="mt-2 text-sm">
+                        <span className={`font-medium ${
+                          closingAmounts[stat.name] === (stat.openingAmount + stat.amount)
+                            ? 'text-green-600'
+                            : closingAmounts[stat.name] > (stat.openingAmount + stat.amount)
+                            ? 'text-blue-600'
+                            : 'text-red-600'
+                        }`}>
+                          Difference: ${(closingAmounts[stat.name] - (stat.openingAmount + stat.amount)).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
+              <button
+                onClick={() => setShowCloseModal(false)}
+                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleFinalClose}
+                disabled={isCreating}
+                className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                  isCreating 
+                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                    : 'bg-red-600 text-white hover:bg-red-700'
+                }`}
+              >
+                {isCreating ? 'Closing...' : 'Close Shift'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
   const renderReturnsTab = () => {
     const returnsData = filteredInvoices.filter(
@@ -872,10 +1005,13 @@ const filterInvoiceByDate = (invoiceDateStr: string) => {
               
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Closing Shift</h1>
             </div>
-            <button className="flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors">
-              <MonitorX className="w-4 h-4" />
-              <span>Close</span>
-            </button>
+           <button 
+  onClick={() => setShowCloseModal(true)}
+  className="flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors"
+>
+  <MonitorX className="w-4 h-4" />
+  <span>Close</span>
+</button>
           </div>
         </div>
       </div>
