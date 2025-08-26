@@ -467,15 +467,7 @@ const getStatusBadge = (status: string) => {
                             }
                         />
                       )}
-                      {/* {["Draft", "Unpaid"].includes(invoice.status) && (
-                        <button
-                          onClick={() => handleDeleteInvoice(invoice.id)}
-                          className="text-red-600 hover:text-red-900 flex items-center space-x-1"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          <span>Delete</span>
-                        </button>
-                      )} */}
+                   
                     </div>
                   </td>
                 </tr>
