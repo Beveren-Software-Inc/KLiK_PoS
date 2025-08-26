@@ -57,19 +57,26 @@ def fetch_item_price(item_code: str, price_list: str) -> dict:
         }
 
 @frappe.whitelist(allow_guest=True)
+@frappe.whitelist(allow_guest=True)
 def get_items_with_balance_and_price(price_list: str = "Standard Selling"):
     pos_doc = get_current_pos_profile()
-    warehouse=pos_doc.warehouse
-   
+    warehouse = pos_doc.warehouse
+
     try:
+        # If POS Profile has item groups → only use those
+        filters = {"disabled": 0, "is_stock_item": 1}
+        if pos_doc.item_groups:
+            item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
+            if item_group_names:
+                filters["item_group"] = ["in", item_group_names]
+
         items = frappe.get_all(
-    "Item",
-    filters={"disabled": 0, "is_stock_item": 1},
-    fields=["name", "item_name", "description", "item_group", "image"],
-    # limit=1000,
-   
-    order_by="modified desc"
-)
+            "Item",
+            filters=filters,
+            fields=["name", "item_name", "description", "item_group", "image"],
+            order_by="modified desc"
+        )
+
         enriched_items = []
         for item in items:
             balance = fetch_item_balance(item["name"], warehouse)
@@ -82,18 +89,19 @@ def get_items_with_balance_and_price(price_list: str = "Standard Selling"):
                 "category": item.get("item_group", "General"),
                 "price": price_info["price"],
                 "currency": price_info["currency"],
-                "currency_symbol":price_info["currency_symbol"],
+                "currency_symbol": price_info["currency_symbol"],
                 "available": balance,
                 "image": item.get("image") or "https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=300&h=300&fit=crop",
                 "sold": 0,
                 "preparationTime": 10
             })
-        
+
         return enriched_items
 
-    except Exception as e:
+    except Exception:
         frappe.log_error(frappe.get_traceback(), "Get Combined Item Data Error")
         frappe.throw(_("Something went wrong while fetching item data."))
+
 
 
 @frappe.whitelist(allow_guest=True)
