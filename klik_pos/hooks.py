@@ -39,6 +39,10 @@ fixtures = [
                     "Sales Invoice-custom_column_break_vtq6c",
                     "Sales Invoice-custom_roundoff_amount",
                     "Sales Invoice-custom_roundoff",
+                    "POS Profile-custom_allow_credit_sales",
+                    "POS Profile-custom_hide_expected_amount",
+                    "POS Profile-custom_allow_return",
+                    "POS Profile-custom_use_scanner_fully",
                 ),
             ]
         ],

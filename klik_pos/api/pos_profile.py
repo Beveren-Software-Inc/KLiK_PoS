@@ -49,6 +49,11 @@ def get_pos_details():
         "currency":pos.currency,
         "currency_symbol":frappe.db.get_value("Currency", pos.currency, "symbol") or pos.currency,
         "print_receipt_on_order_complete":pos.print_receipt_on_order_complete,
-        "print_format":pos.custom_pos_printformat
+        "print_format":pos.custom_pos_printformat,
+        "custom_use_scanner_fully":pos.custom_use_scanner_fully,
+        "custom_allow_credit_sales":pos.custom_allow_credit_sales,
+        "custom_allow_return":pos.custom_allow_return,
+        "custom_hide_expected_amount":pos.custom_hide_expected_amount,
+        
     }
     return details
