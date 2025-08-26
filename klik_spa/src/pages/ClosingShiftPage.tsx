@@ -1,13 +1,13 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-
+  FileText,
   CreditCard,
-
+  RefreshCw,
   Search,
   Eye,
   MonitorX,
-
+  EyeOff,
   X
 } from "lucide-react";
 
@@ -223,45 +223,34 @@ export default function ClosingShiftPage() {
           {!hideExpectedAmount && (
             <>
               {/* Payment Method Cards */}
-              <div
-  className={`grid gap-6`}
-  style={{
-    gridTemplateColumns: `repeat(${Object.values(paymentStats).length}, minmax(0, 1fr))`,
-  }}
->
-  {Object.values(paymentStats).map((stat) => (
-    <div
-      key={stat.name}
-      className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700"
-    >
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-gray-900 dark:text-white">
-          {stat.name}
-        </h3>
-        {stat.name.toLowerCase().includes("cash") ? (
-          <div className="text-2xl">💵</div>
-        ) : (
-          <CreditCard className="w-8 h-8 text-beveren-600" />
-        )}
-      </div>
-      <div className="space-y-2">
-        <div className="text-2xl font-bold text-gray-900 dark:text-white">
-          ${stat.amount.toFixed(2)}
-        </div>
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          {stat.transactions} transactions
-        </div>
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          {total > 0 ? ((stat.amount / total) * 100).toFixed(1) : 0}% of total
-        </div>
-      </div>
-    </div>
-  ))}
-</div>
-
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {Object.values(paymentStats).map((stat) => (
+                  <div key={stat.name} className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold text-gray-900 dark:text-white">{stat.name}</h3>
+                      {stat.name.toLowerCase().includes('cash') ? (
+                        <div className="text-2xl">💵</div>
+                      ) : (
+                        <CreditCard className="w-8 h-8 text-beveren-600" />
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                        ${stat.amount.toFixed(2)}
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        {stat.transactions} transactions
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        {total > 0 ? ((stat.amount / total) * 100).toFixed(1) : 0}% of total
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
 
               {/* Payment Distribution Chart */}
-              {/* <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Payment Distribution</h3>
                 <div className="space-y-4">
                   {Object.values(paymentStats).map((stat, index) => {
@@ -303,7 +292,7 @@ export default function ClosingShiftPage() {
                     </div>
                   </div>
                 </div>
-              </div> */}
+              </div>
             </>
           )}
 
@@ -321,17 +310,22 @@ export default function ClosingShiftPage() {
                 />
               </div>
               <select
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              >
-                <option value="all">All Time</option>
-                <option value="today">Today</option>
-                <option value="yesterday">Yesterday</option>
-                <option value="week">This Week</option>
-                <option value="month">This Month</option>
-                <option value="year">This Year</option>
-              </select>
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                    disabled
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                              focus:outline-none focus:ring-2 focus:ring-beveren-500 
+                              bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 
+                              cursor-not-allowed"
+                  >
+                    <option value="all">All Time</option>
+                    <option value="today">Today</option>
+                    <option value="yesterday">Yesterday</option>
+                    <option value="week">This Week</option>
+                    <option value="month">This Month</option>
+                    <option value="year">This Year</option>
+                  </select>
+
               
               <select
                 value={statusFilter}
@@ -462,10 +456,10 @@ export default function ClosingShiftPage() {
 
         {/* Close Shift Modal */}
         {showCloseModal && (
-          <div className="fixed inset-0 bg-black/70 bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-lg mx-4">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Close Shift - Payment Methods</h2>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Close Shift</h2>
                 <button
                   onClick={() => setShowCloseModal(false)}
                   className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -476,68 +470,34 @@ export default function ClosingShiftPage() {
 
               <div className="space-y-4">
                 {Object.values(paymentStats).map((stat) => (
-                  <div key={stat.name} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-semibold text-gray-900 dark:text-white">{stat.name}</h3>
+                  <div key={stat.name} className="flex items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div className="flex items-center space-x-3 flex-shrink-0">
                       {stat.name.toLowerCase().includes('cash') ? (
-                        <div className="text-2xl">💵</div>
+                        <div className="text-xl">💵</div>
                       ) : (
-                        <CreditCard className="w-6 h-6 text-beveren-600" />
+                        <CreditCard className="w-5 h-5 text-beveren-600" />
                       )}
+                      <span className="font-medium text-gray-900 dark:text-white">{stat.name}</span>
                     </div>
                     
-                    <div className="grid grid-cols-3 gap-4 mb-4">
-                      <div>
-                        <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                          Opening Amount
-                        </label>
-                        <div className="text-lg font-medium text-gray-900 dark:text-white">
+                    <div className="flex items-center space-x-4">
+                      <div className="text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Opening: </span>
+                        <span className="font-medium text-gray-900 dark:text-white">
                           ${stat.openingAmount.toFixed(2)}
-                        </div>
+                        </span>
                       </div>
-                      <div>
-                        <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                          Sales Amount
-                        </label>
-                        <div className="text-lg font-medium text-green-600">
-                          ${stat.amount.toFixed(2)}
-                        </div>
+                      
+                      <div className="flex-shrink-0">
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="Closing amount"
+                          value={closingAmounts[stat.name] || ''}
+                          onChange={(e) => handleClosingAmountChange(stat.name, e.target.value)}
+                          className="w-32 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                        />
                       </div>
-                      <div>
-                        <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                          Expected Amount
-                        </label>
-                        <div className="text-lg font-medium text-blue-600">
-                          ${(stat.openingAmount + stat.amount).toFixed(2)}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                        Closing Amount *
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder="Enter closing amount"
-                        value={closingAmounts[stat.name] || ''}
-                        onChange={(e) => handleClosingAmountChange(stat.name, e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      />
-                      {closingAmounts[stat.name] && (
-                        <div className="mt-2 text-sm">
-                          <span className={`font-medium ${
-                            closingAmounts[stat.name] === (stat.openingAmount + stat.amount)
-                              ? 'text-green-600'
-                              : closingAmounts[stat.name] > (stat.openingAmount + stat.amount)
-                              ? 'text-blue-600'
-                              : 'text-red-600'
-                          }`}>
-                            Difference: ${(closingAmounts[stat.name] - (stat.openingAmount + stat.amount)).toFixed(2)}
-                          </span>
-                        </div>
-                      )}
                     </div>
                   </div>
                 ))}
@@ -546,7 +506,7 @@ export default function ClosingShiftPage() {
               <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
                 <button
                   onClick={() => setShowCloseModal(false)}
-                  className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 font-medium"
+                  className="px-4 py-2 text-red-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-500 font-medium"
                 >
                   Cancel
                 </button>
@@ -556,7 +516,7 @@ export default function ClosingShiftPage() {
                   className={`px-6 py-2 rounded-lg font-medium transition-colors ${
                     isCreating 
                       ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
-                      : 'bg-red-600 text-white hover:bg-red-700'
+                      : 'bg-beveren-600 text-white hover:bg-beveren-700'
                   }`}
                 >
                   {isCreating ? 'Closing...' : 'Close Shift'}
