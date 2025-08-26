@@ -29,7 +29,7 @@ import { useCreatePOSClosingEntry } from "../services/closingEntry";
 
 export default function ClosingShiftPage() {
   // const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("invoices");
+  const [activeTab, setActiveTab] = useState("payments");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("today");
@@ -56,7 +56,7 @@ const navigate = useNavigate();
     { id: "invoices", name: "All Invoices", icon: FileText },
     // { id: "cashiers", name: "Cashier Sales", icon: Users },
     
-    { id: "returns", name: "Returns & Refunds", icon: RefreshCw },
+    // { id: "returns", name: "Returns & Refunds", icon: RefreshCw },
   ];
 
 
@@ -261,7 +261,7 @@ const filterInvoiceByDate = (invoiceDateStr: string) => {
       {renderFilters(true, true)}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {/* <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
@@ -309,7 +309,7 @@ const filterInvoiceByDate = (invoiceDateStr: string) => {
             <TrendingUp className="w-8 h-8 text-blue-600" />
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Invoices Table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
