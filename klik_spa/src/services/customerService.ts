@@ -15,14 +15,18 @@ interface CustomerData {
 }
 
 export const useCustomerActions = () => {
+  const csrfToken = window.csrf_token;
   const createCustomer = async (customerData: CustomerData) => {
     try {
       const response = await fetch('/api/method/klik_pos.api.customer.create_or_update_customer', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+           "X-Frappe-CSRF-Token": csrfToken,
+
         },
         body: JSON.stringify({ customer_data: customerData }),
+        credentials: 'include'
       });
 
       const result = await response.json();
@@ -44,11 +48,15 @@ export const useCustomerActions = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+             "X-Frappe-CSRF-Token": csrfToken,
+
         },
         body: JSON.stringify({
           customer_id: customerId,
           customer_data: customerData
         }),
+                credentials: 'include'
+
       });
 
       const result = await response.json();
