@@ -15,7 +15,7 @@ import {
   List,
   Eye,
   Edit,
-  Trash2,
+ 
 } from "lucide-react";
 
 import InvoiceViewModal from "../components/InvoiceViewModal";

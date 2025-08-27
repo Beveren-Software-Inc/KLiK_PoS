@@ -780,7 +780,7 @@ useEffect(() => {
             )}
 
             {/* Gift Coupon Button with Popover */}
-            <div className="relative">
+            {/* <div className="relative">
               <button
                 ref={couponButtonRef}
                 onClick={() => setShowCouponPopover(!showCouponPopover)}
@@ -797,7 +797,7 @@ useEffect(() => {
                 onClose={() => setShowCouponPopover(false)}
                 buttonRef={couponButtonRef}
               />
-            </div>
+            </div> */}
 
             <div className="flex justify-between font-bold text-lg pt-3 border-t border-gray-100 dark:border-gray-700">
               <span className="text-gray-900 dark:text-white">Total</span>
