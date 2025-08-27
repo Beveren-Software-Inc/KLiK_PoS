@@ -1,13 +1,10 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  FileText,
   CreditCard,
-  RefreshCw,
   Search,
   Eye,
   MonitorX,
-  EyeOff,
   X
 } from "lucide-react";
 
@@ -442,7 +439,7 @@ export default function ClosingShiftPage() {
                               className="text-orange-600 hover:text-orange-900">Return</button>
                           )}
                           {invoice.status === "Pending" && (
-                            <button className="text-red-600 hover:text-red-900">Cancel</button>
+                            <button className="text-red-600 hover:text-red-500">Cancel</button>
                           )}
                         </div>
                       </td>
@@ -506,7 +503,7 @@ export default function ClosingShiftPage() {
               <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
                 <button
                   onClick={() => setShowCloseModal(false)}
-                  className="px-4 py-2 text-red-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-500 font-medium"
+                  className="px-4 py-2 text-red-600 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-500 font-medium"
                 >
                   Cancel
                 </button>

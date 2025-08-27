@@ -15,7 +15,7 @@ import {
   List,
   Eye,
   Edit,
-  Trash2,
+ 
 } from "lucide-react";
 
 import InvoiceViewModal from "../components/InvoiceViewModal";
@@ -191,8 +191,6 @@ const getStatusBadge = (status: string) => {
   }
 
   const handleViewInvoice = (invoice: SalesInvoice) => {
-    // setSelectedInvoice(invoice);
-    // setShowInvoiceModal(true);
     navigate(`/invoice/${invoice.id}`);
 
   };
@@ -229,7 +227,7 @@ const getStatusBadge = (status: string) => {
   };
 
   const renderFilters = () => (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 mb-6">
+    <div className="w-full max-w-none bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 mb-6">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
@@ -282,7 +280,7 @@ const getStatusBadge = (status: string) => {
   );
 
   const renderSummaryCards = () => (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+    <div className="w-full max-w-none grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div>
@@ -335,7 +333,7 @@ const getStatusBadge = (status: string) => {
   );
 
   const renderInvoicesTable = () => (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div className="w-full max-w-none bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
       <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
           {activeTab === "all" ? "All Invoices" : tabs.find(t => t.id === activeTab)?.name} ({filteredInvoices.length})
@@ -548,29 +546,31 @@ const getStatusBadge = (status: string) => {
           </div>
         </div>
 
-        <div className="flex-1 px-6 py-8 mt-16 ml-20 flex flex-col items-center">
-          {/* Status Tabs */}
-          <div className="mb-8">
-            <div className="border-b border-gray-200 dark:border-gray-700">
-              <nav className="-mb-px flex space-x-8 overflow-x-auto">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
-                      activeTab === tab.id
-                        ? "border-beveren-500 text-beveren-600 dark:text-beveren-400"
-                        : `border-transparent ${tab.color} dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300`
-                    }`}
-                  >
-                    <tab.icon className="w-5 h-5" />
-                    <span>{tab.name}</span>
-                    <span className="ml-2 px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 rounded-full">
-                      {getStatusCount(tab.id)}
-                    </span>
-                  </button>
-                ))}
-              </nav>
+        <div className="flex-1 px-6 py-8 mt-16 ml-20 max-w-none">
+          {/* Status Tabs - Now full width like the table */}
+          <div className="mb-8 w-full max-w-none">
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+              <div className="border-b border-gray-200 dark:border-gray-700">
+                <nav className="-mb-px flex space-x-8 overflow-x-auto">
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                        activeTab === tab.id
+                          ? "border-beveren-500 text-beveren-600 dark:text-beveren-400"
+                          : `border-transparent ${tab.color} dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300`
+                      }`}
+                    >
+                      <tab.icon className="w-5 h-5" />
+                      <span>{tab.name}</span>
+                      <span className="ml-2 px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 rounded-full">
+                        {getStatusCount(tab.id)}
+                      </span>
+                    </button>
+                  ))}
+                </nav>
+              </div>
             </div>
           </div>
 
