@@ -95,7 +95,7 @@
   "name": "POS Profile-custom_business_type",
   "no_copy": 0,
   "non_negative": 0,
-  "options": "\nB2C\nB2B",
+  "options": "\nB2C\nB2B\nB2B & B2C",
   "permlevel": 0,
   "placeholder": null,
   "precision": "",
