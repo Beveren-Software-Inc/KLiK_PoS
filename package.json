@@ -13,6 +13,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "react-phone-number-input": "^3.4.12",
+    "react-select-country-list": "^2.2.3",
     "react-toastify": "^11.0.5"
   }
 }

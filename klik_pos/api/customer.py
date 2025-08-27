@@ -74,125 +74,125 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
         return {"success": False, "error": _("Something went wrong while fetching customers.")}
 
 
-@frappe.whitelist()
-def create_or_update_customer(customer_data):
-    try:
-        if isinstance(customer_data, str):
-            customer_data = frappe.parse_json(customer_data)
+# @frappe.whitelist()
+# def create_or_update_customer(customer_data):
+#     try:
+#         if isinstance(customer_data, str):
+#             customer_data = frappe.parse_json(customer_data)
+#         print(str(customer_data))
+#         customer_name = customer_data.get("name")
+#         email = customer_data.get("email")
+#         phone = customer_data.get("phone")
+#         country = customer_data.get("address", {}).get("country", "Kenya")
+#         name_arabic = customer_data.get("name_arabic", "")
+#         address = customer_data.get("address", {})
 
-        customer_name = customer_data.get("name")
-        email = customer_data.get("email")
-        phone = customer_data.get("phone")
-        country = customer_data.get("address", {}).get("country", "Kenya")
-        name_arabic = customer_data.get("name_arabic", "")
-        address = customer_data.get("address", {})
+#         # Create or update the Customer
+#         customer_doc = get_or_create_customer(customer_name, email, phone, country, name_arabic)
 
-        # Create or update the Customer
-        customer_doc = get_or_create_customer(customer_name, email, phone, country, name_arabic)
+#         # Create or update the Address
+#         addr_doc = create_or_update_address(customer_doc.name, customer_name, address, country)
 
-        # Create or update the Address
-        addr_doc = create_or_update_address(customer_doc.name, customer_name, address, country)
+#         return {
+#             "success": True,
+#             "customer_name": customer_doc.name,
+#             "address_name": addr_doc.name
+#         }
 
-        return {
-            "success": True,
-            "customer_name": customer_doc.name,
-            "address_name": addr_doc.name
-        }
-
-    except Exception as e:
-        frappe.log_error(frappe.get_traceback(), "Customer Creation/Update Error")
-        return {
-            "success": False,
-            "error": str(e)
-        }
-
-
-def get_or_create_customer(name, email, phone, country, name_arabic=""):
-    """Create or update a Customer."""
-    existing = frappe.get_all("Customer", filters={"customer_name": name}, fields=["name"])
-    if existing:
-        doc = frappe.get_doc("Customer", existing[0]["name"])
-        doc.email_id = email
-        doc.mobile_no = phone
-        doc.custom_country = country
-        doc.save()
-    else:
-        doc = frappe.get_doc({
-            "doctype": "Customer",
-            "customer_name": name,
-            "customer_type": "Individual",
-            "customer_name_in_arabic": name_arabic,
-            "email_id": email,
-            "mobile_no": phone,
-            "custom_country": country
-        })
-        doc.insert()
-    return doc
+#     except Exception as e:
+#         frappe.log_error(frappe.get_traceback(), "Customer Creation/Update Error")
+#         return {
+#             "success": False,
+#             "error": str(e)
+#         }
 
 
-def create_or_update_address(customer_id, customer_name, address_data, country):
-    """Create or update primary address for the customer."""
-    address_title = f"{customer_name} - Primary"
-
-    address_fields = {
-        "address_title": address_title,
-        "address_type": "Billing",
-        "address_line1": address_data.get("street", ""),
-        "city": address_data.get("city", ""),
-        "state": address_data.get("state"),
-        "pincode": address_data.get("zipCode"),
-        "country": country,
-        "is_primary_address": 1,
-        "is_shipping_address": 1
-    }
-
-    link_data = {
-        "link_doctype": "Customer",
-        "link_name": customer_id,
-        "link_title": customer_name
-    }
-
-    existing = frappe.get_all("Address", filters={"address_title": address_title}, fields=["name"])
-    if existing:
-        doc = frappe.get_doc("Address", existing[0]["name"])
-        for field, value in address_fields.items():
-            setattr(doc, field, value)
-        doc.links = []  # Reset existing links
-    else:
-        doc = frappe.new_doc("Address")
-        for field, value in address_fields.items():
-            setattr(doc, field, value)
-
-    doc.append("links", link_data)
-    doc.save()
-    return doc
+# def get_or_create_customer(name, email, phone, country, name_arabic=""):
+#     """Create or update a Customer."""
+#     existing = frappe.get_all("Customer", filters={"customer_name": name}, fields=["name"])
+#     if existing:
+#         doc = frappe.get_doc("Customer", existing[0]["name"])
+#         doc.email_id = email
+#         doc.mobile_no = phone
+#         doc.custom_country = country
+#         doc.save()
+#     else:
+#         doc = frappe.get_doc({
+#             "doctype": "Customer",
+#             "customer_name": name,
+#             "customer_type": "Individual",
+#             "customer_name_in_arabic": name_arabic,
+#             "email_id": email,
+#             "mobile_no": phone,
+#             "custom_country": country
+#         })
+#         doc.insert()
+#     return doc
 
 
-@frappe.whitelist()
-def update_customer(customer_id, customer_data):
-    if isinstance(customer_data, str):
-        customer_data = json.loads(customer_data)
+# def create_or_update_address(customer_id, customer_name, address_data, country):
+#     """Create or update primary address for the customer."""
+#     address_title = f"{customer_name} - Primary"
+
+#     address_fields = {
+#         "address_title": address_title,
+#         "address_type": "Billing",
+#         "address_line1": address_data.get("street", ""),
+#         "city": address_data.get("city", ""),
+#         "state": address_data.get("state"),
+#         "pincode": address_data.get("zipCode"),
+#         "country": country,
+#         "is_primary_address": 1,
+#         "is_shipping_address": 1
+#     }
+
+#     link_data = {
+#         "link_doctype": "Customer",
+#         "link_name": customer_id,
+#         "link_title": customer_name
+#     }
+
+#     existing = frappe.get_all("Address", filters={"address_title": address_title}, fields=["name"])
+#     if existing:
+#         doc = frappe.get_doc("Address", existing[0]["name"])
+#         for field, value in address_fields.items():
+#             setattr(doc, field, value)
+#         doc.links = []  # Reset existing links
+#     else:
+#         doc = frappe.new_doc("Address")
+#         for field, value in address_fields.items():
+#             setattr(doc, field, value)
+
+#     doc.append("links", link_data)
+#     doc.save()
+#     return doc
+
+
+# @frappe.whitelist()
+# def update_customer(customer_id, customer_data):
+#     if isinstance(customer_data, str):
+#         customer_data = json.loads(customer_data)
     
-    try:
-        customer = frappe.get_doc("Customer", customer_id)
+#     try:
+#         customer = frappe.get_doc("Customer", customer_id)
         
-        for key, value in customer_data.items():
-            setattr(customer, key, value)
+#         for key, value in customer_data.items():
+#             setattr(customer, key, value)
         
-        customer.ignore_version = True  # ✅ Add this line
-        customer.save()
+#         customer.ignore_version = True  # ✅ Add this line
+#         customer.save()
 
-        return {
-            "success": True,
-            "updated_customer": customer.name
-        }
+#         return {
+#             "success": True,
+#             "updated_customer": customer.name
+#         }
 
-    except Exception as e:
-        frappe.log_error(frappe.get_traceback(), "Update Customer Error")
-        return {
-            "success": False,
-            "error": str(e)
-        }
+#     except Exception as e:
+#         frappe.log_error(frappe.get_traceback(), "Update Customer Error")
+#         return {
+#             "success": False,
+#             "error": str(e)
+#         }
 
 def get_user_company_and_currency():
     user = frappe.session.user
@@ -245,3 +245,247 @@ def get_customer_info(customer_name: str):
         "email_id": customer.email_id,
         "mobile_no": customer.mobile_no,
     }
+
+
+
+@frappe.whitelist()
+def create_or_update_customer(customer_data):
+    try:
+        if isinstance(customer_data, str):
+            customer_data = frappe.parse_json(customer_data)
+        print(str(customer_data))
+        # Extract main fields
+        customer_name = customer_data.get("name")
+        email = customer_data.get("email")
+        phone = customer_data.get("phone")
+        cust_type = customer_data.get("type", "individual").lower()
+        country = customer_data.get("address", {}).get("country", "Kenya")
+        name_arabic = customer_data.get("name_arabic", "")
+        address = customer_data.get("address", {})
+
+        # If name is missing, fallback to phone → email
+        if not customer_name:
+            customer_name = phone or email
+        if not customer_name:
+            frappe.throw("Customer must have at least a name, phone, or email")
+
+        # Create or update Customer
+        customer_doc = get_or_create_customer(customer_name, email, phone, country, name_arabic, customer_data)
+
+        contact_doc = None
+        addr_doc = None
+        print("mania", customer_doc)
+        # For Individuals → only create contact if phone exists
+        if cust_type == "individual":
+            if phone:
+                contact_doc = create_or_update_contact(customer_doc.name, customer_name, email, phone)
+
+        # For Companies → create both Contact and Address
+        if cust_type == "company":
+            contact_doc = create_or_update_contact(customer_doc.name, customer_name, email, phone)
+            addr_doc = create_or_update_address(customer_doc.name, customer_name, address, country)
+
+            # 🔗 Link Address to Customer
+            if addr_doc:
+                frappe.db.set_value("Customer", customer_doc.name, "customer_primary_address", addr_doc.name)
+
+        return {
+            "success": True,
+            "customer_name": customer_doc.name,
+            "contact_name": contact_doc.name if contact_doc else None,
+            "address_name": addr_doc.name if addr_doc else None
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Customer Creation/Update Error")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+def get_or_create_customer(name, email, phone, country, name_arabic="", data=None):
+    """Create or update a Customer (Individual or Company)."""
+    try:
+        cust_type = "Company" if data and data.get("type") == "company" else "Individual"
+
+        existing = frappe.get_all("Customer", filters={"customer_name": name}, fields=["name"])
+        if existing:
+            # Update existing
+            doc = frappe.get_doc("Customer", existing[0]["name"])
+            doc.email_id = email
+            doc.mobile_no = phone
+            doc.custom_country = country
+            doc.customer_type = cust_type
+            doc.customer_name_in_arabic = name_arabic
+
+            if cust_type == "Company":
+                doc.custom_vat_number = data.get("vatNumber")
+                doc.custom_payment_method = data.get("preferredPaymentMethod")
+                doc.custom_registration_scheme = data.get("registrationScheme")
+                doc.custom_registration_number = data.get("registrationNumber")
+
+            doc.save()
+        else:
+            # Create new
+            doc = frappe.get_doc({
+                "doctype": "Customer",
+                "customer_name": name,
+                "customer_type": cust_type,
+                "customer_name_in_arabic": name_arabic,
+                "email_id": email,
+                "mobile_no": phone,
+                "custom_country": country,
+                "status": data.get("status", "Active") if data else "Active",
+                "custom_vat_number": data.get("vatNumber") if cust_type == "Company" else None,
+                "custom_payment_method": data.get("preferredPaymentMethod") if cust_type=="Company" else None,
+                "custom_registration_scheme": data.get("registrationScheme") if cust_type == "Company" else None,
+                "custom_registration_number": data.get("registrationNumber") if cust_type == "Company" else None
+            })
+            doc.insert()
+        return doc
+
+        # Handle address creation if provided
+        
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Customer Creation Failed")
+        frappe.throw(f"Failed to create/update customer: {e}")
+
+# def get_or_create_customer(name, email, phone, country, name_arabic="", data=None):
+#     """Create or update a Customer (Individual or Company)."""
+#     existing = frappe.get_all("Customer", filters={"customer_name": name}, fields=["name"])
+#     cust_type = "Company" if data.get("type") == "company" else "Individual"
+
+#     if existing:
+#         doc = frappe.get_doc("Customer", existing[0]["name"])
+#         doc.email_id = email
+#         doc.mobile_no = phone
+#         doc.custom_country = country
+#         doc.customer_type = cust_type
+#         doc.customer_name_in_arabic = name_arabic
+
+#         if cust_type == "Company":
+#             doc.custom_vat_number = data.get("vatNumber")
+#             doc.custom_payment_method = data.get("preferredPaymentMethod")
+#             doc.custom_registration_scheme = data.get("registrationScheme")
+#             doc.custom_registration_number = data.get("registrationNumber")
+
+#         doc.save()
+#     else:
+#         doc = frappe.get_doc({
+#             "doctype": "Customer",
+#             "customer_name": name,
+#             "customer_type": cust_type,
+#             "customer_name_in_arabic": name_arabic,
+#             "email_id": email,
+#             "mobile_no": phone,
+#             "custom_country": country,
+#             "status": data.get("status", "Active"),
+#             "custom_vat_number": data.get("vatNumber") if cust_type == "Company" else None,
+#             "custom_payment_method": data.get("preferredPaymentMethod"),
+#             "custom_registration_scheme": data.get("registrationScheme") if cust_type == "Company" else None,
+#             "custom_registration_number": data.get("registrationNumber") if cust_type == "Company" else None
+#         })
+#         doc.insert()
+
+#     return doc
+
+
+
+def create_or_update_contact(customer, customer_name, email, phone):
+    existing_contact = frappe.get_all(
+        "Contact",
+        filters={"email_id": email, "link_name": customer},
+        limit=1
+    )
+
+    if existing_contact:
+        # load existing document
+        doc = frappe.get_doc("Contact", existing_contact[0].name)
+        doc.first_name = customer_name
+        doc.phone = phone
+        doc.email_id = email
+    else:
+        # create new document properly
+        doc = frappe.get_doc({
+            "doctype": "Contact",
+            "first_name": customer_name,
+            "email_id": email,
+            "phone": phone,
+            "links": [{
+                "link_doctype": "Customer",
+                "link_name": customer
+            }]
+        })
+
+    doc.save(ignore_permissions=True)
+    return doc
+
+
+
+def create_or_update_address(customer_id, customer_name, address_data, country):
+    """Create or update primary Address for the customer."""
+    if not address_data:
+        return None
+
+    address_title = f"{customer_name} - Primary"
+
+    address_fields = {
+        "address_title": address_title,
+        "address_type": address_data.get("addressType", "Billing"),
+        "address_line1": address_data.get("streetName", ""),
+        "address_line2": address_data.get("buildingNumber", ""),
+        "city": address_data.get("subdivisionName", ""),
+        "county": address_data.get("cityName", ""),
+        "pincode": address_data.get("postalCode", ""),
+        "country": country,
+        "is_primary_address": 1 if address_data.get("isPrimary") else 0,
+        "is_shipping_address": 0
+    }
+
+    existing = frappe.get_all("Address", filters={"address_title": address_title}, fields=["name"])
+
+    if existing:
+        doc = frappe.get_doc("Address", existing[0]["name"])
+        for field, value in address_fields.items():
+            setattr(doc, field, value)
+        doc.links = []
+    else:
+        doc = frappe.new_doc("Address")
+        for field, value in address_fields.items():
+            setattr(doc, field, value)
+
+    doc.append("links", {
+        "link_doctype": "Customer",
+        "link_name": customer_id,
+        "link_title": customer_name
+    })
+    doc.save()
+    return doc
+
+
+@frappe.whitelist()
+def update_customer(customer_id, customer_data):
+    if isinstance(customer_data, str):
+        customer_data = json.loads(customer_data)
+    
+    try:
+        customer = frappe.get_doc("Customer", customer_id)
+        
+        for key, value in customer_data.items():
+            setattr(customer, key, value)
+        
+        customer.ignore_version = True
+        customer.save()
+
+        return {
+            "success": True,
+            "updated_customer": customer.name
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Update Customer Error")
+        return {
+            "success": False,
+            "error": str(e)
+        }
