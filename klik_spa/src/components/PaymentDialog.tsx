@@ -85,6 +85,12 @@ export default function PaymentDialog({
   const [invoiceData, setInvoiceData] = useState(null)
   const [roundOffInput, setRoundOffInput] = useState(roundOffAmount.toFixed(2));
   const [isAutoPrinting, setIsAutoPrinting] = useState(false);
+  const [sharingMode, setSharingMode] = useState(null) // 'email', 'sms', 'whatsapp'
+const [sharingData, setSharingData] = useState({
+  email: selectedCustomer?.email || '',
+  phone: selectedCustomer?.phone || '',
+  name: selectedCustomer?.name || ''
+})
 
   // Hooks
   const { modes, isLoading, error } = usePaymentModes("Test POS Profile");
@@ -507,7 +513,7 @@ const getActionButtonText = () => {
       </button>
 
       <button
-        className="flex items-center space-x-2 px-4 py-2 bg-purple-100 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/30 transition-colors"
+        className="flex items-center space-x-2 px-4 py-2 bg-purple-100 dark:bg-teal-900/20 text-teal-500 dark:text-teal-400 rounded-lg hover:bg-teal-200 dark:hover:bg-purple-900/30 transition-colors"
         title="Text Message"
         onClick={() => window.open(`tel:${selectedCustomer?.phone}`)}
       >
@@ -516,7 +522,7 @@ const getActionButtonText = () => {
       </button>
 
       <button
-        className="flex items-center space-x-2 px-4 py-2 bg-purple-100 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/30 transition-colors"
+        className="flex items-center space-x-2 px-4 py-2 bg-purple-100 dark:bg-purple-900/20 text-p-600 dark:text-purple-400 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/30 transition-colors"
         title="View Full Invoice"
         onClick={() => handleViewInvoice(invoiceData)}
       >
@@ -745,64 +751,56 @@ const getActionButtonText = () => {
       
         
            {invoiceSubmitted ? (
-    <div className="flex items-center space-x-3">
-      {isAutoPrinting && (
+  <div className="flex items-center space-x-3">
+    {isAutoPrinting && (
       <div className="flex items-center space-x-2 text-blue-600">
         <Loader2 size={16} className="animate-spin" />
         <span className="text-sm">Printing...</span>
       </div>
     )}
-      <button
-        className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"
-        title="Print"
-        onClick={() => {
+    <button
+      className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"
+      title="Print"
+      onClick={() => {
         handlePrintInvoice(invoiceData);
         navigate('/');
       }}
     >
+      <Printer size={20} />
+    </button>
 
-        <Printer size={20} />
-      </button>
+    <button
+      className={`p-2 rounded-lg ${sharingMode === 'email' ? 'bg-blue-100 text-blue-700' : 'text-blue-600 hover:bg-blue-100'} dark:text-blue-400 dark:hover:bg-blue-900`}
+      title="Email"
+      onClick={() => setSharingMode(sharingMode === 'email' ? null : 'email')}
+    >
+      <MailPlus size={20} />
+    </button>
 
-       <button
-        className="p-2 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900 rounded-lg"
-        title="Email"
-        onClick={() => {
-          const subject = encodeURIComponent("Your Invoice");
-          const body = encodeURIComponent(`Dear ${selectedCustomer?.name},\n\nHere is your invoice total: ${formatCurrency(grandTotal)}\n\nThank you.`);
-          window.open(`mailto:${selectedCustomer?.email}?subject=${subject}&body=${body}`);
-        }}
-      >
-        <MailPlus size={20} />
-      </button>
+    <button
+      className={`p-2 rounded-lg ${sharingMode === 'whatsapp' ? 'bg-blue-100 text-green-700' : 'text-green-600 hover:bg-green-100'} dark:text-green-400 dark:hover:bg-green-900`}
+      title="WhatsApp"
+      onClick={() => setSharingMode(sharingMode === 'whatsapp' ? null : 'whatsapp')}
+    >
+      <MessageCirclePlus size={20} />
+    </button>
 
-      <button
-        className="p-2 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900 rounded-lg"
-        title="WhatsApp"
-        onClick={() => {
-          const msg = encodeURIComponent(`Here is your invoice total: ${formatCurrency(grandTotal)}`);
-          window.open(`https://wa.me/${selectedCustomer?.phone}?text=${msg}`, "_blank");
-        }}
-      >
-        <MessageCirclePlus size={20} />
-      </button>
+    <button
+      className={`p-2 rounded-lg ${sharingMode === 'sms' ? 'bg-purple-100 text-teal-700' : 'text-teal-600 hover:bg-purple-100'} dark:text-teal-400 dark:hover:bg-teal-900`}
+      title="Text Message"
+      onClick={() => setSharingMode(sharingMode === 'sms' ? null : 'sms')}
+    >
+      <MessageSquarePlus size={20} />
+    </button>
 
-      <button
-        className="p-2 text-purple-600 hover:bg-purple-100 dark:text-purple-400 dark:hover:bg-purple-900 rounded-lg"
-        title="Text Message"
-        onClick={() => window.open(`tel:${selectedCustomer?.phone}`)}
-      >
-        <MessageSquarePlus />
-      </button>
-
-      <button
-        className="p-2 text-purple-600 hover:bg-purple-100 dark:text-purple-400 dark:hover:bg-purple-900 rounded-lg"
-        title="View Full"
-        onClick={()=>handleViewInvoice(invoiceData)}
-      >
-        <Eye />
-      </button>
-    </div>
+    <button
+      className="p-2 text-purple-600 hover:bg-purple-100 dark:text-purple-400 dark:hover:bg-purple-900 rounded-lg"
+      title="View Full"
+      onClick={() => handleViewInvoice(invoiceData)}
+    >
+      <Eye size={20} />
+    </button>
+  </div>
   ) : (
     <button
       onClick={onClose}
@@ -818,193 +816,365 @@ const getActionButtonText = () => {
         {/* Main Content */}
         <div className="flex flex-1 min-h-0">
           {/* Left Section */}
-          <div className="w-2/3 p-6 overflow-y-auto custom-scrollbar space-y-6">
-            {/* Tax Type Indicator */}
-
-            {/* Payment Methods - Show for both B2C and B2B but disable for B2B */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                Payment Methods 
-              </h3>
-              <div className="flex space-x-4 overflow-x-auto pb-2">
-                  {paymentMethods.map((method) => (
-  <div
-    key={method.id}
-    className={`min-w-[50%] sm:min-w-[300px] md:min-w-[350px] border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-beveren-300 transition-colors flex-shrink-0 ${invoiceSubmitted || isProcessingPayment || isB2B ? 'bg-gray-50 dark:bg-gray-800' : ''}`}
-  >
-    <div className="flex items-center space-x-3 mb-3">
-      <div className={`w-8 h-8 rounded-md ${method.color} text-white flex items-center justify-center`}>
-        <div className="scale-75">{method.icon}</div>
+            {/* Left Section */}
+{/* Left Section */}
+<div className="w-2/3 p-6 overflow-y-auto custom-scrollbar space-y-6">
+  {invoiceSubmitted && sharingMode ? (
+    // Sharing Interface
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xl font-semibold text-gray-900 dark:text-white capitalize">
+          Share via {sharingMode}
+        </h3>
+        <button
+          onClick={() => setSharingMode(null)}
+          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+        >
+          <X size={20} />
+        </button>
       </div>
-      <div className="flex-1">
-        <p className="font-medium text-gray-900 dark:text-white text-sm">{method.name}</p>
-      </div>
-    </div>
-    <div>
-      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
-      <input
-        type="number"
-        step="0.01"
-        value={method.amount || ''}
-        onChange={(e) => {
-          const inputValue = e.target.value;
-          // Just store the raw number without formatting during typing
-          const numValue = inputValue === '' ? 0 : parseFloat(inputValue);
-          handlePaymentAmountChange(method.id, isNaN(numValue) ? 0 : numValue);
-        }}
-        onBlur={(e) => {
-          // Format to 2 decimal places only when user leaves the field
-          const numValue = parseFloat(e.target.value);
-          if (!isNaN(numValue)) {
-            const formatted = parseFloat(numValue.toFixed(2));
-            handlePaymentAmountChange(method.id, formatted);
-          }
-        }}
-        placeholder="0.00"
-        disabled={invoiceSubmitted || isProcessingPayment}
-        className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
-      />
-    </div>
-  </div>
-))}
 
-              </div>
-            </div>
-
-            {/* Tax Section */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Tax Configuration</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Sales & Tax Charges
-                  </label>
-                  <select
-                    value={selectedSalesTaxCharges}
-                    onChange={(e) => handleSalesTaxChange(e.target.value)}
-                    disabled={invoiceSubmitted || isProcessingPayment}
-                    className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
-                  >
-                    {salesTaxCharges.map((tax) => (
-                      <option key={tax.id} value={tax.id}>
-                        {tax.name} ({tax.rate}% {tax.is_inclusive ? 'Incl.' : 'Excl.'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Tax Amount {calculations.isInclusive && '(Included)'}
-                  </label>
-                  <div className={`px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg font-medium ${
-                    calculations.isInclusive 
-                      ? 'text-blue-600 dark:text-blue-400' 
-                      : 'text-gray-900 dark:text-white'
-                  }`}>
-                    {calculations.isInclusive ? `(${formatCurrency(calculations.taxAmount)})` : formatCurrency(calculations.taxAmount)}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Totals Section */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                {isB2B ? "Invoice Summary" : "Payment Summary"}
-              </h3>
-              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Round Off
-                    </label>
-                    <div className="flex space-x-2">
-                      <input
-                        type="number"
-                        value={roundOffInput}
-                        onChange={(e) => handleRoundOffChange(e.target.value)}
-                        disabled={invoiceSubmitted || isProcessingPayment}
-                        className={`flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
-                      />
-                      <button
-                        onClick={handleRoundOff}
-                        disabled={invoiceSubmitted || isProcessingPayment}
-                        className={`px-3 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
-                        title="Auto Round"
-                      >
-                        <Calculator size={16} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border-t border-gray-200 dark:border-gray-600 pt-3 space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
-                    <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(calculations.subtotal)}</span>
-                  </div>
-                  {calculations.couponDiscount > 0 && (
-                    <div className="flex justify-between text-green-600 dark:text-green-400">
-                      <span>Coupon Discount</span>
-                      <span>-{formatCurrency(calculations.couponDiscount)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">
-                      Tax ({calculations.selectedTax?.rate}% {calculations.isInclusive ? 'Incl.' : 'Excl.'})
-                    </span>
-                    <span className={`font-medium ${
-                      calculations.isInclusive 
-                        ? 'text-blue-600 dark:text-blue-400' 
-                        : 'text-gray-900 dark:text-white'
-                    }`}>
-                      {calculations.isInclusive ? `(${formatCurrency(calculations.taxAmount)})` : formatCurrency(calculations.taxAmount)}
-                    </span>
-                  </div>
-                  {roundOffAmount !== 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Round Off</span>
-                      <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(roundOffAmount)}</span>
-                    </div>
-                  )}
-                  <div className="border-t border-gray-200 dark:border-gray-600 pt-2">
-                    <div className="flex justify-between">
-                      <span className="text-xl font-bold text-gray-900 dark:text-white">Grand Total</span>
-                      <span className="text-xl font-bold text-gray-900 dark:text-white">{formatCurrency(calculations.grandTotal)}</span>
-                    </div>
-                  </div>
-                  
-                  {(isB2C || isB2B) && (
-                    <>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Total Paid</span>
-                        <span className="font-medium text-blue-600 dark:text-blue-400">{formatCurrency(totalPaidAmount)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Outstanding Amount</span>
-                        <span className={`font-bold ${outstandingAmount > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                          {formatCurrency(outstandingAmount)}
-                        </span>
-                      </div>
-                      {totalPaidAmount > calculations.grandTotal && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 dark:text-gray-400">Change</span>
-                          <span className="font-bold text-green-600 dark:text-green-400">{formatCurrency(totalPaidAmount - calculations.grandTotal)}</span>
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  {isB2B && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Outstanding Amount</span>
-                      <span className="font-bold text-orange-600 dark:text-orange-400">{formatCurrency(calculations.grandTotal)}</span>
-                    </div>
-                  )}
-                </div>
+      {sharingMode === 'email' && (
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Customer Name
+            </label>
+            <input
+              type="text"
+              value={sharingData.name}
+              onChange={(e) => setSharingData(prev => ({...prev, name: e.target.value}))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              placeholder="Customer name"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Email Address
+            </label>
+            <input
+              type="email"
+              value={sharingData.email}
+              onChange={(e) => setSharingData(prev => ({...prev, email: e.target.value}))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              placeholder="customer@email.com"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Email Preview
+            </label>
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Subject: Your Invoice from KLIK POS</p>
+              <div className="text-sm text-gray-900 dark:text-white">
+                <p>Dear {sharingData.name || 'Customer'},</p>
+                <p className="mt-2">Thank you for your purchase. Here are your invoice details:</p>
+                <p className="mt-2 font-medium">Invoice Total: {formatCurrency(calculations.grandTotal)}</p>
+                <p className="mt-2">Thank you for your business!</p>
+                <p className="mt-2">Best regards,<br/>KLIK POS Team</p>
               </div>
             </div>
           </div>
+          <button
+            onClick={() => {
+              const subject = encodeURIComponent("Your Invoice from KLIK POS");
+              const body = encodeURIComponent(`Dear ${sharingData.name},\n\nThank you for your purchase. Here are your invoice details:\n\nInvoice Total: ${formatCurrency(calculations.grandTotal)}\n\nThank you for your business!\n\nBest regards,\nKLIK POS Team`);
+              window.open(`mailto:${sharingData.email}?subject=${subject}&body=${body}`);
+              setSharingMode(null);
+            }}
+            disabled={!sharingData.email}
+            className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          >
+            Send Email
+          </button>
+        </div>
+      )}
+
+      {sharingMode === 'whatsapp' && (
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Customer Name
+            </label>
+            <input
+              type="text"
+              value={sharingData.name}
+              onChange={(e) => setSharingData(prev => ({...prev, name: e.target.value}))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              placeholder="Customer name"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Phone Number
+            </label>
+            <input
+              type="tel"
+              value={sharingData.phone}
+              onChange={(e) => setSharingData(prev => ({...prev, phone: e.target.value}))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              placeholder="+254700000000"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              WhatsApp Message Preview
+            </label>
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
+              <div className="text-sm text-gray-900 dark:text-white">
+                <p>Hi {sharingData.name || 'there'}!</p>
+                <p className="mt-2">Thank you for shopping with us at KLIK POS!</p>
+                <p className="mt-2">Invoice Total: *{formatCurrency(calculations.grandTotal)}*</p>
+                <p className="mt-2">We appreciate your business!</p>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              const msg = encodeURIComponent(`Hi ${sharingData.name || 'there'}!\n\nThank you for shopping with us at KLIK POS!\n\nInvoice Total: *${formatCurrency(calculations.grandTotal)}*\n\nWe appreciate your business!`);
+              window.open(`https://wa.me/${sharingData.phone.replace(/\D/g, '')}?text=${msg}`, "_blank");
+              setSharingMode(null);
+            }}
+            disabled={!sharingData.phone}
+            className="w-full py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          >
+            Send WhatsApp Message
+          </button>
+        </div>
+      )}
+
+      {sharingMode === 'sms' && (
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Customer Name
+            </label>
+            <input
+              type="text"
+              value={sharingData.name}
+              onChange={(e) => setSharingData(prev => ({...prev, name: e.target.value}))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              placeholder="Customer name"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Phone Number
+            </label>
+            <input
+              type="tel"
+              value={sharingData.phone}
+              onChange={(e) => setSharingData(prev => ({...prev, phone: e.target.value}))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              placeholder="+254700000000"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              SMS Message Preview
+            </label>
+            <div className="bg-purple-50 dark:bg-teal-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
+              <div className="text-sm text-gray-900 dark:text-white">
+                <p>Hi {sharingData.name || 'Customer'}!</p>
+                <p className="mt-1">Thank you for your purchase at KLIK POS.</p>
+                <p className="mt-1">Invoice Total: {formatCurrency(calculations.grandTotal)}</p>
+                <p className="mt-1">Thank you!</p>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              const msg = encodeURIComponent(`Hi ${sharingData.name || 'Customer'}!\nThank you for your purchase at KLIK POS.\nInvoice Total: ${formatCurrency(calculations.grandTotal)}\nThank you!`);
+              window.open(`sms:${sharingData.phone}?body=${msg}`);
+              setSharingMode(null);
+            }}
+            disabled={!sharingData.phone}
+            className="w-full py-3 bg-teal-500 text-white rounded-lg font-medium hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          >
+            Send SMS
+          </button>
+        </div>
+      )}
+    </div>
+  ) : (
+    // Original payment content
+    <div className="space-y-6">
+      {/* Payment Methods */}
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          Payment Methods 
+        </h3>
+        <div className="flex space-x-4 overflow-x-auto pb-2">
+          {paymentMethods.map((method) => (
+            <div
+              key={method.id}
+              className={`min-w-[50%] sm:min-w-[300px] md:min-w-[350px] border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-beveren-300 transition-colors flex-shrink-0 ${invoiceSubmitted || isProcessingPayment ? 'bg-gray-50 dark:bg-gray-800' : ''}`}
+            >
+              <div className="flex items-center space-x-3 mb-3">
+                <div className={`w-8 h-8 rounded-md ${method.color} text-white flex items-center justify-center`}>
+                  <div className="scale-75">{method.icon}</div>
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900 dark:text-white text-sm">{method.name}</p>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={method.amount || ''}
+                  onChange={(e) => {
+                    const inputValue = e.target.value;
+                    const numValue = inputValue === '' ? 0 : parseFloat(inputValue);
+                    handlePaymentAmountChange(method.id, isNaN(numValue) ? 0 : numValue);
+                  }}
+                  onBlur={(e) => {
+                    const numValue = parseFloat(e.target.value);
+                    if (!isNaN(numValue)) {
+                      const formatted = parseFloat(numValue.toFixed(2));
+                      handlePaymentAmountChange(method.id, formatted);
+                    }
+                  }}
+                  placeholder="0.00"
+                  disabled={invoiceSubmitted || isProcessingPayment}
+                  className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Tax Section */}
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Tax Configuration</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Sales & Tax Charges
+            </label>
+            <select
+              value={selectedSalesTaxCharges}
+              onChange={(e) => handleSalesTaxChange(e.target.value)}
+              disabled={invoiceSubmitted || isProcessingPayment}
+              className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
+            >
+              {salesTaxCharges.map((tax) => (
+                <option key={tax.id} value={tax.id}>
+                  {tax.name} ({tax.rate}% {tax.is_inclusive ? 'Incl.' : 'Excl.'})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Tax Amount {calculations.isInclusive && '(Included)'}
+            </label>
+            <div className={`px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg font-medium ${
+              calculations.isInclusive 
+                ? 'text-blue-600 dark:text-blue-400' 
+                : 'text-gray-900 dark:text-white'
+            }`}>
+              {calculations.isInclusive ? `(${formatCurrency(calculations.taxAmount)})` : formatCurrency(calculations.taxAmount)}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Totals Section */}
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          {isB2B ? "Invoice Summary" : "Payment Summary"}
+        </h3>
+        <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Round Off
+              </label>
+              <div className="flex space-x-2">
+                <input
+                  type="number"
+                  value={roundOffInput}
+                  onChange={(e) => handleRoundOffChange(e.target.value)}
+                  disabled={invoiceSubmitted || isProcessingPayment}
+                  className={`flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
+                />
+                <button
+                  onClick={handleRoundOff}
+                  disabled={invoiceSubmitted || isProcessingPayment}
+                  className={`px-3 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors ${invoiceSubmitted || isProcessingPayment ? 'cursor-not-allowed opacity-50' : ''}`}
+                  title="Auto Round"
+                >
+                  <Calculator size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-200 dark:border-gray-600 pt-3 space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
+              <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(calculations.subtotal)}</span>
+            </div>
+            {calculations.couponDiscount > 0 && (
+              <div className="flex justify-between text-green-600 dark:text-green-400">
+                <span>Coupon Discount</span>
+                <span>-{formatCurrency(calculations.couponDiscount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">
+                Tax ({calculations.selectedTax?.rate}% {calculations.isInclusive ? 'Incl.' : 'Excl.'})
+              </span>
+              <span className={`font-medium ${
+                calculations.isInclusive 
+                  ? 'text-blue-600 dark:text-blue-400' 
+                  : 'text-gray-900 dark:text-white'
+              }`}>
+                {calculations.isInclusive ? `(${formatCurrency(calculations.taxAmount)})` : formatCurrency(calculations.taxAmount)}
+              </span>
+            </div>
+            {roundOffAmount !== 0 && (
+              <div className="flex justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Round Off</span>
+                <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(roundOffAmount)}</span>
+              </div>
+            )}
+            <div className="border-t border-gray-200 dark:border-gray-600 pt-2">
+              <div className="flex justify-between">
+                <span className="text-xl font-bold text-gray-900 dark:text-white">Grand Total</span>
+                <span className="text-xl font-bold text-gray-900 dark:text-white">{formatCurrency(calculations.grandTotal)}</span>
+              </div>
+            </div>
+            
+            {(isB2C || isB2B) && (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Total Paid</span>
+                  <span className="font-medium text-blue-600 dark:text-blue-400">{formatCurrency(totalPaidAmount)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Outstanding Amount</span>
+                  <span className={`font-bold ${outstandingAmount > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                    {formatCurrency(outstandingAmount)}
+                  </span>
+                </div>
+                {totalPaidAmount > calculations.grandTotal && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Change</span>
+                    <span className="font-bold text-green-600 dark:text-green-400">{formatCurrency(totalPaidAmount - calculations.grandTotal)}</span>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
+</div>
 
           {/* Right Section - Invoice Preview */}
           <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-600 flex-1 overflow-y-auto custom-scrollbar">
