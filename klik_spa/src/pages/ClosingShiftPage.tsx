@@ -220,7 +220,7 @@ export default function ClosingShiftPage() {
           {!hideExpectedAmount && (
             <>
               {/* Payment Method Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {Object.values(paymentStats).map((stat) => (
                   <div key={stat.name} className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
                     <div className="flex items-center justify-between mb-4">
@@ -247,7 +247,7 @@ export default function ClosingShiftPage() {
               </div>
 
               {/* Payment Distribution Chart */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+              {/* <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Payment Distribution</h3>
                 <div className="space-y-4">
                   {Object.values(paymentStats).map((stat, index) => {
@@ -289,7 +289,7 @@ export default function ClosingShiftPage() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </div> */}
             </>
           )}
 
