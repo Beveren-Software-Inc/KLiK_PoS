@@ -13,10 +13,17 @@ interface AddCustomerModalProps {
   onClose: () => void;
   onSave: (customer: Partial<Customer>) => void;
   isFullPage?: boolean;
+  prefilledName?: string; // Add this prop
 }
 
-export default function AddCustomerModal({ customer, onClose, onSave, isFullPage = false }: AddCustomerModalProps) {
-  const { createCustomer, updateCustomer } = useCustomerActions();
+
+export default function AddCustomerModal({ 
+  customer, 
+  onClose, 
+  onSave, 
+  isFullPage = false, 
+  prefilledName = "" // Add this prop with default value
+}: AddCustomerModalProps) {  const { createCustomer, updateCustomer } = useCustomerActions();
   const isEditing = !!customer;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -55,8 +62,9 @@ const countryOptions = countryList().getData();
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Initialize form with customer data if editing
-  useEffect(() => {
+   useEffect(() => {
     if (customer) {
+      // Existing customer initialization code
       setFormData({
         type: customer.type,
         name: customer.name,
@@ -81,8 +89,14 @@ const countryOptions = countryList().getData();
       // If editing, show all steps as completed
       setCompletedSteps(new Set([1, 2, 3, 4]));
       setCurrentStep(4);
+    } else if (prefilledName) {
+      // If no customer but there's a prefilled name, set it in the form
+      setFormData(prev => ({
+        ...prev,
+        name: prefilledName
+      }));
     }
-  }, [customer]);
+  }, [customer, prefilledName]);
 
   const isB2B = posDetails?.business_type === 'B2B';
   const isB2C = posDetails?.business_type === 'B2C';
@@ -437,7 +451,7 @@ const addressTypes = [
                   {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
                 </div>
 
-                <div>
+                {/* <div>
                   <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Status
                   </label>
@@ -451,7 +465,7 @@ const addressTypes = [
                     <option value="vip">VIP</option>
                     <option value="inactive">Inactive</option>
                   </select>
-                </div>
+                </div> */}
 
                 {formData.type === "company" && (
                     <div>
@@ -532,42 +546,45 @@ const addressTypes = [
             )}
 
             {/* Action buttons for step 1 */}
-            <div className="flex justify-between mt-4">
-              <div className="flex space-x-3">
-                {formData.type === 'individual' && canProceedFromStep(1) && (
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className={`px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 ${
-                      isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
-                    }`}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <span className="animate-spin">↻</span>
-                        <span>Saving...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Save size={18} />
-                        <span>Save Customer</span>
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-              
-              {canProceedFromStep(1) && currentStep === 1 && (
-                <button
-                  type="button"
-                  onClick={proceedToNextStep}
-                  className="px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors flex items-center space-x-2"
-                >
-                  <span>{formData.type === 'company' ? 'Continue to Contact' : 'Add Address'}</span>
-                  <ChevronRight size={16} />
-                </button>
-              )}
-            </div>
+            {/* Action buttons for step 1 */}
+<div className="flex justify-between mt-4">
+  <div className="flex space-x-3">
+    {/* Show Save button only if still on step 1 */}
+    {formData.type === 'individual' && canProceedFromStep(1) && currentStep === 1 && (
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        className={`px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 ${
+          isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
+        }`}
+      >
+        {isSubmitting ? (
+          <>
+            <span className="animate-spin">↻</span>
+            <span>Saving...</span>
+          </>
+        ) : (
+          <>
+            <Save size={18} />
+            <span>Save Customer</span>
+          </>
+        )}
+      </button>
+    )}
+  </div>
+  
+  {canProceedFromStep(1) && currentStep === 1 && (
+    <button
+      type="button"
+      onClick={proceedToNextStep}
+      className="px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors flex items-center space-x-2"
+    >
+      <span>{formData.type === 'company' ? 'Continue to Contact' : 'Add Address'}</span>
+      <ChevronRight size={16} />
+    </button>
+  )}
+</div>
+
           </div>
 
           {/* Step 2: Contact Information (Company only) OR Address (Individual) */}

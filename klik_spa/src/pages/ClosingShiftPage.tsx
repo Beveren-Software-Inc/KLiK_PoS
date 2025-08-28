@@ -17,6 +17,7 @@ import { useAllPaymentModes } from "../hooks/usePaymentModes";
 import RetailSidebar from "../components/RetailSidebar";
 import { usePOSDetails } from "../hooks/usePOSProfile";
 import { useCreatePOSClosingEntry } from "../services/closingEntry";
+import BottomNavigation from "../components/BottomNavigation";
 
 export default function ClosingShiftPage() {
   const navigate = useNavigate();
@@ -195,7 +196,14 @@ export default function ClosingShiftPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
-      <RetailSidebar/>
+      <div className="hidden md:block">
+    <RetailSidebar />
+  </div>
+
+  {/* Bottom nav for mobile */}
+  <div className="md:hidden fixed bottom-0 left-0 right-0">
+    <BottomNavigation /> {/* 👈 your bottom sidebar component */}
+  </div>
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="fixed top-0 left-20 right-0 z-50 bg-beveren-50 dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
@@ -220,7 +228,7 @@ export default function ClosingShiftPage() {
           {!hideExpectedAmount && (
             <>
               {/* Payment Method Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {Object.values(paymentStats).map((stat) => (
                   <div key={stat.name} className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
                     <div className="flex items-center justify-between mb-4">
@@ -246,50 +254,7 @@ export default function ClosingShiftPage() {
                 ))}
               </div>
 
-              {/* Payment Distribution Chart */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Payment Distribution</h3>
-                <div className="space-y-4">
-                  {Object.values(paymentStats).map((stat, index) => {
-                    const colors = ['bg-green-500', 'bg-beveren-600', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500'];
-                    const color = colors[index % colors.length];
-                    
-                    return (
-                      <div key={stat.name} className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className={`w-4 h-4 ${color} rounded`}></div>
-                          <span className="text-sm text-gray-700 dark:text-gray-300">{stat.name}</span>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-semibold text-gray-900 dark:text-white">
-                            ${stat.amount.toFixed(2)}
-                          </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {total > 0 ? ((stat.amount / total) * 100).toFixed(1) : 0}%
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div className="mt-4">
-                    <div className="flex rounded-lg overflow-hidden h-3">
-                      {Object.values(paymentStats).map((stat, index) => {
-                        const colors = ['bg-green-500', 'bg-beveren-600', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500'];
-                        const color = colors[index % colors.length];
-                        const width = total > 0 ? (stat.amount / total) * 100 : 0;
-                        
-                        return (
-                          <div
-                            key={stat.name}
-                            className={color}
-                            style={{ width: `${width}%` }}
-                          ></div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
+              
             </>
           )}
 
