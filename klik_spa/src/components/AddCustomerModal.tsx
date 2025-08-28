@@ -13,10 +13,17 @@ interface AddCustomerModalProps {
   onClose: () => void;
   onSave: (customer: Partial<Customer>) => void;
   isFullPage?: boolean;
+  prefilledName?: string; // Add this prop
 }
 
-export default function AddCustomerModal({ customer, onClose, onSave, isFullPage = false }: AddCustomerModalProps) {
-  const { createCustomer, updateCustomer } = useCustomerActions();
+
+export default function AddCustomerModal({ 
+  customer, 
+  onClose, 
+  onSave, 
+  isFullPage = false, 
+  prefilledName = "" // Add this prop with default value
+}: AddCustomerModalProps) {  const { createCustomer, updateCustomer } = useCustomerActions();
   const isEditing = !!customer;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -55,8 +62,9 @@ const countryOptions = countryList().getData();
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Initialize form with customer data if editing
-  useEffect(() => {
+   useEffect(() => {
     if (customer) {
+      // Existing customer initialization code
       setFormData({
         type: customer.type,
         name: customer.name,
@@ -81,8 +89,14 @@ const countryOptions = countryList().getData();
       // If editing, show all steps as completed
       setCompletedSteps(new Set([1, 2, 3, 4]));
       setCurrentStep(4);
+    } else if (prefilledName) {
+      // If no customer but there's a prefilled name, set it in the form
+      setFormData(prev => ({
+        ...prev,
+        name: prefilledName
+      }));
     }
-  }, [customer]);
+  }, [customer, prefilledName]);
 
   const isB2B = posDetails?.business_type === 'B2B';
   const isB2C = posDetails?.business_type === 'B2C';

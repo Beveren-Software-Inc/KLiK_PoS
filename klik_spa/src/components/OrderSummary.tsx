@@ -17,6 +17,7 @@ import { usePOSDetails } from "../hooks/usePOSProfile"
 
 
 
+
 // Extended CartItem interface to include discount properties
 interface ExtendedCartItem extends CartItem {
   discountPercentage?: number;
@@ -57,6 +58,8 @@ export default function OrderSummary({
   const { customers, isLoading, error } = useCustomers()
   const navigate = useNavigate()
   const { posDetails, loading: posLoading } = usePOSDetails();
+  const [prefilledCustomerName, setPrefilledCustomerName] = useState("")
+
 
   
   const currency = posDetails?.currency
@@ -112,6 +115,21 @@ const [itemBatches, setItemBatches] = useState<Record<string, { batch_no: string
 
   // Calculate final total
   const total = Math.max(0, subtotal - couponDiscount)
+const handleCustomerSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  if (e.key === 'Enter' && customerSearchQuery.trim() !== '') {
+    // Check if there are no matching customers
+    if (filteredCustomers.length === 0) {
+      // Set the prefilled name and open the modal
+      setPrefilledCustomerName(customerSearchQuery.trim())
+      setShowAddCustomerModal(true)
+      setShowCustomerDropdown(false)
+    } else if (filteredCustomers.length === 1) {
+      // If there's exactly one match, select it
+      handleCustomerSelect(filteredCustomers[0])
+    }
+    // If multiple matches, do nothing (let user choose from dropdown)
+  }
+}
 
   // Function to update item discount
   const updateItemDiscount = (itemId: string, field: string, value: number | string) => {
@@ -148,10 +166,12 @@ const [itemBatches, setItemBatches] = useState<Record<string, { batch_no: string
     setShowCustomerDropdown(false)
   }
 
-  const handleSaveCustomer = (newCustomer: Partial<Customer>) => {
-    console.log('Saving new customer:', newCustomer)
-    setShowAddCustomerModal(false)
-  }
+ const handleSaveCustomer = (newCustomer: Partial<Customer>) => {
+  console.log('Saving new customer:', newCustomer)
+  setShowAddCustomerModal(false)
+  setPrefilledCustomerName("") // Clear the prefilled name
+}
+
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleCompletePayment = (paymentData: any) => {
@@ -278,16 +298,17 @@ useEffect(() => {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
-                  type="text"
-                  placeholder="Search customers..."
-                  value={customerSearchQuery}
-                  onChange={(e) => {
-                    setCustomerSearchQuery(e.target.value)
-                    setShowCustomerDropdown(e.target.value.length > 0)
-                  }}
-                  onFocus={() => setShowCustomerDropdown(true)}
-                  className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
+  type="text"
+  placeholder="Search customers... (Press Enter to add new)"
+  value={customerSearchQuery}
+  onChange={(e) => {
+    setCustomerSearchQuery(e.target.value)
+    setShowCustomerDropdown(e.target.value.length > 0)
+  }}
+  onKeyDown={handleCustomerSearchKeyDown} // Add this line
+  onFocus={() => setShowCustomerDropdown(true)}
+  className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+/>
                 
                 {/* Customer Dropdown */}
                 {showCustomerDropdown && filteredCustomers.length > 0 && (
@@ -867,9 +888,14 @@ useEffect(() => {
       {/* Add Customer Modal */}
       {showAddCustomerModal && (
         <AddCustomerModal
-          onClose={() => setShowAddCustomerModal(false)}
-          onSave={handleSaveCustomer}
-        />
+  customer={null}
+  onClose={() => {
+    setShowAddCustomerModal(false)
+    setPrefilledCustomerName("") // Clear prefilled name when modal is closed
+  }}
+  onSave={handleSaveCustomer}
+  prefilledName={prefilledCustomerName} // Add this prop
+/>
       )}
 
       {/* Payment Dialog */}
