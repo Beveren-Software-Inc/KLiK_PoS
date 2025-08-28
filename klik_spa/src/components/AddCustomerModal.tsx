@@ -437,7 +437,7 @@ const addressTypes = [
                   {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
                 </div>
 
-                <div>
+                {/* <div>
                   <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Status
                   </label>
@@ -451,7 +451,7 @@ const addressTypes = [
                     <option value="vip">VIP</option>
                     <option value="inactive">Inactive</option>
                   </select>
-                </div>
+                </div> */}
 
                 {formData.type === "company" && (
                     <div>
@@ -532,42 +532,45 @@ const addressTypes = [
             )}
 
             {/* Action buttons for step 1 */}
-            <div className="flex justify-between mt-4">
-              <div className="flex space-x-3">
-                {formData.type === 'individual' && canProceedFromStep(1) && (
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className={`px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 ${
-                      isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
-                    }`}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <span className="animate-spin">↻</span>
-                        <span>Saving...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Save size={18} />
-                        <span>Save Customer</span>
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-              
-              {canProceedFromStep(1) && currentStep === 1 && (
-                <button
-                  type="button"
-                  onClick={proceedToNextStep}
-                  className="px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors flex items-center space-x-2"
-                >
-                  <span>{formData.type === 'company' ? 'Continue to Contact' : 'Add Address'}</span>
-                  <ChevronRight size={16} />
-                </button>
-              )}
-            </div>
+            {/* Action buttons for step 1 */}
+<div className="flex justify-between mt-4">
+  <div className="flex space-x-3">
+    {/* Show Save button only if still on step 1 */}
+    {formData.type === 'individual' && canProceedFromStep(1) && currentStep === 1 && (
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        className={`px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 ${
+          isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
+        }`}
+      >
+        {isSubmitting ? (
+          <>
+            <span className="animate-spin">↻</span>
+            <span>Saving...</span>
+          </>
+        ) : (
+          <>
+            <Save size={18} />
+            <span>Save Customer</span>
+          </>
+        )}
+      </button>
+    )}
+  </div>
+  
+  {canProceedFromStep(1) && currentStep === 1 && (
+    <button
+      type="button"
+      onClick={proceedToNextStep}
+      className="px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors flex items-center space-x-2"
+    >
+      <span>{formData.type === 'company' ? 'Continue to Contact' : 'Add Address'}</span>
+      <ChevronRight size={16} />
+    </button>
+  )}
+</div>
+
           </div>
 
           {/* Step 2: Contact Information (Company only) OR Address (Individual) */}
