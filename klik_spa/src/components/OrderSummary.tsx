@@ -59,9 +59,10 @@ export default function OrderSummary({
   const navigate = useNavigate()
   const { posDetails, loading: posLoading } = usePOSDetails();
   const [prefilledCustomerName, setPrefilledCustomerName] = useState("")
+  const [prefilledData, setPrefilledData] = useState<{name?: string, email?: string, phone?: string}>({})
 
 
-  
+
   const currency = posDetails?.currency
   const currency_symbol = posDetails?.currency_symbol
   // State for item-level discounts and details
@@ -76,7 +77,7 @@ export default function OrderSummary({
 
 const [itemBatches, setItemBatches] = useState<Record<string, { batch_no: string; qty: number }[]>>({});
 
-  
+
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
 
   // Helper function to calculate item price after discount
@@ -119,8 +120,48 @@ const handleCustomerSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) =
   if (e.key === 'Enter' && customerSearchQuery.trim() !== '') {
     // Check if there are no matching customers
     if (filteredCustomers.length === 0) {
-      // Set the prefilled name and open the modal
-      setPrefilledCustomerName(customerSearchQuery.trim())
+      // This is a new customer - detect input type and set prefilled data
+      const trimmedValue = customerSearchQuery.trim()
+      let prefilledData = {}
+
+      // Check if it's an email
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedValue)) {
+        console.log('Detected email:', trimmedValue)
+        prefilledData = { email: trimmedValue }
+      }
+      // Check if it's a phone number (contains mostly digits with some special characters)
+      else if (/^[\d\s\+\-\(\)]+$/.test(trimmedValue) && trimmedValue.replace(/[\s\+\-\(\)]/g, '').length >= 7) {
+        console.log('Detected phone:', trimmedValue)
+        // Format phone number with Saudi Arabia country code if it doesn't already have one
+        let formattedPhone = trimmedValue
+        const cleanNumber = trimmedValue.replace(/[\s\+\-\(\)]/g, '')
+
+        // If the number doesn't start with +966 (Saudi Arabia code), add it
+        if (!cleanNumber.startsWith('966') && !cleanNumber.startsWith('+966')) {
+          // If it starts with 0, replace with +966
+          if (cleanNumber.startsWith('0')) {
+            formattedPhone = '+966' + cleanNumber.substring(1)
+          } else {
+            // Otherwise just add +966
+            formattedPhone = '+966' + cleanNumber
+          }
+        } else if (cleanNumber.startsWith('966') && !cleanNumber.startsWith('+966')) {
+          // If it starts with 966 but no +, add the +
+          formattedPhone = '+' + cleanNumber
+        }
+
+        console.log('Formatted phone with Saudi Arabia code:', formattedPhone)
+        prefilledData = { phone: formattedPhone }
+      }
+      // Otherwise treat as name
+      else {
+        console.log('Detected name:', trimmedValue)
+        prefilledData = { name: trimmedValue }
+      }
+
+      // Set the prefilled data and open the modal
+      setPrefilledData(prefilledData)
+      setPrefilledCustomerName(trimmedValue)
       setShowAddCustomerModal(true)
       setShowCustomerDropdown(false)
     } else if (filteredCustomers.length === 1) {
@@ -170,6 +211,7 @@ const handleCustomerSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) =
   console.log('Saving new customer:', newCustomer)
   setShowAddCustomerModal(false)
   setPrefilledCustomerName("") // Clear the prefilled name
+  setPrefilledData({}) // Clear the prefilled data
 }
 
 
@@ -198,7 +240,7 @@ const handleCustomerSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) =
   const handleClearCart = () => {
     // Handle clearing the cart - remove all items immediately
     if (cartItems.length === 0) return
-    
+
     // Use dedicated clear function if available
     if (onClearCart) {
       onClearCart()
@@ -211,15 +253,15 @@ const handleCustomerSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) =
         }
       })
     }
-    
+
     // Clear applied coupons
     appliedCoupons.forEach(coupon => {
       onRemoveCoupon(coupon.code)
     })
-    
+
     // Clear item discounts
     setItemDiscounts({})
-    
+
     // Reset customer selection
     setSelectedCustomer(null)
     setCustomerSearchQuery("")
@@ -252,7 +294,7 @@ useEffect(() => {
     setSelectedCustomer(singleCustomer);
     setCustomerSearchQuery(singleCustomer.name);
     setShowCustomerDropdown(false);
-    
+
     // toast.info(`Automatically selected customer: ${singleCustomer.name}`);
   }
 }, [customers, selectedCustomer, isLoading]);
@@ -291,7 +333,7 @@ useEffect(() => {
       {!isMobile && (
         <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
           <h2 className="text-xl font-semibold font-medium text-gray-900 dark:text-white mb-3">Shopping Cart</h2>
-          
+
           {/* Customer Search */}
           <div className="relative">
             <div className="flex items-center">
@@ -299,7 +341,7 @@ useEffect(() => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
   type="text"
-  placeholder="Search customers... (Press Enter to add new)"
+  placeholder="Search customers... (name, email, or phone)"
   value={customerSearchQuery}
   onChange={(e) => {
     setCustomerSearchQuery(e.target.value)
@@ -309,7 +351,7 @@ useEffect(() => {
   onFocus={() => setShowCustomerDropdown(true)}
   className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
 />
-                
+
                 {/* Customer Dropdown */}
                 {showCustomerDropdown && filteredCustomers.length > 0 && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
@@ -340,7 +382,7 @@ useEffect(() => {
                   </div>
                 )}
               </div>
-              
+
               <button
                 onClick={() => setShowAddCustomerModal(true)}
                 className="ml-2 p-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors"
@@ -349,7 +391,7 @@ useEffect(() => {
                 <UserPlus size={16} />
               </button>
             </div>
-            
+
             {/* Selected Customer Display */}
             {selectedCustomer && (
               <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
@@ -390,16 +432,17 @@ useEffect(() => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
                   type="text"
-                  placeholder="Search customers..." // Fixed typo: "customeer" -> "customers"
+                  placeholder="Search customers... (name, email, or phone)"
                   value={customerSearchQuery}
                   onChange={(e) => {
                     setCustomerSearchQuery(e.target.value)
                     setShowCustomerDropdown(e.target.value.length > 0)
                   }}
+                  onKeyPress={handleCustomerSearchKeyDown}
                   onFocus={() => setShowCustomerDropdown(true)}
                   className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
-                
+
                 {/* ADD THIS MISSING DROPDOWN - This was missing in mobile version */}
                 {showCustomerDropdown && filteredCustomers.length > 0 && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
@@ -437,7 +480,7 @@ useEffect(() => {
                 <UserPlus size={16} />
               </button>
             </div>
-            
+
             {selectedCustomer && (
               <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 <div className="flex items-center justify-between">
@@ -482,7 +525,7 @@ useEffect(() => {
               const originalTotal = item.price * item.quantity
               const discountedTotal = discountedPrice * item.quantity
               const itemDiscount = itemDiscounts[item.id] || { discountPercentage: 0, discountAmount: 0, batchNumber: '', serialNumber: '', availableQuantity: 150 }
-              
+
               return (
                 <div key={item.id} className={`${isMobile ? "bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden" : ""}`}>
                   {/* Main item row */}
@@ -494,12 +537,12 @@ useEffect(() => {
                         className={`${isMobile ? "w-5 h-5" : "w-5 h-5"} rounded-full bg-gray-100 dark:bg-gray-600 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-500 transition-all duration-200`}
                         title="Show/Hide Details"
                       >
-                        <svg 
+                        <svg
                           className={`${isMobile ? "w-3 h-3" : "w-4 h-4"} text-beveren-500 dark:text-gray-400 transform transition-transform duration-200 ${
                             expandedItems.has(item.id) ? 'rotate-90' : ''
                           }`}
-                          fill="none" 
-                          stroke="currentColor" 
+                          fill="none"
+                          stroke="currentColor"
                           viewBox="0 0 24 24"
                         >
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -516,7 +559,7 @@ useEffect(() => {
                         crossOrigin="anonymous"
                       />
                     </div>
-                    
+
                     {/* Product Info */}
                     <div className="flex-1 min-w-0 px-3">
                       <h4 className={`font-semibold text-gray-900 dark:text-white ${isMobile ? "text-base" : "text-sm"} truncate`}>
@@ -543,7 +586,7 @@ useEffect(() => {
                         )}
                       </div>
                     </div>
-                    
+
                     {/* Quantity Controls - Fixed Width Container */}
                     <div className="flex-shrink-0 flex items-center ml-10 space-x-1 min-w-[70px] justify-center">
                       <button
@@ -562,7 +605,7 @@ useEffect(() => {
                         <Plus size={isMobile ? 16 : 14} />
                       </button>
                     </div>
-                    
+
                     {/* Total Price - Fixed Width */}
                     <div className="flex-shrink-0 text-right min-w-[80px] px-2">
                       {discountedTotal < originalTotal ? (
@@ -580,7 +623,7 @@ useEffect(() => {
                         </p>
                       )}
                     </div>
-                    
+
                     {/* Remove Button */}
                     <div className="flex-shrink-0 ml-2">
                       <button
@@ -643,7 +686,7 @@ useEffect(() => {
                                 updateItemDiscount(item.id, 'batchNumber', selectedBatch);
                                 updateItemDiscount(item.id, 'availableQuantity', selectedQty);
                               }}
-                              className={`w-full ${isMobile ? "text-sm" : "text-xs"} px-2 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent 
+                              className={`w-full ${isMobile ? "text-sm" : "text-xs"} px-2 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent
                                 bg-white text-gray-900 appearance-none`} // Removed dark mode classes
                               style={{
                                 backgroundColor: 'white',
@@ -753,7 +796,7 @@ useEffect(() => {
               <span className="font-medium text-gray-700 dark:text-gray-300">Items</span>
               <span className="font-semibold text-gray-900 dark:text-white">{cartItems.length}</span>
             </div>
-            
+
             {/* Original Subtotal (before item discounts) */}
             <div className="flex justify-between text-sm">
               <span className="font-medium text-gray-700 dark:text-gray-300">Original Subtotal</span>
@@ -810,7 +853,7 @@ useEffect(() => {
                 <Tag size={16} className="mr-2" />
                 Add Coupon
               </button>
-              
+
               <GiftCouponPopover
                 onApplyCoupon={onApplyCoupon}
                 appliedCoupons={appliedCoupons}
@@ -888,14 +931,16 @@ useEffect(() => {
       {/* Add Customer Modal */}
       {showAddCustomerModal && (
         <AddCustomerModal
-  customer={null}
-  onClose={() => {
-    setShowAddCustomerModal(false)
-    setPrefilledCustomerName("") // Clear prefilled name when modal is closed
-  }}
-  onSave={handleSaveCustomer}
-  prefilledName={prefilledCustomerName} // Add this prop
-/>
+          customer={null}
+          onClose={() => {
+            setShowAddCustomerModal(false)
+            setPrefilledCustomerName("") // Clear prefilled name when modal is closed
+            setPrefilledData({}) // Clear prefilled data when modal is closed
+          }}
+          onSave={handleSaveCustomer}
+          prefilledName={prefilledCustomerName}
+          prefilledData={prefilledData}
+        />
       )}
 
       {/* Payment Dialog */}

@@ -6,8 +6,8 @@ from klik_pos.klik_pos.utils import get_current_pos_profile
 def pos_details():
     pos = get_current_pos_profile
     customer = pos.customer
-    
-    
+
+
 def fetch_item_balance(item_code: str, warehouse: str) -> float:
     """Get stock balance of an item from a warehouse."""
     try:
@@ -44,7 +44,7 @@ def fetch_item_price(item_code: str, price_list: str) -> dict:
                 "currency": default_currency,
                 "currency_symbol": default_symbol
             }
-            
+
         # return {
         #     "price": price_doc.price_list_rate if price_doc else 0,
         #     "currency": price_doc.currency if price_doc else "SAR"
@@ -57,6 +57,56 @@ def fetch_item_price(item_code: str, price_list: str) -> dict:
         }
 
 @frappe.whitelist(allow_guest=True)
+def get_item_by_barcode(barcode: str):
+    """Get item details by barcode."""
+    try:
+        pos_doc = get_current_pos_profile()
+        warehouse = pos_doc.warehouse
+        price_list = "Standard Selling"
+        print("+++++++", str(barcode))
+        # First try to find item by barcode in the Barcodes child table
+        item_code = frappe.db.sql("""
+            SELECT parent
+            FROM `tabItem Barcode`
+            WHERE barcode = %s
+        """, barcode, as_dict=True)
+
+        if not item_code:
+            # Fallback: try to find by item code directly
+            item_code = frappe.db.sql("""
+                SELECT name
+                FROM `tabItem`
+                WHERE name = %s AND disabled = 0
+            """, barcode, as_dict=True)
+
+        if not item_code:
+            frappe.throw(_("Item not found for barcode: {0}").format(barcode))
+
+        item_name = item_code[0].parent or item_code[0].name
+
+        # Get item details
+        item_doc = frappe.get_doc("Item", item_name)
+
+        # Get balance and price
+        balance = fetch_item_balance(item_name, warehouse)
+        price_info = fetch_item_price(item_name, price_list)
+
+        return {
+            "item_code": item_name,
+            "item_name": item_doc.item_name or item_name,
+            "description": item_doc.description or "",
+            "item_group": item_doc.item_group or "General",
+            "price": price_info["price"],
+            "currency": price_info["currency"],
+            "currency_symbol": price_info["currency_symbol"],
+            "available": balance,
+            "image": item_doc.image or "https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=300&h=300&fit=crop"
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), f"Error fetching item by barcode: {barcode}")
+        frappe.throw(_("Error fetching item by barcode: {0}").format(str(e)))
+
 @frappe.whitelist(allow_guest=True)
 def get_items_with_balance_and_price(price_list: str = "Standard Selling"):
     pos_doc = get_current_pos_profile()

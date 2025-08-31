@@ -1,25 +1,26 @@
 "use client"
 
-import { useState } from "react"
-import { useI18n } from "../hooks/useI18n"
+import { useState, useEffect } from "react"
 import { useProducts } from "../hooks/useProducts"
 import RetailSidebar from "./RetailSidebar"
 import MenuGrid from "./MenuGrid"
 import OrderSummary from "./OrderSummary"
 import MobilePOSLayout from "./MobilePOSLayout"
 import LoadingSpinner from "./LoadingSpinner"
+import BarcodeScannerModal from "./BarcodeScanner"
+import { useBarcodeScanner } from "../hooks/useBarcodeScanner"
 import type { MenuItem, CartItem, GiftCoupon } from "../../types"
 import { useMediaQuery } from "../hooks/useMediaQuery"
 
 export default function RetailPOSLayout() {
-  const { t } = useI18n()
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [appliedCoupons, setAppliedCoupons] = useState<GiftCoupon[]>([])
+  const [showScanner, setShowScanner] = useState(false)
 
   // Use professional data management
-  const { products: menuItems, loading, error, refetch, liveDataCount, mockDataCount } = useProducts()
+  const { products: menuItems, isLoading: loading, error, refetch } = useProducts()
 
   // Use media query to detect mobile/tablet screens
   const isMobile = useMediaQuery("(max-width: 1024px)")
@@ -77,6 +78,57 @@ export default function RetailPOSLayout() {
     setAppliedCoupons(appliedCoupons.filter((coupon) => coupon.code !== couponCode))
   }
 
+  // Barcode scanning functionality - moved after handleAddToCart is defined
+  const { scanBarcode } = useBarcodeScanner(handleAddToCart)
+
+  const handleBarcodeDetected = async (barcode: string) => {
+    const success = await scanBarcode(barcode)
+    if (success) {
+      setShowScanner(false)
+    }
+  }
+
+  // Handle search input for both product search and barcode scanning
+  const handleSearchInput = (query: string) => {
+    setSearchQuery(query)
+
+    // If input looks like a barcode (numeric/alphanumeric, 8+ characters),
+    // it might be from a hardware scanner
+    if (query.length >= 8 && /^[0-9A-Za-z]+$/.test(query)) {
+      console.log('Potential barcode input detected:', query)
+    }
+  }
+
+  // Handle Enter key for barcode processing
+  const handleSearchKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && searchQuery.trim()) {
+      e.preventDefault()
+
+      // Check if this looks like a barcode (numeric/alphanumeric, 8+ characters)
+      if (searchQuery.length >= 8 && /^[0-9A-Za-z]+$/.test(searchQuery)) {
+        console.log('Processing as barcode:', searchQuery)
+        handleBarcodeDetected(searchQuery.trim())
+        setSearchQuery('') // Clear after processing
+      } else {
+        // Regular search - just let it filter products
+        console.log('Processing as product search:', searchQuery)
+      }
+    }
+  }
+
+  // Auto-process barcode after a short delay (for hardware scanners)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery.length >= 8 && /^[0-9A-Za-z]+$/.test(searchQuery)) {
+        console.log('Auto-processing potential barcode:', searchQuery)
+        handleBarcodeDetected(searchQuery.trim())
+        setSearchQuery('')
+      }
+    }, 500) // Wait 500ms after last input
+
+    return () => clearTimeout(timer)
+  }, [searchQuery, handleBarcodeDetected])
+
   const filteredItems = menuItems.filter((item) => {
     // Category filter
     const matchesCategory = selectedCategory === "all" || item.category === selectedCategory
@@ -126,46 +178,65 @@ export default function RetailPOSLayout() {
   // Render mobile layout for screens smaller than 1024px
   if (isMobile) {
     return (
-      <MobilePOSLayout
-        items={filteredItems}
-        selectedCategory={selectedCategory}
-        onCategoryChange={setSelectedCategory}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-      />
-    )
-  }
-
-  // Desktop layout for larger screens
-  return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
-      <RetailSidebar />
-
-      {/* Menu Section - Takes remaining space minus cart width */}
-      <div className="flex-1 overflow-hidden ml-20">
-        <MenuGrid
+      <>
+        <MobilePOSLayout
           items={filteredItems}
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          onAddToCart={handleAddToCart}
+          onScanBarcode={() => setShowScanner(true)}
         />
+        <BarcodeScannerModal
+          isOpen={showScanner}
+          onClose={() => setShowScanner(false)}
+          onBarcodeDetected={handleBarcodeDetected}
+        />
+      </>
+    )
+  }
+
+    // Desktop layout for larger screens
+  return (
+    <>
+      <div className="flex h-screen bg-gray-50">
+        {/* Sidebar */}
+        <RetailSidebar />
+
+        {/* Menu Section - Takes remaining space minus cart width */}
+        <div className="flex-1 overflow-hidden ml-20">
+          <MenuGrid
+            items={filteredItems}
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+            searchQuery={searchQuery}
+            onSearchChange={handleSearchInput}
+            onSearchKeyPress={handleSearchKeyPress}
+            onAddToCart={handleAddToCart}
+            onScanBarcode={() => setShowScanner(true)}
+          />
+        </div>
+
+        {/* Order Summary - 30% width on medium and large screens */}
+        <div className="w-[30%] min-w-[380px] max-w-[500px] bg-white shadow-lg overflow-y-auto">
+          <OrderSummary
+            cartItems={cartItems}
+            onUpdateQuantity={handleUpdateQuantity}
+            onRemoveItem={handleRemoveItem}
+            onClearCart={handleClearCart}
+            appliedCoupons={appliedCoupons}
+            onApplyCoupon={handleApplyCoupon}
+            onRemoveCoupon={handleRemoveCoupon}
+          />
+        </div>
       </div>
 
-      {/* Order Summary - 30% width on medium and large screens */}
-      <div className="w-[30%] min-w-[380px] max-w-[500px] bg-white shadow-lg overflow-y-auto">
-        <OrderSummary
-          cartItems={cartItems}
-          onUpdateQuantity={handleUpdateQuantity}
-          onRemoveItem={handleRemoveItem}
-          onClearCart={handleClearCart}
-          appliedCoupons={appliedCoupons}
-          onApplyCoupon={handleApplyCoupon}
-          onRemoveCoupon={handleRemoveCoupon}
-        />
-      </div>
-    </div>
+      {/* Barcode Scanner Modal */}
+      <BarcodeScannerModal
+        isOpen={showScanner}
+        onClose={() => setShowScanner(false)}
+        onBarcodeDetected={handleBarcodeDetected}
+      />
+    </>
   )
 }
