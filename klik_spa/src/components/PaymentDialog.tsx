@@ -25,7 +25,9 @@ interface PaymentDialogProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onHoldOrder: (orderData: any) => void
   isMobile?: boolean
-  isFullPage?: boolean,
+  isFullPage?: boolean
+  initialSharingMode?: string | null // 'email', 'sms', 'whatsapp'
+  externalInvoiceData?: any // For invoice sharing
 }
 
 interface PaymentMethod {
@@ -72,7 +74,9 @@ export default function PaymentDialog({
   onCompletePayment,
   onHoldOrder,
   isMobile = false,
-  isFullPage = false
+  isFullPage = false,
+  initialSharingMode = null,
+  externalInvoiceData = null
 }: PaymentDialogProps) {
   const [selectedSalesTaxCharges, setSelectedSalesTaxCharges] = useState('')
   const [paymentAmounts, setPaymentAmounts] = useState<PaymentAmount>({})
@@ -85,7 +89,7 @@ export default function PaymentDialog({
   const [invoiceData, setInvoiceData] = useState(null)
   const [roundOffInput, setRoundOffInput] = useState(roundOffAmount.toFixed(2));
   const [isAutoPrinting, setIsAutoPrinting] = useState(false);
-  const [sharingMode, setSharingMode] = useState(null) // 'email', 'sms', 'whatsapp'
+  const [sharingMode, setSharingMode] = useState<string | null>(initialSharingMode) // 'email', 'sms', 'whatsapp'
 const [sharingData, setSharingData] = useState({
   email: selectedCustomer?.email || '',
   phone: selectedCustomer?.phone || '',
@@ -109,14 +113,14 @@ const [sharingData, setSharingData] = useState({
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
     const couponDiscount = appliedCoupons.reduce((sum, coupon) => sum + coupon.value, 0)
     const taxableAmount = Math.max(0, subtotal - couponDiscount)
-    
+
     const selectedTax = salesTaxCharges.find(tax => tax.id === selectedSalesTaxCharges)
     const taxRate = selectedTax?.rate || 0
     const isInclusive = selectedTax?.is_inclusive || false
-    
+
     let taxAmount: number
     let grandTotal: number
-    
+
    if (isInclusive) {
   // For inclusive tax: tax is already included in the taxable amount
   taxAmount = taxableAmount * taxRate / (100 + taxRate)
@@ -129,7 +133,7 @@ const [sharingData, setSharingData] = useState({
   grandTotal = taxableAmount + taxAmount
 }
 
-    
+
     return {
       subtotal,
       couponDiscount,
@@ -174,11 +178,11 @@ useEffect(() => {
       const otherPaymentsTotal = Object.entries(paymentAmounts)
         .filter(([key]) => key !== defaultMode.mode_of_payment)
         .reduce((sum, [, amount]) => sum + (amount || 0), 0);
-      
+
       // For B2B, allow flexible payment amounts (can be 0 for pay later)
       // For B2C, require full payment by default
       const remainingAmount = isB2C ? Math.max(0, calculations.grandTotal - otherPaymentsTotal) : 0;
-      
+
       setPaymentAmounts(prev => ({
         ...prev,
         [defaultMode.mode_of_payment]: remainingAmount
@@ -218,7 +222,7 @@ useEffect(() => {
 
  const handlePaymentAmountChange = (methodId: string, amount: string) => {
   if (invoiceSubmitted || isProcessingPayment) return;
-  
+
   const numericAmount = parseFloat(amount) || 0;
   setPaymentAmounts(prev => ({
     ...prev,
@@ -229,10 +233,10 @@ const handleRoundOff = () => {
   if (invoiceSubmitted || isProcessingPayment) return;
 
   const totalBeforeRoundOff = calculations.isInclusive ? calculations.taxableAmount : calculations.taxableAmount + calculations.taxAmount;
-  
+
   // Change this line: use Math.floor instead of Math.round to always round DOWN
   const rounded = Math.floor(totalBeforeRoundOff);
-  
+
   // The difference will now be negative (business loss)
   const difference = rounded - totalBeforeRoundOff;
 
@@ -350,7 +354,7 @@ if (isB2C) {
       setSubmittedInvoice(response);
       setShowPreview(true)
       setInvoiceData(response.invoice)
-      
+
       const successMessage = isB2B ? "Invoice submitted successfully!" : "Payment completed successfully!";
       toast.success(successMessage);
     } catch (err) {
@@ -416,7 +420,7 @@ const getActionButtonText = () => {
   if (isProcessingPayment) {
     return isB2B ? "Submitting Invoice..." : "Processing Payment...";
   }
-  
+
   if (isB2B) {
     if (totalPaidAmount === 0) {
       return "Submit Invoice (Pay Later)";
@@ -426,7 +430,7 @@ const getActionButtonText = () => {
       return "Submit Invoice (Paid)";
     }
   }
-  
+
   return "Complete Payment";
 };
 
@@ -474,7 +478,7 @@ const getActionButtonText = () => {
           <span className="text-sm">Printing...</span>
         </div>
       )}
-      
+
       <button
         className="flex items-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
         title="Print"
@@ -594,7 +598,7 @@ const getActionButtonText = () => {
                 )}
 
                 {/* Tax Type Indicator */}
-                
+
 
                 {/* Round Off */}
                 <div>
@@ -639,8 +643,8 @@ const getActionButtonText = () => {
                       Tax ({calculations.selectedTax?.rate}% {calculations.isInclusive ? 'Incl.' : 'Excl.'})
                     </span>
                     <span className={`font-medium ${
-                      calculations.isInclusive 
-                        ? 'text-blue-600 dark:text-blue-400' 
+                      calculations.isInclusive
+                        ? 'text-blue-600 dark:text-blue-400'
                         : 'text-gray-900 dark:text-white'
                     }`}>
                       {calculations.isInclusive ? `(${formatCurrency(calculations.taxAmount)})` : formatCurrency(calculations.taxAmount)}
@@ -658,7 +662,7 @@ const getActionButtonText = () => {
                       <span className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrency(calculations.grandTotal)}</span>
                     </div>
                   </div>
-                  
+
                   {(isB2C || isB2B) && (
                     <>
                       <div className="flex justify-between">
@@ -693,8 +697,8 @@ const getActionButtonText = () => {
                     onClick={handleCompletePayment}
                     disabled={isActionButtonDisabled()}
                     className={`w-full py-4 rounded-lg font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2 ${
-                      isB2B 
-                        ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                      isB2B
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
                         : 'bg-green-600 hover:bg-green-700 text-white'
                     }`}
                   >
@@ -748,8 +752,8 @@ const getActionButtonText = () => {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
             {isB2B ? "Invoice Submission" : "Payment Processing"}
           </h2>
-      
-        
+
+
            {invoiceSubmitted ? (
   <div className="flex items-center space-x-3">
     {isAutoPrinting && (
@@ -819,7 +823,7 @@ const getActionButtonText = () => {
             {/* Left Section */}
 {/* Left Section */}
 <div className="w-2/3 p-6 overflow-y-auto custom-scrollbar space-y-6">
-  {invoiceSubmitted && sharingMode ? (
+  {(invoiceSubmitted && sharingMode) || (externalInvoiceData && sharingMode) ? (
     // Sharing Interface
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -864,7 +868,7 @@ const getActionButtonText = () => {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Email Preview
             </label>
-            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border">
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Subject: Your Invoice from KLIK POS</p>
               <div className="text-sm text-gray-900 dark:text-white">
                 <p>Dear {sharingData.name || 'Customer'},</p>
@@ -973,7 +977,7 @@ const getActionButtonText = () => {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               SMS Message Preview
             </label>
-            <div className="bg-purple-50 dark:bg-teal-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
+            <div className="bg-teal-50 dark:bg-teal-900/20 rounded-lg p-4 border border-teal-200 dark:border-teal-800">
               <div className="text-sm text-gray-900 dark:text-white">
                 <p>Hi {sharingData.name || 'Customer'}!</p>
                 <p className="mt-1">Thank you for your purchase at KLIK POS.</p>
@@ -989,7 +993,7 @@ const getActionButtonText = () => {
               setSharingMode(null);
             }}
             disabled={!sharingData.phone}
-            className="w-full py-3 bg-teal-500 text-white rounded-lg font-medium hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="w-full py-3 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
             Send SMS
           </button>
@@ -1002,7 +1006,7 @@ const getActionButtonText = () => {
       {/* Payment Methods */}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          Payment Methods 
+          Payment Methods
         </h3>
         <div className="flex space-x-4 overflow-x-auto pb-2">
           {paymentMethods.map((method) => (
@@ -1072,8 +1076,8 @@ const getActionButtonText = () => {
               Tax Amount {calculations.isInclusive && '(Included)'}
             </label>
             <div className={`px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg font-medium ${
-              calculations.isInclusive 
-                ? 'text-blue-600 dark:text-blue-400' 
+              calculations.isInclusive
+                ? 'text-blue-600 dark:text-blue-400'
                 : 'text-gray-900 dark:text-white'
             }`}>
               {calculations.isInclusive ? `(${formatCurrency(calculations.taxAmount)})` : formatCurrency(calculations.taxAmount)}
@@ -1129,8 +1133,8 @@ const getActionButtonText = () => {
                 Tax ({calculations.selectedTax?.rate}% {calculations.isInclusive ? 'Incl.' : 'Excl.'})
               </span>
               <span className={`font-medium ${
-                calculations.isInclusive 
-                  ? 'text-blue-600 dark:text-blue-400' 
+                calculations.isInclusive
+                  ? 'text-blue-600 dark:text-blue-400'
                   : 'text-gray-900 dark:text-white'
               }`}>
                 {calculations.isInclusive ? `(${formatCurrency(calculations.taxAmount)})` : formatCurrency(calculations.taxAmount)}
@@ -1148,7 +1152,7 @@ const getActionButtonText = () => {
                 <span className="text-xl font-bold text-gray-900 dark:text-white">{formatCurrency(calculations.grandTotal)}</span>
               </div>
             </div>
-            
+
             {(isB2C || isB2B) && (
               <>
                 <div className="flex justify-between">
@@ -1178,7 +1182,7 @@ const getActionButtonText = () => {
 
           {/* Right Section - Invoice Preview */}
           <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-600 flex-1 overflow-y-auto custom-scrollbar">
-            
+
             {/* Show PrintPreview if invoice is submitted */}
             {invoiceSubmitted && invoiceData ? (
               <div className="mb-4">
@@ -1212,15 +1216,44 @@ const getActionButtonText = () => {
                 )}
 
                 <div className="space-y-2 mb-4">
-                  {cartItems.map((item, index) => (
-                    <div key={index} className="flex justify-between text-sm">
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900 dark:text-white">{item.name}</p>
-                        <p className="text-gray-600 dark:text-gray-400">{item.quantity} x {formatCurrency(item.price)}</p>
+                  {cartItems.length > 0 ? (
+                    // Show cart items for payment
+                    cartItems.map((item, index) => (
+                      <div key={index} className="flex justify-between text-sm">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900 dark:text-white">{item.name}</p>
+                          <p className="text-gray-600 dark:text-gray-400">{item.quantity} x {formatCurrency(item.price)}</p>
+                        </div>
+                        <p className="font-medium text-gray-900 dark:text-white">{formatCurrency(item.quantity * item.price)}</p>
                       </div>
-                      <p className="font-medium text-gray-900 dark:text-white">{formatCurrency(item.quantity * item.price)}</p>
+                    ))
+                  ) : (
+                    // Show invoice details for sharing
+                    <div className="space-y-4">
+                      <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Invoice Details</h3>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 dark:text-gray-400">Invoice #:</span>
+                            <span className="font-medium text-gray-900 dark:text-white">{externalInvoiceData?.name || selectedCustomer?.name || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 dark:text-gray-400">Customer:</span>
+                            <span className="font-medium text-gray-900 dark:text-white">{externalInvoiceData?.customer || selectedCustomer?.name || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 dark:text-gray-400">Total:</span>
+                            <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(externalInvoiceData?.grand_total || calculations.grandTotal)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Invoice Preview */}
+                      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
+                        <DisplayPrintPreview invoice={externalInvoiceData || submittedInvoice || {}} />
+                      </div>
                     </div>
-                  ))}
+                  )}
                 </div>
 
                 <div className="border-t border-gray-200 dark:border-gray-600 pt-2 space-y-1 text-sm">
@@ -1239,8 +1272,8 @@ const getActionButtonText = () => {
                       Tax ({calculations.selectedTax?.rate}% {calculations.isInclusive ? 'Incl.' : 'Excl.'})
                     </span>
                     <span className={`${
-                      calculations.isInclusive 
-                        ? 'text-blue-600 dark:text-blue-400' 
+                      calculations.isInclusive
+                        ? 'text-blue-600 dark:text-blue-400'
                         : 'text-gray-900 dark:text-white'
                     }`}>
                       {calculations.isInclusive ? `(${formatCurrency(calculations.taxAmount)})` : formatCurrency(calculations.taxAmount)}
@@ -1291,8 +1324,8 @@ const getActionButtonText = () => {
                   {calculations.selectedTax && (
                     <div className="border-t border-gray-200 dark:border-gray-600 pt-2 mt-2">
                       <p className={`text-xs ${
-                        calculations.isInclusive 
-                          ? 'text-blue-500 dark:text-blue-400' 
+                        calculations.isInclusive
+                          ? 'text-blue-500 dark:text-blue-400'
                           : 'text-orange-500 dark:text-orange-400'
                       }`}>
                         Tax is {calculations.isInclusive ? 'inclusive' : 'exclusive'} of item prices
@@ -1365,8 +1398,8 @@ const getActionButtonText = () => {
                 onClick={handleCompletePayment}
                 disabled={isActionButtonDisabled()}
                 className={`px-8 py-2 rounded-lg font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center space-x-2 ${
-                  isB2B 
-                    ? 'bg-beveren-500 hover:bg-blue-700 text-white' 
+                  isB2B
+                    ? 'bg-beveren-500 hover:bg-blue-700 text-white'
                     : 'bg-green-600 hover:bg-green-700 text-white'
                 }`}
               >

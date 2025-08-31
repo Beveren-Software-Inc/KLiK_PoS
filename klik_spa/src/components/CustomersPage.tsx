@@ -150,18 +150,18 @@ export default function CustomersPage() {
   const handleSearchKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && searchQuery.trim()) {
       e.preventDefault()
-      
+
       // Check if customer exists in filtered results
       const existingCustomer = filteredCustomers.find(customer =>
         customer.name.toLowerCase() === searchQuery.toLowerCase() ||
         customer.email?.toLowerCase() === searchQuery.toLowerCase() ||
         customer.phone === searchQuery
       )
-      
+
       if (!existingCustomer) {
         // This is a new customer - detect input type and set prefilled data
         const trimmedValue = searchQuery.trim()
-        
+
         // Check if it's an email
         if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedValue)) {
           console.log('Detected email:', trimmedValue)
@@ -177,7 +177,7 @@ export default function CustomersPage() {
           console.log('Detected name:', trimmedValue)
           setPrefilledData({ name: trimmedValue })
         }
-        
+
         setShowAddModal(true)
         setSearchQuery('') // Clear search after opening modal
       }
@@ -424,22 +424,24 @@ export default function CustomersPage() {
 
       {/* Add/Edit Customer Modal */}
       {showAddModal && (
-        <AddCustomerModal
-          customer={selectedCustomer}
-          onClose={() => {
-            setShowAddModal(false)
-            setSelectedCustomer(null)
-            setPrefilledData({}) // Clear prefilled data
-          }}
-          onSave={(customer: Partial<Customer>) => {
-            console.log('Saving customer:', customer)
-            setShowAddModal(false)
-            setSelectedCustomer(null)
-            setPrefilledData({}) // Clear prefilled data
-          }}
-          prefilledData={prefilledData}
-        />
-        {showAddModal && console.log('Opening modal with prefilled data:', prefilledData)}
+        <>
+          {console.log('Opening modal with prefilled data:', prefilledData)}
+          <AddCustomerModal
+            customer={selectedCustomer}
+            onClose={() => {
+              setShowAddModal(false)
+              setSelectedCustomer(null)
+              setPrefilledData({}) // Clear prefilled data
+            }}
+            onSave={(customer: Partial<Customer>) => {
+              console.log('Saving customer:', customer)
+              setShowAddModal(false)
+              setSelectedCustomer(null)
+              setPrefilledData({}) // Clear prefilled data
+            }}
+            prefilledData={prefilledData}
+          />
+        </>
       )}
     </div>
   )

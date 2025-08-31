@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom"; // ✅ import this
 
 import {
@@ -23,6 +23,7 @@ import {
 
 
 import RetailSidebar from "../components/RetailSidebar";
+import PaymentDialog from "../components/PaymentDialog";
 import { useInvoiceDetails } from "../hooks/useInvoiceDetails";
 import { createSalesReturn } from "../services/salesInvoice";
 import { toast } from "react-toastify";
@@ -34,9 +35,13 @@ export default function InvoiceViewPage() {
 
   const { id } = useParams()
   const invoiceId = id ?? ""
-  
+
   const { invoice, isLoading, error } = useInvoiceDetails(invoiceId);
-    const navigate = useNavigate()
+  const navigate = useNavigate()
+
+  // PaymentDialog state for sharing
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false)
+  const [sharingMode, setSharingMode] = useState<string | null>(null) // 'email', 'sms', 'whatsapp'
 
 
   const handleBackClick = () => {
@@ -65,7 +70,7 @@ export default function InvoiceViewPage() {
     }
   };
 
-     
+
 
   const handleReturn = async(invoiceName: string) => {
       try {
@@ -74,7 +79,7 @@ export default function InvoiceViewPage() {
           toast.success(`Invoice returned: ${result.return_invoice}`);
         } catch (error: any) {
           toast.error(error.message || "Failed to return invoice");
-        
+
       // Add return logic here
     }
   };
@@ -107,8 +112,8 @@ export default function InvoiceViewPage() {
           <div className="text-center">
             <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <p className="text-red-600 dark:text-red-400">Error loading invoice: {error}</p>
-            <button 
-              onClick={() => window.location.reload()} 
+            <button
+              onClick={() => window.location.reload()}
               className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               Retry
@@ -181,9 +186,8 @@ export default function InvoiceViewPage() {
                   className="p-2 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900 rounded-lg"
                   title="Email"
                   onClick={() => {
-                    const subject = encodeURIComponent("Your Invoice");
-                    const body = encodeURIComponent(`Dear ${invoice.customer_name},\n\nHere is your invoice total: ${formatCurrency(invoice.grand_total)}\n\nThank you.`);
-                    window.open(`mailto:${invoice.customer_address_doc?.email_id}?subject=${subject}&body=${body}`);
+                    setSharingMode('email')
+                    setShowPaymentDialog(true)
                   }}
                 >
                   <MailPlus size={20} />
@@ -193,8 +197,8 @@ export default function InvoiceViewPage() {
                   className="p-2 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900 rounded-lg"
                   title="WhatsApp"
                   onClick={() => {
-                    const msg = encodeURIComponent(`Here is your invoice total: ${formatCurrency(invoice.grand_total)}`);
-                    window.open(`https://wa.me/${mockCustomer?.phone}?text=${msg}`, "_blank");
+                    setSharingMode('whatsapp')
+                    setShowPaymentDialog(true)
                   }}
                 >
                   <MessageCirclePlus size={20} />
@@ -203,7 +207,10 @@ export default function InvoiceViewPage() {
                 <button
                   className="p-2 text-purple-600 hover:bg-purple-100 dark:text-purple-400 dark:hover:bg-purple-900 rounded-lg"
                   title="Text Message"
-                  onClick={() => window.open(`tel:${mockCustomer?.phone}`)}
+                  onClick={() => {
+                    setSharingMode('sms')
+                    setShowPaymentDialog(true)
+                  }}
                 >
                   <MessageSquarePlus size={20} />
                 </button>
@@ -457,6 +464,58 @@ export default function InvoiceViewPage() {
                         </div>
                     </div>
                     )}
+
+      {/* PaymentDialog for Sharing */}
+      {showPaymentDialog && (
+        <PaymentDialog
+          isOpen={showPaymentDialog}
+          onClose={() => {
+            setShowPaymentDialog(false)
+            setSharingMode(null)
+          }}
+          cartItems={[]} // Empty for invoice sharing
+          appliedCoupons={[]} // Empty for invoice sharing
+          selectedCustomer={{
+            id: invoice.customer,
+            name: invoice.customer,
+            email: invoice.customer_address_doc?.email_id || '',
+            phone: invoice.customer_address_doc?.phone || '',
+            type: 'individual',
+            status: 'active',
+            loyaltyPoints: 0,
+            totalOrders: 0,
+            totalSpent: 0,
+            lastVisit: null,
+            address: {
+              addressType: 'Billing',
+              streetName: invoice.customer_address_doc?.address_line1 || '',
+              buildingNumber: '',
+              subdivisionName: '',
+              cityName: '',
+              postalCode: '',
+              country: 'Saudi Arabia',
+              isPrimary: true
+            },
+            vatNumber: '',
+            registrationScheme: '',
+            registrationNumber: '',
+            preferredPaymentMethod: 'Cash',
+            tags: []
+          }}
+          onCompletePayment={() => {
+            setShowPaymentDialog(false)
+            setSharingMode(null)
+          }}
+          onHoldOrder={() => {
+            setShowPaymentDialog(false)
+            setSharingMode(null)
+          }}
+          isMobile={false}
+          isFullPage={false}
+          initialSharingMode={sharingMode}
+          externalInvoiceData={invoice} // Pass the actual invoice data
+        />
+      )}
 
       </div>
     </div>
