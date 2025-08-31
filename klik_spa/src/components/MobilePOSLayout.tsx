@@ -4,7 +4,7 @@ import { useI18n } from "../hooks/useI18n"
 import { useAuth } from "../hooks/useAuth"
 import { useTheme } from "../hooks/useTheme"
 import { useCartStore } from "../stores/cartStore"
-import { ShoppingCart, Menu, X, Search, Settings, LogOut, Moon, Sun, Mail } from "lucide-react"
+import { ShoppingCart, Menu, X, Search, Settings, LogOut, Moon, Sun, Mail, Scan } from "lucide-react"
 import CategoryTabs from "./CategoryTabs"
 import ProductGrid from "./ProductGrid"
 import BottomNavigation from "./BottomNavigation"
@@ -16,6 +16,7 @@ interface MobilePOSLayoutProps {
   onCategoryChange: (category: string) => void
   searchQuery: string
   onSearchChange: (query: string) => void
+  onScanBarcode?: () => void
 }
 
 export default function MobilePOSLayout({
@@ -24,6 +25,7 @@ export default function MobilePOSLayout({
   onCategoryChange,
   searchQuery,
   onSearchChange,
+  onScanBarcode,
 }: MobilePOSLayoutProps) {
   const { t } = useI18n()
   const { user, logout } = useAuth()
@@ -129,7 +131,7 @@ export default function MobilePOSLayout({
                     <Settings size={14} className="mr-3 text-gray-500 dark:text-gray-400" />
                     <span>Settings</span>
                   </Link>
-                  
+
                   <button
                     onClick={() => {
                       toggleTheme()
@@ -145,9 +147,9 @@ export default function MobilePOSLayout({
                     )}
                     <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
                   </button>
-                  
+
                   <div className="border-t border-gray-100 dark:border-gray-700 my-1"></div>
-                  
+
                   <button
                     onClick={() => {
                       handleLogout()
@@ -167,15 +169,24 @@ export default function MobilePOSLayout({
 
         {/* Search Bar */}
         <div className="px-4 pb-3">
-          <div className="relative">
+          <div className="relative flex items-center">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
               placeholder={t("SEARCH_PRODUCTS")}
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              className="flex-1 pl-10 pr-12 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
             />
+            {onScanBarcode && (
+              <button
+                onClick={onScanBarcode}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1.5 text-gray-400 hover:text-beveren-600 dark:hover:text-beveren-400 transition-colors focus:outline-none focus:ring-2 focus:ring-beveren-500 focus:ring-offset-2 rounded-lg"
+                title="Scan Barcode"
+              >
+                <Scan className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
 

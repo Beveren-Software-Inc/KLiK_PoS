@@ -1,14 +1,23 @@
 "use client"
 
 import { useState } from "react"
+import { Scan } from "lucide-react"
 
 interface SearchBarProps {
   searchQuery: string
   onSearchChange: (query: string) => void
+  onScanBarcode?: () => void
+  onSearchKeyPress?: (e: React.KeyboardEvent<HTMLInputElement>) => void
   isMobile?: boolean
 }
 
-export default function SearchBar({ searchQuery, onSearchChange, isMobile = false }: SearchBarProps) {
+export default function SearchBar({
+  searchQuery,
+  onSearchChange,
+  onScanBarcode,
+  onSearchKeyPress,
+  isMobile = false
+}: SearchBarProps) {
   const [isFocused, setIsFocused] = useState(false)
 
   const getPlaceholder = () => {
@@ -20,13 +29,14 @@ export default function SearchBar({ searchQuery, onSearchChange, isMobile = fals
 
   return (
     <div className={`relative ${isMobile ? "w-full" : "w-full max-w-3xl"}`}>
-      <div className="relative">
+      <div className="relative flex items-center">
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
+          onKeyPress={onSearchKeyPress}
           placeholder={getPlaceholder()}
-          className={`w-full px-4 py-3 pl-12 pr-4 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-beveren-500 focus:border-transparent transition-all duration-200 ${
+          className={`flex-1 px-4 py-3 pl-12 pr-12 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-beveren-500 focus:border-transparent transition-all duration-200 ${
             isFocused ? "shadow-lg" : "shadow-sm"
           }`}
           onFocus={() => setIsFocused(true)}
@@ -47,7 +57,20 @@ export default function SearchBar({ searchQuery, onSearchChange, isMobile = fals
             />
           </svg>
         </div>
-        {searchQuery && (
+
+        {/* Scanner Button - Integrated into search bar */}
+        {onScanBarcode && (
+          <button
+            onClick={onScanBarcode}
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 p-2 text-gray-400 hover:text-beveren-600 dark:hover:text-beveren-400 transition-colors focus:outline-none focus:ring-2 focus:ring-beveren-500 focus:ring-offset-2 rounded-lg"
+            title="Scan Barcode"
+          >
+            <Scan size={20} />
+          </button>
+        )}
+
+        {/* Clear Button - Only show when there's text and no scanner button */}
+        {searchQuery && !onScanBarcode && (
           <button
             onClick={() => onSearchChange("")}
             className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"

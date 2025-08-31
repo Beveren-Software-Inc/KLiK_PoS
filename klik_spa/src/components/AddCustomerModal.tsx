@@ -13,16 +13,18 @@ interface AddCustomerModalProps {
   onClose: () => void;
   onSave: (customer: Partial<Customer>) => void;
   isFullPage?: boolean;
-  prefilledName?: string; // Add this prop
+  prefilledName?: string;
+  prefilledData?: {name?: string, email?: string, phone?: string};
 }
 
 
-export default function AddCustomerModal({ 
-  customer, 
-  onClose, 
-  onSave, 
-  isFullPage = false, 
-  prefilledName = "" // Add this prop with default value
+export default function AddCustomerModal({
+  customer,
+  onClose,
+  onSave,
+  isFullPage = false,
+  prefilledName = "",
+  prefilledData = {}
 }: AddCustomerModalProps) {  const { createCustomer, updateCustomer } = useCustomerActions();
   const isEditing = !!customer;
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,14 +91,23 @@ const countryOptions = countryList().getData();
       // If editing, show all steps as completed
       setCompletedSteps(new Set([1, 2, 3, 4]));
       setCurrentStep(4);
+    } else if (prefilledData && Object.keys(prefilledData).length > 0) {
+      // If no customer but there's prefilled data, set it in the form
+      console.log('Setting prefilled data:', prefilledData)
+      setFormData(prev => ({
+        ...prev,
+        name: prefilledData.name || prev.name,
+        email: prefilledData.email || prev.email,
+        phone: prefilledData.phone || prev.phone
+      }));
     } else if (prefilledName) {
-      // If no customer but there's a prefilled name, set it in the form
+      // Fallback to old prefilledName prop
       setFormData(prev => ({
         ...prev,
         name: prefilledName
       }));
     }
-  }, [customer, prefilledName]);
+  }, [customer, prefilledName, prefilledData]);
 
   const isB2B = posDetails?.business_type === 'B2B';
   const isB2C = posDetails?.business_type === 'B2C';
@@ -158,7 +169,7 @@ const countryOptions = countryList().getData();
       if (!formData.vatNumber.trim() && !formData.registrationNumber.trim()) {
         newErrors.vatOrRegistration = "Either VAT number or Registration number must be provided";
       }
-      
+
       if (formData.registrationScheme && !formData.registrationNumber.trim()) {
         newErrors.registrationNumber = "Registration number is required when registration scheme is selected";
       }
@@ -228,7 +239,7 @@ const countryOptions = countryList().getData();
 
     if (!isValid) return;
     setIsSubmitting(true);
-    
+
     try {
       const customerData = {
         name: formData.name,
@@ -258,13 +269,13 @@ const countryOptions = countryList().getData();
           id: newCustomer.name,
         });
       }
-      
+
       onClose();
     } catch (error) {
       console.error('Customer save error:', error);
       setSubmitError(
-        error instanceof Error 
-          ? error.message 
+        error instanceof Error
+          ? error.message
           : 'Failed to save customer. Please try again.'
       );
     } finally {
@@ -340,7 +351,7 @@ const addressTypes = [
               const isCompleted = completedSteps.has(stepNumber);
               const isCurrent = currentStep === stepNumber;
               const canShow = stepNumber <= currentStep || isCompleted;
-              
+
               return (
                 <div key={stepNumber} className={`flex items-center ${i < getMaxSteps() - 1 ? 'flex-1' : ''}`}>
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
@@ -373,7 +384,7 @@ const addressTypes = [
 
         {/* Form */}
         <form onSubmit={handleSubmit} className={isFullPage ? "flex-1 p-6 space-y-6 overflow-y-auto" : "p-6 space-y-6"}>
-          
+
           {/* Step 1: Customer Type & Basic Information + Contact (Individual) OR Basic Only (Company) */}
           <div className={`transition-all duration-300 ${currentStep >= 1 ? 'block' : 'hidden'}`}>
             {/* Customer Type Selection - Only show if multiple types available */}
@@ -572,7 +583,7 @@ const addressTypes = [
       </button>
     )}
   </div>
-  
+
   {canProceedFromStep(1) && currentStep === 1 && (
     <button
       type="button"
@@ -658,7 +669,7 @@ const addressTypes = [
                     </button>
                   )}
                 </div>
-                
+
                 {canProceedFromStep(2) && currentStep === 2 && (
                   <button
                     type="button"
@@ -688,8 +699,8 @@ const addressTypes = [
                   <select
                     id="paymentMethod"
                     value={formData.preferredPaymentMethod}
-                    onChange={(e) => setFormData(prev => ({ 
-                      ...prev, 
+                    onChange={(e) => setFormData(prev => ({
+                      ...prev,
                       preferredPaymentMethod: e.target.value as Customer['preferredPaymentMethod']
                     }))}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white"
@@ -787,7 +798,7 @@ const addressTypes = [
           )}
 
           {/* Step 2: Address for Individual OR Step 4: Address for Company */}
-          {(currentStep >= 2 && formData.type === 'individual') || 
+          {(currentStep >= 2 && formData.type === 'individual') ||
  (currentStep >= 4 && formData.type === 'company') ? (
   <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
@@ -814,8 +825,8 @@ const addressTypes = [
         address: { ...prev.address, addressType: e.target.value },
       }))
     }
-    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 
-               rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 
+    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600
+               rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500
                dark:bg-gray-700 dark:text-white"
   >
     <option value="">Select Address Type</option>
@@ -839,8 +850,8 @@ const addressTypes = [
             type="text"
             id="streetName"
             value={formData.address.streetName}
-            onChange={(e) => setFormData(prev => ({ 
-              ...prev, 
+            onChange={(e) => setFormData(prev => ({
+              ...prev,
               address: { ...prev.address, streetName: e.target.value }
             }))}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white"
@@ -861,8 +872,8 @@ const addressTypes = [
             type="text"
             id="buildingNumber"
             value={formData.address.buildingNumber}
-            onChange={(e) => setFormData(prev => ({ 
-              ...prev, 
+            onChange={(e) => setFormData(prev => ({
+              ...prev,
               address: { ...prev.address, buildingNumber: e.target.value }
             }))}
             className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
@@ -884,8 +895,8 @@ const addressTypes = [
             type="text"
             id="subdivisionName"
             value={formData.address.subdivisionName}
-            onChange={(e) => setFormData(prev => ({ 
-              ...prev, 
+            onChange={(e) => setFormData(prev => ({
+              ...prev,
               address: { ...prev.address, subdivisionName: e.target.value }
             }))}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white"
@@ -906,8 +917,8 @@ const addressTypes = [
             type="text"
             id="cityName"
             value={formData.address.cityName}
-            onChange={(e) => setFormData(prev => ({ 
-              ...prev, 
+            onChange={(e) => setFormData(prev => ({
+              ...prev,
               address: { ...prev.address, cityName: e.target.value }
             }))}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white"
@@ -925,8 +936,8 @@ const addressTypes = [
             type="text"
             id="postalCode"
             value={formData.address.postalCode}
-            onChange={(e) => setFormData(prev => ({ 
-              ...prev, 
+            onChange={(e) => setFormData(prev => ({
+              ...prev,
               address: { ...prev.address, postalCode: e.target.value }
             }))}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white"
@@ -941,8 +952,8 @@ const addressTypes = [
           <input
             type="checkbox"
             checked={formData.address.isPrimary}
-            onChange={(e) => setFormData(prev => ({ 
-              ...prev, 
+            onChange={(e) => setFormData(prev => ({
+              ...prev,
               address: { ...prev.address, isPrimary: e.target.checked }
             }))}
             className="w-4 h-4 text-beveren-600 bg-gray-100 border-gray-300 rounded focus:ring-beveren-500 dark:focus:ring-beveren-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
@@ -1001,4 +1012,3 @@ const addressTypes = [
     </div>
   );
 }
-                

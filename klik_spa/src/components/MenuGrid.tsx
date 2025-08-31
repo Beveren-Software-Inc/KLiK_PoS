@@ -15,7 +15,9 @@ interface MenuGridProps {
   onCategoryChange: (category: string) => void
   searchQuery: string
   onSearchChange: (query: string) => void
+  onSearchKeyPress?: (e: React.KeyboardEvent<HTMLInputElement>) => void
   onAddToCart: (item: MenuItem) => void
+  onScanBarcode?: () => void
 }
 
 export default function MenuGrid({
@@ -24,7 +26,9 @@ export default function MenuGrid({
   onCategoryChange,
   searchQuery,
   onSearchChange,
+  onSearchKeyPress,
   onAddToCart,
+  onScanBarcode,
 }: MenuGridProps) {
   const { t } = useI18n()
   const { user, logout } = useAuth()
@@ -76,7 +80,12 @@ export default function MenuGrid({
         {/* Search and User Info */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex-1 max-w-md">
-            <SearchBar searchQuery={searchQuery} onSearchChange={onSearchChange} />
+            <SearchBar
+              searchQuery={searchQuery}
+              onSearchChange={onSearchChange}
+              onSearchKeyPress={onSearchKeyPress}
+              onScanBarcode={onScanBarcode}
+            />
           </div>
           <div className="flex items-center space-x-4 ml-6 relative" ref={dropdownRef}>
             <div className="text-right">
@@ -124,7 +133,7 @@ export default function MenuGrid({
                     <Settings size={16} className="mr-3 text-gray-500 dark:text-gray-400" />
                     <span>Settings</span>
                   </Link>
-                  
+
                   <button
                     onClick={() => {
                       toggleTheme()
@@ -140,9 +149,9 @@ export default function MenuGrid({
                     )}
                     <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
                   </button>
-                  
+
                   <div className="border-t border-gray-100 dark:border-gray-700 my-1"></div>
-                  
+
                   <button
                     onClick={() => {
                       handleLogout()

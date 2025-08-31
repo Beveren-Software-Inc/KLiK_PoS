@@ -16,6 +16,7 @@ interface CustomerData {
 
 export const useCustomerActions = () => {
   const csrfToken = window.csrf_token;
+
   const createCustomer = async (customerData: CustomerData) => {
     try {
       const response = await fetch('/api/method/klik_pos.api.customer.create_or_update_customer', {
@@ -55,7 +56,7 @@ export const useCustomerActions = () => {
           customer_id: customerId,
           customer_data: customerData
         }),
-                credentials: 'include'
+        credentials: 'include'
 
       });
 
