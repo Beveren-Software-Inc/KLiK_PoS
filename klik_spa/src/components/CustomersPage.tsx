@@ -2,12 +2,12 @@
 
 import React, { useState, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
-import { 
-  Search, 
-  Plus, 
-  Filter, 
-  Phone, 
-  Mail, 
+import {
+  Search,
+  Plus,
+  Filter,
+  Phone,
+  Mail,
   Crown,
   Star,
   Users,
@@ -50,7 +50,7 @@ export default function CustomersPage() {
     // Apply search
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(customer => 
+      filtered = filtered.filter(customer =>
         customer.name.toLowerCase().includes(query) ||
         customer.email.toLowerCase().includes(query) ||
         customer.phone.includes(searchQuery) ||
@@ -69,12 +69,12 @@ export default function CustomersPage() {
   // Stats calculation
   const stats = useMemo(() => {
     if (isLoading) return { total: 0, active: 0, vip: 0, totalSpent: 0 }
-    
+
     const total = customers.length
     const active = customers.filter(c => c.status === 'active').length
     const vip = customers.filter(c => c.status === 'vip').length
     const totalSpent = customers.reduce((sum, c) => sum + (c.totalSpent || 0), 0)
-    
+
     return { total, active, vip, totalSpent }
   }, [customers, isLoading])
 
@@ -450,7 +450,7 @@ export default function CustomersPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
       <RetailSidebar/>
-      
+
       {/* Fixed Header */}
       <div className="fixed top-0 left-20 right-0 z-50 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="px-6 py-4">
@@ -482,7 +482,7 @@ export default function CustomersPage() {
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
               <div className="flex items-center">
                 <Star className="text-green-500" size={24} />
@@ -492,7 +492,7 @@ export default function CustomersPage() {
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
               <div className="flex items-center">
                 <Crown className="text-yellow-500" size={24} />
@@ -502,7 +502,7 @@ export default function CustomersPage() {
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
               <div className="flex items-center">
                 <div className="w-6 h-6 bg-beveren-500 rounded flex items-center justify-center">
@@ -577,7 +577,7 @@ export default function CustomersPage() {
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {filteredCustomers.map((customer) => (
-                    <tr 
+                    <tr
                       key={customer.id}
                       className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
                       onClick={() => navigate(`/customers/${customer.id}`)}
@@ -599,7 +599,7 @@ export default function CustomersPage() {
                           </div>
                         </div>
                       </td>
-                      
+
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="space-y-1">
                           <div className="flex items-center text-sm text-gray-900 dark:text-white">
@@ -612,7 +612,7 @@ export default function CustomersPage() {
                           </div>
                         </div>
                       </td>
-                      
+
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="space-y-1">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
@@ -623,18 +623,18 @@ export default function CustomersPage() {
                           </div>
                         </div>
                       </td>
-                      
+
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(customer.status)}`}>
                           {customer.status === 'vip' && <Crown size={12} className="mr-1" />}
                           {customer.status.toUpperCase()}
                         </span>
                       </td>
-                      
+
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {customer.lastVisit ? formatDate(customer.lastVisit) : 'Never'}
                       </td>
-                      
+
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end space-x-2">
                           <button
@@ -669,7 +669,7 @@ export default function CustomersPage() {
                 <Users className="mx-auto h-12 w-12 text-gray-400" />
                 <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No customers found</h3>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {searchQuery || statusFilter !== "all" 
+                  {searchQuery || statusFilter !== "all"
                     ? "Try adjusting your search or filter criteria."
                     : "Get started by adding your first customer."
                   }
