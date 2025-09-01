@@ -20,6 +20,8 @@ interface ERPCustomer {
   creation?: string;
   custom_avatar?: string;
   custom_notes?: string;
+  default_currency?: string;
+  company_currency?: string;
 }
 
 export function useCustomers() {
@@ -46,7 +48,6 @@ export function useCustomers() {
           { street: "Al Rigga Road", city: "Deira", state: "Dubai", zipCode: "23456" }
         ];
         const randomAddress = uaeAddresses[Math.floor(Math.random() * uaeAddresses.length)];
-
         return {
           id: customer.name,
           name: customer.customer_name || `Customer ${customer.name.slice(0, 5)}`,
@@ -55,16 +56,18 @@ export function useCustomers() {
           address: { ...randomAddress, country: "United Arab Emirates" },
           dateOfBirth: customer.custom_date_of_birth || getRandomBirthDate(),
           gender: (customer.custom_gender as Customer["gender"]) || getRandomGender(),
-          loyaltyPoints: customer.custom_loyalty_points || Math.floor(Math.random() * 1000),
-          totalSpent: customer.custom_total_spent || Math.floor(Math.random() * 10000) + 500,
-          totalOrders: customer.custom_total_orders ?? 200,
+          loyaltyPoints: customer.custom_loyalty_points || 0,
+          totalSpent: customer.custom_total_spent || 0,
+          totalOrders: customer.custom_total_orders || 0,
           preferredPaymentMethod: getRandomPaymentMethod(),
           notes: customer.custom_notes || "",
-          tags: customer.custom_tags?.split(",") || getRandomTags(),
-          status: (customer.custom_status as Customer["status"]) || getRandomStatus(),
+          tags: customer.custom_tags?.split(",") || [],
+          status: (customer.custom_status as Customer["status"]) || "active",
           createdAt: customer.creation || new Date().toISOString(),
-          lastVisit: customer.custom_last_visit || getRandomRecentDate(),
-          avatar: customer.custom_avatar || getRandomAvatar()
+          lastVisit: customer.custom_last_visit || null,
+          avatar: customer.custom_avatar || null,
+          defaultCurrency: customer.default_currency,
+          companyCurrency: customer.company_currency
         };
       });
 

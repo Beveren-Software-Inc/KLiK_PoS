@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X, User, Mail, MapPin, CreditCard, Building, Save, ChevronRight } from "lucide-react";
-import { type Customer } from "../data/mockCustomers";
+import { type Customer } from "../../types";
 import { useCustomerActions } from "../services/customerService";
 import { toast } from "react-toastify";
 import { usePOSDetails } from "../hooks/usePOSProfile";
@@ -38,19 +38,16 @@ const countryOptions = countryList().getData();
 
   // Initialize form data
   const [formData, setFormData] = useState({
-    type: "individual" as Customer['type'],
+    customer_type: "individual" as Customer['customer_type'],
     name: "",
     email: "",
     phone: "",
     address: {
-      addressType: "",
-      streetName: "",
-      buildingNumber: "",
-      subdivisionName: "",
-      cityName: "",
-      postalCode: "",
-      country: "Saudi Arabia",
-      isPrimary: true
+      street: "",
+      city: "",
+      state: "",
+      zipCode: "",
+      country: "Saudi Arabia"
     },
     status: "active" as Customer['status'],
     // Company specific fields
@@ -58,8 +55,37 @@ const countryOptions = countryList().getData();
     registrationScheme: "",
     registrationNumber: "",
     // Payment method
-    preferredPaymentMethod: "Cash" as Customer['preferredPaymentMethod']
+    preferredPaymentMethod: "cash" as Customer['preferredPaymentMethod']
   });
+
+    // Set customer type based on POS Profile business type when component mounts
+  useEffect(() => {
+    if (posDetails && !isEditing) {
+      let defaultCustomerType: Customer['customer_type'] = 'individual';
+
+      if (posDetails.business_type === 'B2B') {
+        defaultCustomerType = 'company';
+      } else if (posDetails.business_type === 'B2C') {
+        defaultCustomerType = 'individual';
+      } else if (posDetails.business_type === 'B2B & B2C') {
+        // Keep default as individual, but allow user to choose
+        defaultCustomerType = 'individual';
+      }
+
+      setFormData(prev => ({ ...prev, customer_type: defaultCustomerType }));
+
+             // For B2B and B2C company customers, show all sections at once
+       if (defaultCustomerType === 'company') {
+         setCurrentStep(4); // Show all steps
+         setCompletedSteps(new Set([1, 2, 3, 4]));
+       }
+    }
+  }, [posDetails, isEditing]);
+
+  // Check if we should show all sections at once (for B2B and B2C company customers)
+  const shouldShowAllSections = () => {
+    return formData.customer_type === 'company';
+  };
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -68,25 +94,22 @@ const countryOptions = countryList().getData();
     if (customer) {
       // Existing customer initialization code
       setFormData({
-        type: customer.type,
+        customer_type: customer.customer_type || "individual",
         name: customer.name,
         email: customer.email,
         phone: customer.phone,
         address: {
-          addressType: customer.address?.addressType || "Billing",
-          streetName: customer.address?.streetName || "",
-          buildingNumber: customer.address?.buildingNumber || "",
-          subdivisionName: customer.address?.subdivisionName || "",
-          cityName: customer.address?.cityName || "",
-          postalCode: customer.address?.postalCode || "",
-          country: customer.address?.country || "Saudi Arabia",
-          isPrimary: customer.address?.isPrimary !== false
+          street: customer.address?.street || "",
+          city: customer.address?.city || "",
+          state: customer.address?.state || "",
+          zipCode: customer.address?.zipCode || "",
+          country: customer.address?.country || "Saudi Arabia"
         },
         status: customer.status,
-        vatNumber: customer.vatNumber || "",
-        registrationScheme: customer.registrationScheme || "",
-        registrationNumber: customer.registrationNumber || "",
-        preferredPaymentMethod: customer.preferredPaymentMethod || "Cash"
+        vatNumber: "", // Not available in current Customer type
+        registrationScheme: "", // Not available in current Customer type
+        registrationNumber: "", // Not available in current Customer type
+        preferredPaymentMethod: customer.preferredPaymentMethod || "cash"
       });
       // If editing, show all steps as completed
       setCompletedSteps(new Set([1, 2, 3, 4]));
@@ -132,12 +155,12 @@ const countryOptions = countryList().getData();
     const newErrors: Record<string, string> = {};
 
     if (step === 1) {
-      if (formData.type === 'company') {
+      if (formData.customer_type === 'company') {
         // For company: Basic Information - name is required
         if (!formData.name.trim()) {
           newErrors.name = "Full name is required";
         }
-      } else if (formData.type === 'individual') {
+      } else if (formData.customer_type === 'individual') {
         // For individual: Basic + Contact - at least phone or email required
         if (!formData.email.trim() && !formData.phone.trim()) {
           newErrors.contact = "Either email or phone number must be provided";
@@ -149,7 +172,7 @@ const countryOptions = countryList().getData();
       }
     }
 
-    if (step === 2 && formData.type === 'company') {
+    if (step === 2 && formData.customer_type === 'company') {
       // Contact Information for company
       if (!formData.email.trim()) {
         newErrors.email = "Email is required for company";
@@ -164,7 +187,7 @@ const countryOptions = countryList().getData();
       }
     }
 
-    if (step === 3 && formData.type === 'company') {
+    if (step === 3 && formData.customer_type === 'company') {
       // ZATCA Details
       if (!formData.vatNumber.trim() && !formData.registrationNumber.trim()) {
         newErrors.vatOrRegistration = "Either VAT number or Registration number must be provided";
@@ -181,11 +204,10 @@ const countryOptions = countryList().getData();
     }
 
     // Address validation (optional but validate format if provided)
-    const addressStep = formData.type === 'company' ? 4 : 2;
+    const addressStep = formData.customer_type === 'company' ? 4 : 2;
     if (step === addressStep) {
-      if (formData.address.buildingNumber && !/^\d{4}$/.test(formData.address.buildingNumber)) {
-        newErrors.buildingNumber = "Building number must be exactly 4 digits";
-      }
+      // Note: buildingNumber is not available in current address structure
+      // Remove this validation for now
     }
 
     setErrors(newErrors);
@@ -209,16 +231,16 @@ const countryOptions = countryList().getData();
 
   const canProceedFromStep = (step: number): boolean => {
     if (step === 1) {
-      if (formData.type === 'company') {
+      if (formData.customer_type === 'company') {
         return formData.name.trim() !== "";
-      } else if (formData.type === 'individual') {
+      } else if (formData.customer_type === 'individual') {
         return formData.email.trim() !== "" || formData.phone.trim() !== "";
       }
     }
-    if (step === 2 && formData.type === 'company') {
+    if (step === 2 && formData.customer_type === 'company') {
       return formData.email.trim() !== "" && formData.phone.trim() !== "";
     }
-    if (step === 3 && formData.type === 'company') {
+    if (step === 3 && formData.customer_type === 'company') {
       return formData.vatNumber.trim() !== "" || formData.registrationNumber.trim() !== "";
     }
     return true;
@@ -245,11 +267,11 @@ const countryOptions = countryList().getData();
         name: formData.name,
         email: formData.email || undefined,
         phone: formData.phone || undefined,
-        type: formData.type,
+        customer_type: formData.customer_type,
         address: formData.address,
         status: formData.status,
         preferredPaymentMethod: formData.preferredPaymentMethod,
-        ...(formData.type === 'company' && {
+        ...(formData.customer_type === 'company' && {
           vatNumber: formData.vatNumber || undefined,
           registrationScheme: formData.registrationScheme || undefined,
           registrationNumber: formData.registrationNumber || undefined,
@@ -320,8 +342,8 @@ const addressTypes = [
 
   // Determine what steps to show based on customer type
   const getMaxSteps = () => {
-    if (formData.type === 'individual') return 2; // Basic+Contact, Address
-    if (formData.type === 'company') return 4; // Basic, Contact, ZATCA, Address
+    if (formData.customer_type === 'individual') return 2; // Basic+Contact, Address
+    if (formData.customer_type === 'company') return 4; // Basic, Contact, ZATCA, Address
     return 2;
   };
 
@@ -372,11 +394,11 @@ const addressTypes = [
           </div>
           <div className="text-sm text-gray-600 dark:text-gray-400">
             Step {currentStep} of {getMaxSteps()}: {
-              currentStep === 1 && formData.type === 'company' ? 'Basic Information' :
-              currentStep === 1 && formData.type === 'individual' ? 'Basic & Contact Information' :
-              currentStep === 2 && formData.type === 'company' ? 'Contact Information' :
-              currentStep === 2 && formData.type === 'individual' ? 'Address (Optional)' :
-              currentStep === 3 && formData.type === 'company' ? 'ZATCA Details' :
+              currentStep === 1 && formData.customer_type === 'company' ? 'Basic Information' :
+              currentStep === 1 && formData.customer_type === 'individual' ? 'Basic & Contact Information' :
+              currentStep === 2 && formData.customer_type === 'company' ? 'Contact Information' :
+              currentStep === 2 && formData.customer_type === 'individual' ? 'Address (Optional)' :
+              currentStep === 3 && formData.customer_type === 'company' ? 'ZATCA Details' :
               'Address (Optional)'
             }
           </div>
@@ -386,9 +408,9 @@ const addressTypes = [
         <form onSubmit={handleSubmit} className={isFullPage ? "flex-1 p-6 space-y-6 overflow-y-auto" : "p-6 space-y-6"}>
 
           {/* Step 1: Customer Type & Basic Information + Contact (Individual) OR Basic Only (Company) */}
-          <div className={`transition-all duration-300 ${currentStep >= 1 ? 'block' : 'hidden'}`}>
-            {/* Customer Type Selection - Only show if multiple types available */}
-            {availableCustomerTypes.length > 1 && (
+          <div className={`transition-all duration-300 ${currentStep >= 1 || shouldShowAllSections() ? 'block' : 'hidden'}`}>
+            {/* Customer Type Selection - Only show if B2B & B2C business type */}
+            {posDetails?.business_type === 'B2B & B2C' ? (
               <div className="mb-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                   Customer Type
@@ -400,7 +422,7 @@ const addressTypes = [
                       <label
                         key={type.value}
                         className={`relative flex flex-col items-center p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-gray-50 dark:hover:bg-gray-700 ${
-                          formData.type === type.value
+                          formData.customer_type === type.value
                             ? 'border-beveren-500 bg-beveren-50 dark:bg-beveren-900/20'
                             : 'border-gray-200 dark:border-gray-600'
                         }`}
@@ -409,30 +431,57 @@ const addressTypes = [
                           type="radio"
                           name="customerType"
                           value={type.value}
-                          checked={formData.type === type.value}
+                          checked={formData.customer_type === type.value}
                           onChange={(e) => {
-                            setFormData(prev => ({ ...prev, type: e.target.value as Customer['type'] }));
+                            setFormData(prev => ({ ...prev, customer_type: e.target.value as Customer['customer_type'] }));
                             setCurrentStep(1);
                             setCompletedSteps(new Set());
                           }}
                           className="sr-only"
                         />
                         <IconComponent size={24} className={`mb-2 ${
-                          formData.type === type.value ? 'text-beveren-600' : 'text-gray-400'
+                          formData.customer_type === type.value ? 'text-beveren-600' : 'text-gray-400'
                         }`} />
                         <span className={`font-medium text-sm ${
-                          formData.type === type.value ? 'text-beveren-900 dark:text-beveren-100' : 'text-gray-900 dark:text-white'
+                          formData.customer_type === type.value ? 'text-beveren-900 dark:text-beveren-100' : 'text-gray-900 dark:text-white'
                         }`}>
                           {type.label}
                         </span>
                         <span className={`text-xs text-center mt-1 ${
-                          formData.type === type.value ? 'text-beveren-700 dark:text-beveren-300' : 'text-gray-500 dark:text-gray-400'
+                          formData.customer_type === type.value ? 'text-beveren-700 dark:text-beveren-300' : 'text-gray-500 dark:text-gray-400'
                         }`}>
                           {type.desc}
                         </span>
                       </label>
                     );
                   })}
+                </div>
+              </div>
+            ) : (
+              /* Show current customer type when automatically determined */
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                  Customer Type
+                </h3>
+                <div className="bg-beveren-50 dark:bg-beveren-900/20 border-2 border-beveren-500 rounded-lg p-4">
+                  <div className="flex items-center">
+                    {formData.customer_type === 'company' ? (
+                      <Building size={24} className="text-beveren-600 mr-3" />
+                    ) : (
+                      <User size={24} className="text-beveren-600 mr-3" />
+                    )}
+                    <div>
+                      <span className="font-medium text-beveren-900 dark:text-beveren-100">
+                        {formData.customer_type === 'company' ? 'Company' : 'Individual'} Customer
+                      </span>
+                      <p className="text-sm text-beveren-700 dark:text-beveren-300 mt-1">
+                        {formData.customer_type === 'company'
+                          ? 'Business customer (B2B)'
+                          : 'Personal customer (B2C)'
+                        }
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -478,7 +527,7 @@ const addressTypes = [
                   </select>
                 </div> */}
 
-                {formData.type === "company" && (
+                {formData.customer_type === "company" && (
                     <div>
                       <label
                         htmlFor="country"
@@ -510,7 +559,7 @@ const addressTypes = [
             </div>
 
             {/* Contact Information for Individual - Show in Step 1 */}
-            {formData.type === 'individual' && (
+            {formData.customer_type === 'individual' && (
               <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 mt-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                   <Mail size={20} className="mr-2" />
@@ -561,7 +610,7 @@ const addressTypes = [
 <div className="flex justify-between mt-4">
   <div className="flex space-x-3">
     {/* Show Save button only if still on step 1 */}
-    {formData.type === 'individual' && canProceedFromStep(1) && currentStep === 1 && (
+    {formData.customer_type === 'individual' && canProceedFromStep(1) && currentStep === 1 && (
       <button
         type="submit"
         disabled={isSubmitting}
@@ -590,7 +639,7 @@ const addressTypes = [
       onClick={proceedToNextStep}
       className="px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors flex items-center space-x-2"
     >
-      <span>{formData.type === 'company' ? 'Continue to Contact' : 'Add Address'}</span>
+      <span>{formData.customer_type === 'company' ? 'Continue to Contact' : 'Add Address'}</span>
       <ChevronRight size={16} />
     </button>
   )}
@@ -599,7 +648,7 @@ const addressTypes = [
           </div>
 
           {/* Step 2: Contact Information (Company only) OR Address (Individual) */}
-          {currentStep >= 2 && formData.type === 'company' && (
+          {(currentStep >= 2 || shouldShowAllSections()) && formData.customer_type === 'company' && (
             <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                 <Mail size={20} className="mr-2" />
@@ -685,7 +734,7 @@ const addressTypes = [
           )}
 
           {/* Step 3: ZATCA Details (Company only) */}
-          {currentStep >= 3 && formData.type === 'company' && (
+          {(currentStep >= 3 || shouldShowAllSections()) && formData.customer_type === 'company' && (
             <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                 <CreditCard size={20} className="mr-2" />
@@ -798,8 +847,9 @@ const addressTypes = [
           )}
 
           {/* Step 2: Address for Individual OR Step 4: Address for Company */}
-          {(currentStep >= 2 && formData.type === 'individual') ||
- (currentStep >= 4 && formData.type === 'company') ? (
+          {(currentStep >= 2 && formData.customer_type === 'individual') ||
+ (currentStep >= 4 && formData.customer_type === 'company') ||
+ shouldShowAllSections() ? (
   <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
       <MapPin size={20} className="mr-2" />
@@ -842,7 +892,7 @@ const addressTypes = [
 
         <div>
           <label htmlFor="streetName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Street Name {formData.type === "company" && (
+            Street Name {formData.customer_type === "company" && (
     <span className="text-red-500">*</span>
   )}
           </label>
@@ -996,6 +1046,8 @@ const addressTypes = [
               {submitError}
             </div>
           )}
+
+
 
           {/* Cancel Button - Always visible */}
           <div className="flex justify-start pt-4 border-t border-gray-200 dark:border-gray-700">
