@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useProducts } from "../hooks/useProducts"
+import { usePOSDetails } from "../hooks/usePOSProfile"
 import RetailSidebar from "./RetailSidebar"
 import MenuGrid from "./MenuGrid"
 import OrderSummary from "./OrderSummary"
@@ -22,6 +23,10 @@ export default function RetailPOSLayout() {
   // Use professional data management
   const { products: menuItems, isLoading: loading, error, refetch } = useProducts()
 
+  // Get POS details including scanner-only setting
+  const { posDetails } = usePOSDetails()
+  const useScannerOnly = posDetails?.custom_use_scanner_fully || false
+
   // Use media query to detect mobile/tablet screens
   const isMobile = useMediaQuery("(max-width: 1024px)")
 
@@ -29,6 +34,17 @@ export default function RetailPOSLayout() {
     // Don't add if item is not available
     if (item.available <= 0) return
 
+    // If scanner-only mode is enabled, prevent adding items by clicking
+    if (useScannerOnly) {
+      console.log('Scanner-only mode enabled. Items can only be added via barcode scanning.')
+      return
+    }
+
+    addItemToCart(item)
+  }
+
+  // Separate function for adding items to cart (used by both click and barcode)
+  const addItemToCart = (item: MenuItem) => {
     const existingItem = cartItems.find((cartItem) => cartItem.id === item.id)
     if (existingItem) {
       setCartItems(
@@ -48,6 +64,11 @@ export default function RetailPOSLayout() {
           quantity: 1,
         },
       ])
+    }
+
+    // Show success message for barcode scanning
+    if (useScannerOnly) {
+      console.log(`✅ Added ${item.name} to cart via barcode scanning`)
     }
   }
 
@@ -79,7 +100,7 @@ export default function RetailPOSLayout() {
   }
 
   // Barcode scanning functionality - moved after handleAddToCart is defined
-  const { scanBarcode } = useBarcodeScanner(handleAddToCart)
+  const { scanBarcode } = useBarcodeScanner(addItemToCart)
 
   const handleBarcodeDetected = async (barcode: string) => {
     const success = await scanBarcode(barcode)
@@ -147,6 +168,18 @@ export default function RetailPOSLayout() {
     return <LoadingSpinner message="Loading products..." />
   }
 
+  // Show scanner-only mode indicator (desktop only)
+  const scannerOnlyIndicator = useScannerOnly && !isMobile && (
+    <div className="fixed top-4 right-4 z-50 bg-blue-600/90 text-white px-3 py-1.5 rounded-lg shadow-lg backdrop-blur-sm">
+      <div className="flex items-center space-x-2">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V6a1 1 0 00-1-1H5a1 1 0 00-1 1v1a1 1 0 001 1zm12 0h2a1 1 0 001-1V6a1 1 0 00-1-1h-2a1 1 0 00-1 1v1a1 1 0 001 1z" />
+        </svg>
+        <span className="text-sm font-medium">Scanner Only</span>
+      </div>
+    </div>
+  )
+
   // Show error state with retry option
   if (error) {
     return (
@@ -186,6 +219,7 @@ export default function RetailPOSLayout() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onScanBarcode={() => setShowScanner(true)}
+          scannerOnly={useScannerOnly}
         />
         <BarcodeScannerModal
           isOpen={showScanner}
@@ -199,6 +233,7 @@ export default function RetailPOSLayout() {
     // Desktop layout for larger screens
   return (
     <>
+      {scannerOnlyIndicator}
       <div className="flex h-screen bg-gray-50">
         {/* Sidebar */}
         <RetailSidebar />
@@ -214,6 +249,7 @@ export default function RetailPOSLayout() {
             onSearchKeyPress={handleSearchKeyPress}
             onAddToCart={handleAddToCart}
             onScanBarcode={() => setShowScanner(true)}
+            scannerOnly={useScannerOnly}
           />
         </div>
 

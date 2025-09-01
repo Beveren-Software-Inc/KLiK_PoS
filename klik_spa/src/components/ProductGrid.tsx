@@ -8,9 +8,10 @@ interface ProductGridProps {
   items: MenuItem[]
   onAddToCart: (item: MenuItem) => void
   isMobile?: boolean
+  scannerOnly?: boolean
 }
 
-export default function ProductGrid({ items, onAddToCart, isMobile = false }: ProductGridProps) {
+export default function ProductGrid({ items, onAddToCart, isMobile = false, scannerOnly = false }: ProductGridProps) {
   const { t } = useI18n()
 
   if (items.length === 0) {
@@ -35,7 +36,7 @@ export default function ProductGrid({ items, onAddToCart, isMobile = false }: Pr
         }`}
       >
         {items.map((item) => (
-          <ProductCard key={item.id} item={item} onAddToCart={onAddToCart} isMobile={isMobile} />
+          <ProductCard key={item.id} item={item} onAddToCart={onAddToCart} isMobile={isMobile} scannerOnly={scannerOnly} />
         ))}
       </div>
     </div>

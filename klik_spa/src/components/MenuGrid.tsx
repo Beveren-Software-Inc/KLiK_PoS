@@ -18,6 +18,7 @@ interface MenuGridProps {
   onSearchKeyPress?: (e: React.KeyboardEvent<HTMLInputElement>) => void
   onAddToCart: (item: MenuItem) => void
   onScanBarcode?: () => void
+  scannerOnly?: boolean
 }
 
 export default function MenuGrid({
@@ -29,6 +30,7 @@ export default function MenuGrid({
   onSearchKeyPress,
   onAddToCart,
   onScanBarcode,
+  scannerOnly = false,
 }: MenuGridProps) {
   const { t } = useI18n()
   const { user, logout } = useAuth()
@@ -177,7 +179,7 @@ export default function MenuGrid({
 
       {/* Products Grid */}
       <div className="flex-1 overflow-y-auto">
-        <ProductGrid items={items} onAddToCart={onAddToCart} />
+        <ProductGrid items={items} onAddToCart={onAddToCart} scannerOnly={scannerOnly} />
       </div>
     </div>
   )
