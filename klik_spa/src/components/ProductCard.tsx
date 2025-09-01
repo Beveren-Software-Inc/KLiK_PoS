@@ -7,11 +7,13 @@ interface ProductCardProps {
   item: MenuItem
   onAddToCart: (item: MenuItem) => void
   isMobile?: boolean
+  scannerOnly?: boolean
 }
 
-export default function ProductCard({ item, onAddToCart, isMobile = false }: ProductCardProps) {
+export default function ProductCard({ item, onAddToCart, isMobile = false, scannerOnly = false }: ProductCardProps) {
   const { t } = useI18n()
   const isOutOfStock = item.available <= 0
+  const isDisabled = isOutOfStock || scannerOnly
 
   // Format price based on currency
   const formattedPrice = `${item.currency_symbol}${item.price.toFixed(2)}`
@@ -19,11 +21,11 @@ export default function ProductCard({ item, onAddToCart, isMobile = false }: Pro
 return (
     <div
       className={`bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden transition-all duration-200 ${
-        isOutOfStock
-          ? "opacity-50 cursor-not-allowed"
+        isDisabled
+          ? "opacity-70 cursor-not-allowed"
           : "hover:shadow-lg hover:scale-105 cursor-pointer active:scale-95"
       } ${isMobile ? "touch-manipulation" : ""}`}
-      onClick={() => !isOutOfStock && onAddToCart(item)}
+      onClick={() => !isDisabled && onAddToCart(item)}
     >
       <div className="relative">
         <img
@@ -45,6 +47,13 @@ return (
         {isOutOfStock && (
           <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
             <span className="text-white font-bold text-xs">Out of Stock</span>
+          </div>
+        )}
+        {scannerOnly && !isOutOfStock && (
+          <div className="absolute inset-0  flex items-center justify-center">
+            <span className="text-blue-600 dark:text-blue-400 font-semibold text-xs bg-white/90 dark:bg-gray-800/90 px-2 py-1 rounded-md shadow-sm border border-blue-200 dark:border-blue-700">
+              Scan Only
+            </span>
           </div>
         )}
       </div>
