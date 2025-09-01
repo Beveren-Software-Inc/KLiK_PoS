@@ -10,7 +10,7 @@ def get_sales_invoices(limit=100, start=0):
     try:
         invoices = frappe.get_all(
             "Sales Invoice",
-            filters={},  
+            filters={},
             fields=[
                 "name",
                 "posting_date",
@@ -92,18 +92,18 @@ def get_invoice_details(invoice_id):
         }
 
 
-        
+
 @frappe.whitelist()
 def create_and_submit_invoice(data):
     print("Data received in create_and_submit_invoice:", data)
     try:
         customer, items, amount_paid, sales_and_tax_charges, mode_of_payment, business_type, roundoff_amount = parse_invoice_data(data)
         doc = build_sales_invoice_doc(
-            customer, items, amount_paid, sales_and_tax_charges, 
-            mode_of_payment, business_type, roundoff_amount, 
+            customer, items, amount_paid, sales_and_tax_charges,
+            mode_of_payment, business_type, roundoff_amount,
             include_payments=True
         )
-        
+
         doc.base_paid_amount = amount_paid
         doc.paid_amount = amount_paid
         doc.outstanding_amount = 0
@@ -132,8 +132,8 @@ def create_draft_invoice(data):
     try:
         customer, items, amount_paid, sales_and_tax_charges, mode_of_payment, business_type, roundoff_amount = parse_invoice_data(data)
         doc = build_sales_invoice_doc(
-            customer, items, amount_paid, sales_and_tax_charges, 
-            mode_of_payment, business_type, roundoff_amount, 
+            customer, items, amount_paid, sales_and_tax_charges,
+            mode_of_payment, business_type, roundoff_amount,
             include_payments=True
         )
         doc.insert(ignore_permissions=True)
@@ -160,29 +160,29 @@ def parse_invoice_data(data):
     print("My data", str(data))
     customer = data.get("customer", {}).get("id")
     items = data.get("items", [])
-    
+
     amount_paid = 0.0
     sales_and_tax_charges = get_current_pos_profile().taxes_and_charges
     business_type = data.get("businessType")
     mode_of_payment = None
-    
+
     # Extract round-off data from frontend
     roundoff_amount = data.get("roundOffAmount", 0.0)
-    
+
     # Only get round-off account if round-off amount is not zero
     roundoff_account = None
     if roundoff_amount != 0:
         roundoff_account = get_writeoff_account()
-    
+
     if data.get("amountPaid"):
         amount_paid = data.get("amountPaid")
-        
+
     if data.get("paymentMethods"):
         mode_of_payment = data.get("paymentMethods")
-        
+
     if data.get("SalesTaxCharges"):
         sales_and_tax_charges = data.get("SalesTaxCharges")
-    
+
     if not customer or not items:
         frappe.throw(_("Customer and items are required"))
 
@@ -243,7 +243,7 @@ def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,
     # Add round-off entry to taxes if present and not zero
     if roundoff_amount != 0:
         conversion_rate = doc.conversion_rate or 1
-       
+
     # Add payments if required
     if include_payments and isinstance(mode_of_payment, list):
         for payment in mode_of_payment:
@@ -391,7 +391,7 @@ def set_grand_total_with_roundoff(doc, method):
         return
     if not doc.custom_roundoff_account or not doc.custom_roundoff_amount:
         return
-    
+
     # Monkey Patch calculate_totals method to include round-off
     calculate_taxes_and_totals.calculate_totals = custom_calculate_totals
 
@@ -412,8 +412,8 @@ def custom_calculate_totals(self):
 		self.doc.total_taxes_and_charges = 0.0
 
 	# Make Grand Total Less Retention
-	if (self.doc.doctype == "Sales Invoice" 
-		and self.doc.custom_roundoff_account 
+	if (self.doc.doctype == "Sales Invoice"
+		and self.doc.custom_roundoff_account
         and self.doc.custom_roundoff_amount):
 		self.doc.grand_total -= self.doc.custom_roundoff_amount
 
@@ -453,13 +453,13 @@ def custom_calculate_totals(self):
 	self.doc.round_floats_in(self.doc, ["grand_total", "base_grand_total"])
 
 	self.set_rounded_total()
- 
+
 
 def create_roundoff_writeoff_entry(self):
     """Create a write-off entry for round-off amount"""
     if not self.doc.custom_roundoff_amount or not self.doc.custom_roundoff_account:
         return
-        
+
     # Add round-off entry as a separate line item or tax entry
     roundoff_entry = {
         "charge_type": "Actual",
@@ -472,18 +472,18 @@ def create_roundoff_writeoff_entry(self):
         "included_in_print_rate": 0,
         "cost_center": self.doc.cost_center or frappe.get_cached_value("Company", self.doc.company, "cost_center")
     }
-    
+
     # Add to taxes table
     self.doc.append("taxes", roundoff_entry)
-    
-    
+
+
 
 def get_writeoff_account():
     pos_profile = get_current_pos_profile()
     if pos_profile.write_off_account:
         return pos_profile.write_off_account
-    
-    
+
+
 # Copyright (c) 2025, Beveren Software Inc and contributors
 # For license information, please see license.txt
 
@@ -519,7 +519,7 @@ class CustomSalesInvoice(SalesInvoice):
 
 		return gl_entries
 
-	
+
 	def make_roundoff_gl_entry(self, gl_entries):
 		if self.custom_roundoff_account and self.custom_roundoff_amount:
 			against_voucher = self.name
@@ -558,7 +558,7 @@ def create_payment_entry(sales_invoice, mode_of_payment, amount_paid):
         # Get company and customer details
         company = sales_invoice.company
         customer = sales_invoice.customer
-        
+
         # Create Payment Entry
         payment_entry = frappe.new_doc("Payment Entry")
         payment_entry.payment_type = "Receive"
@@ -566,60 +566,60 @@ def create_payment_entry(sales_invoice, mode_of_payment, amount_paid):
         payment_entry.party = customer
         payment_entry.company = company
         payment_entry.posting_date = frappe.utils.nowdate()
-        
+
         # Set paid amount
         payment_entry.paid_amount = amount_paid
         payment_entry.received_amount = amount_paid
         payment_entry.source_exchange_rate = 1
         payment_entry.target_exchange_rate = 1
-        
+
         # Get default accounts
         company_doc = frappe.get_doc("Company", company)
-        
+
         # Set party account (Customer's receivable account)
         payment_entry.party_account = get_customer_receivable_account(customer, company)
-        
+
         # Handle multiple payment methods
         if isinstance(mode_of_payment, list) and len(mode_of_payment) > 0:
             first_payment = mode_of_payment[0]
             mode_of_payment_doc = frappe.get_doc("Mode of Payment", first_payment["method"])
-            
+
             for account in mode_of_payment_doc.accounts:
                 if account.company == company:
                     payment_entry.paid_to = account.default_account
                     break
-            
+
             if not payment_entry.paid_to:
                 payment_entry.paid_to = company_doc.default_cash_account
-            
+
             payment_entry.mode_of_payment = first_payment["method"]
-            
+
             # Add reference to Sales Invoice
             payment_entry.append("references", {
                 "reference_doctype": "Sales Invoice",
                 "reference_name": sales_invoice.name,
                 "allocated_amount": amount_paid
             })
-            
+
         else:
             payment_entry.paid_to = company_doc.default_cash_account
             payment_entry.mode_of_payment = "Cash"
-            
+
             # Add reference to Sales Invoice
             payment_entry.append("references", {
                 "reference_doctype": "Sales Invoice",
                 "reference_name": sales_invoice.name,
                 "allocated_amount": amount_paid
             })
-        
+
         payment_entry.paid_from_account_currency = sales_invoice.currency
         payment_entry.paid_to_account_currency = sales_invoice.currency
-        
+
         payment_entry.save()
         payment_entry.submit()
-        
+
         return payment_entry
-        
+
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), f"Error creating payment entry for invoice {sales_invoice.name}")
         frappe.throw(f"Failed to create payment entry: {str(e)}")
@@ -632,3 +632,300 @@ def get_customer_receivable_account(customer, company):
     except Exception as e:
         frappe.log_error(f"Error getting receivable account for customer {customer}: {str(e)}")
         return frappe.db.get_value("Company", company, "default_receivable_account")
+
+
+@frappe.whitelist()
+def returned_qty(customer, sales_invoice, item):
+    """Get total returned quantity for a specific item from a specific invoice for a customer"""
+    values = {
+        'customer': customer,
+        'sales_invoice': sales_invoice,
+        'item': item
+    }
+
+    total_returned = frappe.db.sql("""
+        SELECT
+            `tabCredit Details`.sales_invoice,
+            `tabSales Invoice`.customer,
+            SUM(`tabCredit Details`.qtr) AS total_returned_qty
+        FROM
+            `tabSales Invoice`
+        JOIN
+            `tabCredit Details` ON `tabSales Invoice`.name = `tabCredit Details`.parent
+        WHERE
+            `tabSales Invoice`.customer = %(customer)s
+            AND `tabCredit Details`.sales_invoice = %(sales_invoice)s
+            AND `tabCredit Details`.item = %(item)s
+            AND `tabSales Invoice`.docstatus = 1
+            AND `tabSales Invoice`.status != 'Cancelled'
+        GROUP BY
+            `tabCredit Details`.sales_invoice, `tabSales Invoice`.customer
+    """, values=values, as_dict=True)
+
+    if not total_returned:
+        return {'total_returned_qty': 0}
+
+    return total_returned[0]
+
+
+@frappe.whitelist()
+def get_valid_sales_invoices(doctype, txt, searchfield, start, page_len, filters=None):
+    """Get valid sales invoices based on filters for multi-invoice returns"""
+    filters = filters or {}
+
+    customer = filters.get("customer")
+    shipping_address = filters.get("shipping_address")
+    item_code = filters.get("item_code")
+    start_date = filters.get("start_date")
+
+    if not customer or not item_code or not start_date:
+        return []
+
+    # Build dynamic conditions
+    conditions = ["si.docstatus = 1", "si.is_return = 0"]
+    query_params = {
+        "txt": f"%{txt}%",
+        "start": start,
+        "page_len": page_len,
+    }
+
+    if customer:
+        conditions.append("si.customer = %(customer)s")
+        query_params["customer"] = customer
+
+    if shipping_address:
+        conditions.append("si.shipping_address_name = %(shipping_address)s")
+        query_params["shipping_address"] = shipping_address
+
+    if item_code:
+        conditions.append("sii.item_code = %(item_code)s")
+        query_params["item_code"] = item_code
+
+    if start_date:
+        conditions.append("si.posting_date >= %(start_date)s")
+        query_params["start_date"] = start_date
+
+    # Add logic for returned quantities dynamically in SQL
+    conditions.append("""
+        (sii.qty + COALESCE((
+            SELECT SUM(cd.qtr)
+            FROM `tabCredit Details` cd
+            JOIN `tabSales Invoice` rsi ON cd.parent = rsi.name
+            WHERE cd.sales_invoice = si.name
+            AND cd.item = sii.item_code
+            AND rsi.customer = si.customer
+            AND rsi.docstatus = 1
+            AND rsi.status != 'Cancelled'
+        ), 0)) > 0
+    """)
+
+    # Construct query
+    where_clause = " AND ".join(conditions)
+    query = f"""
+        SELECT DISTINCT si.name,si.posting_date,sii.qty
+        FROM `tabSales Invoice` si
+        JOIN `tabSales Invoice Item` sii ON si.name = sii.parent
+        WHERE {where_clause}
+        AND si.name LIKE %(txt)s
+        LIMIT %(start)s, %(page_len)s
+    """
+
+    return frappe.db.sql(query, query_params)
+
+
+@frappe.whitelist()
+def get_customer_invoices_for_return(customer, start_date=None, end_date=None):
+    """Get all invoices for a customer within date range that can be returned"""
+    try:
+        filters = {
+            "customer": customer,
+            "docstatus": 1,
+            "is_return": 0,
+            "status": ["!=", "Cancelled"]
+        }
+
+        if start_date:
+            filters["posting_date"] = [">=", start_date]
+        if end_date:
+            if "posting_date" in filters:
+                filters["posting_date"] = ["between", [start_date, end_date]]
+            else:
+                filters["posting_date"] = ["<=", end_date]
+
+        invoices = frappe.get_all(
+            "Sales Invoice",
+            filters=filters,
+            fields=[
+                "name",
+                "posting_date",
+                "posting_time",
+                "customer",
+                "grand_total",
+                "status"
+            ],
+            order_by="posting_date desc"
+        )
+
+        # Get items for each invoice with returned quantities
+        for invoice in invoices:
+            items = frappe.get_all(
+                "Sales Invoice Item",
+                filters={"parent": invoice.name},
+                fields=[
+                    "item_code",
+                    "item_name",
+                    "qty",
+                    "rate",
+                    "amount"
+                ]
+            )
+
+            # Calculate returned quantities for each item
+            for item in items:
+                returned_data = returned_qty(customer, invoice.name, item.item_code)
+                item.returned_qty = returned_data.get("total_returned_qty", 0)
+                item.available_qty = item.qty - item.returned_qty
+
+            invoice.items = items
+
+        return {
+            "success": True,
+            "data": invoices
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), f"Error fetching customer invoices for return")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+@frappe.whitelist()
+def create_partial_return(invoice_name, return_items):
+    """Create a partial return for selected items from an invoice"""
+    try:
+        if isinstance(return_items, str):
+            return_items = json.loads(return_items)
+
+        original_invoice = frappe.get_doc("Sales Invoice", invoice_name)
+
+        if original_invoice.docstatus != 1:
+            frappe.throw("Only submitted invoices can be returned.")
+
+        if original_invoice.is_return:
+            frappe.throw("This invoice is already a return.")
+
+        # Create return invoice
+        return_doc = frappe.new_doc("Sales Invoice")
+        return_doc.customer = original_invoice.customer
+        return_doc.is_return = 1
+        return_doc.return_against = invoice_name
+        return_doc.posting_date = frappe.utils.nowdate()
+        return_doc.due_date = frappe.utils.nowdate()
+        return_doc.custom_delivery_date = frappe.utils.nowdate()
+        return_doc.currency = original_invoice.currency
+        return_doc.is_pos = original_invoice.is_pos
+        return_doc.update_stock = 1
+
+        # Copy taxes and charges from original invoice
+        if original_invoice.taxes_and_charges:
+            return_doc.taxes_and_charges = original_invoice.taxes_and_charges
+
+        # Copy only selected items with return quantities
+        for return_item in return_items:
+            if return_item.get("return_qty", 0) > 0:
+                # Find original item
+                orig_item = None
+                for item in original_invoice.items:
+                    if item.item_code == return_item["item_code"]:
+                        orig_item = item
+                        break
+
+                if orig_item:
+                    return_doc.append("items", {
+                        "item_code": orig_item.item_code,
+                        "item_name": orig_item.item_name,
+                        "qty": -abs(return_item["return_qty"]),
+                        "rate": orig_item.rate,
+                        "income_account": orig_item.income_account,
+                        "expense_account": orig_item.expense_account,
+                        "prevdoc_detail_docname": orig_item.name
+                    })
+
+        # Copy payment methods with negative amounts
+        for payment in original_invoice.payments:
+            return_doc.append("payments", {
+                "mode_of_payment": payment.mode_of_payment,
+                "amount": -abs(payment.amount * (len(return_items) / len(original_invoice.items))),  # Proportional
+                "account": payment.account
+            })
+
+        # If taxes_and_charges is set, populate taxes manually
+        if return_doc.taxes_and_charges:
+            tax_doc = get_tax_template(return_doc.taxes_and_charges)
+            if tax_doc:
+                for tax in tax_doc.taxes:
+                    return_doc.append("taxes", {
+                        "charge_type": tax.charge_type,
+                        "account_head": tax.account_head,
+                        "description": tax.description,
+                        "cost_center": tax.cost_center,
+                        "rate": tax.rate,
+                        "row_id": tax.row_id,
+                        "tax_amount": tax.tax_amount,
+                        "included_in_print_rate": tax.included_in_print_rate,
+                    })
+
+        return_doc.save()
+        return_doc.submit()
+
+        return {
+            "success": True,
+            "return_invoice": return_doc.name,
+            "message": f"Partial return created successfully: {return_doc.name}"
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Partial Return Error")
+        return {
+            "success": False,
+            "message": str(e)
+        }
+
+
+@frappe.whitelist()
+def create_multi_invoice_return(return_data):
+    """Create multiple return invoices for items from different invoices"""
+    try:
+        if isinstance(return_data, str):
+            return_data = json.loads(return_data)
+
+        customer = return_data.get("customer")
+        invoice_returns = return_data.get("invoice_returns", [])
+
+        created_returns = []
+
+        for invoice_return in invoice_returns:
+            invoice_name = invoice_return.get("invoice_name")
+            return_items = invoice_return.get("return_items", [])
+
+            if return_items:
+                result = create_partial_return(invoice_name, return_items)
+                if result.get("success"):
+                    created_returns.append(result.get("return_invoice"))
+                else:
+                    frappe.log_error(f"Failed to create return for {invoice_name}: {result.get('message')}")
+
+        return {
+            "success": True,
+            "created_returns": created_returns,
+            "message": f"Created {len(created_returns)} return invoices successfully"
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Multi Invoice Return Error")
+        return {
+            "success": False,
+            "message": str(e)
+        }

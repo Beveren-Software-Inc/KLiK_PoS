@@ -1,0 +1,207 @@
+export interface ReturnItem {
+  item_code: string;
+  item_name: string;
+  qty: number;
+  rate: number;
+  amount: number;
+  returned_qty: number;
+  available_qty: number;
+  return_qty?: number;
+}
+
+export interface InvoiceForReturn {
+  name: string;
+  posting_date: string;
+  posting_time: string;
+  customer: string;
+  grand_total: number;
+  status: string;
+  items: ReturnItem[];
+}
+
+export interface ReturnData {
+  customer: string;
+  invoice_returns: {
+    invoice_name: string;
+    return_items: ReturnItem[];
+  }[];
+}
+
+export async function getReturnedQty(customer: string, salesInvoice: string, item: string) {
+  try {
+    const response = await fetch(`/api/method/klik_pos.api.sales_invoice.returned_qty`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        customer,
+        sales_invoice: salesInvoice,
+        item
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to get returned quantity');
+    }
+
+    return {
+      success: true,
+      data: data.message
+    };
+  } catch (error: any) {
+    console.error('Error getting returned quantity:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to get returned quantity'
+    };
+  }
+}
+
+export async function getCustomerInvoicesForReturn(
+  customer: string,
+  startDate?: string,
+  endDate?: string
+): Promise<{success: boolean; data?: InvoiceForReturn[]; error?: string}> {
+  try {
+    const params = new URLSearchParams({
+      customer,
+      ...(startDate && { start_date: startDate }),
+      ...(endDate && { end_date: endDate })
+    });
+
+    const response = await fetch(`/api/method/klik_pos.api.sales_invoice.get_customer_invoices_for_return?${params}`);
+    const data = await response.json();
+
+    if (!response.ok || !data.message.success) {
+      throw new Error(data.message.error || 'Failed to fetch customer invoices');
+    }
+
+    return {
+      success: true,
+      data: data.message.data
+    };
+  } catch (error: any) {
+    console.error('Error fetching customer invoices for return:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to fetch customer invoices'
+    };
+  }
+}
+
+export async function createPartialReturn(
+  invoiceName: string,
+  returnItems: ReturnItem[]
+): Promise<{success: boolean; returnInvoice?: string; message?: string; error?: string}> {
+  try {
+    const response = await fetch(`/api/method/klik_pos.api.sales_invoice.create_partial_return`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        invoice_name: invoiceName,
+        return_items: returnItems
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.message.success) {
+      throw new Error(data.message.message || 'Failed to create partial return');
+    }
+
+    return {
+      success: true,
+      returnInvoice: data.message.return_invoice,
+      message: data.message.message
+    };
+  } catch (error: any) {
+    console.error('Error creating partial return:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to create partial return'
+    };
+  }
+}
+
+export async function createMultiInvoiceReturn(
+  returnData: ReturnData
+): Promise<{success: boolean; createdReturns?: string[]; message?: string; error?: string}> {
+  try {
+    const response = await fetch(`/api/method/klik_pos.api.sales_invoice.create_multi_invoice_return`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        return_data: returnData
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.message.success) {
+      throw new Error(data.message.message || 'Failed to create multi-invoice return');
+    }
+
+    return {
+      success: true,
+      createdReturns: data.message.created_returns,
+      message: data.message.message
+    };
+  } catch (error: any) {
+    console.error('Error creating multi-invoice return:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to create multi-invoice return'
+    };
+  }
+}
+
+export async function getValidSalesInvoices(
+  customer: string,
+  itemCode: string,
+  startDate: string,
+  shippingAddress?: string,
+  searchText?: string
+) {
+  try {
+    const filters = {
+      customer,
+      item_code: itemCode,
+      start_date: startDate,
+      ...(shippingAddress && { shipping_address: shippingAddress })
+    };
+
+    const params = new URLSearchParams({
+      doctype: 'Sales Invoice',
+      txt: searchText || '',
+      searchfield: 'name',
+      start: '0',
+      page_len: '20',
+      filters: JSON.stringify(filters)
+    });
+
+    const response = await fetch(`/api/method/klik_pos.api.sales_invoice.get_valid_sales_invoices?${params}`);
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to fetch valid sales invoices');
+    }
+
+    return {
+      success: true,
+      data: data.message
+    };
+  } catch (error: any) {
+    console.error('Error fetching valid sales invoices:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to fetch valid sales invoices'
+    };
+  }
+}

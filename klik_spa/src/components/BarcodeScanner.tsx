@@ -29,8 +29,6 @@ export default function BarcodeScannerModal({ onBarcodeDetected, onClose, isOpen
     }
   }, [])
 
-
-
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && manualBarcode.trim()) {
       e.preventDefault()

@@ -96,7 +96,7 @@ export interface SalesInvoice {
   customer_address_doc?: AddressDoc;
   company_address_doc?: AddressDoc;
   company: string;
-  posting_date: string; 
+  posting_date: string;
   posting_time: string;
 }
 
@@ -187,6 +187,8 @@ export interface Customer {
   createdAt: string
   lastVisit?: string
   avatar?: string
+  defaultCurrency?: string
+  companyCurrency?: string
 }
 
 export interface PaymentMode {

@@ -19,6 +19,8 @@ import {
   FileText,
   CheckCircle,
   AlertTriangle,
+  RotateCcw,
+  Users,
 } from "lucide-react";
 
 
@@ -28,7 +30,9 @@ import { useInvoiceDetails } from "../hooks/useInvoiceDetails";
 import { createSalesReturn } from "../services/salesInvoice";
 import { toast } from "react-toastify";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
-import { DisplayPrintPreview, handlePrintInvoice } from "../utils/invoicePrint"
+import { DisplayPrintPreview, handlePrintInvoice } from "../utils/invoicePrint";
+import SingleInvoiceReturn from "../components/SingleInvoiceReturn";
+import MultiInvoiceReturn from "../components/MultiInvoiceReturn";
 
 export default function InvoiceViewPage() {
   // const { id: invoiceId } = useParams(); // ✅ extract ID from URL
@@ -42,6 +46,10 @@ export default function InvoiceViewPage() {
   // PaymentDialog state for sharing
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [sharingMode, setSharingMode] = useState<string | null>(null) // 'email', 'sms', 'whatsapp'
+
+  // Return modals state
+  const [showSingleReturn, setShowSingleReturn] = useState(false)
+  const [showMultiReturn, setShowMultiReturn] = useState(false)
 
 
   const handleBackClick = () => {
@@ -86,6 +94,16 @@ export default function InvoiceViewPage() {
 
   const handleEditCustomer = () => {
     // Navigate to customer edit page
+  };
+
+  const handleSingleReturnSuccess = (returnInvoice: string) => {
+    toast.success(`Return invoice created: ${returnInvoice}`);
+    navigate(`/invoice/${returnInvoice}`);
+  };
+
+  const handleMultiReturnSuccess = (returnInvoices: string[]) => {
+    toast.success(`${returnInvoices.length} return invoices created successfully`);
+    navigate('/invoice'); // Navigate back to invoice list
   };
 
   // Loading state
@@ -171,9 +189,9 @@ export default function InvoiceViewPage() {
               {/* Action Buttons */}
               <div className="flex items-center space-x-3">
                 <div className="sr-only">
-                                    <DisplayPrintPreview invoice={invoice} />
-
+                  <DisplayPrintPreview invoice={invoice} />
                 </div>
+
                 <button
                   className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"
                   title="Print"
@@ -214,6 +232,29 @@ export default function InvoiceViewPage() {
                 >
                   <MessageSquarePlus size={20} />
                 </button>
+
+                {/* Return Buttons */}
+                {invoice.status === "Paid" && !invoice.is_return && (
+                  <>
+                    <div className="w-px h-6 bg-gray-300 dark:bg-gray-600"></div>
+
+                    <button
+                      className="p-2 text-orange-600 hover:bg-orange-100 dark:text-orange-400 dark:hover:bg-orange-900 rounded-lg"
+                      title="Return Items"
+                      onClick={() => setShowSingleReturn(true)}
+                    >
+                      <RotateCcw size={20} />
+                    </button>
+
+                    <button
+                      className="p-2 text-indigo-600 hover:bg-indigo-100 dark:text-indigo-400 dark:hover:bg-indigo-900 rounded-lg"
+                      title="Multi-Invoice Return"
+                      onClick={() => setShowMultiReturn(true)}
+                    >
+                      <Users size={20} />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -516,6 +557,22 @@ export default function InvoiceViewPage() {
           externalInvoiceData={invoice} // Pass the actual invoice data
         />
       )}
+
+      {/* Single Invoice Return Modal */}
+      <SingleInvoiceReturn
+        invoice={invoice}
+        isOpen={showSingleReturn}
+        onClose={() => setShowSingleReturn(false)}
+        onSuccess={handleSingleReturnSuccess}
+      />
+
+      {/* Multi-Invoice Return Modal */}
+      <MultiInvoiceReturn
+        customer={invoice?.customer || ''}
+        isOpen={showMultiReturn}
+        onClose={() => setShowMultiReturn(false)}
+        onSuccess={handleMultiReturnSuccess}
+      />
 
       </div>
     </div>

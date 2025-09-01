@@ -27,7 +27,7 @@ export default function RetailPOSLayout() {
   const { posDetails } = usePOSDetails()
   const useScannerOnly = posDetails?.custom_use_scanner_fully || false
 
-  // Use media query to detect mobile/tablet screens
+    // Use media query to detect mobile/tablet screens
   const isMobile = useMediaQuery("(max-width: 1024px)")
 
   const handleAddToCart = (item: MenuItem) => {

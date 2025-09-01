@@ -32,7 +32,7 @@ export default function MobilePOSLayout({
   const { t } = useI18n()
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
-  const { cartItems, addToCart } = useCartStore()
+    const { cartItems, addToCart } = useCartStore()
   const navigate = useNavigate()
   const [showUserMenu, setShowUserMenu] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -95,6 +95,7 @@ export default function MobilePOSLayout({
                 </div>
               </div>
             )}
+
           </div>
 
           <div className="flex items-center space-x-2 relative" ref={dropdownRef}>
@@ -224,6 +225,7 @@ export default function MobilePOSLayout({
             <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
               {totalItems}
             </span>
+
           </div>
         </button>
       )}
