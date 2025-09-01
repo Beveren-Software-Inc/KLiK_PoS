@@ -215,7 +215,7 @@ const handleCustomerSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) =
 }
 
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleCompletePayment = (paymentData: any) => {
     // In a real app, this would process the payment and create invoice
     console.log('Processing payment:', paymentData)
@@ -224,17 +224,30 @@ const handleCustomerSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) =
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleHoldOrder = (orderData: any) => {
+  const handleHoldOrder = async (orderData: any) => {
     if (!selectedCustomer) {
       toast.error("Kindly select a customer")
       return;
     }
-    // Creates a draft invoice and saves the order
-    console.log('Creating draft invoice:', orderData)
-    setShowPaymentDialog(false)
-    createDraftSalesInvoice(orderData)
-    handleClearCart()
-    toast.success('Draft invoice created and order held successfully!')
+
+    try {
+      // Creates a draft invoice and saves the order
+      console.log('Creating draft invoice:', orderData)
+      setShowPaymentDialog(false)
+
+      const result = await createDraftSalesInvoice(orderData)
+      console.log('Draft invoice result:', result)
+
+      if (result && result.success) {
+        handleClearCart()
+        toast.success('Draft invoice created and order held successfully!')
+      } else {
+        toast.error('Failed to create draft invoice')
+      }
+    } catch (error) {
+      console.error('Error creating draft invoice:', error)
+      toast.error('Failed to create draft invoice: ' + (error as Error).message)
+    }
   }
 
   const handleClearCart = () => {
@@ -332,7 +345,7 @@ useEffect(() => {
       {/* Header */}
       {!isMobile && (
         <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-          <h2 className="text-xl font-semibold font-medium text-gray-900 dark:text-white mb-3">Shopping Cart</h2>
+                    <h2 className="text-xl font-semibold font-medium text-gray-900 dark:text-white mb-3">Shopping Cart</h2>
 
           {/* Customer Search */}
           <div className="relative">
@@ -881,32 +894,31 @@ useEffect(() => {
           {/* Action Buttons */}
           <div className={`grid grid-cols-2 gap-3 ${isMobile ? "mb-3" : ""}`}>
             <button
-  onClick={() => {
-    handleHoldOrder({
-      items: cartItems.map(item => ({
-        ...item,
-        discountedPrice: getDiscountedPrice(item),
-        itemDiscount: itemDiscounts[item.id] || {},
-        originalPrice: item.price,
-        finalAmount: getDiscountedPrice(item) * item.quantity
-      })),
-      customer: selectedCustomer,
-      subtotal,
-      total,
-      appliedCoupons,
-      itemDiscounts,
-      totalItemDiscount,
-      totalSavings: totalItemDiscount + couponDiscount,
-      status: 'held'
-    })
+              onClick={() => {
+                if (!validateCustomer()) return;
 
-    // Navigate home
-    navigate('/')
-  }}
-  className="px-4 py-3 border border-beveren-600 text-beveren-600 dark:text-beveren-400 rounded-xl font-medium hover:bg-beveren-50 dark:hover:bg-beveren-900/20 transition-colors"
->
-  Hold
-</button>
+                const orderData = {
+                  items: cartItems.map(item => ({
+                    id: item.id,
+                    quantity: item.quantity,
+                    price: getDiscountedPrice(item)
+                  })),
+                  customer: { id: selectedCustomer.id },
+                  subtotal,
+                  total,
+                  appliedCoupons,
+                  itemDiscounts,
+                  totalItemDiscount,
+                  totalSavings: totalItemDiscount + couponDiscount,
+                  status: 'held'
+                };
+
+                handleHoldOrder(orderData);
+              }}
+              className="px-4 py-3 border border-beveren-600 text-beveren-600 dark:text-beveren-400 rounded-xl font-medium hover:bg-beveren-600 hover:text-white transition-colors"
+            >
+              Hold
+            </button>
             <button
               onClick={handleClearCart}
               className="px-4 py-3 border border-red-500 text-red-600 dark:text-red-400 rounded-xl font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"

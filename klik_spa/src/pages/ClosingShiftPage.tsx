@@ -18,9 +18,11 @@ import RetailSidebar from "../components/RetailSidebar";
 import { usePOSDetails } from "../hooks/usePOSProfile";
 import { useCreatePOSClosingEntry } from "../services/closingEntry";
 import BottomNavigation from "../components/BottomNavigation";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 
 export default function ClosingShiftPage() {
   const navigate = useNavigate();
+  const isMobile = useMediaQuery("(max-width: 1024px)");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("today");
@@ -31,7 +33,7 @@ export default function ClosingShiftPage() {
   const [closingAmounts, setClosingAmounts] = useState({});
   const { createClosingEntry, isCreating } = useCreatePOSClosingEntry();
 
-  const { invoices, isLoading, error } = useSalesInvoices(); 
+  const { invoices, isLoading, error } = useSalesInvoices();
   const { modes } = useAllPaymentModes()
   const { posDetails } = usePOSDetails();
 
@@ -166,9 +168,9 @@ export default function ClosingShiftPage() {
   const paymentStats = modes.reduce((acc, mode) => {
     acc[mode.name] = {
       name: mode.name,
-      openingAmount: mode.openingAmount || 0,  
-      amount: mode.amount || 0,                
-      transactions: mode.transactions || 0    
+      openingAmount: mode.openingAmount || 0,
+      amount: mode.amount || 0,
+      transactions: mode.transactions || 0
     };
     return acc;
   }, {});
@@ -194,16 +196,292 @@ export default function ClosingShiftPage() {
     }
   };
 
+  // Mobile layout: full-width content and persistent bottom navigation
+  if (isMobile) {
+    return (
+      <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
+        {/* Mobile Header */}
+        <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+          <div className="px-4 py-3">
+            <div className="flex items-center justify-between">
+              <h1 className="text-lg font-bold text-gray-900 dark:text-white">Closing Shift</h1>
+              <button
+                onClick={() => setShowCloseModal(true)}
+                className="flex items-center space-x-2 px-3 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors text-sm"
+              >
+                <MonitorX className="w-4 h-4" />
+                <span>Close</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto pb-20 w-[98%] mx-auto px-2 py-4">
+          {/* Payment Summary - Only show if not hidden */}
+          {!hideExpectedAmount && (
+            <div className="grid grid-cols-1 gap-4 mb-6">
+              {Object.values(paymentStats).map((stat) => (
+                <div key={stat.name} className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-gray-900 dark:text-white">{stat.name}</h3>
+                    {stat.name.toLowerCase().includes('cash') ? (
+                      <div className="text-2xl">💵</div>
+                    ) : (
+                      <CreditCard className="w-8 h-8 text-beveren-600" />
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                      ${stat.amount.toFixed(2)}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      {stat.transactions} transactions
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      {total > 0 ? ((stat.amount / total) * 100).toFixed(1) : 0}% of total
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Filters */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 mb-6">
+            <div className="grid grid-cols-1 gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+              <select
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                disabled
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                          focus:outline-none focus:ring-2 focus:ring-beveren-500
+                          bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400
+                          cursor-not-allowed"
+              >
+                <option value="all">All Time</option>
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="week">This Week</option>
+                <option value="month">This Month</option>
+                <option value="year">This Year</option>
+              </select>
+
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              >
+                <option value="all">All Status</option>
+                <option value="Draft">Draft</option>
+                <option value="Unpaid">Unpaid</option>
+                <option value="Partly Paid">Partly Paid</option>
+                <option value="Paid">Paid</option>
+                <option value="Overdue">Overdue</option>
+                <option value="Return">Return</option>
+                <option value="Cancelled">Cancelled</option>
+              </select>
+
+              <select
+                value={paymentFilter}
+                onChange={(e) => setPaymentFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              >
+                <option value="all">All Payments</option>
+                {modes.map((mode) => (
+                  <option key={mode.name} value={mode.name}>
+                    {mode.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Invoices Table */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="px-4 py-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                All Invoices ({filteredInvoices.length})
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Invoice
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Customer
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Amount
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                  {filteredInvoices.map((invoice) => (
+                    <tr key={invoice.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">{invoice.id}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {invoice.date} {invoice.time}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900 dark:text-white">{invoice.customer}</div>
+                        {invoice.giftCardCode && (
+                          <div className="text-xs text-purple-600 dark:text-purple-400">Gift: {invoice.giftCardCode}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">
+                          ${invoice.totalAmount.toFixed(2)}
+                        </div>
+                        {invoice.giftCardDiscount > 0 && (
+                          <div className="text-xs text-green-600 dark:text-green-400">
+                            -${invoice.giftCardDiscount.toFixed(2)} gift
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className={getStatusBadge(invoice.status)}>{invoice.status}</span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleViewInvoice(invoice)}
+                            className="text-beveren-600 hover:text-beveren-900 flex items-center space-x-1"
+                          >
+                            <Eye className="w-4 h-4" />
+                            <span className="hidden sm:inline">View</span>
+                          </button>
+                          {invoice.status === "Paid" && (
+                            <button
+                              onClick={() => handleRefund(invoice.id)}
+                              className="text-orange-600 hover:text-orange-900 text-sm">Return</button>
+                          )}
+                          {invoice.status === "Pending" && (
+                            <button className="text-red-600 hover:text-red-500 text-sm">Cancel</button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Close Shift Modal */}
+        {showCloseModal && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-lg mx-4">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Close Shift</h2>
+                <button
+                  onClick={() => setShowCloseModal(false)}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {Object.values(paymentStats).map((stat) => (
+                  <div key={stat.name} className="flex items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div className="flex items-center space-x-3 flex-shrink-0">
+                      {stat.name.toLowerCase().includes('cash') ? (
+                        <div className="text-xl">💵</div>
+                      ) : (
+                        <CreditCard className="w-5 h-5 text-beveren-600" />
+                      )}
+                      <span className="font-medium text-gray-900 dark:text-white">{stat.name}</span>
+                    </div>
+
+                    <div className="flex flex-col space-y-2">
+                      <div className="text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Opening: </span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          ${stat.openingAmount.toFixed(2)}
+                        </span>
+                      </div>
+
+                      <div className="flex-shrink-0">
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="Closing amount"
+                          value={closingAmounts[stat.name] || ''}
+                          onChange={(e) => handleClosingAmountChange(stat.name, e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
+                <button
+                  onClick={() => setShowCloseModal(false)}
+                  className="px-4 py-2 text-red-600 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-500 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleFinalClose}
+                  disabled={isCreating}
+                  className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                    isCreating
+                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                      : 'bg-beveren-600 text-white hover:bg-beveren-700'
+                  }`}
+                >
+                  {isCreating ? 'Closing...' : 'Close Shift'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Invoice View Modal */}
+        <InvoiceViewModal
+          invoice={selectedInvoice}
+          isOpen={showInvoiceModal}
+          onClose={() => setShowInvoiceModal(false)}
+          onRefund={handleRefund}
+          onCancel={handleCancel}
+        />
+
+        {/* Bottom Navigation */}
+        <BottomNavigation />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
-      <div className="hidden md:block">
-    <RetailSidebar />
-  </div>
-
-  {/* Bottom nav for mobile */}
-  <div className="md:hidden fixed bottom-0 left-0 right-0">
-    <BottomNavigation /> {/* 👈 your bottom sidebar component */}
-  </div>
+      <RetailSidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="fixed top-0 left-20 right-0 z-50 bg-beveren-50 dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
@@ -212,7 +490,7 @@ export default function ClosingShiftPage() {
               <div className="flex items-center space-x-4">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Closing Shift</h1>
               </div>
-              <button 
+              <button
                 onClick={() => setShowCloseModal(true)}
                 className="flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors"
               >
@@ -223,7 +501,7 @@ export default function ClosingShiftPage() {
           </div>
         </div>
 
-        <div className="flex-1 px-6 py-8 mt-16 ml-20 space-y-6">
+        <div className="flex-1 px-6 py-8 mt-16 ml-0 space-y-6">
           {/* Payment Summary - Only show if not hidden */}
           {!hideExpectedAmount && (
             <>
@@ -254,7 +532,7 @@ export default function ClosingShiftPage() {
                 ))}
               </div>
 
-              
+
             </>
           )}
 
@@ -275,9 +553,9 @@ export default function ClosingShiftPage() {
                     value={dateFilter}
                     onChange={(e) => setDateFilter(e.target.value)}
                     disabled
-                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
-                              focus:outline-none focus:ring-2 focus:ring-beveren-500 
-                              bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                              focus:outline-none focus:ring-2 focus:ring-beveren-500
+                              bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400
                               cursor-not-allowed"
                   >
                     <option value="all">All Time</option>
@@ -288,7 +566,7 @@ export default function ClosingShiftPage() {
                     <option value="year">This Year</option>
                   </select>
 
-              
+
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
@@ -399,7 +677,7 @@ export default function ClosingShiftPage() {
                             <span>View</span>
                           </button>
                           {invoice.status === "Paid" && (
-                            <button 
+                            <button
                               onClick={() => handleRefund(invoice.id)}
                               className="text-orange-600 hover:text-orange-900">Return</button>
                           )}
@@ -441,7 +719,7 @@ export default function ClosingShiftPage() {
                       )}
                       <span className="font-medium text-gray-900 dark:text-white">{stat.name}</span>
                     </div>
-                    
+
                     <div className="flex items-center space-x-4">
                       <div className="text-sm">
                         <span className="text-gray-600 dark:text-gray-400">Opening: </span>
@@ -449,7 +727,7 @@ export default function ClosingShiftPage() {
                           ${stat.openingAmount.toFixed(2)}
                         </span>
                       </div>
-                      
+
                       <div className="flex-shrink-0">
                         <input
                           type="number"
@@ -476,8 +754,8 @@ export default function ClosingShiftPage() {
                   onClick={handleFinalClose}
                   disabled={isCreating}
                   className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-                    isCreating 
-                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                    isCreating
+                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
                       : 'bg-beveren-600 text-white hover:bg-beveren-700'
                   }`}
                 >
