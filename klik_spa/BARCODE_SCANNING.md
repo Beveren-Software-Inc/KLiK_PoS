@@ -10,7 +10,7 @@ The Klik POS system now includes a comprehensive barcode scanning feature that s
 - **Integrated Search Bar**: Product search and barcode scanning in one unified input field
 - **Smart Detection**: Automatically detects barcodes (8+ alphanumeric characters)
 - **Hardware Scanner Support**: Works seamlessly with USB/Bluetooth barcode scanners
-- **Auto-processing**: Automatically processes scanned barcodes after 500ms delay
+- **Auto-processing**: Automatically processes scanned barcodes after 500ms delay, we can reduce this for faster scanning.
 - **Camera Scanner**: Integrated camera button inside search bar for mobile barcode scanning
 
 ### 2. Camera-Based Scanning
@@ -37,7 +37,7 @@ The Klik POS system now includes a comprehensive barcode scanning feature that s
 1. **Product Search**: Type product names in the search bar to filter products
 2. **Barcode Scanning**:
    - **Hardware Scanner**: Scan barcodes directly into search field
-   - **Camera Scanner**: Tap the scanner button (📷) inside the search bar
+   - **Camera Scanner**: Tap the scanner button () inside the search bar
    - Grant camera permissions when prompted
    - Point camera at barcode
    - Item will be automatically added to cart upon successful scan
@@ -55,7 +55,6 @@ The Klik POS system now includes a comprehensive barcode scanning feature that s
 - Returns complete item details including price and stock
 
 ### Dependencies
-- `quagga`: JavaScript barcode scanning library
 - `lucide-react`: Icons for UI elements
 
 ## Supported Barcode Formats
@@ -81,5 +80,3 @@ The Klik POS system now includes a comprehensive barcode scanning feature that s
 ## Future Enhancements
 - Batch scanning for multiple items
 - Barcode history
-- Custom barcode formats
-- Offline barcode processing

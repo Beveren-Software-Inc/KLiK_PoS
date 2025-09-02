@@ -36,7 +36,6 @@ export default function AddCustomerModal({
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
 const countryOptions = countryList().getData();
 
-  // Initialize form data
   const [formData, setFormData] = useState({
     customer_type: "individual" as Customer['customer_type'],
     name: "",
@@ -50,11 +49,9 @@ const countryOptions = countryList().getData();
       country: "Saudi Arabia"
     },
     status: "active" as Customer['status'],
-    // Company specific fields
     vatNumber: "",
     registrationScheme: "",
     registrationNumber: "",
-    // Payment method
     preferredPaymentMethod: "cash" as Customer['preferredPaymentMethod']
   });
 
@@ -68,7 +65,6 @@ const countryOptions = countryList().getData();
       } else if (posDetails.business_type === 'B2C') {
         defaultCustomerType = 'individual';
       } else if (posDetails.business_type === 'B2B & B2C') {
-        // Keep default as individual, but allow user to choose
         defaultCustomerType = 'individual';
       }
 
@@ -76,7 +72,7 @@ const countryOptions = countryList().getData();
 
              // For B2B and B2C company customers, show all sections at once
        if (defaultCustomerType === 'company') {
-         setCurrentStep(4); // Show all steps
+         setCurrentStep(4);
          setCompletedSteps(new Set([1, 2, 3, 4]));
        }
     }
@@ -89,10 +85,8 @@ const countryOptions = countryList().getData();
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Initialize form with customer data if editing
    useEffect(() => {
     if (customer) {
-      // Existing customer initialization code
       setFormData({
         customer_type: customer.customer_type || "individual",
         name: customer.name,
@@ -106,16 +100,15 @@ const countryOptions = countryList().getData();
           country: customer.address?.country || "Saudi Arabia"
         },
         status: customer.status,
-        vatNumber: "", // Not available in current Customer type
-        registrationScheme: "", // Not available in current Customer type
-        registrationNumber: "", // Not available in current Customer type
+        vatNumber: "",
+        registrationScheme: "", 
+        registrationNumber: "", 
         preferredPaymentMethod: customer.preferredPaymentMethod || "cash"
       });
       // If editing, show all steps as completed
       setCompletedSteps(new Set([1, 2, 3, 4]));
       setCurrentStep(4);
     } else if (prefilledData && Object.keys(prefilledData).length > 0) {
-      // If no customer but there's prefilled data, set it in the form
       console.log('Setting prefilled data:', prefilledData)
       setFormData(prev => ({
         ...prev,
@@ -173,7 +166,6 @@ const countryOptions = countryList().getData();
     }
 
     if (step === 2 && formData.customer_type === 'company') {
-      // Contact Information for company
       if (!formData.email.trim()) {
         newErrors.email = "Email is required for company";
       }
@@ -207,7 +199,7 @@ const countryOptions = countryList().getData();
     const addressStep = formData.customer_type === 'company' ? 4 : 2;
     if (step === addressStep) {
       // Note: buildingNumber is not available in current address structure
-      // Remove this validation for now
+      
     }
 
     setErrors(newErrors);
@@ -342,8 +334,8 @@ const addressTypes = [
 
   // Determine what steps to show based on customer type
   const getMaxSteps = () => {
-    if (formData.customer_type === 'individual') return 2; // Basic+Contact, Address
-    if (formData.customer_type === 'company') return 4; // Basic, Contact, ZATCA, Address
+    if (formData.customer_type === 'individual') return 2; 
+    if (formData.customer_type === 'company') return 4;
     return 2;
   };
 
@@ -593,7 +585,7 @@ const addressTypes = [
         <PhoneInput
           id="phone"
           international
-          defaultCountry="SA" // or "US", "SA" etc. (set based on your context)
+          defaultCountry="SA" 
           value={formData.phone}
           onChange={(value) => setFormData(prev => ({ ...prev, phone: value }))}
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white"
@@ -605,7 +597,6 @@ const addressTypes = [
               </div>
             )}
 
-            {/* Action buttons for step 1 */}
             {/* Action buttons for step 1 */}
 <div className="flex justify-between mt-4">
   <div className="flex space-x-3">
@@ -685,7 +676,7 @@ const addressTypes = [
                       <PhoneInput
                         id="phone"
                         international
-                        defaultCountry="SA" // or "US", "SA" etc. (set based on your context)
+                        defaultCountry="SA"
                         value={formData.phone}
                         onChange={(value) => setFormData(prev => ({ ...prev, phone: value }))}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white"
