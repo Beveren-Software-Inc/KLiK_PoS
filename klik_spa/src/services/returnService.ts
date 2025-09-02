@@ -96,16 +96,20 @@ export async function createPartialReturn(
   invoiceName: string,
   returnItems: ReturnItem[]
 ): Promise<{success: boolean; returnInvoice?: string; message?: string; error?: string}> {
+  
+  const csrfToken = window.csrf_token;
   try {
     const response = await fetch(`/api/method/klik_pos.api.sales_invoice.create_partial_return`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-Frappe-CSRF-Token': csrfToken
       },
       body: JSON.stringify({
         invoice_name: invoiceName,
         return_items: returnItems
-      })
+      }),
+       credentials: 'include'
     });
 
     const data = await response.json();
@@ -131,15 +135,18 @@ export async function createPartialReturn(
 export async function createMultiInvoiceReturn(
   returnData: ReturnData
 ): Promise<{success: boolean; createdReturns?: string[]; message?: string; error?: string}> {
+  const csrfToken = window.csrf_token;
   try {
     const response = await fetch(`/api/method/klik_pos.api.sales_invoice.create_multi_invoice_return`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+         'X-Frappe-CSRF-Token': csrfToken
       },
       body: JSON.stringify({
         return_data: returnData
-      })
+      }),
+       credentials: 'include'
     });
 
     const data = await response.json();
