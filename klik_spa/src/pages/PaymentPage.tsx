@@ -73,7 +73,6 @@ export default function PaymentScreen() {
     try {
       // Process payment based on selected method
       console.log("Processing payment:", selectedPaymentMethod, invoiceData.invoiceId)
-      // Navigate to receipt screen
     } catch (error) {
       console.error("Payment failed:", error)
     }

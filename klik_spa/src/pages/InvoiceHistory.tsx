@@ -16,7 +16,6 @@ import {
   Eye,
   Edit,
   Users,
-  RotateCcw,
   ShoppingCart,
   CreditCard,
   Send,
@@ -551,7 +550,6 @@ const getStatusBadge = (status: string) => {
     </div>
   );
 
-  // Define handler functions before they are used
   const handleViewInvoice = (invoice: SalesInvoice) => {
     navigate(`/invoice/${invoice.id}`);
   };
@@ -561,11 +559,12 @@ const getStatusBadge = (status: string) => {
     setShowEditOptions(true);
   };
 
-  const handleDeleteInvoice = (invoiceId: string) => {
-    if (window.confirm("Are you sure you want to delete this invoice?")) {
-      toast.success("Invoice deleted successfully");
-    }
-  };
+  //Just Incase we allow deletion of invoice, activate/uncomment this: Mania
+  // const handleDeleteInvoice = (invoiceId: string) => {
+  //   if (window.confirm("Are you sure you want to delete this invoice?")) {
+  //     toast.success("Invoice deleted successfully");
+  //   }
+  // };
 
   const handleRefund = (invoiceId: string) => {
     handleReturnClick(invoiceId);
@@ -590,13 +589,12 @@ const getStatusBadge = (status: string) => {
 
   // Multi-Invoice Return handlers
   const handleMultiReturnClick = () => {
-    setCustomerSearchQuery(""); // Reset search when opening
+    setCustomerSearchQuery("");
     setShowCustomerSelection(true);
   };
 
     // Draft Invoice Edit Option handlers
   const handleGoToCart = () => {
-    // Go back to the main POS cart page to edit/modify items
     navigate('/pos');
     setShowEditOptions(false);
     setSelectedDraftInvoice(null);
@@ -607,17 +605,13 @@ const getStatusBadge = (status: string) => {
     navigate('/pos');
     setShowEditOptions(false);
     setSelectedDraftInvoice(null);
-    // Show a helpful message
     toast.info('Navigate to the cart and use the Checkout button to process payment');
   };
 
   const handleSubmitInvoice = async () => {
     if (selectedDraftInvoice) {
       try {
-        // Here you would call the API to submit the draft invoice
-        // For now, we'll just show a success message and refresh
         toast.success(`Invoice ${selectedDraftInvoice.id} submitted successfully`);
-        // You might want to refresh the invoices list here
       } catch (error: any) {
         toast.error(error.message || "Failed to submit invoice");
       }
@@ -638,7 +632,7 @@ const getStatusBadge = (status: string) => {
     }
     setSelectedCustomer(customer);
     setShowCustomerSelection(false);
-    setCustomerSearchQuery(""); // Reset search
+    setCustomerSearchQuery("");
     setShowMultiReturn(true);
   };
 
@@ -650,7 +644,7 @@ const getStatusBadge = (status: string) => {
 
   const handleCloseCustomerSelection = () => {
     setShowCustomerSelection(false);
-    setCustomerSearchQuery(""); // Reset search when closing
+    setCustomerSearchQuery("");
   };
 
   // Mobile layout: full-width content and persistent bottom navigation
