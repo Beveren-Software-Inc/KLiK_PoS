@@ -120,15 +120,12 @@ export default function BarcodeScannerModal({ onBarcodeDetected, onClose, isOpen
           const ctx = canvas.getContext('2d')
 
           if (ctx) {
-            // Set canvas size to match video
             canvas.width = videoRef.current.videoWidth
             canvas.height = videoRef.current.videoHeight
 
-            // Draw current video frame to canvas
             ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height)
 
             try {
-              // Detect barcodes in the current frame
               const barcodes = await barcodeDetector.detect(canvas)
 
               if (barcodes.length > 0) {
@@ -152,7 +149,7 @@ export default function BarcodeScannerModal({ onBarcodeDetected, onClose, isOpen
             }
           }
         }
-      }, 200) // Check every 200ms
+      }, 200) 
 
     } catch (err) {
       console.error('BarcodeDetector error:', err)
@@ -219,7 +216,6 @@ export default function BarcodeScannerModal({ onBarcodeDetected, onClose, isOpen
           </div>
         )}
 
-        {/* Camera View */}
         <div className="space-y-4">
           <div className="relative bg-gray-900 rounded-lg overflow-hidden aspect-video">
             <video
@@ -229,7 +225,6 @@ export default function BarcodeScannerModal({ onBarcodeDetected, onClose, isOpen
               className="w-full h-full object-cover"
             />
 
-            {/* Scanning overlay */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="border-2 border-green-400 border-dashed rounded-lg w-64 h-32 flex items-center justify-center">
                 <div className="text-green-400 text-center">
@@ -239,7 +234,6 @@ export default function BarcodeScannerModal({ onBarcodeDetected, onClose, isOpen
               </div>
             </div>
 
-            {/* Status indicator */}
             <div className="absolute top-4 left-4 bg-black bg-opacity-70 text-white px-3 py-1 rounded text-sm">
               {isBarcodeDetectorSupported ? (
                 <span className="flex items-center">
@@ -263,7 +257,6 @@ export default function BarcodeScannerModal({ onBarcodeDetected, onClose, isOpen
               }
             </p>
 
-            {/* Manual input for fallback */}
             <div className="pt-2 border-t border-gray-200 dark:border-gray-600">
               <input
                 type="text"
@@ -277,7 +270,6 @@ export default function BarcodeScannerModal({ onBarcodeDetected, onClose, isOpen
           </div>
         </div>
 
-        {/* Browser compatibility info */}
         <div className="mt-4 text-xs text-gray-500 dark:text-gray-400 text-center">
           BarcodeDetector support: {isBarcodeDetectorSupported ? '✅ Enabled' : '❌ Not available'}
         </div>

@@ -86,9 +86,9 @@ def get_user_company_and_currency():
     default_company = frappe.defaults.get_user_default("Company")
     if not default_company:
         default_company = frappe.db.get_single_value("Global Defaults", "default_company")
-    
+
     company_currency = frappe.db.get_value("Company", default_company, "default_currency")
-    
+
     return default_company, company_currency
 
 
@@ -126,7 +126,7 @@ def get_customer_info(customer_name: str):
         "customer_primary_address": customer.customer_primary_address,
         "email_id": customer.email_id,
         "mobile_no": customer.mobile_no,
-        
+
     }
 
 
