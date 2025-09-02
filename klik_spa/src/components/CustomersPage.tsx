@@ -100,7 +100,7 @@ export default function CustomersPage() {
   const formatCurrency = (amount: number, currency?: string) => {
     // Validate currency code and provide fallbacks
     let validCurrency = 'USD'; // Default fallback
-    
+
     if (currency && currency.trim() && currency.length === 3) {
       try {
         // Test if the currency is valid by trying to create a NumberFormat

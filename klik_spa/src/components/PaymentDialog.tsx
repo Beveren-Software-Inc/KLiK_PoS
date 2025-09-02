@@ -13,6 +13,7 @@ import { createSalesInvoice } from "../services/salesInvoice"
 import { toast } from 'react-toastify';
 import { useNavigate } from "react-router-dom"
 import { DisplayPrintPreview, handlePrintInvoice } from "../utils/invoicePrint"
+import { sendEmails } from "../services/useSharing"
 
 interface PaymentDialogProps {
   isOpen: boolean
@@ -26,7 +27,7 @@ interface PaymentDialogProps {
   onHoldOrder: (orderData: any) => void
   isMobile?: boolean
   isFullPage?: boolean
-  initialSharingMode?: string | null // 'email', 'sms', 'whatsapp'
+  initialSharingMode?: string | null
   externalInvoiceData?: any // For invoice sharing
 }
 
@@ -96,6 +97,9 @@ const [sharingData, setSharingData] = useState({
   name: selectedCustomer?.name || ''
 })
 
+const [ isSendingEmail, setIsSendingEmail] = useState(false)
+
+
   // Hooks
   const { modes, isLoading, error } = usePaymentModes("Test POS Profile");
   const { salesTaxCharges, defaultTax } = useSalesTaxCharges();
@@ -124,7 +128,7 @@ const [sharingData, setSharingData] = useState({
    if (isInclusive) {
   // For inclusive tax: tax is already included in the taxable amount
   taxAmount = taxableAmount * taxRate / (100 + taxRate)
-  taxAmount = parseFloat(taxAmount.toFixed(2)) // Ensure 2 decimal places
+  taxAmount = parseFloat(taxAmount.toFixed(2))
   grandTotal = taxableAmount
 } else {
   // For exclusive tax: tax is added to the taxable amount
@@ -157,8 +161,7 @@ const outstandingAmount = Math.max(0, calculations.grandTotal - totalPaidAmount)
     }
   }, [isOpen, defaultTax, selectedSalesTaxCharges]);
 
-  // Only set up payment amounts for B2C
- // Set up payment amounts for both B2C and B2B
+
 useEffect(() => {
   if (isOpen && modes.length > 0) {
     const defaultMode = modes.find(mode => mode.default === 1);
@@ -169,8 +172,7 @@ useEffect(() => {
   }
 }, [isOpen, modes, calculations.grandTotal, paymentAmounts, isB2B, isB2C]);
 
-  // Update default payment method amount when grand total changes (B2C only)
- // Update default payment method amount when grand total changes
+
 useEffect(() => {
   if (modes.length > 0 && Object.keys(paymentAmounts).length > 0) {
     const defaultMode = modes.find(mode => mode.default === 1);
@@ -179,8 +181,7 @@ useEffect(() => {
         .filter(([key]) => key !== defaultMode.mode_of_payment)
         .reduce((sum, [, amount]) => sum + (amount || 0), 0);
 
-      // For B2B, allow flexible payment amounts (can be 0 for pay later)
-      // For B2C, require full payment by default
+     
       const remainingAmount = isB2C ? Math.max(0, calculations.grandTotal - otherPaymentsTotal) : 0;
 
       setPaymentAmounts(prev => ({
@@ -191,7 +192,6 @@ useEffect(() => {
   }
 }, [calculations.grandTotal, modes, isB2C, isB2B]);
 
-// Auto-print when invoice is submitted and auto-print is enabled
 // Auto-print when invoice is submitted and auto-print is enabled
 useEffect(() => {
   if (invoiceSubmitted && invoiceData && print_receipt_on_order_complete) {
@@ -237,7 +237,6 @@ const handleRoundOff = () => {
   // Change this line: use Math.floor instead of Math.round to always round DOWN
   const rounded = Math.floor(totalBeforeRoundOff);
 
-  // The difference will now be negative (business loss)
   const difference = rounded - totalBeforeRoundOff;
 
   setRoundOffAmount(difference);
@@ -254,27 +253,6 @@ const handleRoundOff = () => {
     }
   }
 };
-//   const handleRoundOff = () => {
-//     if (invoiceSubmitted || isProcessingPayment) return;
-
-//     const totalBeforeRoundOff = calculations.isInclusive ? calculations.taxableAmount : calculations.taxableAmount + calculations.taxAmount;
-//     const rounded = Math.round(totalBeforeRoundOff);
-//     const difference = rounded - totalBeforeRoundOff;
-
-//     setRoundOffAmount(difference);
-//     setRoundOffInput(difference.toFixed(2));
-
-//     // For B2C, update payment amount; for B2B, keep flexible
-// if (isB2C) {
-//   const defaultMode = modes.find(mode => mode.default === 1);
-//   if (defaultMode) {
-//     setPaymentAmounts(prev => ({
-//       ...prev,
-//       [defaultMode.mode_of_payment]: rounded
-//     }));
-//   }
-// }
-//   };
 
   const handleSalesTaxChange = (value: string) => {
     if (invoiceSubmitted || isProcessingPayment) return;
@@ -325,7 +303,6 @@ if (isB2C) {
 }
 
 // For B2B, no payment validation required - can be partial or zero payment
-
     setIsProcessingPayment(true);
 
     const paymentData = {
@@ -864,6 +841,7 @@ const getActionButtonText = () => {
               placeholder="customer@email.com"
             />
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Email Preview
@@ -879,17 +857,30 @@ const getActionButtonText = () => {
               </div>
             </div>
           </div>
+          
           <button
-            onClick={() => {
-              const subject = encodeURIComponent("Your Invoice from KLIK POS");
-              const body = encodeURIComponent(`Dear ${sharingData.name},\n\nThank you for your purchase. Here are your invoice details:\n\nInvoice Total: ${formatCurrency(calculations.grandTotal)}\n\nThank you for your business!\n\nBest regards,\nKLIK POS Team`);
-              window.open(`mailto:${sharingData.email}?subject=${subject}&body=${body}`);
-              setSharingMode(null);
-            }}
-            disabled={!sharingData.email}
+            onClick={async () => {
+                setIsSendingEmail(true);
+                try {
+                  await sendEmails({
+                    email: sharingData.email,
+                    customer_name: sharingData.name,
+                    invoice_data: invoiceData.name,
+                  });
+                  toast.success('Email sent successfully!');
+                  setSharingMode(null);
+                } catch (error) {
+                  toast.error('Failed to send email: ' + error.message);
+                } finally {
+                  setIsSendingEmail(false);
+                }
+              }}
+
+            disabled={!sharingData.email || isSendingEmail}
             className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
-            Send Email
+              {isSendingEmail ? 'Sending...' : 'Send Email'}
+
           </button>
         </div>
       )}

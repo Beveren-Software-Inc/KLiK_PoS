@@ -3,15 +3,12 @@ import {
   X,
   RotateCcw,
   Search,
-  Calendar,
   Filter,
   CheckCircle,
   Package,
   Minus,
   Plus,
-  AlertTriangle,
   FileText,
-  User,
   Clock
 } from "lucide-react";
 import { toast } from "react-toastify";
@@ -39,7 +36,7 @@ export default function MultiInvoiceReturn({
   const [invoices, setInvoices] = useState<InvoiceForReturn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
-  const [daysBack, setDaysBack] = useState<number>(90); // Default to 90 days
+  const [daysBack, setDaysBack] = useState<number>(90);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
 
@@ -64,7 +61,6 @@ export default function MultiInvoiceReturn({
 
     const loadAvailableItems = async () => {
     try {
-      // Get all items from customer invoices in the last X days
       const endDate = new Date().toISOString().split('T')[0];
       const startDate = new Date(Date.now() - (daysBack * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
 
@@ -87,7 +83,7 @@ export default function MultiInvoiceReturn({
         }));
 
         setAvailableItems(items);
-        setFilteredAvailableItems(items); // Initialize filtered items
+        setFilteredAvailableItems(items); 
       } else {
         setAvailableItems([]);
         setFilteredAvailableItems([]);
@@ -114,7 +110,6 @@ export default function MultiInvoiceReturn({
       const result = await getCustomerInvoicesForReturn(customer, startDate, endDate);
 
       if (result.success && result.data) {
-        // Filter invoices to only show those containing selected items
         const filteredInvoices = result.data.filter(invoice =>
           invoice.items.some(item =>
             selectedItems.some(selectedItem =>
@@ -123,14 +118,13 @@ export default function MultiInvoiceReturn({
           )
         ).map(invoice => ({
           ...invoice,
-          // Only show items that are in the selected items list and set default return_qty to available_qty
           items: invoice.items.filter(item =>
             selectedItems.some(selectedItem =>
               selectedItem.item_code === item.item_code && item.available_qty > 0
             )
           ).map(item => ({
             ...item,
-            return_qty: item.available_qty // Set default return quantity to available quantity
+            return_qty: item.available_qty
           }))
         }));
 
@@ -198,7 +192,7 @@ export default function MultiInvoiceReturn({
       if (invoice.name === invoiceName) {
         const updatedItems = invoice.items.map(item => ({
           ...item,
-          return_qty: item.available_qty // Set return quantity to available quantity
+          return_qty: item.available_qty
         }));
         return { ...invoice, items: updatedItems };
       }
