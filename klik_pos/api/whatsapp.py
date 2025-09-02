@@ -51,7 +51,7 @@ def send_invoice_whatsapp(**kwargs):
             "to": mobile,
             "type": "template",
             "template": {
-                "name": "invoice_notification",   # must match approved template
+                "name": "invoice_notification",
                 "language": {"code": "en_US"},
                 "components": [
                     {

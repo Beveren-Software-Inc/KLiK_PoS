@@ -7,7 +7,6 @@ def pos_details():
     pos = get_current_pos_profile
     customer = pos.customer
 
-
 def fetch_item_balance(item_code: str, warehouse: str) -> float:
     """Get stock balance of an item from a warehouse."""
     try:
@@ -45,10 +44,7 @@ def fetch_item_price(item_code: str, price_list: str) -> dict:
                 "currency_symbol": default_symbol
             }
 
-        # return {
-        #     "price": price_doc.price_list_rate if price_doc else 0,
-        #     "currency": price_doc.currency if price_doc else "SAR"
-        # }
+        
     except Exception:
         frappe.log_error(frappe.get_traceback(), f"Error fetching price for {item_code}")
         return {
@@ -63,8 +59,7 @@ def get_item_by_barcode(barcode: str):
         pos_doc = get_current_pos_profile()
         warehouse = pos_doc.warehouse
         price_list = "Standard Selling"
-        print("+++++++", str(barcode))
-        # First try to find item by barcode in the Barcodes child table
+        
         item_code = frappe.db.sql("""
             SELECT parent
             FROM `tabItem Barcode`
@@ -72,7 +67,6 @@ def get_item_by_barcode(barcode: str):
         """, barcode, as_dict=True)
 
         if not item_code:
-            # Fallback: try to find by item code directly
             item_code = frappe.db.sql("""
                 SELECT name
                 FROM `tabItem`
@@ -84,10 +78,8 @@ def get_item_by_barcode(barcode: str):
 
         item_name = item_code[0].parent or item_code[0].name
 
-        # Get item details
         item_doc = frappe.get_doc("Item", item_name)
 
-        # Get balance and price
         balance = fetch_item_balance(item_name, warehouse)
         price_info = fetch_item_price(item_name, price_list)
 

@@ -1,4 +1,4 @@
-import { Receipt, FileText, Grid3X3, Settings, BarChart3, Users } from "lucide-react"
+import { Receipt, FileText, Grid3X3, BarChart3, Users } from "lucide-react"
 import { useNavigate, useLocation } from "react-router-dom"
 
 export default function BottomNavigation() {
