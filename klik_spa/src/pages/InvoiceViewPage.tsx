@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom"; // ✅ import this
+import { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 
 import {
   ArrowLeft,
@@ -35,7 +35,6 @@ import SingleInvoiceReturn from "../components/SingleInvoiceReturn";
 import MultiInvoiceReturn from "../components/MultiInvoiceReturn";
 
 export default function InvoiceViewPage() {
-  // const { id: invoiceId } = useParams(); // ✅ extract ID from URL
 
   const { id } = useParams()
   const invoiceId = id ?? ""
@@ -45,7 +44,7 @@ export default function InvoiceViewPage() {
 
   // PaymentDialog state for sharing
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
-  const [sharingMode, setSharingMode] = useState<string | null>(null) // 'email', 'sms', 'whatsapp'
+  const [sharingMode, setSharingMode] = useState<string | null>(null)
 
   // Return modals state
   const [showSingleReturn, setShowSingleReturn] = useState(false)
@@ -54,7 +53,6 @@ export default function InvoiceViewPage() {
 
   const handleBackClick = () => {
     navigate(`/invoice`)
-    // You can replace this with your navigation logic
   };
 
 
@@ -88,12 +86,11 @@ export default function InvoiceViewPage() {
         } catch (error: any) {
           toast.error(error.message || "Failed to return invoice");
 
-      // Add return logic here
     }
   };
 
   const handleEditCustomer = () => {
-    // Navigate to customer edit page
+    console.log("Not implemented")
   };
 
   const handleSingleReturnSuccess = (returnInvoice: string) => {
@@ -103,7 +100,7 @@ export default function InvoiceViewPage() {
 
   const handleMultiReturnSuccess = (returnInvoices: string[]) => {
     toast.success(`${returnInvoices.length} return invoices created successfully`);
-    navigate('/invoice'); // Navigate back to invoice list
+    navigate('/invoice');
   };
 
   // Loading state
@@ -514,8 +511,8 @@ export default function InvoiceViewPage() {
             setShowPaymentDialog(false)
             setSharingMode(null)
           }}
-          cartItems={[]} // Empty for invoice sharing
-          appliedCoupons={[]} // Empty for invoice sharing
+          cartItems={[]}
+          appliedCoupons={[]} 
           selectedCustomer={{
             id: invoice.customer,
             name: invoice.customer,
@@ -554,7 +551,7 @@ export default function InvoiceViewPage() {
           isMobile={false}
           isFullPage={false}
           initialSharingMode={sharingMode}
-          externalInvoiceData={invoice} // Pass the actual invoice data
+          externalInvoiceData={invoice}
         />
       )}
 

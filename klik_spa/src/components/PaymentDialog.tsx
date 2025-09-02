@@ -13,7 +13,8 @@ import { createSalesInvoice } from "../services/salesInvoice"
 import { toast } from 'react-toastify';
 import { useNavigate } from "react-router-dom"
 import { DisplayPrintPreview, handlePrintInvoice } from "../utils/invoicePrint"
-import { sendEmails } from "../services/useSharing"
+import { sendEmails, sendWhatsApp } from "../services/useSharing"
+
 
 interface PaymentDialogProps {
   isOpen: boolean
@@ -98,6 +99,8 @@ const [sharingData, setSharingData] = useState({
 })
 
 const [ isSendingEmail, setIsSendingEmail] = useState(false)
+const [ isSendingWhatsapp, setIsSendingWhatsapp] = useState(false)
+
 
 
   // Hooks
@@ -857,7 +860,7 @@ const getActionButtonText = () => {
               </div>
             </div>
           </div>
-          
+
           <button
             onClick={async () => {
                 setIsSendingEmail(true);
@@ -925,15 +928,27 @@ const getActionButtonText = () => {
             </div>
           </div>
           <button
-            onClick={() => {
-              const msg = encodeURIComponent(`Hi ${sharingData.name || 'there'}!\n\nThank you for shopping with us at KLIK POS!\n\nInvoice Total: *${formatCurrency(calculations.grandTotal)}*\n\nWe appreciate your business!`);
-              window.open(`https://wa.me/${sharingData.phone.replace(/\D/g, '')}?text=${msg}`, "_blank");
-              setSharingMode(null);
-            }}
-            disabled={!sharingData.phone}
+             onClick={async () => {
+                setIsSendingWhatsapp(true);
+                try {
+                  await sendWhatsApp({
+                    mobile_no: sharingData.phone,
+                    customer_name: sharingData.name,
+                    invoice_data: invoiceData.name,
+                  });
+                  toast.success('Whatsap message sent successfully!');
+                  setSharingMode(null);
+                } catch (error) {
+                  toast.error('Failed to send whatsap message: ' + error.message);
+                } finally {
+                  setIsSendingWhatsapp(false);
+                }
+              }}
+            disabled={!sharingData.phone || isSendingWhatsapp}
             className="w-full py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
-            Send WhatsApp Message
+                          {isSendingWhatsapp ? 'Sending...' : 'Send Whatsap Message'}
+
           </button>
         </div>
       )}

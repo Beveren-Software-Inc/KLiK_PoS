@@ -44,7 +44,6 @@ export default function BarcodeScannerModal({ onBarcodeDetected, onClose, isOpen
     }
   }
 
-  // Camera and barcode detection
   useEffect(() => {
     if (isOpen) {
       startCamera()
@@ -74,7 +73,6 @@ export default function BarcodeScannerModal({ onBarcodeDetected, onClose, isOpen
         videoRef.current.srcObject = stream
         streamRef.current = stream
 
-        // Start barcode detection once video is playing
         videoRef.current.onloadedmetadata = () => {
           startBarcodeDetection()
         }

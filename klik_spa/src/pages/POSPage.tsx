@@ -91,7 +91,6 @@ useEffect(() => {
     refetch()
   }
 
-  // Handle closing the modal (user cancelled)
   const handleOpeningClose = () => {
     setShowOpeningModal(false)
    
