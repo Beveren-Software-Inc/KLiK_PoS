@@ -11,14 +11,14 @@ const fetchInvoices = async () => {
 
   setIsLoading(true); // ✅ MUST ENABLE THIS
   try {
-    
+
     const response = await fetch(
       "/api/method/klik_pos.api.sales_invoice.get_sales_invoices"
     );
     const resData = await response.json();
-    
+
     const rawInvoices = resData.message.data;
-    
+
     const transformed: SalesInvoice[] = rawInvoices.map((invoice: any) => ({
       id: invoice.name,
       date: invoice.posting_date || new Date().toISOString().split("T")[0],
@@ -27,7 +27,7 @@ const fetchInvoices = async () => {
       cashierId: invoice.owner || "",
       customer: invoice.customer_name || "",
       customerId: invoice.customer || "",
-      items: [],
+      items: invoice.items || [],
       subtotal:
         (invoice.base_grand_total || 0) -
         (invoice.total_taxes_and_charges || 0) +
@@ -54,7 +54,7 @@ const fetchInvoices = async () => {
           | "Not Reported"
           | "Cleared"
           | "Not Cleared") || "Draft",
-      
+
       notes: invoice.remarks || "",
     }));
     // console.log("Transformed", transformed)

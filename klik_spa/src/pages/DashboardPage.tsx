@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import {
-  ArrowLeft,
+  
   TrendingUp,
   TrendingDown,
   DollarSign,
@@ -16,7 +16,7 @@ import {
   Activity,
   Filter,
   Download,
-  RefreshCw,
+ 
 } from "lucide-react"
 import { mockDashboardStats, mockSalesInvoices } from "../data/mockSalesData"
 import type { SalesInvoice, DashboardStats } from "../../types"
@@ -92,10 +92,10 @@ export default function DashboardPage() {
                   <Filter className="w-4 h-4" />
                   <span className="text-sm">Filters</span>
                 </button>
-                <button className="flex items-center space-x-2 px-3 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors">
+                {/* <button className="flex items-center space-x-2 px-3 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors">
                   <RefreshCw className="w-4 h-4" />
                   <span className="text-sm">Refresh</span>
-                </button>
+                </button> */}
               </div>
             </div>
           </div>
@@ -179,13 +179,13 @@ export default function DashboardPage() {
                     ).toFixed(2)}
                   </p>
                   <div className="flex items-center mt-2">
-                    <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                    <span className="text-sm text-green-600 dark:text-green-400">+12.5%</span>
+                    <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
+                    <span className="text-sm text-orange-600 dark:text-orange-400">+12.5%</span>
                     <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">vs last period</span>
                   </div>
                 </div>
-                <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
-                  <DollarSign className="w-6 h-6 text-green-600 dark:text-green-400" />
+                <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center">
+                  <DollarSign className="w-6 h-6 text-orange-600 dark:text-orange-400" />
                 </div>
               </div>
             </div>
@@ -223,13 +223,13 @@ export default function DashboardPage() {
                     ).toFixed(2)}
                   </p>
                   <div className="flex items-center mt-2">
-                    <TrendingUp className="w-4 h-4 text-purple-500 mr-1" />
-                    <span className="text-sm text-purple-600 dark:text-purple-400">+3.8%</span>
+                    <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
+                    <span className="text-sm text-orange-600 dark:text-orange-400">+3.8%</span>
                     <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">vs last period</span>
                   </div>
                 </div>
-                <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center">
-                  <BarChart3 className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center">
+                  <BarChart3 className="w-6 h-6 text-orange-600 dark:text-orange-400" />
                 </div>
               </div>
             </div>
@@ -300,7 +300,7 @@ export default function DashboardPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   <div className="flex items-center space-x-3">
-                    <div className="w-4 h-4 bg-green-500 rounded"></div>
+                    <div className="w-4 h-4 bg-orange-500 rounded"></div>
                     <span className="text-sm text-gray-700 dark:text-gray-300">Cash</span>
                   </div>
                   <div className="text-right">
@@ -328,7 +328,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="mt-4">
                   <div className="flex rounded-lg overflow-hidden h-4">
-                    <div className="bg-green-500" style={{ width: `${stats.paymentMethods.cash.percentage}%` }}></div>
+                    <div className="bg-orange-500" style={{ width: `${stats.paymentMethods.cash.percentage}%` }}></div>
                     <div
                       className="bg-beveren-600"
                       style={{ width: `${stats.paymentMethods.debitCard.percentage}%` }}
@@ -345,10 +345,10 @@ export default function DashboardPage() {
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Gift Card Usage</h3>
-                <Gift className="w-5 h-5 text-purple-600" />
+                <Gift className="w-5 h-5 text-orange-600" />
               </div>
               <div className="space-y-3">
-                <div className="flex justify-between p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                <div className="flex justify-between p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                   <span className="text-sm text-gray-600 dark:text-gray-400">Total Redeemed</span>
                   <span className="font-semibold text-gray-900 dark:text-white">
                     ${stats.giftCardUsage.totalRedeemed.toFixed(2)}
@@ -362,7 +362,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600 dark:text-gray-400">Avg Discount</span>
-                  <span className="font-semibold text-purple-600 dark:text-purple-400">
+                  <span className="font-semibold text-orange-600 dark:text-orange-400">
                     ${stats.giftCardUsage.averageDiscount.toFixed(2)}
                   </span>
                 </div>
@@ -562,11 +562,11 @@ export default function DashboardPage() {
                 <Filter className="w-4 h-4" />
                 <span className="hidden sm:inline">Filters</span>
               </button>
-              <button className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors">
+              {/* <button className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors">
                 <RefreshCw className="w-4 h-4" />
                 <span className="hidden sm:inline">Refresh</span>
-              </button>
-              <button className="hidden sm:flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+              </button> */}
+              <button className="hidden sm:flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-orange-700 transition-colors">
                 <Download className="w-4 h-4" />
                 <span>Export</span>
               </button>
@@ -652,13 +652,13 @@ export default function DashboardPage() {
                   ).toFixed(2)}
                 </p>
                 <div className="flex items-center mt-2">
-                  <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                  <span className="text-sm text-green-600 dark:text-green-400">+12.5%</span>
+                  <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
+                  <span className="text-sm text-orange-600 dark:text-orange-400">+12.5%</span>
                   <span className="text-xs text-gray-500 dark:text-gray-400 ml-1 hidden sm:inline">vs last period</span>
                 </div>
               </div>
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 dark:text-green-400" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center">
+                <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600 dark:text-orange-400" />
               </div>
             </div>
           </div>
@@ -673,13 +673,13 @@ export default function DashboardPage() {
                     : currentStats.totalTransactions}
                 </p>
                 <div className="flex items-center mt-2">
-                  <TrendingUp className="w-4 h-4 text-blue-500 mr-1" />
-                  <span className="text-sm text-blue-600 dark:text-blue-400">+8.2%</span>
+                  <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
+                  <span className="text-sm text-orange-600 dark:text-blue-400">+8.2%</span>
                   <span className="text-xs text-gray-500 dark:text-gray-400 ml-1 hidden sm:inline">vs last period</span>
                 </div>
               </div>
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
-                <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400" />
+                <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600 dark:text-blue-400" />
               </div>
             </div>
           </div>
@@ -696,13 +696,13 @@ export default function DashboardPage() {
                   ).toFixed(2)}
                 </p>
                 <div className="flex items-center mt-2">
-                  <TrendingUp className="w-4 h-4 text-purple-500 mr-1" />
-                  <span className="text-sm text-purple-600 dark:text-purple-400">+3.8%</span>
+                  <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
+                  <span className="text-sm text-orange-600 dark:text-orange-400">+3.8%</span>
                   <span className="text-xs text-gray-500 dark:text-gray-400 ml-1 hidden sm:inline">vs last period</span>
                 </div>
               </div>
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center">
-                <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 dark:text-purple-400" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center">
+                <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600 dark:text-orange-400" />
               </div>
             </div>
           </div>
@@ -773,7 +773,7 @@ export default function DashboardPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 <div className="flex items-center space-x-3">
-                  <div className="w-4 h-4 bg-green-500 rounded"></div>
+                  <div className="w-4 h-4 bg-orange-500 rounded"></div>
                   <span className="text-sm text-gray-700 dark:text-gray-300">Cash</span>
                 </div>
                 <div className="text-right">
@@ -801,7 +801,7 @@ export default function DashboardPage() {
               </div>
               <div className="mt-4">
                 <div className="flex rounded-lg overflow-hidden h-4">
-                  <div className="bg-green-500" style={{ width: `${stats.paymentMethods.cash.percentage}%` }}></div>
+                  <div className="bg-orange-500" style={{ width: `${stats.paymentMethods.cash.percentage}%` }}></div>
                   <div
                     className="bg-beveren-600"
                     style={{ width: `${stats.paymentMethods.debitCard.percentage}%` }}
@@ -818,10 +818,10 @@ export default function DashboardPage() {
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Gift Card Usage</h3>
-              <Gift className="w-5 h-5 text-purple-600" />
+              <Gift className="w-5 h-5 text-orange-600" />
             </div>
             <div className="space-y-3">
-              <div className="flex justify-between p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+              <div className="flex justify-between p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                 <span className="text-sm text-gray-600 dark:text-gray-400">Total Redeemed</span>
                 <span className="font-semibold text-gray-900 dark:text-white">
                   ${stats.giftCardUsage.totalRedeemed.toFixed(2)}
@@ -835,7 +835,7 @@ export default function DashboardPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600 dark:text-gray-400">Avg Discount</span>
-                <span className="font-semibold text-purple-600 dark:text-purple-400">
+                <span className="font-semibold text-orange-600 dark:text-orange-400">
                   ${stats.giftCardUsage.averageDiscount.toFixed(2)}
                 </span>
               </div>

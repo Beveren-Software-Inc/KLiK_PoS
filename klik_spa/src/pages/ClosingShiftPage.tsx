@@ -413,7 +413,7 @@ export default function ClosingShiftPage() {
                       {stat.name.toLowerCase().includes('cash') ? (
                         <div className="text-xl">💵</div>
                       ) : (
-                        <CreditCard className="w-5 h-5 text-beveren-600" />
+                        <CreditCard className="w-5 h-5 text-orange-600" />
                       )}
                       <span className="font-medium text-gray-900 dark:text-white">{stat.name}</span>
                     </div>
@@ -514,7 +514,7 @@ export default function ClosingShiftPage() {
                       {stat.name.toLowerCase().includes('cash') ? (
                         <div className="text-2xl">💵</div>
                       ) : (
-                        <CreditCard className="w-8 h-8 text-beveren-600" />
+                        <CreditCard className="w-8 h-8 text-orange-600" />
                       )}
                     </div>
                     <div className="space-y-2">

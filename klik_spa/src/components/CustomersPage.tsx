@@ -210,7 +210,7 @@ export default function CustomersPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 mt-3">
               <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
                 <div className="flex items-center">
-                  <Users className="text-blue-500" size={24} />
+                  <Users className="text-orange-500" size={24} />
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Customers</p>
                     <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.total}</p>
@@ -220,7 +220,7 @@ export default function CustomersPage() {
 
               <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
                 <div className="flex items-center">
-                  <div className="w-6 h-6 bg-green-500 rounded flex items-center justify-center">
+                  <div className="w-6 h-6 bg-orange-500 rounded flex items-center justify-center">
                     <span className="text-white text-xs font-bold">📦</span>
                   </div>
                   <div className="ml-4">
@@ -437,7 +437,7 @@ export default function CustomersPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 mt-3">
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
               <div className="flex items-center">
-                <Users className="text-blue-500" size={24} />
+                <Users className="text-orange-500" size={24} />
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Customers</p>
                   <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.total}</p>
@@ -447,7 +447,7 @@ export default function CustomersPage() {
 
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
               <div className="flex items-center">
-                <div className="w-6 h-6 bg-green-500 rounded flex items-center justify-center">
+                <div className="w-6 h-6 bg-orange-500 rounded flex items-center justify-center">
                   <span className="text-white text-xs font-bold">📦</span>
                 </div>
                 <div className="ml-4">

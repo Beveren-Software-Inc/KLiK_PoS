@@ -40,7 +40,7 @@ return (
           </div>
         )}
         {!isOutOfStock && (
-          <div className="absolute top-2 right-2 bg-green-500 text-white px-1.5 py-0.5 rounded-md text-xs font-medium">
+          <div className="absolute top-2 right-2 bg-orange-500 text-white px-1.5 py-0.5 rounded-md text-xs font-medium">
             {item.available}
           </div>
         )}

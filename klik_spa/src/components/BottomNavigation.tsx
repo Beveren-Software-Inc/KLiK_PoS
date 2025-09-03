@@ -7,10 +7,10 @@ export default function BottomNavigation() {
 
    const menuItems = [
     { icon: Grid3X3, path: "/pos", label: "POS" },
-     { icon: Receipt, path: "/invoice", label: "InvoiceHistory" },
+     { icon: Receipt, path: "/invoice", label: "Invoice" },
      { icon: Users, path: "/customers", label: "Customers" },
     { icon: BarChart3, path: "/dashboard", label: "Dashboard" },
-    { icon: FileText, path: "/closing_shift", label: "Closing Shift" },
+    { icon: FileText, path: "/closing_shift", label: "Closing" },
     
   ]
 
