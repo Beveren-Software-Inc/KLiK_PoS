@@ -20,6 +20,9 @@ import {
   CreditCard,
   Send,
   RotateCcw,
+  Files,
+  FileMinus,
+  FileSymlink
 } from "lucide-react";
 
 import InvoiceViewModal from "../components/InvoiceViewModal";
@@ -481,7 +484,8 @@ const getStatusBadge = (status: string) => {
                           <span>Edit</span>
                         </button>
                       )}
-                      {(invoice.status === "Paid" || invoice.status === "Unpaid" || invoice.status === "Overdue" || invoice.status === "Partly Paid") && (
+                      {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && hasReturnableItems(invoice) && (
+
                         <button
                           onClick={() => handleSingleReturnClick(invoice)}
                           className="text-orange-600 hover:text-orange-900 flex items-center space-x-1"
@@ -541,7 +545,7 @@ const getStatusBadge = (status: string) => {
                     Edit
                   </button>
                 )}
-                  {["Paid", "Unpaid", "Overdue", "Partly Paid"].includes(invoice.status) && (
+                  {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && (
                   <button
                     onClick={() => handleSingleReturnClick(invoice)}
                     className="flex-1 text-xs px-3 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors"
@@ -564,6 +568,17 @@ const getStatusBadge = (status: string) => {
   const handleEditInvoice = (invoice: SalesInvoice) => {
     setSelectedDraftInvoice(invoice);
     setShowEditOptions(true);
+  };
+
+  // Helper function to check if invoice has items that can still be returned
+  const hasReturnableItems = (invoice: SalesInvoice) => {
+    if (!invoice || !invoice.items) return false;
+    
+    return invoice.items.some(item => {
+      const soldQty = item.qty || item.quantity || 0;
+      const returnedQty = item.returned_qty || 0;
+      return returnedQty < soldQty;
+    });
   };
 
   //Just Incase we allow deletion of invoice, activate/uncomment this: Mania
@@ -902,7 +917,7 @@ const getStatusBadge = (status: string) => {
                   onClick={handleMultiReturnClick}
                   className="flex items-center space-x-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
                 >
-                  <Users className="w-4 h-4" />
+                  <FileMinus className="w-4 h-4" />
                   <span>Multi-Invoice Return</span>
                 </button>
                 <button className="flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors">

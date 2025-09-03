@@ -77,16 +77,23 @@ def get_invoice_details(invoice_id):
         invoice = frappe.get_doc("Sales Invoice", invoice_id)
         invoice_data = invoice.as_dict()
 
-        # Get items explicitly
+        # Get items explicitly with return quantities
         items = []
         for item in invoice.items:
+            # Get returned quantity for this item
+            returned_data = returned_qty(invoice.customer, invoice.name, item.item_code)
+            returned_qty_value = returned_data.get("total_returned_qty", 0)
+            available_qty = item.qty - returned_qty_value
+            
             items.append({
                 "item_code": item.item_code,
                 "item_name": item.item_name,
                 "qty": item.qty,
                 "rate": item.rate,
                 "amount": item.amount,
-                "description": item.description
+                "description": item.description,
+                "returned_qty": returned_qty_value,
+                "available_qty": available_qty
             })
 
         # Get full company address doc
@@ -677,38 +684,71 @@ def get_customer_receivable_account(customer, company):
         return frappe.db.get_value("Company", company, "default_receivable_account")
 
 
+# @frappe.whitelist()
+# def returned_qty(customer, sales_invoice, item):
+#     """Get total returned quantity for a specific item from a specific invoice for a customer"""
+#     values = {
+#         'customer': customer,
+#         'sales_invoice': sales_invoice,
+#         'item': item
+#     }
+
+#     total_returned = frappe.db.sql("""
+#         SELECT
+#             `tabCredit Details`.sales_invoice,
+#             `tabSales Invoice`.customer,
+#             SUM(`tabCredit Details`.qtr) AS total_returned_qty
+#         FROM
+#             `tabSales Invoice`
+#         JOIN
+#             `tabCredit Details` ON `tabSales Invoice`.name = `tabCredit Details`.parent
+#         WHERE
+#             `tabSales Invoice`.customer = %(customer)s
+#             AND `tabCredit Details`.sales_invoice = %(sales_invoice)s
+#             AND `tabCredit Details`.item = %(item)s
+#             AND `tabSales Invoice`.docstatus = 1
+#             AND `tabSales Invoice`.status != 'Cancelled'
+#         GROUP BY
+#             `tabCredit Details`.sales_invoice, `tabSales Invoice`.customer
+#     """, values=values, as_dict=True)
+
+#     if not total_returned:
+#         return {'total_returned_qty': 0}
+
+#     return total_returned[0]
 @frappe.whitelist()
 def returned_qty(customer, sales_invoice, item):
-    """Get total returned quantity for a specific item from a specific invoice for a customer"""
+    """
+    Get total returned quantity for a specific item (item_code) against a given sales invoice.
+    - sales_invoice should be the original invoice name.
+    - item should be the item_code (not item name or child row name).
+    Returns: {'total_returned_qty': <float>}
+    """
     values = {
-        'customer': customer,
-        'sales_invoice': sales_invoice,
-        'item': item
+        "customer": customer,
+        "sales_invoice": sales_invoice,
+        "item": item,
     }
 
-    total_returned = frappe.db.sql("""
-        SELECT
-            `tabCredit Details`.sales_invoice,
-            `tabSales Invoice`.customer,
-            SUM(`tabCredit Details`.qtr) AS total_returned_qty
-        FROM
-            `tabSales Invoice`
-        JOIN
-            `tabCredit Details` ON `tabSales Invoice`.name = `tabCredit Details`.parent
-        WHERE
-            `tabSales Invoice`.customer = %(customer)s
-            AND `tabCredit Details`.sales_invoice = %(sales_invoice)s
-            AND `tabCredit Details`.item = %(item)s
-            AND `tabSales Invoice`.docstatus = 1
-            AND `tabSales Invoice`.status != 'Cancelled'
-        GROUP BY
-            `tabCredit Details`.sales_invoice, `tabSales Invoice`.customer
-    """, values=values, as_dict=True)
+    # Sum qty from Sales Invoice Items of return invoices that point to the original invoice
+    result = frappe.db.sql(
+        """
+        SELECT COALESCE(SUM(sii.qty), 0) AS total_returned_qty
+        FROM `tabSales Invoice` si
+        JOIN `tabSales Invoice Item` sii ON si.name = sii.parent
+        WHERE si.is_return = 1
+          AND si.return_against = %(sales_invoice)s
+          AND sii.item_code = %(item)s
+          AND si.docstatus = 1
+          AND si.customer = %(customer)s
+        """,
+        values=values,
+        as_dict=True,
+    )
 
-    if not total_returned:
-        return {'total_returned_qty': 0}
+    total = abs(result[0]["total_returned_qty"]) if result else 0.0
+    return {"total_returned_qty": float(total)}
 
-    return total_returned[0]
 
 
 @frappe.whitelist()
@@ -777,7 +817,7 @@ def get_valid_sales_invoices(doctype, txt, searchfield, start, page_len, filters
 
 
 @frappe.whitelist()
-def get_customer_invoices_for_return(customer, start_date=None, end_date=None):
+def get_customer_invoices_for_return(customer, start_date=None, end_date=None, shipping_address=None):
     """Get all invoices for a customer within date range that can be returned"""
     try:
         filters = {
@@ -794,6 +834,10 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None):
                 filters["posting_date"] = ["between", [start_date, end_date]]
             else:
                 filters["posting_date"] = ["<=", end_date]
+
+        # Add shipping address filter if provided
+        if shipping_address:
+            filters["customer_address"] = shipping_address
 
         invoices = frappe.get_all(
             "Sales Invoice",
@@ -902,19 +946,26 @@ def create_partial_return(invoice_name, return_items):
         # Replace items with only the selected ones
         return_doc.items = filtered_items
 
-        # Update payments to be proportional to returned items
+        # Clear existing payments and recalculate based on returned items
         return_doc.payments = []
-        total_returned_amount = sum(abs(item.qty * item.rate) for item in return_doc.items)
-        total_original_amount = sum(item.qty * item.rate for item in original_invoice.items)
 
-        if total_original_amount > 0:
+        # Calculate total returned amount (should be positive for calculation)
+        total_returned_amount = sum(abs(item.qty * item.rate) for item in return_doc.items)
+        total_original_amount = sum(abs(item.qty * item.rate) for item in original_invoice.items)
+
+        if total_original_amount > 0 and total_returned_amount > 0:
             proportion = total_returned_amount / total_original_amount
             for payment in original_invoice.payments:
+                # Ensure the amount is negative for returns
+                payment_amount = -abs(payment.amount * proportion)
                 return_doc.append("payments", {
                     "mode_of_payment": payment.mode_of_payment,
-                    "amount": -abs(payment.amount * proportion),
+                    "amount": payment_amount,
                     "account": payment.account,
                 })
+        else:
+            # If no items to return, don't add any payments
+            pass
 
         return_doc.save()
         return_doc.submit()
@@ -940,21 +991,31 @@ def create_multi_invoice_return(return_data):
         if isinstance(return_data, str):
             return_data = json.loads(return_data)
 
+        print(f"Multi-invoice return data: {return_data}")
+
         customer = return_data.get("customer")
         invoice_returns = return_data.get("invoice_returns", [])
 
+        print(f"Customer: {customer}")
+        print(f"Number of invoice returns: {len(invoice_returns)}")
+
         created_returns = []
 
-        for invoice_return in invoice_returns:
+        for i, invoice_return in enumerate(invoice_returns):
             invoice_name = invoice_return.get("invoice_name")
             return_items = invoice_return.get("return_items", [])
 
+            print(f"Processing invoice {i+1}: {invoice_name} with {len(return_items)} items")
+
             if return_items:
+                # Call create_partial_return with separate parameters
                 result = create_partial_return(invoice_name, return_items)
+                print(f"Result for {invoice_name}: {result}")
                 if result.get("success"):
                     created_returns.append(result.get("return_invoice"))
                 else:
                     frappe.log_error(f"Failed to create return for {invoice_name}: {result.get('message')}")
+                    # Continue with other invoices even if one fails
 
         return {
             "success": True,

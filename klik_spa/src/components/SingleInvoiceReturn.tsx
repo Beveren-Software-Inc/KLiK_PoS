@@ -38,31 +38,20 @@ export default function SingleInvoiceReturn({
   const initializeReturnItems = async () => {
     setLoadingReturnData(true);
     try {
-      console.log('Invoice object:', invoice);
 
       // If invoice.items is empty, fetch complete invoice details from backend
       let invoiceWithItems = invoice;
               if (!invoice.items || invoice.items.length === 0) {
-          console.log('Fetching complete invoice details from backend...');
           const invoiceDetails = await getInvoiceDetails(invoice.name || invoice.id);
 
-          console.log('Invoice details response:', invoiceDetails);
-
           if (invoiceDetails.success && invoiceDetails.data) {
-            // Handle nested data structure
             invoiceWithItems = invoiceDetails.data.data || invoiceDetails.data;
-            console.log('Fetched invoice details:', invoiceWithItems);
+
           } else {
             console.error('Failed to fetch invoice details:', invoiceDetails.error);
             throw new Error(invoiceDetails.error || 'Failed to fetch invoice details from backend');
           }
         }
-
-              console.log('Invoice items:', invoiceWithItems.items);
-        console.log('Invoice items type:', typeof invoiceWithItems.items);
-        console.log('Invoice items is array:', Array.isArray(invoiceWithItems.items));
-        console.log('Full invoiceWithItems object:', invoiceWithItems);
-        console.log('Available keys in invoiceWithItems:', Object.keys(invoiceWithItems));
 
         const items: ReturnItem[] = [];
 
@@ -151,9 +140,9 @@ export default function SingleInvoiceReturn({
     }
 
     setIsLoading(true);
-
+    const invoiceName = invoice.id || invoice.name
     try {
-      const result = await createPartialReturn(invoice.id, itemsToReturn);
+      const result = await createPartialReturn(invoiceName, itemsToReturn);
 
       if (result.success) {
         toast.success(result.message || 'Return created successfully');
@@ -183,7 +172,7 @@ export default function SingleInvoiceReturn({
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 bg-orange-50 dark:bg-orange-900/20 border-b border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 bg-beveren-100 dark:bg-orange-900/20 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-orange-100 dark:bg-orange-900/40 rounded-lg">
@@ -236,7 +225,7 @@ export default function SingleInvoiceReturn({
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Return Amount</p>
-                  <p className="text-xl font-bold text-orange-600 dark:text-orange-400">
+                  <p className="text-xl font-bold text-black-600 dark:text-orange-400">
                     ${totalReturnAmount.toFixed(2)}
                   </p>
                 </div>

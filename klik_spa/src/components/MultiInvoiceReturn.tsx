@@ -9,7 +9,8 @@ import {
   Minus,
   Plus,
   FileText,
-  Clock
+  Clock,
+  MapPin
 } from "lucide-react";
 import { toast } from "react-toastify";
 import {
@@ -50,6 +51,10 @@ export default function MultiInvoiceReturn({
   const [availableItems, setAvailableItems] = useState<{item_code: string, item_name: string}[]>([]);
   const [filteredAvailableItems, setFilteredAvailableItems] = useState<{item_code: string, item_name: string}[]>([]);
 
+  // Address filter states
+  const [customerAddresses, setCustomerAddresses] = useState<Array<{name: string, address_line1: string, city: string}>>([]);
+  const [selectedAddress, setSelectedAddress] = useState<string>('');
+
   useEffect(() => {
     if (isOpen) {
       // Reset workflow when opening
@@ -65,20 +70,38 @@ export default function MultiInvoiceReturn({
       setSelectedInvoices(new Set());
       setFilteredAvailableItems([]);
       setCustomerSearchQuery('');
+      setSelectedAddress('');
 
-      // Automatically load available items when modal opens if customer is provided
+      // Automatically load available items and addresses when modal opens if customer is provided
       if (customer) {
         loadAvailableItems();
+        loadCustomerAddresses();
       }
     }
   }, [isOpen, customer]);
 
-    const loadAvailableItems = async () => {
+    const loadCustomerAddresses = async () => {
+    try {
+      const response = await fetch(`/api/method/klik_pos.api.customer.get_customer_addresses?customer=${selectedCustomer}`);
+      const data = await response.json();
+
+      if (data.message && Array.isArray(data.message)) {
+        setCustomerAddresses(data.message);
+      } else {
+        setCustomerAddresses([]);
+      }
+    } catch (error) {
+      console.error('Error loading customer addresses:', error);
+      setCustomerAddresses([]);
+    }
+  };
+
+  const loadAvailableItems = async () => {
     try {
       const endDate = new Date().toISOString().split('T')[0];
       const startDate = new Date(Date.now() - (daysBack * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
 
-      const result = await getCustomerInvoicesForReturn(selectedCustomer, startDate, endDate);
+      const result = await getCustomerInvoicesForReturn(selectedCustomer, startDate, endDate, selectedAddress);
 
       if (result.success && result.data) {
         // Extract unique items from all invoices
@@ -121,8 +144,9 @@ export default function MultiInvoiceReturn({
       const endDate = new Date().toISOString().split('T')[0];
       const startDate = new Date(Date.now() - (daysBack * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
 
-      const result = await getCustomerInvoicesForReturn(selectedCustomer, startDate, endDate);
-
+      // Include address filter if selected
+      const result = await getCustomerInvoicesForReturn(selectedCustomer, startDate, endDate, selectedAddress);
+      
       if (result.success && result.data) {
         const filteredInvoices = result.data.filter(invoice =>
           invoice.items.some(item =>
@@ -235,6 +259,7 @@ export default function MultiInvoiceReturn({
 
   const handleSubmitReturn = async () => {
     const invoiceReturns = invoices
+      .filter(invoice => selectedInvoices.has(invoice.name)) // Only include selected invoices
       .map(invoice => ({
         invoice_name: invoice.name,
         return_items: invoice.items.filter(item => (item.return_qty || 0) > 0)
@@ -252,6 +277,7 @@ export default function MultiInvoiceReturn({
     };
 
     setIsLoading(true);
+    console.log("Data", returnData)
     try {
       const result = await createMultiInvoiceReturn(returnData);
 
@@ -276,7 +302,7 @@ export default function MultiInvoiceReturn({
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-7xl h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 bg-orange-50 dark:bg-orange-900/20 border-b border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 bg-beveren-100 dark:bg-orange-900/20 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-orange-100 dark:bg-orange-900/40 rounded-lg">
@@ -388,10 +414,57 @@ export default function MultiInvoiceReturn({
                     .map((customer) => (
                       <button
                         key={customer.name || customer.customer_name || Math.random()}
-                        onClick={() => {
-                          setSelectedCustomer(customer.name || customer.customer_name || '');
+                        onClick={async () => {
+                          const customerName = customer.name || customer.customer_name || '';
+                          setSelectedCustomer(customerName);
                           setWorkflowStep('select-items');
-                          loadAvailableItems();
+
+                          // Load items and addresses with the selected customer
+                          try {
+                            const endDate = new Date().toISOString().split('T')[0];
+                            const startDate = new Date(Date.now() - (daysBack * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+
+                            // Load addresses
+                            const addressResponse = await fetch(`/api/method/klik_pos.api.customer.get_customer_addresses?customer=${customerName}`);
+                            const addressData = await addressResponse.json();
+
+                            if (addressData.message && Array.isArray(addressData.message)) {
+                              setCustomerAddresses(addressData.message);
+                            } else {
+                              setCustomerAddresses([]);
+                            }
+
+                            // Load available items
+                            const result = await getCustomerInvoicesForReturn(customerName, startDate, endDate, selectedAddress);
+
+                            if (result.success && result.data) {
+                              // Extract unique items from all invoices
+                              const itemMap = new Map<string, string>();
+                              result.data.forEach(invoice => {
+                                invoice.items.forEach(item => {
+                                  if (item.available_qty > 0) {
+                                    itemMap.set(item.item_code, item.item_name);
+                                  }
+                                });
+                              });
+
+                              const items = Array.from(itemMap.entries()).map(([code, name]) => ({
+                                item_code: code,
+                                item_name: name
+                              }));
+
+                              setAvailableItems(items);
+                              setFilteredAvailableItems(items);
+                            } else {
+                              setAvailableItems([]);
+                              setFilteredAvailableItems([]);
+                            }
+                          } catch (error) {
+                            console.error('Error loading customer data:', error);
+                            setAvailableItems([]);
+                            setFilteredAvailableItems([]);
+                            setCustomerAddresses([]);
+                          }
                         }}
                         className="w-full text-left p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                       >
@@ -483,6 +556,36 @@ export default function MultiInvoiceReturn({
                     >
                       <RotateCcw className="w-4 h-4" />
                     </button>
+                  </div>
+                </div>
+
+                {/* Address Filter */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Shipping Address (Optional)
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    <MapPin className="w-4 h-4 text-gray-400" />
+                    <input
+                        list="address-list"
+                        value={selectedAddress}
+                        onChange={(e) => {
+                          setSelectedAddress(e.target.value);
+                          setTimeout(() => loadAvailableItems(), 100);
+                        }}
+                        className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                                  focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800
+                                  text-gray-900 dark:text-white"
+                      />
+
+                      <datalist id="address-list">
+                        {customerAddresses.map((address) => (
+                          <option key={address.name} value={address.name}>
+                            {address.address_line1}, {address.city}
+                          </option>
+                        ))}
+                      </datalist>
+
                   </div>
                 </div>
 

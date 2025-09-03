@@ -70,6 +70,14 @@ export interface SalesInvoiceItem {
   unitPrice: number
   total: number
   discount: number
+  item_code?: string
+  item_name?: string
+  qty?: number
+  rate?: number
+  amount?: number
+  description?: string
+  returned_qty?: number
+  available_qty?: number
 }
 
 export interface SalesInvoice {
