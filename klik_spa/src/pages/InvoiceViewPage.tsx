@@ -107,7 +107,7 @@ export default function InvoiceViewPage() {
   // Helper function to check if invoice has items that can still be returned
   const hasReturnableItems = () => {
     if (!invoice || !invoice.items) return false;
-    
+
     return invoice.items.some(item => {
       const soldQty = item.qty || item.quantity || 0;
       const returnedQty = item.returned_qty || 0;

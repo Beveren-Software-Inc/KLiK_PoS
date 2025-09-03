@@ -55,10 +55,33 @@ def get_sales_invoices(limit=100, start=0):
             start=start
         )
 
-        # Fetch full name for each owner
+        # Fetch full name for each owner and add item details with return quantities
         for inv in invoices:
             full_name = frappe.db.get_value("User", inv["owner"], "full_name") or inv["owner"]
             inv["cashier_name"] = full_name
+
+            # Get items with return quantities for this invoice
+            invoice_doc = frappe.get_doc("Sales Invoice", inv["name"])
+            items = []
+            for item in invoice_doc.items:
+                # Get returned quantity for this item
+                returned_data = returned_qty(invoice_doc.customer, invoice_doc.name, item.item_code)
+                returned_qty_value = returned_data.get("total_returned_qty", 0)
+                available_qty = item.qty - returned_qty_value
+
+                items.append({
+                    "item_code": item.item_code,
+                    "item_name": item.item_name,
+                    "qty": item.qty,
+                    "rate": item.rate,
+                    "amount": item.amount,
+                    "description": item.description,
+                    "returned_qty": returned_qty_value,
+                    "available_qty": available_qty
+                })
+
+            inv["items"] = items
+
         return {
             "success": True,
             "data": invoices
@@ -84,7 +107,7 @@ def get_invoice_details(invoice_id):
             returned_data = returned_qty(invoice.customer, invoice.name, item.item_code)
             returned_qty_value = returned_data.get("total_returned_qty", 0)
             available_qty = item.qty - returned_qty_value
-            
+
             items.append({
                 "item_code": item.item_code,
                 "item_name": item.item_name,

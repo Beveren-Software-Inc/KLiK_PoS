@@ -62,7 +62,7 @@ const getIconAndColor = (
   const lowerLabel = label.toLowerCase();
 
   if (lowerLabel.includes("cash")) {
-    return { icon: <Banknote size={24} />, color: "bg-green-600" };
+    return { icon: <Banknote size={24} />, color: "bg-beveren-600" };
   }
   if (
     lowerLabel.includes("card") ||
@@ -70,19 +70,19 @@ const getIconAndColor = (
     lowerLabel.includes("debit") ||
     lowerLabel.includes("bank")
   ) {
-    return { icon: <CreditCard size={24} />, color: "bg-blue-600" };
+    return { icon: <CreditCard size={24} />, color: "bg-beveren-600" };
   }
   if (lowerLabel.includes("phone") || lowerLabel.includes("mpesa")) {
-    return { icon: <Smartphone size={24} />, color: "bg-purple-600" };
+    return { icon: <Smartphone size={24} />, color: "bg-beveren--600" };
   }
   if (lowerLabel.includes("gift")) {
-    return { icon: <Gift size={24} />, color: "bg-orange-600" };
+    return { icon: <Gift size={24} />, color: "bg-beveren--600" };
   }
   if (lowerLabel.includes("cheque") || lowerLabel.includes("check")) {
-    return { icon: <Check size={24} />, color: "bg-yellow-600" };
+    return { icon: <Check size={24} />, color: "bg-beveren--600" };
   }
 
-  return { icon: <CreditCard size={24} />, color: "bg-gray-600" };
+  return { icon: <CreditCard size={24} />, color: "bg-beveren--600" };
 };
 
 export default function PaymentDialog({
@@ -553,7 +553,7 @@ export default function PaymentDialog({
                   </button>
 
                   <button
-                    className="flex items-center space-x-2 px-4 py-2 bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/30 transition-colors"
+                    className="flex items-center space-x-2 px-4 py-2 bg-green-100 dark:bg-green-900/20 text-beveren-600 dark:text-green-400 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/30 transition-colors"
                     title="WhatsApp"
                     onClick={() => {
                       const msg = encodeURIComponent(
@@ -739,7 +739,7 @@ export default function PaymentDialog({
                     <span
                       className={`font-medium ${
                         calculations.isInclusive
-                          ? "text-blue-600 dark:text-blue-400"
+                          ? "text-beveren-600 dark:text-beveren-400"
                           : "text-gray-900 dark:text-white"
                       }`}
                     >
@@ -775,7 +775,7 @@ export default function PaymentDialog({
                         <span className="text-gray-600 dark:text-gray-400">
                           Total Paid
                         </span>
-                        <span className="font-medium text-blue-600 dark:text-blue-400">
+                        <span className="font-medium text-beveren-600 dark:text-blue-400">
                           {formatCurrency(totalPaidAmount)}
                         </span>
                       </div>
@@ -792,7 +792,7 @@ export default function PaymentDialog({
                           <span className="text-gray-600 dark:text-gray-400">
                             Change
                           </span>
-                          <span className="font-medium text-green-600 dark:text-green-400">
+                          <span className="font-medium text-beveren-600 dark:text-beveren-400">
                             {formatCurrency(
                               totalPaidAmount - calculations.grandTotal
                             )}
@@ -1801,7 +1801,7 @@ export default function PaymentDialog({
                 className={`px-8 py-2 rounded-lg font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center space-x-2 ${
                   isB2B
                     ? "bg-beveren-500 hover:bg-blue-700 text-white"
-                    : "bg-green-600 hover:bg-green-700 text-white"
+                    : "bg-beveren-600 hover:bg-beveren-700 text-white"
                 }`}
               >
                 {isProcessingPayment ? (
