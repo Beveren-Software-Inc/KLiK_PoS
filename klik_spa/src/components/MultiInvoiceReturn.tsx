@@ -378,7 +378,7 @@ export default function MultiInvoiceReturn({
 
         {/* Step 0: Select Customer (only when no customer provided) */}
         {workflowStep === 'select-customer' && (
-          <div className="flex-1 flex flex-col sm:flex-col overflow-y-auto sm:overflow-y-auto px-4 sm:px-6 py-4 bg-gray-50 dark:bg-gray-700">
+          <div className="flex-1 flex flex-col overflow-y-auto sm:overflow-visible px-4 sm:px-6 py-4 bg-gray-50 dark:bg-gray-700">
             <div className="mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                 Step 1: Select Customer
@@ -404,7 +404,7 @@ export default function MultiInvoiceReturn({
 
             {/* Customer List */}
             <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4 flex-1 flex flex-col">
-              <div className="space-y-2 flex-1 sm:flex-1 overflow-y-auto max-h-60 sm:max-h-none">
+              <div className="space-y-2 flex-1 overflow-y-auto max-h-60 sm:max-h-none">
                 {customers && customers.length > 0 ? (
                   customers
                     .filter(customer =>
@@ -507,7 +507,7 @@ export default function MultiInvoiceReturn({
 
         {/* Step 1: Select Items */}
         {workflowStep === 'select-items' && (
-          <div className="flex-1 flex flex-col sm:flex-col overflow-y-auto sm:overflow-y-auto px-4 sm:px-6 py-4 bg-gray-50 dark:bg-gray-700">
+          <div className="flex-1 flex flex-col overflow-y-auto sm:overflow-visible px-4 sm:px-6 py-4 bg-gray-50 dark:bg-gray-700">
             <div className="mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                 Step 1: Select Items to Return
