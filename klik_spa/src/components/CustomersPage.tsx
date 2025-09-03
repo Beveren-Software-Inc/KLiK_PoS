@@ -247,20 +247,7 @@ export default function CustomersPage() {
                   />
                 </div>
 
-                {/* Status Filter */}
-                {/* <div className="flex items-center space-x-2">
-                  <Filter className="text-gray-400" size={18} />
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as "all" | Customer['status'])}
-                    className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm font-medium text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-beveren-500"
-                  >
-                    <option value="all">All Status</option>
-                    <option value="active">Active</option>
-                    <option value="vip">VIP</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div> */}
+
               </div>
             </div>
 
@@ -619,18 +606,7 @@ export default function CustomersPage() {
               </table>
             </div>
 
-            {/*             {filteredCustomers.length === 0 && (
-              <div className="text-center py-12">
-                <Users className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No customers found</h3>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {searchQuery
-                    ? "Try adjusting your search criteria."
-                    : "Get started by adding your first customer."
-                  }
-                </p>
-              </div>
-            )} */}
+
           </div>
         </div>
       </div>

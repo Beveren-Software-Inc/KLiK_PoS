@@ -231,7 +231,7 @@ export default function InvoiceViewPage() {
                 </button>
 
                 {/* Return Buttons */}
-                {invoice.status === "Paid" && !invoice.is_return && (
+                {["Paid", "Unpaid", "Overdue", "Partly Paid"].includes(invoice.status) && !invoice.is_return && (
                   <>
                     <div className="w-px h-6 bg-gray-300 dark:bg-gray-600"></div>
 

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { createPartialReturn, getReturnedQty, type ReturnItem } from "../services/returnService";
+import { getInvoiceDetails } from "../services/salesInvoice";
 
 interface SingleInvoiceReturnProps {
   invoice: any;
@@ -37,28 +38,73 @@ export default function SingleInvoiceReturn({
   const initializeReturnItems = async () => {
     setLoadingReturnData(true);
     try {
-      const items: ReturnItem[] = [];
+      console.log('Invoice object:', invoice);
 
-      for (const item of invoice.items) {
+      // If invoice.items is empty, fetch complete invoice details from backend
+      let invoiceWithItems = invoice;
+              if (!invoice.items || invoice.items.length === 0) {
+          console.log('Fetching complete invoice details from backend...');
+          const invoiceDetails = await getInvoiceDetails(invoice.name || invoice.id);
+
+          console.log('Invoice details response:', invoiceDetails);
+
+          if (invoiceDetails.success && invoiceDetails.data) {
+            // Handle nested data structure
+            invoiceWithItems = invoiceDetails.data.data || invoiceDetails.data;
+            console.log('Fetched invoice details:', invoiceWithItems);
+          } else {
+            console.error('Failed to fetch invoice details:', invoiceDetails.error);
+            throw new Error(invoiceDetails.error || 'Failed to fetch invoice details from backend');
+          }
+        }
+
+              console.log('Invoice items:', invoiceWithItems.items);
+        console.log('Invoice items type:', typeof invoiceWithItems.items);
+        console.log('Invoice items is array:', Array.isArray(invoiceWithItems.items));
+        console.log('Full invoiceWithItems object:', invoiceWithItems);
+        console.log('Available keys in invoiceWithItems:', Object.keys(invoiceWithItems));
+
+        const items: ReturnItem[] = [];
+
+        // Handle different possible item structures
+        const itemsArray = invoiceWithItems.items || invoiceWithItems.items_list || invoiceWithItems.sales_invoice_items || [];
+
+        if (!Array.isArray(itemsArray)) {
+          console.error('Items is not an array:', itemsArray);
+          throw new Error('Invoice items not found in expected format');
+        }
+
+        for (const item of itemsArray) {
+        console.log('Processing item:', item);
+
         // Get returned quantity for each item
         const returnedData = await getReturnedQty(
-          invoice.customer,
-          invoice.name,
-          item.item_code
+          invoiceWithItems.customer,
+          invoiceWithItems.name || invoiceWithItems.id, // Use id as fallback if name is not available
+          item.item_code || item.id
         );
 
         const returnedQty = returnedData.success ?
           returnedData.data?.total_returned_qty || 0 : 0;
 
+        // Handle different property names from different invoice sources
+        const itemCode = item.item_code || item.id;
+        const itemName = item.item_name || item.name;
+        const qty = item.qty || item.quantity;
+        const rate = item.rate || item.unitPrice;
+        const amount = item.amount || item.total;
+
+        console.log('Extracted values:', { itemCode, itemName, qty, rate, amount, returnedQty });
+
         items.push({
-          item_code: item.item_code,
-          item_name: item.item_name,
-          qty: item.qty,
-          rate: item.rate,
-          amount: item.amount,
+          item_code: itemCode,
+          item_name: itemName,
+          qty: qty,
+          rate: rate,
+          amount: amount,
           returned_qty: returnedQty,
-          available_qty: item.qty - returnedQty,
-          return_qty: item.qty - returnedQty // Set default return quantity to available quantity
+          available_qty: qty - returnedQty,
+          return_qty: qty - returnedQty // Set default return quantity to available quantity
         });
       }
 
@@ -105,8 +151,9 @@ export default function SingleInvoiceReturn({
     }
 
     setIsLoading(true);
+
     try {
-      const result = await createPartialReturn(invoice.name, itemsToReturn);
+      const result = await createPartialReturn(invoice.id, itemsToReturn);
 
       if (result.success) {
         toast.success(result.message || 'Return created successfully');
@@ -147,7 +194,7 @@ export default function SingleInvoiceReturn({
                   Return Items
                 </h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Invoice: {invoice?.name} • Customer: {invoice?.customer}
+                  Invoice: {invoice?.name || invoice?.id} • Customer: {invoice?.customer}
                 </p>
               </div>
             </div>

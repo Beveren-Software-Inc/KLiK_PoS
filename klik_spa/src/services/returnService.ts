@@ -96,7 +96,7 @@ export async function createPartialReturn(
   invoiceName: string,
   returnItems: ReturnItem[]
 ): Promise<{success: boolean; returnInvoice?: string; message?: string; error?: string}> {
-  
+
   const csrfToken = window.csrf_token;
   try {
     const response = await fetch(`/api/method/klik_pos.api.sales_invoice.create_partial_return`, {
@@ -113,15 +113,23 @@ export async function createPartialReturn(
     });
 
     const data = await response.json();
+    console.log('Partial return response:', data);
 
-    if (!response.ok || !data.message.success) {
-      throw new Error(data.message.message || 'Failed to create partial return');
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to create partial return');
+    }
+
+    // Handle both response formats
+    const result = data.message || data;
+
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to create partial return');
     }
 
     return {
       success: true,
-      returnInvoice: data.message.return_invoice,
-      message: data.message.message
+      returnInvoice: result.return_invoice,
+      message: result.message
     };
   } catch (error: any) {
     console.error('Error creating partial return:', error);

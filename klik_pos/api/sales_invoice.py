@@ -5,6 +5,31 @@ import erpnext
 from klik_pos.klik_pos.utils import get_current_pos_profile, get_user_default_company
 from frappe.utils import flt
 
+def get_current_pos_opening_entry():
+    """
+    Get the current active POS Opening Entry for the current user and POS profile.
+    Returns the opening entry name or None if not found.
+    """
+    try:
+        user = frappe.session.user
+        pos_profile = get_current_pos_profile()
+
+        if not pos_profile:
+            return None
+
+        # Look for a submitted POS Opening Entry with no linked closing entry
+        open_entry = frappe.db.exists("POS Opening Entry", {
+            "pos_profile": pos_profile.name,
+            "user": user,
+            "docstatus": 1,  # Submitted
+            "pos_closing_entry": None
+        })
+
+        return open_entry
+    except Exception as e:
+        frappe.log_error(f"Error getting current POS opening entry: {str(e)}")
+        return None
+
 @frappe.whitelist(allow_guest=True)
 def get_sales_invoices(limit=100, start=0):
     try:
@@ -52,6 +77,18 @@ def get_invoice_details(invoice_id):
         invoice = frappe.get_doc("Sales Invoice", invoice_id)
         invoice_data = invoice.as_dict()
 
+        # Get items explicitly
+        items = []
+        for item in invoice.items:
+            items.append({
+                "item_code": item.item_code,
+                "item_name": item.item_name,
+                "qty": item.qty,
+                "rate": item.rate,
+                "amount": item.amount,
+                "description": item.description
+            })
+
         # Get full company address doc
         company_address_doc = None
         if invoice.company_address:
@@ -79,6 +116,7 @@ def get_invoice_details(invoice_id):
             "success": True,
             "data": {
                 **invoice_data,
+                "items": items,
                 "company_address_doc": company_address_doc,
                 "customer_address_doc": customer_address_doc
             }
@@ -197,6 +235,11 @@ def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,
     doc.currency = get_customer_billing_currency(customer)
     doc.is_pos = 1 if business_type == "B2C" else 0
     doc.update_stock = 1
+
+    # Set the current POS opening entry
+    current_opening_entry = get_current_pos_opening_entry()
+    if current_opening_entry:
+        doc.custom_pos_opening_entry = current_opening_entry
 
     pos_profile = get_current_pos_profile()
 
@@ -805,6 +848,7 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None):
 def create_partial_return(invoice_name, return_items):
     """Create a partial return for selected items from an invoice"""
     try:
+        # Handle parameter formats
         if isinstance(return_items, str):
             return_items = json.loads(return_items)
 
@@ -816,66 +860,61 @@ def create_partial_return(invoice_name, return_items):
         if original_invoice.is_return:
             frappe.throw("This invoice is already a return.")
 
-        # Create return invoice
-        return_doc = frappe.new_doc("Sales Invoice")
-        return_doc.customer = original_invoice.customer
+        # Create return invoice using the same approach as return_sales_invoice
+        return_doc = get_mapped_doc("Sales Invoice", invoice_name, {
+            "Sales Invoice": {
+                "doctype": "Sales Invoice",
+                "field_map": {
+                    "name": "return_against"
+                },
+                "validation": {
+                    "docstatus": ["=", 1]
+                }
+            },
+            "Sales Invoice Item": {
+                "doctype": "Sales Invoice Item",
+                "field_map": {
+                    "name": "prevdoc_detail_docname"
+                },
+            }
+        })
+
         return_doc.is_return = 1
-        return_doc.return_against = invoice_name
         return_doc.posting_date = frappe.utils.nowdate()
-        return_doc.due_date = frappe.utils.nowdate()
         return_doc.custom_delivery_date = frappe.utils.nowdate()
-        return_doc.currency = original_invoice.currency
-        return_doc.is_pos = original_invoice.is_pos
-        return_doc.update_stock = 1
 
-        # Copy taxes and charges from original invoice
-        if original_invoice.taxes_and_charges:
-            return_doc.taxes_and_charges = original_invoice.taxes_and_charges
+        # Set the current POS opening entry
+        current_opening_entry = get_current_pos_opening_entry()
+        if current_opening_entry:
+            return_doc.custom_pos_opening_entry = current_opening_entry
 
-        # Copy only selected items with return quantities
+        # Filter items to only include selected ones with return quantities
+        filtered_items = []
         for return_item in return_items:
             if return_item.get("return_qty", 0) > 0:
-                # Find original item
-                orig_item = None
-                for item in original_invoice.items:
+                # Find the corresponding item in the mapped doc
+                for item in return_doc.items:
                     if item.item_code == return_item["item_code"]:
-                        orig_item = item
+                        item.qty = -abs(return_item["return_qty"])
+                        filtered_items.append(item)
                         break
 
-                if orig_item:
-                    return_doc.append("items", {
-                        "item_code": orig_item.item_code,
-                        "item_name": orig_item.item_name,
-                        "qty": -abs(return_item["return_qty"]),
-                        "rate": orig_item.rate,
-                        "income_account": orig_item.income_account,
-                        "expense_account": orig_item.expense_account,
-                        "prevdoc_detail_docname": orig_item.name
-                    })
+        # Replace items with only the selected ones
+        return_doc.items = filtered_items
 
-        # Copy payment methods with negative amounts
-        for payment in original_invoice.payments:
-            return_doc.append("payments", {
-                "mode_of_payment": payment.mode_of_payment,
-                "amount": -abs(payment.amount * (len(return_items) / len(original_invoice.items))),  # Proportional
-                "account": payment.account
-            })
+        # Update payments to be proportional to returned items
+        return_doc.payments = []
+        total_returned_amount = sum(abs(item.qty * item.rate) for item in return_doc.items)
+        total_original_amount = sum(item.qty * item.rate for item in original_invoice.items)
 
-        # If taxes_and_charges is set, populate taxes manually
-        if return_doc.taxes_and_charges:
-            tax_doc = get_tax_template(return_doc.taxes_and_charges)
-            if tax_doc:
-                for tax in tax_doc.taxes:
-                    return_doc.append("taxes", {
-                        "charge_type": tax.charge_type,
-                        "account_head": tax.account_head,
-                        "description": tax.description,
-                        "cost_center": tax.cost_center,
-                        "rate": tax.rate,
-                        "row_id": tax.row_id,
-                        "tax_amount": tax.tax_amount,
-                        "included_in_print_rate": tax.included_in_print_rate,
-                    })
+        if total_original_amount > 0:
+            proportion = total_returned_amount / total_original_amount
+            for payment in original_invoice.payments:
+                return_doc.append("payments", {
+                    "mode_of_payment": payment.mode_of_payment,
+                    "amount": -abs(payment.amount * proportion),
+                    "account": payment.account,
+                })
 
         return_doc.save()
         return_doc.submit()
