@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import {
-  
+
   TrendingUp,
   TrendingDown,
   DollarSign,
@@ -16,7 +16,7 @@ import {
   Activity,
   Filter,
   Download,
- 
+
 } from "lucide-react"
 import { mockDashboardStats, mockSalesInvoices } from "../data/mockSalesData"
 import type { SalesInvoice, DashboardStats } from "../../types"
