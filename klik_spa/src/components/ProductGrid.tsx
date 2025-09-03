@@ -27,7 +27,7 @@ export default function ProductGrid({ items, onAddToCart, isMobile = false, scan
   }
 
   return (
-    <div className={`${isMobile ? "p-4" : "p-6"}`}>
+    <div className={`${isMobile ? "p-4" : "p-6"} bg-gray-50 dark:bg-gray-900`}>
       <div
         className={`grid gap-4 ${
           isMobile

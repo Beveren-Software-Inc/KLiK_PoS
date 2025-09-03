@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   RotateCcw,
   Users,
+  FileMinus
 } from "lucide-react";
 
 
@@ -101,6 +102,17 @@ export default function InvoiceViewPage() {
   const handleMultiReturnSuccess = (returnInvoices: string[]) => {
     toast.success(`${returnInvoices.length} return invoices created successfully`);
     navigate('/invoice');
+  };
+
+  // Helper function to check if invoice has items that can still be returned
+  const hasReturnableItems = () => {
+    if (!invoice || !invoice.items) return false;
+    
+    return invoice.items.some(item => {
+      const soldQty = item.qty || item.quantity || 0;
+      const returnedQty = item.returned_qty || 0;
+      return returnedQty < soldQty;
+    });
   };
 
   // Loading state
@@ -190,65 +202,77 @@ export default function InvoiceViewPage() {
                 </div>
 
                 <button
-                  className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"
-                  title="Print"
+                  className="group relative p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
                   onClick={() => handlePrintInvoice(invoice)}
                 >
                   <Printer size={20} />
+                  <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                    Print Invoice
+                  </span>
                 </button>
 
                 <button
-                  className="p-2 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900 rounded-lg"
-                  title="Email"
+                  className="group relative p-2 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900 rounded-lg transition-all duration-200"
                   onClick={() => {
                     setSharingMode('email')
                     setShowPaymentDialog(true)
                   }}
                 >
                   <MailPlus size={20} />
+                  <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                    Send via Email
+                  </span>
                 </button>
 
                 <button
-                  className="p-2 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900 rounded-lg"
-                  title="WhatsApp"
+                  className="group relative p-2 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900 rounded-lg transition-all duration-200"
                   onClick={() => {
                     setSharingMode('whatsapp')
                     setShowPaymentDialog(true)
                   }}
                 >
                   <MessageCirclePlus size={20} />
+                  <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                    Send via WhatsApp
+                  </span>
                 </button>
 
                 <button
-                  className="p-2 text-purple-600 hover:bg-purple-100 dark:text-purple-400 dark:hover:bg-purple-900 rounded-lg"
-                  title="Text Message"
+                  className="group relative p-2 text-purple-600 hover:bg-purple-100 dark:text-purple-400 dark:hover:bg-purple-900 rounded-lg transition-all duration-200"
                   onClick={() => {
                     setSharingMode('sms')
                     setShowPaymentDialog(true)
                   }}
                 >
                   <MessageSquarePlus size={20} />
+                  <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                    Send via SMS
+                  </span>
                 </button>
 
                 {/* Return Buttons */}
-                {invoice.status === "Paid" && !invoice.is_return && (
+                {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && !invoice.is_return && hasReturnableItems() && (
                   <>
                     <div className="w-px h-6 bg-gray-300 dark:bg-gray-600"></div>
 
                     <button
-                      className="p-2 text-orange-600 hover:bg-orange-100 dark:text-orange-400 dark:hover:bg-orange-900 rounded-lg"
-                      title="Return Items"
+                      className="group relative p-2 text-orange-600 hover:bg-orange-100 dark:text-orange-400 dark:hover:bg-orange-900 rounded-lg transition-all duration-200"
                       onClick={() => setShowSingleReturn(true)}
                     >
                       <RotateCcw size={20} />
+                      <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                        Return Items (Single Invoice)
+                      </span>
                     </button>
 
                     <button
-                      className="p-2 text-indigo-600 hover:bg-indigo-100 dark:text-indigo-400 dark:hover:bg-indigo-900 rounded-lg"
-                      title="Multi-Invoice Return"
+                      className="group relative p-2 text-orange-600 hover:bg-indigo-100 dark:text-indigo-400 dark:hover:bg-indigo-900 rounded-lg transition-all duration-200"
                       onClick={() => setShowMultiReturn(true)}
                     >
-                      <Users size={20} />
+                      <FileMinus size={20} />
+                      <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                        Multi-Invoice Return
+                      </span>
                     </button>
                   </>
                 )}
@@ -512,7 +536,7 @@ export default function InvoiceViewPage() {
             setSharingMode(null)
           }}
           cartItems={[]}
-          appliedCoupons={[]} 
+          appliedCoupons={[]}
           selectedCustomer={{
             id: invoice.customer,
             name: invoice.customer,

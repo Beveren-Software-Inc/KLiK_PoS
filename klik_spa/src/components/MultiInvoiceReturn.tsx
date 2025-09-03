@@ -9,7 +9,8 @@ import {
   Minus,
   Plus,
   FileText,
-  Clock
+  Clock,
+  MapPin
 } from "lucide-react";
 import { toast } from "react-toastify";
 import {
@@ -21,17 +22,19 @@ import {
 } from "../services/returnService";
 
 interface MultiInvoiceReturnProps {
-  customer: string;
+  customer?: string;
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (returnInvoices: string[]) => void;
+  customers?: Array<{name: string, customer_name: string}>;
 }
 
 export default function MultiInvoiceReturn({
   customer,
   isOpen,
   onClose,
-  onSuccess
+  onSuccess,
+  customers = []
 }: MultiInvoiceReturnProps) {
   const [invoices, setInvoices] = useState<InvoiceForReturn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -41,30 +44,64 @@ export default function MultiInvoiceReturn({
   const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
 
   // New workflow states
-  const [workflowStep, setWorkflowStep] = useState<'select-items' | 'filter-invoices' | 'select-invoices'>('select-items');
+  const [workflowStep, setWorkflowStep] = useState<'select-customer' | 'select-items' | 'filter-invoices' | 'select-invoices'>('select-customer');
+  const [selectedCustomer, setSelectedCustomer] = useState<string>(customer || '');
+  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
   const [selectedItems, setSelectedItems] = useState<{item_code: string, item_name: string}[]>([]);
   const [availableItems, setAvailableItems] = useState<{item_code: string, item_name: string}[]>([]);
   const [filteredAvailableItems, setFilteredAvailableItems] = useState<{item_code: string, item_name: string}[]>([]);
 
+  // Address filter states
+  const [customerAddresses, setCustomerAddresses] = useState<Array<{name: string, address_line1: string, city: string}>>([]);
+  const [selectedAddress, setSelectedAddress] = useState<string>('');
+
   useEffect(() => {
-    if (isOpen && customer) {
+    if (isOpen) {
       // Reset workflow when opening
-      setWorkflowStep('select-items');
+      if (customer) {
+        setWorkflowStep('select-items');
+        setSelectedCustomer(customer);
+      } else {
+        setWorkflowStep('select-customer');
+        setSelectedCustomer('');
+      }
       setSelectedItems([]);
       setInvoices([]);
       setSelectedInvoices(new Set());
       setFilteredAvailableItems([]);
-      // Automatically load available items when modal opens
-      loadAvailableItems();
+      setCustomerSearchQuery('');
+      setSelectedAddress('');
+
+      // Automatically load available items and addresses when modal opens if customer is provided
+      if (customer) {
+        loadAvailableItems();
+        loadCustomerAddresses();
+      }
     }
   }, [isOpen, customer]);
 
-    const loadAvailableItems = async () => {
+    const loadCustomerAddresses = async () => {
+    try {
+      const response = await fetch(`/api/method/klik_pos.api.customer.get_customer_addresses?customer=${selectedCustomer}`);
+      const data = await response.json();
+
+      if (data.message && Array.isArray(data.message)) {
+        setCustomerAddresses(data.message);
+      } else {
+        setCustomerAddresses([]);
+      }
+    } catch (error) {
+      console.error('Error loading customer addresses:', error);
+      setCustomerAddresses([]);
+    }
+  };
+
+  const loadAvailableItems = async () => {
     try {
       const endDate = new Date().toISOString().split('T')[0];
       const startDate = new Date(Date.now() - (daysBack * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
 
-      const result = await getCustomerInvoicesForReturn(customer, startDate, endDate);
+      const result = await getCustomerInvoicesForReturn(selectedCustomer, startDate, endDate, selectedAddress);
 
       if (result.success && result.data) {
         // Extract unique items from all invoices
@@ -83,7 +120,7 @@ export default function MultiInvoiceReturn({
         }));
 
         setAvailableItems(items);
-        setFilteredAvailableItems(items); 
+        setFilteredAvailableItems(items);
       } else {
         setAvailableItems([]);
         setFilteredAvailableItems([]);
@@ -107,8 +144,9 @@ export default function MultiInvoiceReturn({
       const endDate = new Date().toISOString().split('T')[0];
       const startDate = new Date(Date.now() - (daysBack * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
 
-      const result = await getCustomerInvoicesForReturn(customer, startDate, endDate);
-
+      // Include address filter if selected
+      const result = await getCustomerInvoicesForReturn(selectedCustomer, startDate, endDate, selectedAddress);
+      
       if (result.success && result.data) {
         const filteredInvoices = result.data.filter(invoice =>
           invoice.items.some(item =>
@@ -221,6 +259,7 @@ export default function MultiInvoiceReturn({
 
   const handleSubmitReturn = async () => {
     const invoiceReturns = invoices
+      .filter(invoice => selectedInvoices.has(invoice.name)) // Only include selected invoices
       .map(invoice => ({
         invoice_name: invoice.name,
         return_items: invoice.items.filter(item => (item.return_qty || 0) > 0)
@@ -238,6 +277,7 @@ export default function MultiInvoiceReturn({
     };
 
     setIsLoading(true);
+    console.log("Data", returnData)
     try {
       const result = await createMultiInvoiceReturn(returnData);
 
@@ -262,18 +302,18 @@ export default function MultiInvoiceReturn({
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-7xl h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 bg-purple-50 dark:bg-purple-900/20 border-b border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 bg-beveren-100 dark:bg-orange-900/20 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-purple-100 dark:bg-purple-900/40 rounded-lg">
-                <RotateCcw className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+              <div className="p-2 bg-orange-100 dark:bg-orange-900/40 rounded-lg">
+                <RotateCcw className="w-6 h-6 text-orange-600 dark:text-orange-400" />
               </div>
               <div>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                   Multi-Invoice Return
                 </h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Customer: {customer}
+                  Customer: {selectedCustomer || 'Not selected'}
                 </p>
               </div>
             </div>
@@ -288,33 +328,47 @@ export default function MultiInvoiceReturn({
           {/* Workflow Steps */}
           <div className="mt-4 flex items-center justify-center">
             <div className="flex items-center space-x-4">
-              <div className={`flex items-center space-x-2 ${workflowStep === 'select-items' ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400'}`}>
+              {!customer && (
+                <>
+                  <div className={`flex items-center space-x-2 ${workflowStep === 'select-customer' ? 'text-beveren-600 dark:text-beveren-400' : 'text-gray-400'}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                      workflowStep === 'select-customer' ? 'bg-beveren-600 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-500'
+                    }`}>
+                      1
+                    </div>
+                    <span className="text-sm font-medium">Select Customer</span>
+                  </div>
+                  <div className="w-8 h-1 bg-gray-300 dark:bg-gray-600"></div>
+                </>
+              )}
+
+              <div className={`flex items-center space-x-2 ${workflowStep === 'select-items' ? 'text-beveren-600 dark:text-beveren-400' : 'text-gray-400'}`}>
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  workflowStep === 'select-items' ? 'bg-purple-600 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-500'
+                  workflowStep === 'select-items' ? 'bg-beveren-600 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-500'
                 }`}>
-                  1
+                  {customer ? '1' : '2'}
                 </div>
                 <span className="text-sm font-medium">Select Items</span>
               </div>
 
               <div className="w-8 h-1 bg-gray-300 dark:bg-gray-600"></div>
 
-              <div className={`flex items-center space-x-2 ${workflowStep === 'filter-invoices' ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400'}`}>
+              <div className={`flex items-center space-x-2 ${workflowStep === 'filter-invoices' ? 'text-beveren-600 dark:text-beveren-400' : 'text-gray-400'}`}>
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  workflowStep === 'filter-invoices' ? 'bg-purple-600 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-500'
+                  workflowStep === 'filter-invoices' ? 'bg-beveren-600 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-500'
                 }`}>
-                  2
+                  {customer ? '2' : '3'}
                 </div>
                 <span className="text-sm font-medium">Filter Invoices</span>
               </div>
 
               <div className="w-8 h-1 bg-gray-300 dark:bg-gray-600"></div>
 
-              <div className={`flex items-center space-x-2 ${workflowStep === 'select-invoices' ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400'}`}>
+              <div className={`flex items-center space-x-2 ${workflowStep === 'select-invoices' ? 'text-beveren-600 dark:text-beveren-400' : 'text-gray-400'}`}>
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  workflowStep === 'select-invoices' ? 'bg-purple-600 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-500'
+                  workflowStep === 'select-invoices' ? 'bg-beveren-600 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-500'
                 }`}>
-                  3
+                  {customer ? '3' : '4'}
                 </div>
                 <span className="text-sm font-medium">Select Invoices</span>
               </div>
@@ -322,7 +376,136 @@ export default function MultiInvoiceReturn({
           </div>
         </div>
 
-                {/* Step 1: Select Items */}
+        {/* Step 0: Select Customer (only when no customer provided) */}
+        {workflowStep === 'select-customer' && (
+          <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                Step 1: Select Customer
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Choose a customer to process multi-invoice returns
+              </p>
+            </div>
+
+            {/* Customer Search */}
+            <div className="mb-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="Search customers by name or ID..."
+                  value={customerSearchQuery}
+                  onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                />
+              </div>
+            </div>
+
+            {/* Customer List */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {customers && customers.length > 0 ? (
+                  customers
+                    .filter(customer =>
+                      customer.customer_name?.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+                      customer.name?.toLowerCase().includes(customerSearchQuery.toLowerCase())
+                    )
+                    .map((customer) => (
+                      <button
+                        key={customer.name || customer.customer_name || Math.random()}
+                        onClick={async () => {
+                          const customerName = customer.name || customer.customer_name || '';
+                          setSelectedCustomer(customerName);
+                          setWorkflowStep('select-items');
+
+                          // Load items and addresses with the selected customer
+                          try {
+                            const endDate = new Date().toISOString().split('T')[0];
+                            const startDate = new Date(Date.now() - (daysBack * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+
+                            // Load addresses
+                            const addressResponse = await fetch(`/api/method/klik_pos.api.customer.get_customer_addresses?customer=${customerName}`);
+                            const addressData = await addressResponse.json();
+
+                            if (addressData.message && Array.isArray(addressData.message)) {
+                              setCustomerAddresses(addressData.message);
+                            } else {
+                              setCustomerAddresses([]);
+                            }
+
+                            // Load available items
+                            const result = await getCustomerInvoicesForReturn(customerName, startDate, endDate, selectedAddress);
+
+                            if (result.success && result.data) {
+                              // Extract unique items from all invoices
+                              const itemMap = new Map<string, string>();
+                              result.data.forEach(invoice => {
+                                invoice.items.forEach(item => {
+                                  if (item.available_qty > 0) {
+                                    itemMap.set(item.item_code, item.item_name);
+                                  }
+                                });
+                              });
+
+                              const items = Array.from(itemMap.entries()).map(([code, name]) => ({
+                                item_code: code,
+                                item_name: name
+                              }));
+
+                              setAvailableItems(items);
+                              setFilteredAvailableItems(items);
+                            } else {
+                              setAvailableItems([]);
+                              setFilteredAvailableItems([]);
+                            }
+                          } catch (error) {
+                            console.error('Error loading customer data:', error);
+                            setAvailableItems([]);
+                            setFilteredAvailableItems([]);
+                            setCustomerAddresses([]);
+                          }
+                        }}
+                        className="w-full text-left p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        <div className="font-medium text-gray-900 dark:text-white">
+                          {customer.customer_name || customer.name || 'Unknown Customer'}
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          {customer.name || customer.customer_name || 'No ID'}
+                        </div>
+                      </button>
+                    ))
+                ) : customerSearchQuery.trim() ? (
+                  <div className="text-center py-8">
+                    <div className="text-gray-500 dark:text-gray-400">No customers found matching "{customerSearchQuery}"</div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="text-gray-500 dark:text-gray-400">No customers found</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Results Counter */}
+              {customers && (
+                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                    {customerSearchQuery.trim()
+                      ? `${customers.filter(customer =>
+                          customer.customer_name?.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+                          customer.name?.toLowerCase().includes(customerSearchQuery.toLowerCase())
+                        ).length} of ${customers.length} customers`
+                      : `${customers.length} customers total`
+                    }
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Step 1: Select Items */}
         {workflowStep === 'select-items' && (
           <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
             <div className="mb-4">
@@ -363,7 +546,7 @@ export default function MultiInvoiceReturn({
                           setDaysBack(90);
                         }
                       }}
-                      className="w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      className="w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     />
                     <span className="text-sm text-gray-600 dark:text-gray-400">days</span>
                     <button
@@ -373,6 +556,36 @@ export default function MultiInvoiceReturn({
                     >
                       <RotateCcw className="w-4 h-4" />
                     </button>
+                  </div>
+                </div>
+
+                {/* Address Filter */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Shipping Address (Optional)
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    <MapPin className="w-4 h-4 text-gray-400" />
+                    <input
+                        list="address-list"
+                        value={selectedAddress}
+                        onChange={(e) => {
+                          setSelectedAddress(e.target.value);
+                          setTimeout(() => loadAvailableItems(), 100);
+                        }}
+                        className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                                  focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800
+                                  text-gray-900 dark:text-white"
+                      />
+
+                      <datalist id="address-list">
+                        {customerAddresses.map((address) => (
+                          <option key={address.name} value={address.name}>
+                            {address.address_line1}, {address.city}
+                          </option>
+                        ))}
+                      </datalist>
+
                   </div>
                 </div>
 
@@ -396,7 +609,7 @@ export default function MultiInvoiceReturn({
             {/* Available Items */}
             {isLoading ? (
               <div className="bg-white dark:bg-gray-800 rounded-lg p-6 text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-beveren-600 mx-auto mb-4"></div>
                 <p className="text-gray-600 dark:text-gray-400">Loading available items...</p>
               </div>
             ) : availableItems.length > 0 ? (
@@ -418,7 +631,7 @@ export default function MultiInvoiceReturn({
                       <input
                         type="text"
                         placeholder="Search items by name or code..."
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                         onChange={(e) => {
                           const searchTerm = e.target.value.toLowerCase();
                           const filtered = availableItems.filter(item =>
@@ -457,7 +670,7 @@ export default function MultiInvoiceReturn({
                                   setSelectedItems([]);
                                 }
                               }}
-                              className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                              className="w-4 h-4 text-beveren-600 border-gray-300 rounded focus:ring-beveren-500"
                             />
                             <span className="text-xs text-gray-400">All</span>
                           </div>
@@ -481,7 +694,7 @@ export default function MultiInvoiceReturn({
                               type="checkbox"
                               checked={selectedItems.some(selected => selected.item_code === item.item_code)}
                               onChange={(e) => handleItemSelection(item.item_code, item.item_name, e.target.checked)}
-                              className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                              className="w-4 h-4 text-beveren-600 border-gray-300 rounded focus:ring-beveren-500"
                             />
                           </td>
                           <td className="px-3 py-2">
@@ -526,7 +739,7 @@ export default function MultiInvoiceReturn({
                 </p>
                 <button
                   onClick={loadAvailableItems}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
                 >
                   Refresh Items
                 </button>
@@ -549,7 +762,7 @@ export default function MultiInvoiceReturn({
 
             <div className="flex items-center justify-center py-8">
               <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-beveren-600 mx-auto mb-4"></div>
                 <p className="text-gray-600 dark:text-gray-400">Filtering invoices...</p>
               </div>
             </div>
@@ -567,7 +780,7 @@ export default function MultiInvoiceReturn({
                   placeholder="Search invoices or items..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                 />
               </div>
 
@@ -580,7 +793,7 @@ export default function MultiInvoiceReturn({
                 </button>
                 <div className="text-right">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Return Amount</p>
-                  <p className="text-xl font-bold text-purple-600 dark:text-purple-400">
+                  <p className="text-xl font-bold text-beveren-600 dark:text-beveren-400">
                     ${totalReturnAmount.toFixed(2)}
                   </p>
                 </div>
@@ -606,7 +819,7 @@ export default function MultiInvoiceReturn({
               {loadingInvoices ? (
                 <div className="flex items-center justify-center h-64">
                   <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-beveren-600 mx-auto mb-4"></div>
                     <p className="text-gray-600 dark:text-gray-400">Loading invoices...</p>
                   </div>
                 </div>
@@ -620,7 +833,7 @@ export default function MultiInvoiceReturn({
                     </p>
                     <button
                       onClick={() => setWorkflowStep('select-items')}
-                      className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                      className="mt-4 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
                     >
                       ← Back to Items Selection
                     </button>
@@ -638,7 +851,7 @@ export default function MultiInvoiceReturn({
                           type="checkbox"
                           checked={selectedInvoices.has(invoice.name)}
                           onChange={() => toggleInvoiceSelection(invoice.name)}
-                          className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                          className="w-4 h-4 text-beveren-600 border-gray-300 rounded focus:ring-beveren-500"
                         />
                         <div>
                           <h4 className="font-semibold text-gray-900 dark:text-white">
@@ -653,7 +866,7 @@ export default function MultiInvoiceReturn({
                       </div>
                       <button
                         onClick={() => handleReturnAllAvailable(invoice.name)}
-                        className="px-3 py-1 text-sm bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded hover:bg-purple-200 dark:hover:bg-purple-900/40 transition-colors"
+                        className="px-3 py-1 text-sm bg-beveren-100 dark:bg-beveren-900/20 text-beveren-700 dark:text-beveren-300 rounded hover:bg-beveren-200 dark:hover:bg-beveren-900/40 transition-colors"
                       >
                         Return All Available
                       </button>
@@ -739,7 +952,7 @@ export default function MultiInvoiceReturn({
                                     item.item_code,
                                     parseInt(e.target.value) || 0
                                   )}
-                                  className="w-12 px-1 py-1 text-center border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs"
+                                  className="w-12 px-1 py-1 text-center border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-1 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs"
                                   disabled={item.available_qty === 0}
                                 />
                                 <button
@@ -795,7 +1008,7 @@ export default function MultiInvoiceReturn({
                   disabled={!hasItemsToReturn || isLoading}
                   className={`px-8 py-3 rounded-lg font-semibold text-lg transition-colors shadow-lg ${
                     hasItemsToReturn && !isLoading
-                      ? 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-xl'
+                      ? 'bg-orange-600 text-white hover:bg-orange-700 hover:shadow-xl'
                       : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
                   }`}
                 >

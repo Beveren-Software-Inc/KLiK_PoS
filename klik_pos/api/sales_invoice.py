@@ -5,6 +5,31 @@ import erpnext
 from klik_pos.klik_pos.utils import get_current_pos_profile, get_user_default_company
 from frappe.utils import flt
 
+def get_current_pos_opening_entry():
+    """
+    Get the current active POS Opening Entry for the current user and POS profile.
+    Returns the opening entry name or None if not found.
+    """
+    try:
+        user = frappe.session.user
+        pos_profile = get_current_pos_profile()
+
+        if not pos_profile:
+            return None
+
+        # Look for a submitted POS Opening Entry with no linked closing entry
+        open_entry = frappe.db.exists("POS Opening Entry", {
+            "pos_profile": pos_profile.name,
+            "user": user,
+            "docstatus": 1,  # Submitted
+            "pos_closing_entry": None
+        })
+
+        return open_entry
+    except Exception as e:
+        frappe.log_error(f"Error getting current POS opening entry: {str(e)}")
+        return None
+
 @frappe.whitelist(allow_guest=True)
 def get_sales_invoices(limit=100, start=0):
     try:
@@ -52,6 +77,25 @@ def get_invoice_details(invoice_id):
         invoice = frappe.get_doc("Sales Invoice", invoice_id)
         invoice_data = invoice.as_dict()
 
+        # Get items explicitly with return quantities
+        items = []
+        for item in invoice.items:
+            # Get returned quantity for this item
+            returned_data = returned_qty(invoice.customer, invoice.name, item.item_code)
+            returned_qty_value = returned_data.get("total_returned_qty", 0)
+            available_qty = item.qty - returned_qty_value
+            
+            items.append({
+                "item_code": item.item_code,
+                "item_name": item.item_name,
+                "qty": item.qty,
+                "rate": item.rate,
+                "amount": item.amount,
+                "description": item.description,
+                "returned_qty": returned_qty_value,
+                "available_qty": available_qty
+            })
+
         # Get full company address doc
         company_address_doc = None
         if invoice.company_address:
@@ -79,6 +123,7 @@ def get_invoice_details(invoice_id):
             "success": True,
             "data": {
                 **invoice_data,
+                "items": items,
                 "company_address_doc": company_address_doc,
                 "customer_address_doc": customer_address_doc
             }
@@ -197,6 +242,11 @@ def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,
     doc.currency = get_customer_billing_currency(customer)
     doc.is_pos = 1 if business_type == "B2C" else 0
     doc.update_stock = 1
+
+    # Set the current POS opening entry
+    current_opening_entry = get_current_pos_opening_entry()
+    if current_opening_entry:
+        doc.custom_pos_opening_entry = current_opening_entry
 
     pos_profile = get_current_pos_profile()
 
@@ -634,38 +684,71 @@ def get_customer_receivable_account(customer, company):
         return frappe.db.get_value("Company", company, "default_receivable_account")
 
 
+# @frappe.whitelist()
+# def returned_qty(customer, sales_invoice, item):
+#     """Get total returned quantity for a specific item from a specific invoice for a customer"""
+#     values = {
+#         'customer': customer,
+#         'sales_invoice': sales_invoice,
+#         'item': item
+#     }
+
+#     total_returned = frappe.db.sql("""
+#         SELECT
+#             `tabCredit Details`.sales_invoice,
+#             `tabSales Invoice`.customer,
+#             SUM(`tabCredit Details`.qtr) AS total_returned_qty
+#         FROM
+#             `tabSales Invoice`
+#         JOIN
+#             `tabCredit Details` ON `tabSales Invoice`.name = `tabCredit Details`.parent
+#         WHERE
+#             `tabSales Invoice`.customer = %(customer)s
+#             AND `tabCredit Details`.sales_invoice = %(sales_invoice)s
+#             AND `tabCredit Details`.item = %(item)s
+#             AND `tabSales Invoice`.docstatus = 1
+#             AND `tabSales Invoice`.status != 'Cancelled'
+#         GROUP BY
+#             `tabCredit Details`.sales_invoice, `tabSales Invoice`.customer
+#     """, values=values, as_dict=True)
+
+#     if not total_returned:
+#         return {'total_returned_qty': 0}
+
+#     return total_returned[0]
 @frappe.whitelist()
 def returned_qty(customer, sales_invoice, item):
-    """Get total returned quantity for a specific item from a specific invoice for a customer"""
+    """
+    Get total returned quantity for a specific item (item_code) against a given sales invoice.
+    - sales_invoice should be the original invoice name.
+    - item should be the item_code (not item name or child row name).
+    Returns: {'total_returned_qty': <float>}
+    """
     values = {
-        'customer': customer,
-        'sales_invoice': sales_invoice,
-        'item': item
+        "customer": customer,
+        "sales_invoice": sales_invoice,
+        "item": item,
     }
 
-    total_returned = frappe.db.sql("""
-        SELECT
-            `tabCredit Details`.sales_invoice,
-            `tabSales Invoice`.customer,
-            SUM(`tabCredit Details`.qtr) AS total_returned_qty
-        FROM
-            `tabSales Invoice`
-        JOIN
-            `tabCredit Details` ON `tabSales Invoice`.name = `tabCredit Details`.parent
-        WHERE
-            `tabSales Invoice`.customer = %(customer)s
-            AND `tabCredit Details`.sales_invoice = %(sales_invoice)s
-            AND `tabCredit Details`.item = %(item)s
-            AND `tabSales Invoice`.docstatus = 1
-            AND `tabSales Invoice`.status != 'Cancelled'
-        GROUP BY
-            `tabCredit Details`.sales_invoice, `tabSales Invoice`.customer
-    """, values=values, as_dict=True)
+    # Sum qty from Sales Invoice Items of return invoices that point to the original invoice
+    result = frappe.db.sql(
+        """
+        SELECT COALESCE(SUM(sii.qty), 0) AS total_returned_qty
+        FROM `tabSales Invoice` si
+        JOIN `tabSales Invoice Item` sii ON si.name = sii.parent
+        WHERE si.is_return = 1
+          AND si.return_against = %(sales_invoice)s
+          AND sii.item_code = %(item)s
+          AND si.docstatus = 1
+          AND si.customer = %(customer)s
+        """,
+        values=values,
+        as_dict=True,
+    )
 
-    if not total_returned:
-        return {'total_returned_qty': 0}
+    total = abs(result[0]["total_returned_qty"]) if result else 0.0
+    return {"total_returned_qty": float(total)}
 
-    return total_returned[0]
 
 
 @frappe.whitelist()
@@ -734,7 +817,7 @@ def get_valid_sales_invoices(doctype, txt, searchfield, start, page_len, filters
 
 
 @frappe.whitelist()
-def get_customer_invoices_for_return(customer, start_date=None, end_date=None):
+def get_customer_invoices_for_return(customer, start_date=None, end_date=None, shipping_address=None):
     """Get all invoices for a customer within date range that can be returned"""
     try:
         filters = {
@@ -751,6 +834,10 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None):
                 filters["posting_date"] = ["between", [start_date, end_date]]
             else:
                 filters["posting_date"] = ["<=", end_date]
+
+        # Add shipping address filter if provided
+        if shipping_address:
+            filters["customer_address"] = shipping_address
 
         invoices = frappe.get_all(
             "Sales Invoice",
@@ -805,6 +892,7 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None):
 def create_partial_return(invoice_name, return_items):
     """Create a partial return for selected items from an invoice"""
     try:
+        # Handle parameter formats
         if isinstance(return_items, str):
             return_items = json.loads(return_items)
 
@@ -816,66 +904,68 @@ def create_partial_return(invoice_name, return_items):
         if original_invoice.is_return:
             frappe.throw("This invoice is already a return.")
 
-        # Create return invoice
-        return_doc = frappe.new_doc("Sales Invoice")
-        return_doc.customer = original_invoice.customer
+        # Create return invoice using the same approach as return_sales_invoice
+        return_doc = get_mapped_doc("Sales Invoice", invoice_name, {
+            "Sales Invoice": {
+                "doctype": "Sales Invoice",
+                "field_map": {
+                    "name": "return_against"
+                },
+                "validation": {
+                    "docstatus": ["=", 1]
+                }
+            },
+            "Sales Invoice Item": {
+                "doctype": "Sales Invoice Item",
+                "field_map": {
+                    "name": "prevdoc_detail_docname"
+                },
+            }
+        })
+
         return_doc.is_return = 1
-        return_doc.return_against = invoice_name
         return_doc.posting_date = frappe.utils.nowdate()
-        return_doc.due_date = frappe.utils.nowdate()
         return_doc.custom_delivery_date = frappe.utils.nowdate()
-        return_doc.currency = original_invoice.currency
-        return_doc.is_pos = original_invoice.is_pos
-        return_doc.update_stock = 1
 
-        # Copy taxes and charges from original invoice
-        if original_invoice.taxes_and_charges:
-            return_doc.taxes_and_charges = original_invoice.taxes_and_charges
+        # Set the current POS opening entry
+        current_opening_entry = get_current_pos_opening_entry()
+        if current_opening_entry:
+            return_doc.custom_pos_opening_entry = current_opening_entry
 
-        # Copy only selected items with return quantities
+        # Filter items to only include selected ones with return quantities
+        filtered_items = []
         for return_item in return_items:
             if return_item.get("return_qty", 0) > 0:
-                # Find original item
-                orig_item = None
-                for item in original_invoice.items:
+                # Find the corresponding item in the mapped doc
+                for item in return_doc.items:
                     if item.item_code == return_item["item_code"]:
-                        orig_item = item
+                        item.qty = -abs(return_item["return_qty"])
+                        filtered_items.append(item)
                         break
 
-                if orig_item:
-                    return_doc.append("items", {
-                        "item_code": orig_item.item_code,
-                        "item_name": orig_item.item_name,
-                        "qty": -abs(return_item["return_qty"]),
-                        "rate": orig_item.rate,
-                        "income_account": orig_item.income_account,
-                        "expense_account": orig_item.expense_account,
-                        "prevdoc_detail_docname": orig_item.name
-                    })
+        # Replace items with only the selected ones
+        return_doc.items = filtered_items
 
-        # Copy payment methods with negative amounts
-        for payment in original_invoice.payments:
-            return_doc.append("payments", {
-                "mode_of_payment": payment.mode_of_payment,
-                "amount": -abs(payment.amount * (len(return_items) / len(original_invoice.items))),  # Proportional
-                "account": payment.account
-            })
+        # Clear existing payments and recalculate based on returned items
+        return_doc.payments = []
 
-        # If taxes_and_charges is set, populate taxes manually
-        if return_doc.taxes_and_charges:
-            tax_doc = get_tax_template(return_doc.taxes_and_charges)
-            if tax_doc:
-                for tax in tax_doc.taxes:
-                    return_doc.append("taxes", {
-                        "charge_type": tax.charge_type,
-                        "account_head": tax.account_head,
-                        "description": tax.description,
-                        "cost_center": tax.cost_center,
-                        "rate": tax.rate,
-                        "row_id": tax.row_id,
-                        "tax_amount": tax.tax_amount,
-                        "included_in_print_rate": tax.included_in_print_rate,
-                    })
+        # Calculate total returned amount (should be positive for calculation)
+        total_returned_amount = sum(abs(item.qty * item.rate) for item in return_doc.items)
+        total_original_amount = sum(abs(item.qty * item.rate) for item in original_invoice.items)
+
+        if total_original_amount > 0 and total_returned_amount > 0:
+            proportion = total_returned_amount / total_original_amount
+            for payment in original_invoice.payments:
+                # Ensure the amount is negative for returns
+                payment_amount = -abs(payment.amount * proportion)
+                return_doc.append("payments", {
+                    "mode_of_payment": payment.mode_of_payment,
+                    "amount": payment_amount,
+                    "account": payment.account,
+                })
+        else:
+            # If no items to return, don't add any payments
+            pass
 
         return_doc.save()
         return_doc.submit()
@@ -901,21 +991,31 @@ def create_multi_invoice_return(return_data):
         if isinstance(return_data, str):
             return_data = json.loads(return_data)
 
+        print(f"Multi-invoice return data: {return_data}")
+
         customer = return_data.get("customer")
         invoice_returns = return_data.get("invoice_returns", [])
 
+        print(f"Customer: {customer}")
+        print(f"Number of invoice returns: {len(invoice_returns)}")
+
         created_returns = []
 
-        for invoice_return in invoice_returns:
+        for i, invoice_return in enumerate(invoice_returns):
             invoice_name = invoice_return.get("invoice_name")
             return_items = invoice_return.get("return_items", [])
 
+            print(f"Processing invoice {i+1}: {invoice_name} with {len(return_items)} items")
+
             if return_items:
+                # Call create_partial_return with separate parameters
                 result = create_partial_return(invoice_name, return_items)
+                print(f"Result for {invoice_name}: {result}")
                 if result.get("success"):
                     created_returns.append(result.get("return_invoice"))
                 else:
                     frappe.log_error(f"Failed to create return for {invoice_name}: {result.get('message')}")
+                    # Continue with other invoices even if one fails
 
         return {
             "success": True,

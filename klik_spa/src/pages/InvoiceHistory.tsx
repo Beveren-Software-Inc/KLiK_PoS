@@ -19,11 +19,16 @@ import {
   ShoppingCart,
   CreditCard,
   Send,
+  RotateCcw,
+  Files,
+  FileMinus,
+  FileSymlink
 } from "lucide-react";
 
 import InvoiceViewModal from "../components/InvoiceViewModal";
 import BottomNavigation from "../components/BottomNavigation";
 import MultiInvoiceReturn from "../components/MultiInvoiceReturn";
+import SingleInvoiceReturn from "../components/SingleInvoiceReturn";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import type { SalesInvoice } from "../../types";
 import { useSalesInvoices } from "../hooks/useSalesInvoices";
@@ -56,6 +61,10 @@ export default function InvoiceHistoryPage() {
   // Draft Invoice Edit states
   const [showEditOptions, setShowEditOptions] = useState(false);
   const [selectedDraftInvoice, setSelectedDraftInvoice] = useState<SalesInvoice | null>(null);
+
+  // Single Invoice Return states
+  const [showSingleReturn, setShowSingleReturn] = useState(false);
+  const [selectedInvoiceForReturn, setSelectedInvoiceForReturn] = useState<SalesInvoice | null>(null);
 
   const { invoices, isLoading, error } = useSalesInvoices();
   const { modes } = useAllPaymentModes();
@@ -475,22 +484,16 @@ const getStatusBadge = (status: string) => {
                           <span>Edit</span>
                         </button>
                       )}
-                      {/* {invoice.status === "Paid" && (
-                        <ConfirmDialog
-                            title="Process Return?"
-                            description="Are you sure you want to process a return for this invoice?"
-                            onConfirm={() => handleRefund(invoice.id)}
-                            trigger={
-                            <button
-                                className="flex items-center space-x-2 px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
-                            >
-                                <RefreshCw size={20} />
-                                <span>Return</span>
-                            </button>
-                            }
-                        />
-                      )} */}
+                      {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && hasReturnableItems(invoice) && (
 
+                        <button
+                          onClick={() => handleSingleReturnClick(invoice)}
+                          className="text-orange-600 hover:text-orange-900 flex items-center space-x-1"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                          <span>Return</span>
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -542,6 +545,14 @@ const getStatusBadge = (status: string) => {
                     Edit
                   </button>
                 )}
+                  {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && (
+                  <button
+                    onClick={() => handleSingleReturnClick(invoice)}
+                    className="flex-1 text-xs px-3 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors"
+                  >
+                    Return
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -557,6 +568,17 @@ const getStatusBadge = (status: string) => {
   const handleEditInvoice = (invoice: SalesInvoice) => {
     setSelectedDraftInvoice(invoice);
     setShowEditOptions(true);
+  };
+
+  // Helper function to check if invoice has items that can still be returned
+  const hasReturnableItems = (invoice: SalesInvoice) => {
+    if (!invoice || !invoice.items) return false;
+    
+    return invoice.items.some(item => {
+      const soldQty = item.qty || item.quantity || 0;
+      const returnedQty = item.returned_qty || 0;
+      return returnedQty < soldQty;
+    });
   };
 
   //Just Incase we allow deletion of invoice, activate/uncomment this: Mania
@@ -587,11 +609,24 @@ const getStatusBadge = (status: string) => {
     setShowInvoiceModal(false);
   };
 
-  // Multi-Invoice Return handlers
-  const handleMultiReturnClick = () => {
-    setCustomerSearchQuery("");
-    setShowCustomerSelection(true);
-  };
+      // Multi-Invoice Return handlers
+    const handleMultiReturnClick = () => {
+      setSelectedCustomer("");
+      setShowMultiReturn(true);
+    };
+
+    // Single Invoice Return handlers
+    const handleSingleReturnClick = (invoice: SalesInvoice) => {
+      setSelectedInvoiceForReturn(invoice);
+      setShowSingleReturn(true);
+    };
+
+    const handleSingleReturnSuccess = () => {
+      setShowSingleReturn(false);
+      setSelectedInvoiceForReturn(null);
+      // Refresh the invoices list
+      window.location.reload();
+    };
 
     // Draft Invoice Edit Option handlers
   const handleGoToCart = () => {
@@ -657,10 +692,10 @@ const getStatusBadge = (status: string) => {
             <div className="flex items-center justify-between">
               <h1 className="text-lg font-bold text-gray-900 dark:text-white">Invoice History</h1>
               <div className="flex items-center space-x-2">
-                <button
-                  onClick={handleMultiReturnClick}
-                  className="flex items-center space-x-2 px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm"
-                >
+                                  <button
+                    onClick={handleMultiReturnClick}
+                    className="flex items-center space-x-2 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm"
+                  >
                   <Users className="w-4 h-4" />
                   <span>Multi Return</span>
                 </button>
@@ -798,6 +833,7 @@ const getStatusBadge = (status: string) => {
           isOpen={showMultiReturn}
           onClose={() => setShowMultiReturn(false)}
           onSuccess={handleMultiReturnSuccess}
+          customers={customers}
         />
 
         {/* Draft Invoice Edit Options Modal */}
@@ -879,9 +915,9 @@ const getStatusBadge = (status: string) => {
               <div className="flex items-center space-x-3">
                 <button
                   onClick={handleMultiReturnClick}
-                  className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  className="flex items-center space-x-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
                 >
-                  <Users className="w-4 h-4" />
+                  <FileMinus className="w-4 h-4" />
                   <span>Multi-Invoice Return</span>
                 </button>
                 <button className="flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors">
@@ -1022,6 +1058,7 @@ const getStatusBadge = (status: string) => {
           isOpen={showMultiReturn}
           onClose={() => setShowMultiReturn(false)}
           onSuccess={handleMultiReturnSuccess}
+          customers={customers}
         />
 
         {/* Draft Invoice Edit Options Modal */}
@@ -1078,6 +1115,14 @@ const getStatusBadge = (status: string) => {
             </div>
           </div>
         )}
+
+        {/* Single Invoice Return Modal */}
+        <SingleInvoiceReturn
+          invoice={selectedInvoiceForReturn}
+          isOpen={showSingleReturn}
+          onClose={() => setShowSingleReturn(false)}
+          onSuccess={handleSingleReturnSuccess}
+        />
       </div>
     </div>
   );

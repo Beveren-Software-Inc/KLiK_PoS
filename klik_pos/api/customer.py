@@ -92,6 +92,34 @@ def get_user_company_and_currency():
     return default_company, company_currency
 
 
+@frappe.whitelist(allow_guest=True)
+def get_customer_addresses(customer: str):
+    """Get all addresses for a specific customer"""
+    try:
+        # Get all addresses linked to this customer
+        addresses = frappe.get_all(
+            "Address",
+            filters={
+                "name": ["in", frappe.get_all(
+                    "Dynamic Link",
+                    filters={
+                        "link_doctype": "Customer",
+                        "link_name": customer,
+                        "parenttype": "Address"
+                    },
+                    pluck="parent"
+                )]
+            },
+            fields=["name", "address_line1", "address_line2", "city", "state", "country", "pincode"],
+            order_by="creation desc"
+        )
+        print("Address", addresses)
+        return addresses
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), f"Error fetching addresses for customer {customer}")
+        return []
+
+
 @frappe.whitelist()
 def get_currency_exchange_rate(from_currency: str, to_currency: str, transaction_date: str = None):
     """

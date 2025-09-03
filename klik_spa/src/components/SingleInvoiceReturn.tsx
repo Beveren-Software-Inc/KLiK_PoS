@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { createPartialReturn, getReturnedQty, type ReturnItem } from "../services/returnService";
+import { getInvoiceDetails } from "../services/salesInvoice";
 
 interface SingleInvoiceReturnProps {
   invoice: any;
@@ -37,28 +38,62 @@ export default function SingleInvoiceReturn({
   const initializeReturnItems = async () => {
     setLoadingReturnData(true);
     try {
-      const items: ReturnItem[] = [];
 
-      for (const item of invoice.items) {
+      // If invoice.items is empty, fetch complete invoice details from backend
+      let invoiceWithItems = invoice;
+              if (!invoice.items || invoice.items.length === 0) {
+          const invoiceDetails = await getInvoiceDetails(invoice.name || invoice.id);
+
+          if (invoiceDetails.success && invoiceDetails.data) {
+            invoiceWithItems = invoiceDetails.data.data || invoiceDetails.data;
+
+          } else {
+            console.error('Failed to fetch invoice details:', invoiceDetails.error);
+            throw new Error(invoiceDetails.error || 'Failed to fetch invoice details from backend');
+          }
+        }
+
+        const items: ReturnItem[] = [];
+
+        // Handle different possible item structures
+        const itemsArray = invoiceWithItems.items || invoiceWithItems.items_list || invoiceWithItems.sales_invoice_items || [];
+
+        if (!Array.isArray(itemsArray)) {
+          console.error('Items is not an array:', itemsArray);
+          throw new Error('Invoice items not found in expected format');
+        }
+
+        for (const item of itemsArray) {
+        console.log('Processing item:', item);
+
         // Get returned quantity for each item
         const returnedData = await getReturnedQty(
-          invoice.customer,
-          invoice.name,
-          item.item_code
+          invoiceWithItems.customer,
+          invoiceWithItems.name || invoiceWithItems.id, // Use id as fallback if name is not available
+          item.item_code || item.id
         );
 
         const returnedQty = returnedData.success ?
           returnedData.data?.total_returned_qty || 0 : 0;
 
+        // Handle different property names from different invoice sources
+        const itemCode = item.item_code || item.id;
+        const itemName = item.item_name || item.name;
+        const qty = item.qty || item.quantity;
+        const rate = item.rate || item.unitPrice;
+        const amount = item.amount || item.total;
+
+        console.log('Extracted values:', { itemCode, itemName, qty, rate, amount, returnedQty });
+
         items.push({
-          item_code: item.item_code,
-          item_name: item.item_name,
-          qty: item.qty,
-          rate: item.rate,
-          amount: item.amount,
+          item_code: itemCode,
+          item_name: itemName,
+          qty: qty,
+          rate: rate,
+          amount: amount,
           returned_qty: returnedQty,
-          available_qty: item.qty - returnedQty,
-          return_qty: item.qty - returnedQty // Set default return quantity to available quantity
+          available_qty: qty - returnedQty,
+          return_qty: qty - returnedQty // Set default return quantity to available quantity
         });
       }
 
@@ -105,8 +140,9 @@ export default function SingleInvoiceReturn({
     }
 
     setIsLoading(true);
+    const invoiceName = invoice.id || invoice.name
     try {
-      const result = await createPartialReturn(invoice.name, itemsToReturn);
+      const result = await createPartialReturn(invoiceName, itemsToReturn);
 
       if (result.success) {
         toast.success(result.message || 'Return created successfully');
@@ -136,7 +172,7 @@ export default function SingleInvoiceReturn({
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 bg-orange-50 dark:bg-orange-900/20 border-b border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 bg-beveren-100 dark:bg-orange-900/20 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-orange-100 dark:bg-orange-900/40 rounded-lg">
@@ -147,7 +183,7 @@ export default function SingleInvoiceReturn({
                   Return Items
                 </h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Invoice: {invoice?.name} • Customer: {invoice?.customer}
+                  Invoice: {invoice?.name || invoice?.id} • Customer: {invoice?.customer}
                 </p>
               </div>
             </div>
@@ -189,7 +225,7 @@ export default function SingleInvoiceReturn({
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Return Amount</p>
-                  <p className="text-xl font-bold text-orange-600 dark:text-orange-400">
+                  <p className="text-xl font-bold text-black-600 dark:text-orange-400">
                     ${totalReturnAmount.toFixed(2)}
                   </p>
                 </div>

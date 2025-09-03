@@ -81,3 +81,34 @@ export async function createSalesReturn(invoiceName: string) {
 
   return result.message;
 }
+
+export async function getInvoiceDetails(invoiceName: string) {
+  try {
+    console.log('Fetching invoice details for:', invoiceName);
+    const response = await fetch(`/api/method/klik_pos.api.sales_invoice.get_invoice_details?invoice_id=${invoiceName}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include'
+    });
+
+    const data = await response.json();
+    console.log('Invoice details response:', data);
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to get invoice details');
+    }
+
+    return {
+      success: true,
+      data: data.message
+    };
+  } catch (error: any) {
+    console.error('Error getting invoice details:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to get invoice details'
+    };
+  }
+}

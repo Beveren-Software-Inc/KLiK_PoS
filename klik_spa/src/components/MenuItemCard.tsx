@@ -14,8 +14,8 @@ export default function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) {
     <div
       className={`rounded-xl p-3 shadow-sm transition-shadow relative ${
         isOutOfStock
-          ? "bg-red-50 border-2 border-red-200 opacity-70 cursor-not-allowed"
-          : "bg-white hover:shadow-md cursor-pointer"
+          ? "bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-700 opacity-70 cursor-not-allowed"
+          : "bg-white dark:bg-gray-800 hover:shadow-md cursor-pointer"
       }`}
       onClick={isOutOfStock ? undefined : onAddToCart}
     >
@@ -38,9 +38,9 @@ export default function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) {
 
       {/* Content */}
       <div className="space-y-1">
-        <h3 className="font-semibold text-gray-800 text-sm leading-tight">{item.name}</h3>
+        <h3 className="font-semibold text-gray-800 dark:text-white text-sm leading-tight">{item.name}</h3>
 
-        <div className="flex items-center space-x-2 text-xs text-gray-500">
+        <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
           <span>{item.available} Available</span>
           <span>•</span>
           <span>{item.sold} Sold</span>

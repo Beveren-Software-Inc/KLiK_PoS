@@ -63,15 +63,17 @@ export async function getReturnedQty(customer: string, salesInvoice: string, ite
 export async function getCustomerInvoicesForReturn(
   customer: string,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  shippingAddress?: string
 ): Promise<{success: boolean; data?: InvoiceForReturn[]; error?: string}> {
   try {
     const params = new URLSearchParams({
       customer,
       ...(startDate && { start_date: startDate }),
-      ...(endDate && { end_date: endDate })
+      ...(endDate && { end_date: endDate }),
+      ...(shippingAddress && { shipping_address: shippingAddress })
     });
-
+    
     const response = await fetch(`/api/method/klik_pos.api.sales_invoice.get_customer_invoices_for_return?${params}`);
     const data = await response.json();
 
@@ -96,7 +98,7 @@ export async function createPartialReturn(
   invoiceName: string,
   returnItems: ReturnItem[]
 ): Promise<{success: boolean; returnInvoice?: string; message?: string; error?: string}> {
-  
+
   const csrfToken = window.csrf_token;
   try {
     const response = await fetch(`/api/method/klik_pos.api.sales_invoice.create_partial_return`, {
@@ -113,15 +115,23 @@ export async function createPartialReturn(
     });
 
     const data = await response.json();
+    console.log('Partial return response:', data);
 
-    if (!response.ok || !data.message.success) {
-      throw new Error(data.message.message || 'Failed to create partial return');
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to create partial return');
+    }
+
+    // Handle both response formats
+    const result = data.message || data;
+
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to create partial return');
     }
 
     return {
       success: true,
-      returnInvoice: data.message.return_invoice,
-      message: data.message.message
+      returnInvoice: result.return_invoice,
+      message: result.message
     };
   } catch (error: any) {
     console.error('Error creating partial return:', error);
@@ -140,25 +150,33 @@ export async function createMultiInvoiceReturn(
     const response = await fetch(`/api/method/klik_pos.api.sales_invoice.create_multi_invoice_return`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
          'X-Frappe-CSRF-Token': csrfToken
       },
-      body: JSON.stringify({
-        return_data: returnData
-      }),
+      body: new URLSearchParams({
+        return_data: JSON.stringify(returnData)
+      }).toString(),
        credentials: 'include'
     });
 
     const data = await response.json();
+    console.log('Multi-invoice return response:', data);
 
-    if (!response.ok || !data.message.success) {
-      throw new Error(data.message.message || 'Failed to create multi-invoice return');
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to create multi-invoice return');
+    }
+
+    // Handle both response formats
+    const result = data.message || data;
+
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to create multi-invoice return');
     }
 
     return {
       success: true,
-      createdReturns: data.message.created_returns,
-      message: data.message.message
+      createdReturns: result.created_returns,
+      message: result.message
     };
   } catch (error: any) {
     console.error('Error creating multi-invoice return:', error);
