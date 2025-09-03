@@ -378,7 +378,7 @@ export default function MultiInvoiceReturn({
 
         {/* Step 0: Select Customer (only when no customer provided) */}
         {workflowStep === 'select-customer' && (
-          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 bg-gray-50 dark:bg-gray-700">
+          <div className="flex-1 flex flex-col sm:flex-col overflow-y-auto sm:overflow-y-auto px-4 sm:px-6 py-4 bg-gray-50 dark:bg-gray-700">
             <div className="mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                 Step 1: Select Customer
@@ -403,8 +403,8 @@ export default function MultiInvoiceReturn({
             </div>
 
             {/* Customer List */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4">
-              <div className="space-y-2 max-h-60 overflow-y-auto">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4 flex-1 flex flex-col">
+              <div className="space-y-2 flex-1 sm:flex-1 overflow-y-auto max-h-60 sm:max-h-none">
                 {customers && customers.length > 0 ? (
                   customers
                     .filter(customer =>
@@ -507,7 +507,7 @@ export default function MultiInvoiceReturn({
 
         {/* Step 1: Select Items */}
         {workflowStep === 'select-items' && (
-          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 bg-gray-50 dark:bg-gray-700">
+          <div className="flex-1 flex flex-col sm:flex-col overflow-y-auto sm:overflow-y-auto px-4 sm:px-6 py-4 bg-gray-50 dark:bg-gray-700">
             <div className="mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                 Step 1: Select Items to Return
@@ -608,12 +608,12 @@ export default function MultiInvoiceReturn({
 
             {/* Available Items */}
             {isLoading ? (
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 text-center">
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 text-center flex-1 flex flex-col items-center justify-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-beveren-600 mx-auto mb-4"></div>
                 <p className="text-gray-600 dark:text-gray-400">Loading available items...</p>
               </div>
             ) : availableItems.length > 0 ? (
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4">
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4 flex-1 flex flex-col">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
                   <h4 className="text-sm font-medium text-gray-900 dark:text-white">
                     Available Items (Last {daysBack} days)
@@ -654,7 +654,7 @@ export default function MultiInvoiceReturn({
                 </div>
 
                 {/* Items Table */}
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto flex-1 min-h-0">
                   <table className="w-full">
                     <thead className="bg-gray-50 dark:bg-gray-700">
                       <tr>
@@ -731,7 +731,7 @@ export default function MultiInvoiceReturn({
                 )}
               </div>
             ) : (
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 text-center">
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 text-center flex-1 flex flex-col items-center justify-center min-h-0">
                 <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Items Found</h4>
                 <p className="text-gray-600 dark:text-gray-400 mb-4">
