@@ -9,6 +9,7 @@ interface InvoiceWhatsAppSenderProps {
   onError?: (error: string) => void;
 }
 
+//Just incase we want to implement it somewhere apart from sharing buttons: By Mania
 export const InvoiceWhatsAppSender: React.FC<InvoiceWhatsAppSenderProps> = ({
   customerName = '',
   customerPhone = '',

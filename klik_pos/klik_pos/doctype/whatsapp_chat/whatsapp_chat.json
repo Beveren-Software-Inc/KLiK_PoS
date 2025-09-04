@@ -1,6 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "format:{MM}-{YY}-{####}",
  "creation": "2025-09-04 10:32:23.229926",
  "default_view": "List",
  "doctype": "DocType",
@@ -194,10 +195,11 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-09-04 10:39:59.826978",
+ "modified": "2025-09-04 13:18:52.368119",
  "modified_by": "Administrator",
  "module": "KLIK POS",
  "name": "WhatsApp Chat",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {

@@ -1,10 +1,10 @@
 import frappe, json
 from frappe.utils import now, fmt_money
 from klik_pos.klik_pos.utils import get_current_pos_profile
-from klik_pos.api.whatsap.utils import send_whatsapp_message
+from klik_pos.api.whatsap.utils import send_whatsapp_message, get_invoice_pdf_url
 
 @frappe.whitelist()
-def send_simple_whatsapp(**kwargs):
+def deliver_invoice_via_whatsapp(**kwargs):
     """
     Send simple text WhatsApp message from frontend
     """
@@ -13,24 +13,23 @@ def send_simple_whatsapp(**kwargs):
 
     mobile = data.get("mobile_no")
     customer_name = data.get("customer_name")
-    invoice_data = data.get("invoice_data")
+    invoice_name = data.get("invoice_data")
     message = data.get("message", "Your invoice is ready! Mania Go pick it lol")
-
     if not mobile:
         frappe.throw("Mobile number is required.")
 
     try:
         # Debug logging
-        frappe.logger().debug(f"Frontend call - Mobile: {mobile}, Invoice: {invoice_data}, Message: {message}")
+        frappe.logger().debug(f"Frontend call - Mobile: {mobile}, Invoice: {invoice_name}, Message: {message}")
 
         # If we have invoice data, send as document with PDF
-        if invoice_data:
+        if invoice_name:
             result = send_whatsapp_message(
                 to_number=mobile,
                 message_type="text",
                 message_content=message,
                 reference_doctype="Sales Invoice",
-                reference_name=invoice_data,
+                reference_name=invoice_name,
                 attach_document=True
             )
         else:
@@ -46,7 +45,7 @@ def send_simple_whatsapp(**kwargs):
                 "status": "success",
                 "recipient": mobile,
                 "message": message,
-                "invoice": invoice_data,
+                "invoice": invoice_name,
                 "customer_name": customer_name,
                 "message_id": result.get("message_id"),
                 "timestamp": now(),
@@ -59,6 +58,7 @@ def send_simple_whatsapp(**kwargs):
         frappe.log_error(f"Error details: {str(e)}", "Send Simple WhatsApp Failed")
         frappe.log_error(f"Input data: {data}", "Send Simple WhatsApp Failed")
         frappe.throw(f"Failed to send WhatsApp message: {str(e)}")
+
 
 @frappe.whitelist()
 def send_invoice_whatsapp(**kwargs):

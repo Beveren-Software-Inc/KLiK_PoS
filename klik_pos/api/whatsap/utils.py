@@ -358,6 +358,8 @@ def get_document_attachment_url(doctype, docname):
     try:
         # For testing purposes, use the static PDF URL
         if doctype == "Sales Invoice":
+            pdf_url = get_invoice_pdf_url(doctype, docname)
+
             return "https://clik-pos.k.frappe.cloud/files/REPC-SRET-000001_PDFA3%20(14).pdf"
 
         doc = frappe.get_doc(doctype, docname)
@@ -386,7 +388,7 @@ def get_document_attachment_url(doctype, docname):
         # Check if we're using a local URL
         if '127.0.0.1' in site_url or 'localhost' in site_url:
             frappe.logger().warning(f"Local URL detected: {site_url}. Document sharing may not work with WhatsApp API.")
-            return None  # Return None to trigger fallback to text message
+            return None 
 
         return f'{site_url}{link}&key={key}'
     except Exception as e:
@@ -440,43 +442,6 @@ def get_whatsapp_templates():
         fields=["name", "template_name", "actual_name", "category", "language"]
     )
     return templates
-
-
-@frappe.whitelist()
-def get_whatsapp_setup_status():
-    """Check if WhatsApp is properly configured"""
-    try:
-        settings = frappe.get_doc("WhatsApp Setup", "WhatsApp Setup")
-        token = settings.get_password("token")
-
-        # Validate all required fields
-        validation_errors = []
-        if not settings.enabled:
-            validation_errors.append("WhatsApp is not enabled")
-        if not token:
-            validation_errors.append("WhatsApp token is not configured")
-        if not settings.url:
-            validation_errors.append("WhatsApp URL is not configured")
-        if not settings.version:
-            validation_errors.append("WhatsApp API version is not configured")
-        if not settings.phone_id:
-            validation_errors.append("WhatsApp Phone ID is not configured")
-
-        return {
-            "enabled": settings.enabled,
-            "configured": bool(token) and settings.url and settings.version and settings.phone_id,
-            "url": settings.url,
-            "version": settings.version,
-            "phone_id": settings.phone_id,
-            "validation_errors": validation_errors,
-            "api_url": f"{settings.url}/{settings.version}/{settings.phone_id}/messages" if all([settings.url, settings.version, settings.phone_id]) else None
-        }
-    except Exception as e:
-        return {
-            "enabled": False,
-            "configured": False,
-            "error": str(e)
-        }
 
 
 @frappe.whitelist()
@@ -712,67 +677,6 @@ def get_whatsapp_template_status(template_name):
         return {
             "error": f"Template not found or error: {str(e)}",
             "template_name": template_name
-        }
-
-
-@frappe.whitelist()
-def validate_template_parameters(template_name, parameters):
-    """
-    Validate template parameters before sending
-
-    Args:
-        template_name (str): Name of the template
-        parameters (list): Parameters to validate
-
-    Returns:
-        dict: Validation result
-    """
-    try:
-        template = frappe.get_doc("WhatsApp Message Templates", template_name)
-
-        if not template.field_names:
-            return {
-                "valid": True,
-                "message": "Template has no parameters to validate"
-            }
-
-        # Get expected field names
-        expected_fields = [field.strip() for field in template.field_names.split(',') if field.strip()]
-
-        # Validate parameters
-        if isinstance(parameters, str):
-            try:
-                parameters = json.loads(parameters)
-            except:
-                parameters = [parameters]
-
-        validation_result = {
-            "valid": True,
-            "template_name": template_name,
-            "expected_fields": expected_fields,
-            "provided_parameters": parameters,
-            "parameter_count": len(parameters),
-            "expected_count": len(expected_fields),
-            "issues": []
-        }
-
-        # Check parameter count
-        if len(parameters) != len(expected_fields):
-            validation_result["valid"] = False
-            validation_result["issues"].append(f"Parameter count mismatch: expected {len(expected_fields)}, got {len(parameters)}")
-
-        # Check each parameter
-        for i, (field, param) in enumerate(zip(expected_fields, parameters)):
-            if param is None or str(param).strip() == "":
-                validation_result["issues"].append(f"Parameter {i+1} ({field}) is empty")
-                validation_result["valid"] = False
-
-        return validation_result
-
-    except Exception as e:
-        return {
-            "valid": False,
-            "error": str(e)
         }
 
 
@@ -1224,3 +1128,12 @@ def test_document_url():
             "url": url
         }
 
+def get_invoice_pdf_url(invoice_name, print_format="Standard", lang="en"):
+    """
+    Return the URL to download the PDF of a Sales Invoice.
+    """
+    site_url = frappe.utils.get_url() 
+    
+    # gives https://clik-pos.k.frappe.cloud. WE ca use this since we are not live
+    pdf_url = f"{site_url}/api/method/frappe.utils.print_format.download_pdf?doctype=Sales%20Invoice&name={invoice_name}&format={print_format}&no_letterhead=0&_lang={lang}"
+    return pdf_url
