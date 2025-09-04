@@ -73,7 +73,7 @@ export async function getCustomerInvoicesForReturn(
       ...(endDate && { end_date: endDate }),
       ...(shippingAddress && { shipping_address: shippingAddress })
     });
-    
+
     const response = await fetch(`/api/method/klik_pos.api.sales_invoice.get_customer_invoices_for_return?${params}`);
     const data = await response.json();
 

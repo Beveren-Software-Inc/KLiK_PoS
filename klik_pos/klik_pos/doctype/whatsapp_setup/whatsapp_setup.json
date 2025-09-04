@@ -1,0 +1,92 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-09-04 09:39:06.542630",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "token",
+  "url",
+  "version",
+  "column_break_snwq",
+  "phone_id",
+  "business_id",
+  "app_id",
+  "webhook_verify_token"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "token",
+   "fieldtype": "Password",
+   "label": "Token",
+   "length": 250
+  },
+  {
+   "fieldname": "url",
+   "fieldtype": "Data",
+   "label": "URL"
+  },
+  {
+   "fieldname": "version",
+   "fieldtype": "Data",
+   "label": "Version"
+  },
+  {
+   "fieldname": "phone_id",
+   "fieldtype": "Data",
+   "label": "Phone ID"
+  },
+  {
+   "fieldname": "business_id",
+   "fieldtype": "Data",
+   "label": "Business ID"
+  },
+  {
+   "fieldname": "app_id",
+   "fieldtype": "Data",
+   "label": "App ID"
+  },
+  {
+   "fieldname": "webhook_verify_token",
+   "fieldtype": "Data",
+   "label": "Webhook Verify Token"
+  },
+  {
+   "fieldname": "column_break_snwq",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-09-04 09:39:24.347466",
+ "modified_by": "Administrator",
+ "module": "KLIK POS",
+ "name": "WhatsApp Setup",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
