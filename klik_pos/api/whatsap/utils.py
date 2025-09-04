@@ -8,7 +8,7 @@ import frappe
 from frappe import _
 from frappe.integrations.utils import make_post_request
 from frappe.desk.form.utils import get_pdf_link
-
+from frappe.utils import get_url
 
 @frappe.whitelist()
 def send_whatsapp_message(
@@ -350,8 +350,8 @@ def get_document_attachment_url(doctype, docname):
     try:
         # For testing purposes, use the static PDF URL
         if doctype == "Sales Invoice":
-            pdf_url = get_invoice_pdf_url(doctype, docname)
-
+            pdf_ = generate_and_attach_invoice_pdf(docname)
+            print("Pdf2 ", str(pdf_))
             return "https://clik-pos.k.frappe.cloud/files/REPC-SRET-000001_PDFA3%20(14).pdf"
 
         doc = frappe.get_doc(doctype, docname)
@@ -1030,12 +1030,28 @@ def test_template_with_parameters(template_name, phone_number, parameters=None):
         }
 
 
-def get_invoice_pdf_url(invoice_name, print_format="Standard", lang="en"):
+def generate_and_attach_invoice_pdf(invoice_name, print_format="Standard", lang="en"):
     """
-    Return the URL to download the PDF of a Sales Invoice.
+    Generate PDF for a Sales Invoice, attach it, and return full URL
     """
-    site_url = frappe.utils.get_url() 
-    
-    # gives https://clik-pos.k.frappe.cloud. WE ca use this since we are not live
-    pdf_url = f"{site_url}/api/method/frappe.utils.print_format.download_pdf?doctype=Sales%20Invoice&name={invoice_name}&format={print_format}&no_letterhead=0&_lang={lang}"
-    return pdf_url
+    try:
+        # Generate PDF content
+        pdf_content = frappe.get_print("Sales Invoice", invoice_name, print_format, as_pdf=True)
+
+        # Create File record in /files
+        filedoc = frappe.get_doc({
+            "doctype": "File",
+            "file_name": f"{invoice_name}.pdf",
+            "attached_to_doctype": "Sales Invoice",
+            "attached_to_name": invoice_name,
+            "content": pdf_content,
+            "is_private": 0
+        })
+        filedoc.save(ignore_permissions=True)
+
+        # Return full URL to the file
+        return get_url(filedoc.file_url)
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "generate_and_attach_invoice_pdf Failed")
+        raise
