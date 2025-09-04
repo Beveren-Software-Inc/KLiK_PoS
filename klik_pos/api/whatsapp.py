@@ -1,7 +1,7 @@
 import frappe, json
 from frappe.utils import now, fmt_money
 from klik_pos.klik_pos.utils import get_current_pos_profile
-from klik_pos.api.whatsap.utils import send_whatsapp_message, get_invoice_pdf_url
+from klik_pos.api.whatsap.utils import send_whatsapp_message
 
 @frappe.whitelist()
 def deliver_invoice_via_whatsapp(**kwargs):
