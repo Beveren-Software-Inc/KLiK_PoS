@@ -259,7 +259,7 @@ def make_whatsapp_api_call(data, settings, token, reference_doctype=None, refere
         # Validate phone number format
         if not data.get("to") or not data["to"].isdigit():
             return {"success": False, "error": f"Invalid phone number format: {data.get('to')}. Must be digits only (without +)"}
-       
+
         # Make the API call
         response = make_post_request(
             f"{settings.url}/{settings.version}/{settings.phone_id}/messages",
@@ -380,7 +380,7 @@ def get_document_attachment_url(doctype, docname):
         # Check if we're using a local URL
         if '127.0.0.1' in site_url or 'localhost' in site_url:
             frappe.logger().warning(f"Local URL detected: {site_url}. Document sharing may not work with WhatsApp API.")
-            return None 
+            return None
 
         return f'{site_url}{link}&key={key}'
     except Exception as e:
