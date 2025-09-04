@@ -7,7 +7,7 @@ from werkzeug.wrappers import Response
 
 
 
-#Will check on this later justincase we want to receive messaged from customers: Mania
+#Will check on this later just Incase we want to receive messaged from customers: Mania
 @frappe.whitelist(allow_guest=True)
 def webhook():
 	"""Meta webhook."""
