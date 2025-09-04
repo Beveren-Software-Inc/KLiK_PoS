@@ -3,11 +3,11 @@
 import frappe
 import json
 import requests
-import time
 from werkzeug.wrappers import Response
-import frappe.utils
 
 
+
+#Will check on this later just Incase we want to receive messaged from customers: Mania
 @frappe.whitelist(allow_guest=True)
 def webhook():
 	"""Meta webhook."""
@@ -31,11 +31,11 @@ def get():
 def post():
 	"""Post."""
 	data = frappe.local.form_dict
-	frappe.get_doc({
-		"doctype": "WhatsApp Notification Log",
-		"template": "Webhook",
-		"meta_data": json.dumps(data)
-	}).insert(ignore_permissions=True)
+	# frappe.get_doc({
+	# 	"doctype": "WhatsApp Notification Log",
+	# 	"template": "Webhook",
+	# 	"meta_data": json.dumps(data)
+	# }).insert(ignore_permissions=True)
 
 	messages = []
 	try:
@@ -83,7 +83,7 @@ def post():
 				}).insert(ignore_permissions=True)
 			elif message_type == 'interactive':
 				frappe.get_doc({
-					"doctype": "WhatsApp Message",
+					"doctype": "WhatsApp Chat",
 					"type": "Incoming",
 					"from": message['from'],
 					"message": message['interactive']['nfm_reply']['response_json'],
@@ -93,7 +93,7 @@ def post():
 				}).insert(ignore_permissions=True)
 			elif message_type in ["image", "audio", "video", "document"]:
 				settings = frappe.get_doc(
-							"WhatsApp Settings", "WhatsApp Settings",
+							"WhatsApp Settings", "WhatsApp Setup",
 						)
 				token = settings.get_password("token")
 				url = f"{settings.url}/{settings.version}/"
@@ -119,7 +119,7 @@ def post():
 						file_name = f"{frappe.generate_hash(length=10)}.{file_extension}"
 
 						message_doc = frappe.get_doc({
-							"doctype": "WhatsApp Message",
+							"doctype": "WhatsApp Chat",
 							"type": "Incoming",
 							"from": message['from'],
 							"message_id": message['id'],
@@ -134,7 +134,7 @@ def post():
 							{
 								"doctype": "File",
 								"file_name": file_name,
-								"attached_to_doctype": "WhatsApp Message",
+								"attached_to_doctype": "WhatsApp Chat",
 								"attached_to_name": message_doc.name,
 								"content": file_data,
 								"attached_to_field": "attach"
@@ -146,7 +146,7 @@ def post():
 						message_doc.save()
 			elif message_type == "button":
 				frappe.get_doc({
-					"doctype": "WhatsApp Message",
+					"doctype": "WhatsApp Chat",
 					"type": "Incoming",
 					"from": message['from'],
 					"message": message['button']['text'],
@@ -158,7 +158,7 @@ def post():
 				}).insert(ignore_permissions=True)
 			else:
 				frappe.get_doc({
-					"doctype": "WhatsApp Message",
+					"doctype": "WhatsApp Chat",
 					"type": "Incoming",
 					"from": message['from'],
 					"message_id": message['id'],
@@ -200,7 +200,7 @@ def update_message_status(data):
 	conversation = data['statuses'][0].get('conversation', {}).get('id')
 	name = frappe.db.get_value("WhatsApp Message", filters={"message_id": id})
 
-	doc = frappe.get_doc("WhatsApp Message", name)
+	doc = frappe.get_doc("WhatsApp Chat", name)
 	doc.status = status
 	if conversation:
 		doc.conversation_id = conversation
