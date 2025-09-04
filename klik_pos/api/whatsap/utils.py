@@ -6,11 +6,8 @@ Standalone functions for sending WhatsApp messages from both backend and fronten
 import json
 import frappe
 from frappe import _
-from frappe.model.document import Document
 from frappe.integrations.utils import make_post_request
-from frappe.utils.safe_exec import get_safe_globals, safe_exec
 from frappe.desk.form.utils import get_pdf_link
-from frappe.utils import add_to_date, nowdate, datetime
 
 
 @frappe.whitelist()
@@ -132,11 +129,11 @@ def send_text_message(to_number, message_content, settings, token, reference_doc
         }
 
     # Log the exact request being sent
-    frappe.logger().debug(f"Text message request data: {json.dumps(data, indent=2)}")
-    frappe.logger().debug(f"Phone number: {to_number}")
-    frappe.logger().debug(f"Message content: {message_content}")
-    frappe.logger().debug(f"Attach document: {attach_document}")
-    frappe.logger().debug(f"Document URL: {document_url if attach_document and reference_doctype and reference_name else 'N/A'}")
+    # frappe.logger().debug(f"Text message request data: {json.dumps(data, indent=2)}")
+    # frappe.logger().debug(f"Phone number: {to_number}")
+    # frappe.logger().debug(f"Message content: {message_content}")
+    # frappe.logger().debug(f"Attach document: {attach_document}")
+    # frappe.logger().debug(f"Document URL: {document_url if attach_document and reference_doctype and reference_name else 'N/A'}")
 
     return make_whatsapp_api_call(data, settings, token, reference_doctype, reference_name, "Manual")
 
@@ -177,9 +174,9 @@ def send_template_message(
         template_parameters = validated_parameters
 
         # Log the parameters for debugging
-        frappe.logger().debug(f"Template parameters: {template_parameters}")
-        frappe.logger().debug(f"Template field names: {template.field_names}")
-        frappe.logger().debug(f"Template sample values: {template.sample_values}")
+        # frappe.logger().debug(f"Template parameters: {template_parameters}")
+        # frappe.logger().debug(f"Template field names: {template.field_names}")
+        # frappe.logger().debug(f"Template sample values: {template.sample_values}")
 
     data = {
         "messaging_product": "whatsapp",
@@ -248,11 +245,6 @@ def make_whatsapp_api_call(data, settings, token, reference_doctype=None, refere
         "content-type": "application/json"
     }
 
-    # Debug logging
-    frappe.logger().debug(f"WhatsApp API Request URL: {settings.url}/{settings.version}/{settings.phone_id}/messages")
-    frappe.logger().debug(f"WhatsApp API Headers: {headers}")
-    frappe.logger().debug(f"WhatsApp API Data: {json.dumps(data, indent=2)}")
-
     try:
         # Validate required settings
         if not settings.url:
@@ -267,7 +259,7 @@ def make_whatsapp_api_call(data, settings, token, reference_doctype=None, refere
         # Validate phone number format
         if not data.get("to") or not data["to"].isdigit():
             return {"success": False, "error": f"Invalid phone number format: {data.get('to')}. Must be digits only (without +)"}
-        print(str(data))
+       
         # Make the API call
         response = make_post_request(
             f"{settings.url}/{settings.version}/{settings.phone_id}/messages",
@@ -681,63 +673,6 @@ def get_whatsapp_template_status(template_name):
 
 
 @frappe.whitelist()
-def send_invoice_whatsapp_enhanced(**kwargs):
-    """
-    Enhanced version of send_invoice_whatsapp with better error handling and flexibility
-    """
-    data = kwargs
-    mobile = data.get("mobile_no")
-    customer_name = data.get("customer_name")
-    invoice_no = data.get("invoice_data")
-    template_name = data.get("template_name", "invoice_notification")
-
-    if not (mobile and invoice_no):
-        return {"success": False, "error": "Mobile number and invoice number are required."}
-
-    try:
-        doc = frappe.get_doc("Sales Invoice", invoice_no)
-
-        # Format invoice amount
-        invoice_amount = frappe.utils.fmt_money(doc.rounded_total or doc.grand_total, currency=doc.currency)
-
-        # Prepare template parameters
-        template_parameters = [customer_name, doc.name, invoice_amount]
-
-        # Send WhatsApp message with document attachment
-        result = send_whatsapp_message(
-            to_number=mobile,
-            message_type="template",
-            template_name=template_name,
-            template_parameters=template_parameters,
-            reference_doctype="Sales Invoice",
-            reference_name=invoice_no,
-            attach_document=True
-        )
-
-        if result.get("success"):
-            return {
-                "success": True,
-                "status": "success",
-                "recipient": mobile,
-                "invoice": invoice_no,
-                "amount": invoice_amount,
-                "message_id": result.get("message_id"),
-                "timestamp": frappe.utils.now(),
-            }
-        else:
-            return {
-                "success": False,
-                "error": result.get("error"),
-                "recipient": mobile,
-                "invoice": invoice_no
-            }
-
-    except Exception as e:
-        frappe.log_error(frappe.get_traceback(), "Send Invoice WhatsApp Enhanced Failed")
-        return {"success": False, "error": f"Failed to send WhatsApp message: {str(e)}"}
-
-
-@frappe.whitelist()
 def send_bulk_whatsapp_messages(recipients, message_type="text", message_content=None, template_name=None, template_parameters=None):
     """
     Send WhatsApp messages to multiple recipients
@@ -840,9 +775,6 @@ def test_invoice_with_pdf(phone_number, invoice_no, message="Your invoice is rea
         request_url = f"{settings.url}/{settings.version}/{settings.phone_id}/messages"
         request_data = json.dumps(data, indent=2)
 
-        frappe.logger().debug(f"Test Invoice PDF Request URL: {request_url}")
-        frappe.logger().debug(f"Test Invoice PDF Request Data: {request_data}")
-        # frappe.throw(str(data))
         # Make the actual request
         response = frappe.integrations.utils.make_post_request(
             request_url,
@@ -927,9 +859,6 @@ def test_simple_text_message(phone_number, message="Test message"):
         # Log the exact request that will be sent
         request_url = f"{settings.url}/{settings.version}/{settings.phone_id}/messages"
         request_data = json.dumps(data, indent=2)
-
-        frappe.logger().debug(f"Test Text Request URL: {request_url}")
-        frappe.logger().debug(f"Test Text Request Data: {request_data}")
 
         # Make the actual request
         response = frappe.integrations.utils.make_post_request(
@@ -1044,9 +973,6 @@ def test_template_with_parameters(template_name, phone_number, parameters=None):
         request_url = f"{settings.url}/{settings.version}/{settings.phone_id}/messages"
         request_data = json.dumps(data, indent=2)
 
-        frappe.logger().debug(f"Test Template Request URL: {request_url}")
-        frappe.logger().debug(f"Test Template Request Data: {request_data}")
-
         # Make the actual request
         response = frappe.integrations.utils.make_post_request(
             request_url,
@@ -1103,30 +1029,6 @@ def test_template_with_parameters(template_name, phone_number, parameters=None):
             "parameters_used": cleaned_parameters if 'cleaned_parameters' in locals() else []
         }
 
-
-@frappe.whitelist()
-def test_document_url():
-    """Test if the document URL is accessible"""
-    try:
-        url = "https://clik-pos.k.frappe.cloud/files/REPC-SRET-000001_PDFA3%20(14).pdf"
-
-        # Test URL accessibility
-        import requests
-        response = requests.head(url, timeout=10)
-
-        return {
-            "success": True,
-            "url": url,
-            "status_code": response.status_code,
-            "headers": dict(response.headers),
-            "accessible": response.status_code == 200
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e),
-            "url": url
-        }
 
 def get_invoice_pdf_url(invoice_name, print_format="Standard", lang="en"):
     """

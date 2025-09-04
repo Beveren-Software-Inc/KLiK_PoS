@@ -235,5 +235,3 @@ function test_template_with_parameters(values) {
         }
     });
 }
-
-

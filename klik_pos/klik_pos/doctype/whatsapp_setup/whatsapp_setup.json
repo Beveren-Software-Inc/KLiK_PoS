@@ -27,33 +27,44 @@
   {
    "fieldname": "token",
    "fieldtype": "Password",
+   "in_list_view": 1,
    "label": "Token",
-   "length": 250
+   "length": 250,
+   "reqd": 1
   },
   {
+   "description": "eg.https://graph.facebook.com",
    "fieldname": "url",
    "fieldtype": "Data",
-   "label": "URL"
+   "in_list_view": 1,
+   "label": "URL",
+   "reqd": 1
   },
   {
    "fieldname": "version",
    "fieldtype": "Data",
-   "label": "Version"
+   "in_list_view": 1,
+   "label": "Version",
+   "reqd": 1
   },
   {
    "fieldname": "phone_id",
    "fieldtype": "Data",
-   "label": "Phone ID"
+   "in_list_view": 1,
+   "label": "Phone ID",
+   "reqd": 1
   },
   {
    "fieldname": "business_id",
    "fieldtype": "Data",
-   "label": "Business ID"
+   "label": "Business ID",
+   "reqd": 1
   },
   {
    "fieldname": "app_id",
    "fieldtype": "Data",
-   "label": "App ID"
+   "label": "App ID",
+   "reqd": 1
   },
   {
    "fieldname": "webhook_verify_token",
@@ -68,7 +79,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-09-04 09:39:24.347466",
+ "modified": "2025-09-04 15:01:34.519325",
  "modified_by": "Administrator",
  "module": "KLIK POS",
  "name": "WhatsApp Setup",
