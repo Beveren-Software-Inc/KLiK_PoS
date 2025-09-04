@@ -55,14 +55,14 @@ export default function RetailSidebar() {
       </div>
 
       {/* Settings at bottom */}
-      <div className="p-4 border-t border-gray-100 dark:border-gray-700">
+      {/* <div className="p-4 border-t border-gray-100 dark:border-gray-700">
         <button
           onClick={() => navigate("/settings")}
           className="w-12 h-12 rounded-xl flex items-center justify-center text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mx-auto"
         >
           <Settings size={20} />
         </button>
-      </div>
+      </div> */}
     </div>
   )
 }
