@@ -9,6 +9,11 @@ frappe.ui.form.on('WhatsApp Setup', {
             test_whatsapp_connection(frm);
         }, __('WhatsApp Actions')).addClass('btn-info');
 
+        frm.add_custom_button(__('Get Templates'), function() {
+            fetch_whatsapp_approved_template(frm);
+        }, __('WhatsApp Actions')).addClass('btn-info');
+
+
         frm.add_custom_button(__('Send Test Message'), function() {
             send_test_message(frm);
         }, __('WhatsApp Actions')).addClass('btn-success');
@@ -235,3 +240,24 @@ function test_template_with_parameters(values) {
         }
     });
 }
+
+
+function fetch_whatsapp_approved_template(frm){
+            frappe.call({
+                method: "klik_pos.klik_pos.doctype.whatsapp_message_templates.whatsapp_message_templates.fetch", // replace with your actual app + python file path
+                freeze: true,
+                freeze_message: __("Fetching templates from Meta..."),
+                callback: function(r) {
+                    if (!r.exc) {
+                        frappe.msgprint({
+                            title: __("Success"),
+                            message: __("Templates synced successfully from Meta."),
+                            indicator: "green"
+                        });
+                        frm.reload_doc();
+                    }
+                }
+            });
+        
+    }
+
