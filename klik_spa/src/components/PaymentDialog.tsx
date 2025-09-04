@@ -25,7 +25,7 @@ import { createSalesInvoice } from "../services/salesInvoice";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { DisplayPrintPreview, handlePrintInvoice } from "../utils/invoicePrint";
-import { sendEmails, sendWhatsApp } from "../services/useSharing";
+import { sendEmails, sendWhatsAppMessage } from "../services/useSharing";
 
 interface PaymentDialogProps {
   isOpen: boolean;
@@ -1134,7 +1134,7 @@ export default function PaymentDialog({
                       onClick={async () => {
                         setIsSendingWhatsapp(true);
                         try {
-                          await sendWhatsApp({
+                          await sendWhatsAppMessage({
                             mobile_no: sharingData.phone,
                             customer_name: sharingData.name,
                             invoice_data: invoiceData.name,
