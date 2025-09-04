@@ -53,7 +53,7 @@ export function useAllPaymentModes() {
     const fetchPaymentModes = async () => {
       setIsLoading(true);
       try {
-        const res = await fetch(`/api/method/klik_pos.api.payment.get_opening_entry_payment_summary?include_all_today=true`);
+        const res = await fetch(`/api/method/klik_pos.api.payment.get_opening_entry_payment_summary`);
         const data = await res.json();
         if (!data.message.data) {
           throw new Error(data.message.error || "Failed to fetch payment modes");

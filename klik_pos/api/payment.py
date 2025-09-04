@@ -42,7 +42,7 @@ def get_all_mode_of_payment():
         return {"success": False, "message": str(e)}
 
 @frappe.whitelist()
-def get_opening_entry_payment_summary(include_all_today=False):
+def get_opening_entry_payment_summary():
     try:
         # Step 1: Get current POS profile
         pos_profile = get_current_pos_profile()
@@ -80,9 +80,14 @@ def get_opening_entry_payment_summary(include_all_today=False):
         )
         opening_time = opening_start.time().strftime("%H:%M:%S")
         print("Opening Modes:", opening_time)
-        # Step 4: Aggregate sales invoice payments for that day
-        if include_all_today:
-            # Include all invoices from today (for frontend display consistency)
+        # Check if user has administrative privileges
+        user_roles = frappe.get_roles(frappe.session.user)
+        is_admin_user = any(role in ["Administrator", "Sales Manager", "System Manager"] for role in user_roles)
+
+        # Step 4: Aggregate sales invoice payments
+        if is_admin_user:
+            # For admin users, aggregate all invoices for the day
+            frappe.logger().info(f"Admin user {frappe.session.user} - aggregating all invoices for date: {opening_date}")
             sales_data = frappe.db.sql("""
                 SELECT sip.mode_of_payment,
                        SUM(sip.amount) as total_amount,
@@ -95,19 +100,18 @@ def get_opening_entry_payment_summary(include_all_today=False):
                 GROUP BY sip.mode_of_payment
             """, (pos_profile.name, opening_date), as_dict=True)
         else:
-            # Only include invoices after opening time (for accurate shift reporting)
+            # For regular users, aggregate only invoices for the current POS opening entry
+            frappe.logger().info(f"Aggregating payments for POS opening entry: {opening_entry_name}")
             sales_data = frappe.db.sql("""
                 SELECT sip.mode_of_payment,
                        SUM(sip.amount) as total_amount,
                        COUNT(DISTINCT si.name) as transactions
                 FROM `tabSales Invoice` si
                 JOIN `tabSales Invoice Payment` sip ON si.name = sip.parent
-                WHERE si.pos_profile = %s
+                WHERE si.custom_pos_opening_entry = %s
                   AND si.docstatus = 1
-                  AND si.posting_date = %s
-                  AND si.posting_time >= %s
                 GROUP BY sip.mode_of_payment
-            """, (pos_profile.name, opening_date, opening_time), as_dict=True)
+            """, (opening_entry_name), as_dict=True)
 
 
 

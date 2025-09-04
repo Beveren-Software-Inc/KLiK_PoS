@@ -33,9 +33,29 @@ def get_current_pos_opening_entry():
 @frappe.whitelist(allow_guest=True)
 def get_sales_invoices(limit=100, start=0):
     try:
+                # Get current user's POS opening entry
+        current_opening_entry = get_current_pos_opening_entry()
+
+        # Check if user has administrative privileges
+        user_roles = frappe.get_roles(frappe.session.user)
+        is_admin_user = any(role in ["Administrator", "Sales Manager", "System Manager"] for role in user_roles)
+
+        # Base filters
+        filters = {}
+
+        # If user has administrative privileges, show all invoices
+        if is_admin_user:
+            frappe.logger().info(f"Admin user {frappe.session.user} with roles {user_roles} - showing all invoices")
+        # If user has an active POS opening entry, filter by it
+        elif current_opening_entry:
+            filters["custom_pos_opening_entry"] = current_opening_entry
+            frappe.logger().info(f"Filtering invoices by POS opening entry: {current_opening_entry}")
+        else:
+            frappe.logger().info("No active POS opening entry found, showing all invoices")
+
         invoices = frappe.get_all(
             "Sales Invoice",
-            filters={},
+            filters=filters,
             fields=[
                 "name",
                 "posting_date",
@@ -48,7 +68,8 @@ def get_sales_invoices(limit=100, start=0):
                 "status",
                 "discount_amount",
                 "total_taxes_and_charges",
-                "custom_zatca_submit_status"
+                "custom_zatca_submit_status",
+                "custom_pos_opening_entry"
             ],
             order_by="modified desc",
             limit=limit,
