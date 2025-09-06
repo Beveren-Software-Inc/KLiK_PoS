@@ -3,7 +3,7 @@ import { Link } from "react-router-dom"
 import { useI18n } from "../hooks/useI18n"
 import { useAuth } from "../hooks/useAuth"
 import { useTheme } from "../hooks/useTheme"
-import { Settings, LogOut, Moon, Sun, Mail } from "lucide-react"
+import { Settings, LogOut, Moon, Sun, Mail, Grid3X3, List } from "lucide-react"
 import CategoryTabs from "./CategoryTabs"
 import ProductGrid from "./ProductGrid"
 import SearchBar from "./SearchBar"
@@ -36,6 +36,7 @@ export default function MenuGrid({
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown when clicking outside
@@ -81,13 +82,38 @@ export default function MenuGrid({
       <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
         {/* Search and User Info */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex-1 max-w-md">
+          <div className="flex items-center space-x-3 flex-1 max-w-md">
             <SearchBar
               searchQuery={searchQuery}
               onSearchChange={onSearchChange}
               onSearchKeyPress={onSearchKeyPress}
               onScanBarcode={onScanBarcode}
             />
+            {/* View Toggle Button */}
+            <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-2 rounded-md transition-colors ${
+                  viewMode === 'grid'
+                    ? 'bg-white dark:bg-gray-600 text-beveren-600 dark:text-beveren-400 shadow-sm'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+                title="Grid View"
+              >
+                <Grid3X3 className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 rounded-md transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-white dark:bg-gray-600 text-beveren-600 dark:text-beveren-400 shadow-sm'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+                title="List View"
+              >
+                <List className="w-4 h-4" />
+              </button>
+            </div>
           </div>
           <div className="flex items-center space-x-4 ml-6 relative" ref={dropdownRef}>
             <div className="text-right">
@@ -179,7 +205,7 @@ export default function MenuGrid({
 
       {/* Products Grid */}
       <div className="flex-1 overflow-y-auto">
-        <ProductGrid items={items} onAddToCart={onAddToCart} scannerOnly={scannerOnly} />
+        <ProductGrid items={items} onAddToCart={onAddToCart} scannerOnly={scannerOnly} viewMode={viewMode} />
       </div>
     </div>
   )

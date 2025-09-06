@@ -4,7 +4,7 @@ import { useI18n } from "../hooks/useI18n"
 import { useAuth } from "../hooks/useAuth"
 import { useTheme } from "../hooks/useTheme"
 import { useCartStore } from "../stores/cartStore"
-import { ShoppingCart, Menu, X, Search, Settings, LogOut, Moon, Sun, Mail, Scan } from "lucide-react"
+import { ShoppingCart, Menu, X, Search, Settings, LogOut, Moon, Sun, Mail, Scan, Grid3X3, List } from "lucide-react"
 import CategoryTabs from "./CategoryTabs"
 import ProductGrid from "./ProductGrid"
 import BottomNavigation from "./BottomNavigation"
@@ -35,6 +35,7 @@ export default function MobilePOSLayout({
     const { cartItems, addToCart } = useCartStore()
   const navigate = useNavigate()
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown when clicking outside
@@ -182,24 +183,52 @@ export default function MobilePOSLayout({
 
         {/* Search Bar */}
         <div className="px-4 pb-3">
-          <div className="relative flex items-center">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder={t("SEARCH_PRODUCTS")}
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="flex-1 pl-10 pr-12 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-            />
-            {onScanBarcode && (
+          <div className="flex items-center space-x-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder={t("SEARCH_PRODUCTS")}
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                className="w-full pl-10 pr-12 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+              {onScanBarcode && (
+                <button
+                  onClick={onScanBarcode}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1.5 text-gray-400 hover:text-beveren-600 dark:hover:text-beveren-400 transition-colors focus:outline-none focus:ring-2 focus:ring-beveren-500 focus:ring-offset-2 rounded-lg"
+                  title="Scan Barcode"
+                >
+                  <Scan className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Mobile View Toggle Button */}
+            <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
               <button
-                onClick={onScanBarcode}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1.5 text-gray-400 hover:text-beveren-600 dark:hover:text-beveren-400 transition-colors focus:outline-none focus:ring-2 focus:ring-beveren-500 focus:ring-offset-2 rounded-lg"
-                title="Scan Barcode"
+                onClick={() => setViewMode('grid')}
+                className={`p-2 rounded-md transition-colors ${
+                  viewMode === 'grid'
+                    ? 'bg-white dark:bg-gray-600 text-beveren-600 dark:text-beveren-400 shadow-sm'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+                title="Grid View"
               >
-                <Scan className="w-4 h-4" />
+                <Grid3X3 className="w-4 h-4" />
               </button>
-            )}
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 rounded-md transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-white dark:bg-gray-600 text-beveren-600 dark:text-beveren-400 shadow-sm'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+                title="List View"
+              >
+                <List className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -211,7 +240,7 @@ export default function MobilePOSLayout({
 
       {/* Products Grid */}
       <div className="flex-1 overflow-y-auto">
-        <ProductGrid items={items} onAddToCart={addToCart} isMobile={true} scannerOnly={scannerOnly} />
+        <ProductGrid items={items} onAddToCart={addToCart} isMobile={true} scannerOnly={scannerOnly} viewMode={viewMode} />
       </div>
 
       {/* Floating Cart Button */}

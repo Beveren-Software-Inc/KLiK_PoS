@@ -44,7 +44,7 @@ def fetch_item_price(item_code: str, price_list: str) -> dict:
                 "currency_symbol": default_symbol
             }
 
-        
+
     except Exception:
         frappe.log_error(frappe.get_traceback(), f"Error fetching price for {item_code}")
         return {
@@ -59,7 +59,7 @@ def get_item_by_barcode(barcode: str):
         pos_doc = get_current_pos_profile()
         warehouse = pos_doc.warehouse
         price_list = "Standard Selling"
-        
+
         item_code = frappe.db.sql("""
             SELECT parent
             FROM `tabItem Barcode`
@@ -115,7 +115,7 @@ def get_items_with_balance_and_price(price_list: str = "Standard Selling"):
         items = frappe.get_all(
             "Item",
             filters=filters,
-            fields=["name", "item_name", "description", "item_group", "image"],
+            fields=["name", "item_name", "description", "item_group", "image", "stock_uom"],
             order_by="modified desc"
         )
 
@@ -135,7 +135,8 @@ def get_items_with_balance_and_price(price_list: str = "Standard Selling"):
                 "available": balance,
                 "image": item.get("image") or "https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=300&h=300&fit=crop",
                 "sold": 0,
-                "preparationTime": 10
+                "preparationTime": 10,
+                "uom": item.get("stock_uom", "Nos")
             })
 
         return enriched_items

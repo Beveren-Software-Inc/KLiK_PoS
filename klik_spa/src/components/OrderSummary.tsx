@@ -701,13 +701,13 @@ export default function OrderSummary({
 
                             <span className="text-beveren-600 dark:text-beveren-400 font-semibold">
                               {currency_symbol}
-                              {discountedPrice.toFixed(2)} each
+                              {discountedPrice.toFixed(2)}
                             </span>
                           </div>
                         ) : (
                           <div className="text-beveren-600 dark:text-beveren-400 font-semibold">
                             {currency_symbol}
-                            {item.price.toFixed(2)} each
+                            {item.price.toFixed(2)}
                           </div>
                         )}
                       </div>

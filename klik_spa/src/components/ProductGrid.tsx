@@ -2,6 +2,7 @@
 
 import { useI18n } from "../hooks/useI18n"
 import ProductCard from "./ProductCard"
+import ProductLineView from "./ProductLineView"
 import type { MenuItem } from "../../types"
 
 interface ProductGridProps {
@@ -9,11 +10,18 @@ interface ProductGridProps {
   onAddToCart: (item: MenuItem) => void
   isMobile?: boolean
   scannerOnly?: boolean
+  viewMode?: 'grid' | 'list'
 }
 
-export default function ProductGrid({ items, onAddToCart, isMobile = false, scannerOnly = false }: ProductGridProps) {
+export default function ProductGrid({ items, onAddToCart, isMobile = false, scannerOnly = false, viewMode = 'grid' }: ProductGridProps) {
   const { t } = useI18n()
 
+  // If viewMode is 'list', render the line view
+  if (viewMode === 'list') {
+    return <ProductLineView items={items} onAddToCart={onAddToCart} isMobile={isMobile} scannerOnly={scannerOnly} />
+  }
+
+  // Default grid view
   if (items.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
