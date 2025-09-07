@@ -3,7 +3,7 @@ import { useState, useEffect, createContext, useContext } from "react"
 import erpnextAPI from "../services/erpnext-api"
 
 interface User {
-  name: string // This is the user ID/email in ERPNext
+  name: string
   email: string
   full_name: string
   role?: string
@@ -16,6 +16,7 @@ interface AuthContextType {
   user: User | null
   login: (username: string, password: string) => Promise<{ success: boolean; message: string }>
   logout: () => Promise<void>
+  checkSession: () => Promise<boolean>
   loading: boolean
   isAuthenticated: boolean
 }
@@ -33,16 +34,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!mounted) return
-    
+
     // Initialize ERPNext API session
     erpnextAPI.initializeSession()
-    
+
     // Check if user is already logged in
     const token = localStorage.getItem("erpnext_token")
     const userData = localStorage.getItem("user_data")
 
-    console.log("Auth check:", { 
-      hasToken: !!token, 
+    console.log("Auth check:", {
+      hasToken: !!token,
       hasUserData: !!userData,
       token,
       userData: userData ? JSON.parse(userData) : "missing"
@@ -51,7 +52,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (token && userData) {
       try {
         const parsedUser = JSON.parse(userData)
+
+        // First, set the user from cached data to avoid login redirect
         setUser(parsedUser)
+
+        // Then try to refresh user data from server in the background
+        const refreshUserData = async () => {
+          try {
+            // First validate the session
+            const isSessionValid = await erpnextAPI.validateSession()
+            if (!isSessionValid) {
+              console.warn("Session is invalid, clearing auth data")
+              localStorage.removeItem("erpnext_token")
+              localStorage.removeItem("user_data")
+              localStorage.removeItem("erpnext_sid")
+              setUser(null)
+              return
+            }
+
+            const freshUserData = await erpnextAPI.getCurrentUserProfile()
+            if (freshUserData) {
+              const updatedUser = {
+                name: freshUserData.name || parsedUser.name,
+                email: freshUserData.email || freshUserData.name || parsedUser.email,
+                full_name: freshUserData.full_name || freshUserData.first_name + ' ' + (freshUserData.last_name || '') || parsedUser.full_name,
+                role: freshUserData.role_profile_name || freshUserData.role || parsedUser.role || "User",
+                first_name: freshUserData.first_name,
+                last_name: freshUserData.last_name,
+                user_image: freshUserData.user_image
+              }
+
+              setUser(updatedUser)
+              localStorage.setItem("user_data", JSON.stringify(updatedUser))
+              console.log("User data refreshed:", updatedUser)
+            }
+          } catch (error) {
+            console.warn("Failed to refresh user data, using cached data:", error)
+            // Don't clear the user data if refresh fails - keep using cached data
+          }
+        }
+
+        // Run refresh in background without blocking authentication
+        refreshUserData()
       } catch (error) {
         console.error("Error parsing user data:", error)
         localStorage.removeItem("erpnext_token")
@@ -65,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (username: string, password: string) => {
     try {
       setLoading(true)
-      
+
       // Use the real ERPNext API
       const result = await erpnextAPI.login(username, password)
 
@@ -99,6 +141,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null)
     localStorage.removeItem("erpnext_token")
     localStorage.removeItem("user_data")
+    localStorage.removeItem("erpnext_sid")
+  }
+
+  // Method to check if session is still valid
+  const checkSession = async () => {
+    if (!user) return false
+
+    try {
+      const isValid = await erpnextAPI.validateSession()
+      if (!isValid) {
+        console.log("Session expired, logging out")
+        await logout()
+        return false
+      }
+      return true
+    } catch (error) {
+      console.error("Session check failed:", error)
+      return false
+    }
   }
 
   return (
@@ -107,6 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         login,
         logout,
+        checkSession,
         loading,
         isAuthenticated: !!user,
       }}

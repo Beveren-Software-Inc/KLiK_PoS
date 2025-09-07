@@ -9,7 +9,7 @@ import {
   Save,
   ChevronRight,
 } from "lucide-react";
-import { type Customer } from "../../types";
+import { type Customer } from "../data/mockCustomers";
 import { useCustomerActions } from "../services/customerService";
 import { toast } from "react-toastify";
 import { usePOSDetails } from "../hooks/usePOSProfile";

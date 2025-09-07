@@ -26,15 +26,15 @@ class ERPNextAPI {
     // In development with Vite dev server, use full URL
     const isDevelopment = (import.meta as any).env?.DEV;
     const isServedFromFrappe = !isDevelopment && window.location.pathname.startsWith('/klik_pos');
-    
+
     this.config = {
-      baseUrl: isServedFromFrappe 
+      baseUrl: isServedFromFrappe
         ? '' // Use relative URL for same-origin requests when served from Frappe
         : ((import.meta as any).env?.VITE_ERPNEXT_BASE_URL || 'http://localhost:8000'),
       apiKey: (import.meta as any).env?.VITE_API_KEY || '',
       apiSecret: (import.meta as any).env?.VITE_API_SECRET || ''
     };
-    
+
     console.log('ERPNext API Config:', {
       isDevelopment,
       baseUrl: this.config.baseUrl || '[using proxy]',
@@ -64,7 +64,7 @@ class ERPNextAPI {
   async login(username: string, password: string): Promise<LoginResponse> {
     try {
       console.log('Attempting login to:', this.config.baseUrl);
-      
+
       // Try the standard login endpoint first
       let response = await fetch(`${this.config.baseUrl}/api/method/login`, {
         method: 'POST',
@@ -131,7 +131,7 @@ class ERPNextAPI {
           console.log('Fetching user profile data...');
           const userProfile = await this.getCurrentUserProfile();
           console.log('User profile fetched:', userProfile);
-          
+
           if (userProfile) {
             return {
               success: true,
@@ -191,14 +191,14 @@ class ERPNextAPI {
       }
     } catch (error) {
       console.error('Login error details:', error);
-      
+
       if (error instanceof TypeError && error.message.includes('fetch')) {
         return {
           success: false,
           message: 'Network error. Please check if the ERPNext server is accessible.'
         };
       }
-      
+
       return {
         success: false,
         message: `Network error: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -239,26 +239,38 @@ class ERPNextAPI {
 
   async getCurrentUserProfile(): Promise<any> {
     try {
-      // First get the current logged-in user
-      const currentUser = await this.getCurrentUser();
-      if (!currentUser) {
-        throw new Error('No logged user found');
-      }
-
-
-      // Then fetch the full User document
-      const response = await fetch(`${this.config.baseUrl}/api/resource/User/${currentUser}`, {
+      // Try to get user profile using the frappe.auth.get_logged_user method first
+      const response = await fetch(`${this.config.baseUrl}/api/method/frappe.auth.get_logged_user`, {
         method: 'GET',
         headers: this.getHeaders(),
         credentials: 'include'
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch user profile: ${response.status}`);
+        throw new Error(`Failed to fetch logged user: ${response.status}`);
       }
 
       const data = await response.json();
-      return data.data;
+      const username = data.message;
+
+      if (!username) {
+        throw new Error('No logged user found');
+      }
+
+      // Now fetch the full User document
+      const userResponse = await fetch(`${this.config.baseUrl}/api/resource/User/${username}`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+        credentials: 'include'
+      });
+
+      if (!userResponse.ok) {
+        throw new Error(`Failed to fetch user profile: ${userResponse.status}`);
+      }
+
+      const userData = await userResponse.json();
+      console.log('Full user profile data:', userData.data);
+      return userData.data;
     } catch (error) {
       console.error('Get user profile error:', error);
       throw error;
@@ -269,7 +281,7 @@ class ERPNextAPI {
   async testConnection(): Promise<{ success: boolean; message: string; details?: any }> {
     try {
       console.log('Testing connection to:', this.config.baseUrl);
-      
+
       // First try the ping endpoint
       let response = await fetch(`${this.config.baseUrl}/api/method/ping`, {
         method: 'GET',
@@ -314,7 +326,7 @@ class ERPNextAPI {
       }
     } catch (error) {
       console.error('Connection test error details:', error);
-      
+
       let errorMessage = 'Unknown error';
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
@@ -327,7 +339,7 @@ class ERPNextAPI {
           errorMessage = error.message;
         }
       }
-      
+
       return {
         success: false,
         message: `Connection failed: ${errorMessage}`,
@@ -422,11 +434,32 @@ class ERPNextAPI {
     }
   }
 
+  // Validate session by checking if user is still logged in
+  async validateSession(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.config.baseUrl}/api/method/frappe.auth.get_logged_user`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return !!data.message; // Return true if we get a username
+      }
+      return false;
+    } catch (error) {
+      console.error('Session validation failed:', error);
+      return false;
+    }
+  }
+
   // Initialize session from localStorage
   initializeSession(): void {
     const storedSid = localStorage.getItem('erpnext_sid');
     if (storedSid) {
       this.sessionId = storedSid;
+      console.log('Session restored from localStorage:', storedSid);
     }
   }
 }

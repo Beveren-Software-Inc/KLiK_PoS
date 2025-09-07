@@ -31,6 +31,9 @@ export interface Customer {
   createdAt: string
   lastVisit?: string
   avatar?: string
+  // Additional fields for ERPNext integration
+  defaultCurrency?: string
+  companyCurrency?: string
 }
 
 export const mockCustomers: Customer[] = [
@@ -263,7 +266,7 @@ export const mockCustomers: Customer[] = [
     createdAt: "2023-12-03T12:15:00Z",
     lastVisit: "2024-12-14T13:50:00Z"
   },
-  // Company Customer  
+  // Company Customer
   {
     id: "COMP003",
     type: "company",
@@ -707,7 +710,7 @@ export const getCustomersByStatus = (status: Customer['status']): Customer[] => 
 
 export const searchCustomers = (query: string): Customer[] => {
   const lowercaseQuery = query.toLowerCase()
-  return mockCustomers.filter(customer => 
+  return mockCustomers.filter(customer =>
     customer.name.toLowerCase().includes(lowercaseQuery) ||
     customer.email.toLowerCase().includes(lowercaseQuery) ||
     customer.phone.includes(query) ||

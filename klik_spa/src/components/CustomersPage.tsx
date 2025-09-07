@@ -14,11 +14,10 @@ import {
 } from "lucide-react"
 import { useCustomers } from "../hooks/useCustomers" // Import the hook
 import AddCustomerModal from "./AddCustomerModal"
-import type { Customer } from "../../types"
+import type { Customer } from "../data/mockCustomers"
 import RetailSidebar from "./RetailSidebar"
 import BottomNavigation from "./BottomNavigation"
 import { useMediaQuery } from "../hooks/useMediaQuery"
-import type { Customer as ModalCustomer } from "../data/mockCustomers"
 
 export default function CustomersPage() {
   const navigate = useNavigate()
@@ -28,34 +27,21 @@ export default function CustomersPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [prefilledData, setPrefilledData] = useState<{name?: string, email?: string, phone?: string}>({})
 
-  // Use the customers hook
-  const { customers, isLoading, error } = useCustomers()
+  // Use the customers hook with search
+  const { customers, isLoading, error } = useCustomers(searchQuery)
 
-  // Filter and search customers
+  // Filter and search customers (now handled by API)
   const filteredCustomers = useMemo(() => {
     if (isLoading) return []
     if (error) return []
 
-    let filtered = customers
-
-    // Apply search
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(customer =>
-        customer.name.toLowerCase().includes(query) ||
-        customer.email.toLowerCase().includes(query) ||
-        customer.phone.includes(searchQuery) ||
-        (customer.tags && customer.tags.some(tag => tag.toLowerCase().includes(query)))
-      )
-    }
-
     // Sort by last visit (most recent first)
-    return filtered.sort((a, b) => {
+    return customers.sort((a, b) => {
       const dateA = a.lastVisit ? new Date(a.lastVisit).getTime() : 0
       const dateB = b.lastVisit ? new Date(b.lastVisit).getTime() : 0
       return dateB - dateA
     })
-  }, [customers, searchQuery, isLoading, error])
+  }, [customers, isLoading, error])
 
   // Stats calculation
   const stats = useMemo(() => {
@@ -386,13 +372,13 @@ export default function CustomersPage() {
           <>
             {console.log('Opening modal with prefilled data:', prefilledData)}
             <AddCustomerModal
-              customer={selectedCustomer as unknown as ModalCustomer}
+              customer={selectedCustomer}
               onClose={() => {
                 setShowAddModal(false)
                 setSelectedCustomer(null)
                 setPrefilledData({})
               }}
-              onSave={(customer: Partial<ModalCustomer>) => {
+              onSave={(customer: Partial<Customer>) => {
                 console.log('Saving customer:', customer)
                 setShowAddModal(false)
                 setSelectedCustomer(null)
@@ -616,13 +602,13 @@ export default function CustomersPage() {
         <>
           {console.log('Opening modal with prefilled data:', prefilledData)}
         <AddCustomerModal
-          customer={selectedCustomer as unknown as ModalCustomer}
+          customer={selectedCustomer}
           onClose={() => {
             setShowAddModal(false)
             setSelectedCustomer(null)
               setPrefilledData({}) // Clear prefilled data
           }}
-          onSave={(customer: Partial<ModalCustomer>) => {
+          onSave={(customer: Partial<Customer>) => {
             console.log('Saving customer:', customer)
             setShowAddModal(false)
             setSelectedCustomer(null)
