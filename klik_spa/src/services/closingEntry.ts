@@ -25,19 +25,33 @@ export function useCreatePOSClosingEntry(): UseCreateClosingReturn {
     const csrfToken = window.csrf_token;
 
     try {
+      console.log('Creating closing entry with:', closingBalance);
+
       const res = await fetch("/api/method/klik_pos.api.pos_entry.create_closing_entry", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-Frappe-CSRF-Token": csrfToken,
+          "Accept": "application/json",
         },
         body: JSON.stringify({ closing_balance: closingBalance }),
         credentials: "include",
       });
 
-      const data = await res.json();
+      console.log('Closing entry response:', {
+        status: res.status,
+        statusText: res.statusText,
+        ok: res.ok
+      });
 
-      if (res.ok && data.message) {
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+
+      const data = await res.json();
+      console.log('Closing entry data:', data);
+
+      if (data.message) {
         setSuccess(true);
       } else {
         throw new Error(data._server_messages || "Failed to create closing entry");
