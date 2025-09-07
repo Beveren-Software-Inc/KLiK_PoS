@@ -15,6 +15,7 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
     try:
         pos_profile = get_current_pos_profile()
         default_customer = pos_profile.customer
+        business_type = getattr(pos_profile, 'custom_business_type', 'B2C')  # Default to B2C
         company, company_currency = get_user_company_and_currency()
         result = []
         filters = {}
@@ -23,6 +24,13 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
             filters["name"] = default_customer
         elif search:
             filters["customer_name"] = ["like", f"%{search}%"]
+
+        # Apply business type filtering
+        if business_type == "B2B":
+            filters["customer_type"] = "Company"
+        elif business_type == "B2C":
+            filters["customer_type"] = "Individual"
+        # For "B2B & B2C", no customer_type filter is applied (show all)
 
         customer_names = frappe.get_all(
             "Customer",

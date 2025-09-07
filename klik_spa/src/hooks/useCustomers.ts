@@ -1,11 +1,12 @@
 
 
 import { useEffect, useState } from "react";
-import type { Customer } from "../../types";
+import type { Customer } from "../data/mockCustomers";
 
 interface ERPCustomer {
   name: string;
   customer_name?: string;
+  customer_type?: string;
   email_id?: string;
   mobile_no?: string;
   customer_group?: string;
@@ -24,15 +25,16 @@ interface ERPCustomer {
   company_currency?: string;
 }
 
-export function useCustomers() {
+export function useCustomers(searchQuery?: string) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = async (search?: string) => {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/method/klik_pos.api.customer.get_customers");
+      const searchParam = search ? `?search=${encodeURIComponent(search)}` : '';
+      const response = await fetch(`/api/method/klik_pos.api.customer.get_customers${searchParam}`);
       const resData = await response.json();
 
       if (!resData.message.success) {
@@ -47,25 +49,33 @@ export function useCustomers() {
           { street: "Al Qasba", city: "Sharjah", state: "Sharjah", zipCode: "67890" },
           { street: "Al Rigga Road", city: "Deira", state: "Dubai", zipCode: "23456" }
         ];
-        const randomAddress = uaeAddresses[Math.floor(Math.random() * uaeAddresses.length)];
+        const randomIndex = Math.floor(Math.random() * uaeAddresses.length);
+        const randomAddress = uaeAddresses[randomIndex];
         return {
           id: customer.name,
+          type: customer.customer_type === "Company" ? "company" : "individual",
           name: customer.customer_name || `Customer ${customer.name.slice(0, 5)}`,
           email: customer.email_id || `${customer.name.slice(0, 5)}@example.com`,
           phone: customer.mobile_no || `+9715${Math.floor(Math.random() * 9000000) + 1000000}`,
-          address: { ...randomAddress, country: "United Arab Emirates" },
+          address: {
+            street: randomAddress?.street || "",
+            city: randomAddress?.city || "",
+            state: randomAddress?.state || "",
+            zipCode: randomAddress?.zipCode || "",
+            country: "United Arab Emirates"
+          },
           dateOfBirth: customer.custom_date_of_birth || getRandomBirthDate(),
-          gender: (customer.custom_gender as Customer["gender"]) || getRandomGender(),
+          gender: customer.custom_gender as Customer["gender"] || getRandomGender(),
           loyaltyPoints: customer.custom_loyalty_points || 0,
           totalSpent: customer.custom_total_spent || 0,
           totalOrders: customer.custom_total_orders || 0,
           preferredPaymentMethod: getRandomPaymentMethod(),
           notes: customer.custom_notes || "",
-          tags: customer.custom_tags?.split(",") || [],
+          tags: customer.custom_tags?.split(",").filter(Boolean) || [],
           status: (customer.custom_status as Customer["status"]) || "active",
           createdAt: customer.creation || new Date().toISOString(),
-          lastVisit: customer.custom_last_visit || null,
-          avatar: customer.custom_avatar || null,
+          lastVisit: customer.custom_last_visit || undefined,
+          avatar: customer.custom_avatar || undefined,
           defaultCurrency: customer.default_currency,
           companyCurrency: customer.company_currency
         };
@@ -80,8 +90,8 @@ export function useCustomers() {
   };
 
   useEffect(() => {
-    fetchCustomers();
-  }, []);
+    fetchCustomers(searchQuery);
+  }, [searchQuery]);
 
   return {
     customers,
@@ -95,8 +105,9 @@ export function useCustomers() {
 // Helper functions
 // --------------------
 function getRandomGender(): "male" | "female" | "other" {
-  const genders = ["male", "female", "other"] as const;
-  return genders[Math.floor(Math.random() * genders.length)];
+  const genders: ("male" | "female" | "other")[] = ["male", "female", "other"];
+  const index = Math.floor(Math.random() * genders.length);
+  return genders[index] || "male";
 }
 
 function getRandomBirthDate(): string {
@@ -105,31 +116,10 @@ function getRandomBirthDate(): string {
   return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime())).toISOString();
 }
 
-function getRandomRecentDate(): string {
-  const start = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
-  const end = new Date();
-  return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime())).toISOString();
-}
-
 function getRandomPaymentMethod(): Customer["preferredPaymentMethod"] {
-  const methods = ["cash", "card", "mobile", "loyalty"] as const;
-  return methods[Math.floor(Math.random() * methods.length)];
-}
-
-function getRandomAvatar(): string {
-  const avatars = ["/avatars/1.png", "/avatars/2.png", "/avatars/3.png", "/avatars/4.png"];
-  return avatars[Math.floor(Math.random() * avatars.length)];
-}
-
-function getRandomStatus(): Customer["status"] {
-  const statuses = ["active", "vip", "inactive"] as const;
-  return statuses[Math.floor(Math.random() * statuses.length)];
-}
-
-function getRandomTags(): string[] {
-  const allTags = ["regular", "wholesale", "corporate", "family", "new"];
-  const count = Math.floor(Math.random() * 3) + 1;
-  return [...new Set(Array(count).fill(0).map(() => allTags[Math.floor(Math.random() * allTags.length)]))];
+  const methods: Customer["preferredPaymentMethod"][] = ["cash", "card", "mobile", "loyalty"];
+  const index = Math.floor(Math.random() * methods.length);
+  return methods[index] || "cash";
 }
 
 

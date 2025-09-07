@@ -12,7 +12,6 @@ def _send_invoice_whatsapp(invoice_name=None, mobile_no=None, message=None, cust
     if not mobile_no:
         frappe.throw("Mobile number is required.")
 
-    # Default message if not passed
     if not message:
         if invoice_name and customer_name:
             message = f"Hello {customer_name}, your invoice {invoice_name} is ready! Thank you for shopping with us."
