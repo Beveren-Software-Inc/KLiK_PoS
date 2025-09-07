@@ -43,7 +43,9 @@ fixtures = [
                     "POS Profile-custom_hide_expected_amount",
                     "POS Profile-custom_allow_return",
                     "POS Profile-custom_use_scanner_fully",
-                    "POS Profile-custom_whatsapp_template"
+                    "POS Profile-custom_whatsapp_template",
+                    "Sales Invoice-custom_pos_opening_entry",
+                    "POS Profile-custom_email_template"
                 ),
             ]
         ],

@@ -348,13 +348,40 @@ class ERPNextAPI {
     }
   }
 
+  // Enhanced API call method with better error handling
+  async makeAPICall(url: string, options: RequestInit = {}): Promise<Response> {
+    const defaultOptions: RequestInit = {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      ...options
+    };
+
+    try {
+      console.log('Making API call:', { url, options: defaultOptions });
+      const response = await fetch(url, defaultOptions);
+
+      if (!response.ok) {
+        console.error('API call failed:', {
+          url,
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries())
+        });
+      }
+
+      return response;
+    } catch (error) {
+      console.error('API call error:', { url, error });
+      throw error;
+    }
+  }
+
   async apiCall(method: string, params: any = {}): Promise<any> {
     try {
-      const response = await fetch(`${this.config.baseUrl}/api/method/${method}`, {
+      const response = await this.makeAPICall(`${this.config.baseUrl}/api/method/${method}`, {
         method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify(params),
-        credentials: 'include'
+        body: JSON.stringify(params)
       });
 
       const data = await response.json();

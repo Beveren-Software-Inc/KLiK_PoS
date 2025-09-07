@@ -12,22 +12,43 @@ export function useInvoiceDetails(invoiceId: string | null) {
     const fetchInvoice = async () => {
       setIsLoading(true);
       try {
-        console.log("Here")
-        const response = await fetch(`/api/method/klik_pos.api.sales_invoice.get_invoice_details?invoice_id=${invoiceId}`);
-        const resData = await response.json();
-        if (!resData.message.success) {
-          throw new Error(resData.error || "Failed to fetch invoice");
+        console.log("Fetching invoice details for:", invoiceId);
+
+        const response = await fetch(`/api/method/klik_pos.api.sales_invoice.get_invoice_details?invoice_id=${invoiceId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          credentials: 'include'
+        });
+
+        console.log('Invoice details response:', {
+          status: response.status,
+          statusText: response.statusText,
+          ok: response.ok
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        console.log("data",resData.message)
+
+        const resData = await response.json();
+        console.log("Invoice details data:", resData);
+
+        if (!resData.message || !resData.message.success) {
+          throw new Error(resData.message?.error || resData.error || "Failed to fetch invoice");
+        }
+
         setInvoice(resData.message.data);
       } catch (err: unknown) {
-            if (err instanceof Error) {
-              setError(err.message);
-            } else {
-              setError("Unknown error");
-            }
-          }
-   finally {
+        console.error("Error fetching invoice details:", err);
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError("Unknown error");
+        }
+      } finally {
         setIsLoading(false);
       }
     };

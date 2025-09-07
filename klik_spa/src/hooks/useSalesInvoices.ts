@@ -8,14 +8,38 @@ export function useSalesInvoices() {
   const [error, setError] = useState<string | null>(null);
 
 const fetchInvoices = async () => {
-
-  setIsLoading(true); // ✅ MUST ENABLE THIS
+  setIsLoading(true);
   try {
+    console.log('Fetching sales invoices...');
 
     const response = await fetch(
-      "/api/method/klik_pos.api.sales_invoice.get_sales_invoices"
+      "/api/method/klik_pos.api.sales_invoice.get_sales_invoices",
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        credentials: 'include'
+      }
     );
+
+    console.log('Sales invoices response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
     const resData = await response.json();
+    console.log('Sales invoices data:', resData);
+
+    if (!resData.message || !resData.message.success) {
+      throw new Error(resData.message?.error || resData.error || "Failed to fetch invoices");
+    }
 
     const rawInvoices = resData.message.data;
 
