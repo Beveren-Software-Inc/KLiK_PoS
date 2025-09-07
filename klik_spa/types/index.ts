@@ -27,7 +27,9 @@ export interface MenuItem {
   available: number
   sold: number
   discount?: number
-  description?:string
+  description?: string
+  uom?: string
+  currency_symbol?: string
 }
 
 export interface Category {

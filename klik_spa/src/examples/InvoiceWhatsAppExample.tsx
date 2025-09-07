@@ -3,15 +3,12 @@ import { InvoiceWhatsAppSender } from '../components/InvoiceWhatsAppSender';
 import { sendInvoiceWhatsApp } from '../services/useSharing';
 
 export const InvoiceWhatsAppExample: React.FC = () => {
-  // Example 1: Using the component
   const handleSuccess = (result: any) => {
     console.log('Invoice sent successfully:', result);
-    // You can show a success notification here
   };
 
   const handleError = (error: string) => {
     console.error('Invoice sending failed:', error);
-    // You can show an error notification here
   };
 
   // Example 2: Direct function call
@@ -56,7 +53,6 @@ export const InvoiceWhatsAppExample: React.FC = () => {
         </button>
       </div>
 
-      {/* Example 3: Integration with your existing code */}
       <div className="mb-8">
         <h2 className="text-xl font-semibold mb-4">Example 3: Integration with Your Code</h2>
         <div className="bg-gray-100 p-4 rounded-md">
@@ -64,23 +60,11 @@ export const InvoiceWhatsAppExample: React.FC = () => {
             Replace your existing <code>sendWhatsApp</code> call with:
           </p>
           <pre className="bg-white p-3 rounded text-sm overflow-x-auto">
-{`// Old way
-await sendWhatsApp({
-  mobile_no: sharingData.phone,
-  customer_name: sharingData.name,
-  invoice_data: invoiceData.name,
-});
 
-// New way - will send with PDF attachment
-await sendInvoiceWhatsApp({
-  mobile_no: sharingData.phone,
-  customer_name: sharingData.name,
-  invoice_data: invoiceData.name,
-  message: 'Your invoice is ready! Please find the PDF attached.'
-});`}
           </pre>
         </div>
       </div>
     </div>
   );
 };
+
