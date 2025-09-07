@@ -351,8 +351,13 @@ def get_document_attachment_url(doctype, docname):
         # For testing purposes, use the static PDF URL
         if doctype == "Sales Invoice":
             pdf_ = generate_and_attach_invoice_pdf(docname)
-            print("Pdf2 ", str(pdf_))
-            return "https://clik-pos.k.frappe.cloud/files/REPC-SRET-000001_PDFA3%20(14).pdf"
+
+            # Check if we're using a local URL
+            if "127.0.0.1" in site_url or "localhost" in site_url:
+                frappe.logger().warning(f"Local URL detected: {site_url}. Using static cloud PDF.")
+                return "https://clik-pos.k.frappe.cloud/files/REPC-SRET-000001_PDFA3%20(14).pdf"
+
+            return pdf_
 
         doc = frappe.get_doc(doctype, docname)
         key = doc.get_document_share_key()
