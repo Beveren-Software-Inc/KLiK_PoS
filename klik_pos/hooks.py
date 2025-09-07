@@ -2,7 +2,7 @@ app_name = "klik_pos"
 app_title = "KLIK POS"
 app_publisher = "Beveren Sooftware Inc"
 app_description = "KLIK POS: A Modern Point of Sale for your Business"
-app_email = "simon@beverensoftware.com"
+app_email = "info@beverensoftware.com"
 app_license = "mit"
 
 # Apps

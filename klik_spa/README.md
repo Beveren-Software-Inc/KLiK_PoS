@@ -97,4 +97,4 @@ This project is proprietary software. All rights reserved.
 
 ## Support
 
-For support and questions, please contact the development team (simon@beverensoftware.com).
+For support and questions, please contact the development team (info@beverensoftware.com).
