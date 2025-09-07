@@ -23,9 +23,9 @@ def send_invoice_email(**kwargs):
         print_format = pos_profile.custom_pos_printformat or "Standard"
 
         pdf_data = frappe.get_print(
-            "Sales Invoice", 
-            doc.name, 
-            print_format=print_format, 
+            "Sales Invoice",
+            doc.name,
+            print_format=print_format,
             as_pdf=True
         )
 
@@ -61,4 +61,44 @@ def send_invoice_email(**kwargs):
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Send Invoice Email Failed")
         frappe.throw(f"Failed to send invoice email: {str(e)}")
+
+
+@frappe.whitelist()
+def get_email_templates():
+    """
+    Get all Email templates
+    """
+    try:
+        templates = frappe.get_all(
+            "Email Template",
+            filters={},
+            fields=[
+                "name",
+                "subject",
+                "response_html",
+                "response"
+            ]
+        )
+        return templates
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Email Templates Failed")
+        frappe.throw(f"Failed to get Email templates: {str(e)}")
+
+
+@frappe.whitelist()
+def get_email_template(template_name):
+    """
+    Get a specific Email template by name
+    """
+    try:
+        template = frappe.get_doc("Email Template", template_name)
+        return {
+            "name": template.name,
+            "subject": template.subject,
+            "response_html": template.response_html,
+            "response": template.response
+        }
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Email Template Failed")
+        frappe.throw(f"Failed to get Email template: {str(e)}")
 

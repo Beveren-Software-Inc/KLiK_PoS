@@ -3,47 +3,48 @@ from frappe.utils import now, fmt_money
 from klik_pos.klik_pos.utils import get_current_pos_profile
 from klik_pos.api.whatsap.utils import send_whatsapp_message
 
-@frappe.whitelist()
-def deliver_invoice_via_whatsapp(**kwargs):
-    """
-    Send simple text WhatsApp message from frontend
-    """
-    data = kwargs
-    print("Simple WhatsApp data", data)
 
-    mobile = data.get("mobile_no")
-    customer_name = data.get("customer_name")
-    invoice_name = data.get("invoice_data")
-    message = data.get("message", "Your invoice is ready! Mania Go pick it lol")
-    if not mobile:
+def _send_invoice_whatsapp(invoice_name=None, mobile_no=None, message=None, customer_name=None):
+    """
+    Internal reusable function to send WhatsApp message with/without invoice.
+    """
+
+    if not mobile_no:
         frappe.throw("Mobile number is required.")
 
-    try:
-        # Debug logging
-        frappe.logger().debug(f"Frontend call - Mobile: {mobile}, Invoice: {invoice_name}, Message: {message}")
+    # Default message if not passed
+    if not message:
+        if invoice_name and customer_name:
+            message = f"Hello {customer_name}, your invoice {invoice_name} is ready! Thank you for shopping with us."
+        else:
+            message = "Your invoice is ready! Thank you for shopping with us."
 
-        # If we have invoice data, send as document with PDF
+    try:
+        # Debug log
+        frappe.logger().debug(
+            f"Send WhatsApp - Mobile: {mobile_no}, Invoice: {invoice_name}, Customer: {customer_name}, Message: {message}"
+        )
+
         if invoice_name:
             result = send_whatsapp_message(
-                to_number=mobile,
+                to_number=mobile_no,
                 message_type="text",
                 message_content=message,
                 reference_doctype="Sales Invoice",
                 reference_name=invoice_name,
-                attach_document=True
+                attach_document=True,
             )
         else:
-            # Send simple text message
             result = send_whatsapp_message(
-                to_number=mobile,
+                to_number=mobile_no,
                 message_type="text",
-                message_content=message
+                message_content=message,
             )
 
         if result.get("success"):
             return {
                 "status": "success",
-                "recipient": mobile,
+                "recipient": mobile_no,
                 "message": message,
                 "invoice": invoice_name,
                 "customer_name": customer_name,
@@ -54,10 +55,23 @@ def deliver_invoice_via_whatsapp(**kwargs):
             frappe.throw(f"Failed to send WhatsApp message: {result.get('error')}")
 
     except Exception as e:
-        frappe.log_error(frappe.get_traceback(), "Send Simple WhatsApp Failed")
-        frappe.log_error(f"Error details: {str(e)}", "Send Simple WhatsApp Failed")
-        frappe.log_error(f"Input data: {data}", "Send Simple WhatsApp Failed")
+        frappe.log_error(frappe.get_traceback(), "Send WhatsApp Failed")
         frappe.throw(f"Failed to send WhatsApp message: {str(e)}")
+
+
+@frappe.whitelist()
+def deliver_invoice_via_whatsapp(**kwargs):
+    """
+    Called from frontend with data payload
+    """
+    data = kwargs
+    return _send_invoice_whatsapp(
+        invoice_name=data.get("invoice_data"),
+        mobile_no=data.get("mobile_no"),
+        message=data.get("message"),
+        customer_name=data.get("customer_name"),
+    )
+
 
 
 @frappe.whitelist()
@@ -155,41 +169,76 @@ def send_template_whatsapp(**kwargs):
         frappe.log_error(frappe.get_traceback(), "Send Template WhatsApp Failed")
         frappe.throw(f"Failed to send WhatsApp message: {str(e)}")
 
-
 @frappe.whitelist()
 def deliver_invoice_via_whatsapp_doc(invoice_name, mobile_no=None, message=None):
     """
-    Send WhatsApp message for a Sales Invoice directly from the invoice form
+    Called from Sales Invoice form button
     """
     invoice = frappe.get_doc("Sales Invoice", invoice_name)
     customer = frappe.get_doc("Customer", invoice.customer)
 
     mobile = mobile_no or customer.mobile_no or invoice.contact_mobile
     customer_name = invoice.customer_name
-    message = message or f"Hello {customer_name}, your invoice {invoice.name} is ready! Thank you for shopping with us."
 
-
-    if not mobile:
-        frappe.throw("No mobile number found or entered.")
-
-    result = send_whatsapp_message(
-        to_number=mobile,
-        message_type="text",
-        message_content=message,
-        reference_doctype="Sales Invoice",
-        reference_name=invoice.name,
-        attach_document=True
+    return _send_invoice_whatsapp(
+        invoice_name=invoice.name,
+        mobile_no=mobile,
+        message=message,
+        customer_name=customer_name,
     )
 
-    if result.get("success"):
+
+@frappe.whitelist()
+def get_whatsapp_templates():
+    """
+    Get all WhatsApp message templates
+    """
+    try:
+        templates = frappe.get_all(
+            "WhatsApp Message Templates",
+            filters={},
+            fields=[
+                "name",
+                "template_name",
+                "template",
+                "status",
+                "category",
+                "language",
+                "language_code",
+                "header_type",
+                "header",
+                "footer",
+                "sample_values",
+                "field_names"
+            ]
+        )
+        return templates
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get WhatsApp Templates Failed")
+        frappe.throw(f"Failed to get WhatsApp templates: {str(e)}")
+
+
+@frappe.whitelist()
+def get_whatsapp_template(template_name):
+    """
+    Get a specific WhatsApp template by name
+    """
+    try:
+        template = frappe.get_doc("WhatsApp Message Templates", template_name)
         return {
-            "status": "success",
-            "recipient": mobile,
-            "message": message,
-            "invoice": invoice.name,
-            "customer_name": customer_name,
-            "message_id": result.get("message_id"),
-            "timestamp": now(),
+            "name": template.name,
+            "template_name": template.template_name,
+            "template": template.template,
+            "status": template.status,
+            "category": template.category,
+            "language": template.language,
+            "language_code": template.language_code,
+            "header_type": template.header_type,
+            "header": template.header,
+            "footer": template.footer,
+            "sample_values": template.sample_values,
+            "field_names": template.field_names
         }
-    else:
-        frappe.throw(f"Failed to send WhatsApp message: {result.get('error')}")
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get WhatsApp Template Failed")
+        frappe.throw(f"Failed to get WhatsApp template: {str(e)}")

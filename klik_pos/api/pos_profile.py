@@ -54,6 +54,8 @@ def get_pos_details():
         "custom_allow_credit_sales":pos.custom_allow_credit_sales,
         "custom_allow_return":pos.custom_allow_return,
         "custom_hide_expected_amount":pos.custom_hide_expected_amount,
-        
+        "custom_whatsap_template": getattr(pos, 'custom_whatsap_template', None),
+        "custom_email_template": getattr(pos, 'custom_email_template', None),
+
     }
     return details
