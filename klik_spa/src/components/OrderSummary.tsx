@@ -449,11 +449,11 @@ export default function OrderSummary({
                               {customer.email} • {customer.phone}
                             </div>
                           </div>
-                          {customer.status === "vip" && (
+                          {/* {customer.status === "vip" && (
                             <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300 rounded">
                               VIP
                             </span>
-                          )}
+                          )} */}
                         </div>
                       </button>
                     ))}
@@ -541,11 +541,11 @@ export default function OrderSummary({
                             {customer.email} • {customer.phone}
                           </div>
                         </div>
-                        {customer.status === "vip" && (
+                        {/* {customer.status === "vip" && (
                           <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300 rounded">
                             VIP
                           </span>
-                        )}
+                        )} */}
                       </div>
                     </button>
                   ))}

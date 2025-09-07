@@ -67,4 +67,3 @@ export const InvoiceWhatsAppExample: React.FC = () => {
     </div>
   );
 };
-
