@@ -20,10 +20,6 @@ def _send_invoice_whatsapp(invoice_name=None, mobile_no=None, message=None, cust
             message = "Your invoice is ready! Thank you for shopping with us."
 
     try:
-        # Debug log
-        frappe.logger().debug(
-            f"Send WhatsApp - Mobile: {mobile_no}, Invoice: {invoice_name}, Customer: {customer_name}, Message: {message}"
-        )
 
         if invoice_name:
             result = send_whatsapp_message(
@@ -71,8 +67,7 @@ def deliver_invoice_via_whatsapp(**kwargs):
         message=data.get("message"),
         customer_name=data.get("customer_name"),
     )
-
-
+    
 
 @frappe.whitelist()
 def send_invoice_whatsapp(**kwargs):
@@ -196,11 +191,12 @@ def get_whatsapp_templates():
     try:
         templates = frappe.get_all(
             "WhatsApp Message Templates",
-            filters={},
+            filters={"status":"Approved"},
             fields=[
                 "name",
                 "template_name",
                 "template",
+                "actual_name",
                 "status",
                 "category",
                 "language",

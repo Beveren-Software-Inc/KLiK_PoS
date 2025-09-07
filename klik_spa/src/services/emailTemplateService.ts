@@ -67,6 +67,7 @@ export async function getDefaultEmailTemplate(): Promise<string | null> {
   }
 }
 
+
 /**
  * Get a specific Email template by name
  */
@@ -100,7 +101,7 @@ export async function getEmailTemplate(templateName: string): Promise<EmailTempl
 /**
  * Process email template with parameters (supports HTML)
  */
-export function processEmailTemplate(template: string, parameters: Record<string, any> = {}): string {
+export function processEmailTemplate(template: string, parameters: Record<string, null> = {}): string {
   let processedTemplate = template;
 
   // Replace common placeholders
