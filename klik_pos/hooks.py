@@ -43,6 +43,7 @@ fixtures = [
                     "POS Profile-custom_hide_expected_amount",
                     "POS Profile-custom_allow_return",
                     "POS Profile-custom_use_scanner_fully",
+                    "POS Profile-custom_whatsapp_template"
                 ),
             ]
         ],
@@ -63,7 +64,7 @@ doc_events = {
         "validate": [
             "klik_pos.api.sales_invoice.set_base_roundoff_amount",
             "klik_pos.api.sales_invoice.set_grand_total_with_roundoff",
-         
+
         ],
     },
  "POS Opening Entry": {
@@ -98,7 +99,7 @@ override_doctype_class = {
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {"Sales Invoice" : "public/js/sales_invoice.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}

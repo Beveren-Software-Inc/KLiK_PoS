@@ -15,6 +15,7 @@ import {
   MailPlus,
   MessageSquarePlus,
   Loader2,
+  Pencil
 } from "lucide-react";
 import type { CartItem, GiftCoupon, Customer } from "../../types";
 import { usePaymentModes } from "../hooks/usePaymentModes";
@@ -26,6 +27,20 @@ import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { DisplayPrintPreview, handlePrintInvoice } from "../utils/invoicePrint";
 import { sendEmails, sendWhatsAppMessage } from "../services/useSharing";
+import {
+  fetchWhatsAppTemplates,
+  getDefaultWhatsAppTemplate,
+  processTemplate,
+  getDefaultMessageTemplate,
+  type WhatsAppTemplate
+} from "../services/whatsappTemplateService";
+import {
+  fetchEmailTemplates,
+  getDefaultEmailTemplate,
+  processEmailTemplate,
+  getDefaultEmailMessageTemplate,
+  type EmailTemplate
+} from "../services/emailTemplateService";
 
 interface PaymentDialogProps {
   isOpen: boolean;
@@ -101,12 +116,11 @@ export default function PaymentDialog({
   const [selectedSalesTaxCharges, setSelectedSalesTaxCharges] = useState("");
   const [paymentAmounts, setPaymentAmounts] = useState<PaymentAmount>({});
   const [roundOffAmount, setRoundOffAmount] = useState(0);
-  const [showPreview, setShowPreview] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isHoldingOrder, setIsHoldingOrder] = useState(false);
   const [invoiceSubmitted, setInvoiceSubmitted] = useState(false);
   const [submittedInvoice, setSubmittedInvoice] = useState<any>(null);
-  const [invoiceData, setInvoiceData] = useState(null);
+  const [invoiceData, setInvoiceData] = useState<any>(null);
   const [roundOffInput, setRoundOffInput] = useState(roundOffAmount.toFixed(2));
   const [isAutoPrinting, setIsAutoPrinting] = useState(false);
   const [sharingMode, setSharingMode] = useState<string | null>(
@@ -121,6 +135,20 @@ export default function PaymentDialog({
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [isSendingWhatsapp, setIsSendingWhatsapp] = useState(false);
 
+  // WhatsApp template states
+  const [whatsappTemplates, setWhatsappTemplates] = useState<WhatsAppTemplate[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<WhatsAppTemplate | null>(null);
+  const [customMessage, setCustomMessage] = useState("");
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const [isEditingWhatsapp, setIsEditingWhatsapp] = useState(false);
+
+  // Email template states
+  const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
+  const [selectedEmailTemplate, setSelectedEmailTemplate] = useState<EmailTemplate | null>(null);
+  const [emailMessage, setEmailMessage] = useState("");
+  const [isLoadingEmailTemplates, setIsLoadingEmailTemplates] = useState(false);
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
+
   // Hooks
   const { modes, isLoading, error } = usePaymentModes("Test POS Profile");
   const { salesTaxCharges, defaultTax } = useSalesTaxCharges();
@@ -133,6 +161,134 @@ export default function PaymentDialog({
   const print_receipt_on_order_complete =
     posDetails?.print_receipt_on_order_complete;
   const currencySymbol = posDetails?.currency_symbol;
+
+  // Load WhatsApp templates when sharing mode changes to WhatsApp
+  useEffect(() => {
+    const loadWhatsAppTemplates = async () => {
+      if (sharingMode === 'whatsapp' && whatsappTemplates.length === 0) {
+        setIsLoadingTemplates(true);
+        try {
+          const [templates, defaultTemplateName] = await Promise.all([
+            fetchWhatsAppTemplates(),
+            getDefaultWhatsAppTemplate()
+          ]);
+
+          setWhatsappTemplates(templates);
+
+          // Set default template if available
+          if (defaultTemplateName) {
+            const defaultTemplate = templates.find(t => t.name === defaultTemplateName);
+            if (defaultTemplate) {
+              setSelectedTemplate(defaultTemplate);
+              setCustomMessage(defaultTemplate.template);
+            }
+          } else {
+            // Use default message template if no template is set
+            setCustomMessage(getDefaultMessageTemplate());
+          }
+        } catch (error) {
+          console.error('Error loading WhatsApp templates:', error);
+          setCustomMessage(getDefaultMessageTemplate());
+        } finally {
+          setIsLoadingTemplates(false);
+        }
+      }
+    };
+
+    loadWhatsAppTemplates();
+  }, [sharingMode, whatsappTemplates.length]);
+
+  // Load Email templates when sharing mode changes to email
+  useEffect(() => {
+    const loadEmailTemplates = async () => {
+      if (sharingMode === 'email' && emailTemplates.length === 0) {
+        setIsLoadingEmailTemplates(true);
+        try {
+          const [templates, defaultTemplateName] = await Promise.all([
+            fetchEmailTemplates(),
+            getDefaultEmailTemplate()
+          ]);
+
+          setEmailTemplates(templates);
+
+          // Set default template if available
+          if (defaultTemplateName) {
+            const defaultTemplate = templates.find(t => t.name === defaultTemplateName);
+            if (defaultTemplate) {
+              setSelectedEmailTemplate(defaultTemplate);
+              setEmailMessage(defaultTemplate.response_html || defaultTemplate.response);
+            }
+          } else {
+            // Use default message template if no template is set
+            setEmailMessage(getDefaultEmailMessageTemplate());
+          }
+        } catch (error) {
+          console.error('Error loading Email templates:', error);
+          setEmailMessage(getDefaultEmailMessageTemplate());
+        } finally {
+          setIsLoadingEmailTemplates(false);
+        }
+      }
+    };
+
+    loadEmailTemplates();
+  }, [sharingMode, emailTemplates.length]);
+
+  // Helper function to get processed WhatsApp message
+  const getProcessedMessage = () => {
+    const parameters = {
+      customer_name: sharingData.name || 'there',
+      invoice_total: formatCurrency(calculations.grandTotal),
+      invoice_number: invoiceData?.name || '',
+      company_name: 'KLIK POS',
+      date: new Date().toLocaleDateString(),
+    };
+
+    return processTemplate(customMessage, parameters);
+  };
+
+  // Helper function to get processed email message
+  const getProcessedEmailMessage = () => {
+    const parameters = {
+      customer_name: sharingData.name || 'Customer',
+      customer: sharingData.name || 'Customer',
+      first_name: sharingData.name?.split(' ')[0] || '',
+      last_name: sharingData.name?.split(' ').slice(1).join(' ') || '',
+      address: selectedCustomer?.address || '',
+      customer_address: selectedCustomer?.address || '',
+      delivery_note: invoiceData?.name || '',
+      grand_total: formatCurrency(calculations.grandTotal),
+      departure_time: new Date().toLocaleTimeString(),
+      estimated_arrival: new Date(Date.now() + 30 * 60000).toLocaleTimeString(), // 30 minutes from now
+      driver_name: 'Delivery Driver',
+      cell_number: '+1234567890',
+      vehicle: 'Delivery Vehicle',
+      invoice_total: formatCurrency(calculations.grandTotal),
+      invoice_number: invoiceData?.name || '',
+      company_name: 'KLIK POS',
+      date: new Date().toLocaleDateString(),
+    };
+
+    return processEmailTemplate(emailMessage, parameters);
+  };
+
+  // Handle template selection
+  const handleTemplateChange = (templateName: string) => {
+    const template = whatsappTemplates.find(t => t.name === templateName);
+    if (template) {
+      setSelectedTemplate(template);
+      setCustomMessage(template.template);
+    }
+  };
+
+  // Handle email template selection
+  const handleEmailTemplateChange = (templateName: string) => {
+    const template = emailTemplates.find(t => t.name === templateName);
+    if (template) {
+      setSelectedEmailTemplate(template);
+      setEmailMessage(template.response_html || template.response);
+    }
+  };
 
   // Calculate totals with memoization for performance
   const calculations = useMemo(() => {
@@ -373,7 +529,6 @@ export default function PaymentDialog({
       console.log("Data", paymentData);
       setInvoiceSubmitted(true);
       setSubmittedInvoice(response);
-      setShowPreview(true);
       setInvoiceData(response.invoice);
 
       const successMessage = isB2B
@@ -1024,29 +1179,77 @@ export default function PaymentDialog({
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Email Preview
-                      </label>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Email Message Preview
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingEmail(!isEditingEmail)}
+                          className="text-sm text-beveren-600 hover:text-beveren-700 dark:text-beveren-400 dark:hover:text-beveren-300 font-medium"
+                        >
+                          {isEditingEmail ? (
+      <Check className="w-4 h-4" />
+    ) : (
+      <Pencil className="w-4 h-4" />
+    )}
+                        </button>
+                      </div>
+
+                      {isEditingEmail && (
+                        <div className="space-y-3 mb-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              Email Template
+                            </label>
+                            {isLoadingEmailTemplates ? (
+                              <div className="flex items-center justify-center p-4">
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                <span className="text-sm text-gray-500">Loading templates...</span>
+                              </div>
+                            ) : (
+                              <select
+                                value={selectedEmailTemplate?.name || ""}
+                                onChange={(e) => handleEmailTemplateChange(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                              >
+                                <option value="">Select a template (optional)</option>
+                                {emailTemplates.map((template) => {
+                                  const isDefault = posDetails?.custom_email_template === template.name;
+                                  return (
+                                    <option key={template.name} value={template.name}>
+                                      {template.name}{isDefault ? ' [Default]' : ''}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              Custom Message
+                            </label>
+                            <textarea
+                              value={emailMessage}
+                              onChange={(e) => setEmailMessage(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                              rows={6}
+                              placeholder="Enter your email message..."
+                            />
+                          </div>
+                        </div>
+                      )}
+
                       <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                           Subject: Your Invoice from KLIK POS
                         </p>
                         <div className="text-sm text-gray-900 dark:text-white">
-                          <p>Dear {sharingData.name || "Customer"},</p>
-                          <p className="mt-2">
-                            Thank you for your purchase. Here are your invoice
-                            details:
-                          </p>
-                          <p className="mt-2 font-medium">
-                            Invoice Total:{" "}
-                            {formatCurrency(calculations.grandTotal)}
-                          </p>
-                          <p className="mt-2">Thank you for your business!</p>
-                          <p className="mt-2">
-                            Best regards,
-                            <br />
-                            KLIK POS Team
-                          </p>
+                          <div
+                            className="whitespace-pre-wrap"
+                            dangerouslySetInnerHTML={{ __html: getProcessedEmailMessage() }}
+                          />
                         </div>
                       </div>
                     </div>
@@ -1058,11 +1261,12 @@ export default function PaymentDialog({
                           await sendEmails({
                             email: sharingData.email,
                             customer_name: sharingData.name,
-                            invoice_data: invoiceData.name,
+                            invoice_data: invoiceData?.name || '',
+                            message: getProcessedEmailMessage(),
                           });
                           toast.success("Email sent successfully!");
                           setSharingMode(null);
-                        } catch (error) {
+                        } catch (error: any) {
                           toast.error("Failed to send email: " + error.message);
                         } finally {
                           setIsSendingEmail(false);
@@ -1113,20 +1317,73 @@ export default function PaymentDialog({
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        WhatsApp Message Preview
-                      </label>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          WhatsApp Message Preview
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingWhatsapp(!isEditingWhatsapp)}
+                          className="text-sm text-beveren-600 hover:text-beveren-700 dark:text-beveren-400 dark:hover:text-beveren-300 font-medium"
+                        >
+                          {isEditingWhatsapp ? (
+      <Check className="w-4 h-4" />
+    ) : (
+      <Pencil className="w-4 h-4" />
+    )}
+                        </button>
+                      </div>
+
+                      {isEditingWhatsapp && (
+                        <div className="space-y-3 mb-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              WhatsApp Template
+                            </label>
+                            {isLoadingTemplates ? (
+                              <div className="flex items-center justify-center p-4">
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                <span className="text-sm text-gray-500">Loading templates...</span>
+                              </div>
+                            ) : (
+                              <select
+                                value={selectedTemplate?.name || ""}
+                                onChange={(e) => handleTemplateChange(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                              >
+                                <option value="">Select a template (optional)</option>
+                                {whatsappTemplates.map((template) => {
+                                  const isDefault = posDetails?.custom_whatsap_template === template.name;
+                                  return (
+                                    <option key={template.name} value={template.name}>
+                                      {template.template_name} - {template.category} ({template.status}){isDefault ? ' [Default]' : ''}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              Custom Message
+                            </label>
+                            <textarea
+                              value={customMessage}
+                              onChange={(e) => setCustomMessage(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                              rows={4}
+                              placeholder="Enter your WhatsApp message..."
+                            />
+                          </div>
+                        </div>
+                      )}
+
                       <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
                         <div className="text-sm text-gray-900 dark:text-white">
-                          <p>Hi {sharingData.name || "there"}!</p>
-                          <p className="mt-2">
-                            Thank you for shopping with us at KLIK POS!
-                          </p>
-                          <p className="mt-2">
-                            Invoice Total: *
-                            {formatCurrency(calculations.grandTotal)}*
-                          </p>
-                          <p className="mt-2">We appreciate your business!</p>
+                          <div className="whitespace-pre-wrap">
+                            {getProcessedMessage()}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1137,11 +1394,12 @@ export default function PaymentDialog({
                           await sendWhatsAppMessage({
                             mobile_no: sharingData.phone,
                             customer_name: sharingData.name,
-                            invoice_data: invoiceData.name,
+                            invoice_data: invoiceData?.name || '',
+                            message: getProcessedMessage(),
                           });
                           toast.success("Whatsap message sent successfully!");
                           setSharingMode(null);
-                        } catch (error) {
+                        } catch (error: any) {
                           toast.error(
                             "Failed to send whatsap message: " + error.message
                           );
@@ -1277,7 +1535,7 @@ export default function PaymentDialog({
                                 inputValue === "" ? 0 : parseFloat(inputValue);
                               handlePaymentAmountChange(
                                 method.id,
-                                isNaN(numValue) ? 0 : numValue
+                                isNaN(numValue) ? "0" : numValue.toString()
                               );
                             }}
                             onBlur={(e) => {
@@ -1286,7 +1544,7 @@ export default function PaymentDialog({
                                 const formatted = parseFloat(
                                   numValue.toFixed(2)
                                 );
-                                handlePaymentAmountChange(method.id, formatted);
+                                handlePaymentAmountChange(method.id, formatted.toString());
                               }
                             }}
                             placeholder="0.00"

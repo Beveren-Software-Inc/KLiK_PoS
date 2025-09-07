@@ -34,6 +34,7 @@
    "fieldname": "template_name",
    "fieldtype": "Data",
    "label": "Template Label",
+   "no_copy": 1,
    "reqd": 1,
    "unique": 1
   },
@@ -54,12 +55,14 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
+   "no_copy": 1,
    "read_only": 1
   },
   {
    "fieldname": "id",
    "fieldtype": "Data",
    "label": "ID",
+   "no_copy": 1,
    "read_only": 1
   },
   {
@@ -151,7 +154,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-09-04 09:41:46.672918",
+ "modified": "2025-09-07 13:12:40.127041",
  "modified_by": "Administrator",
  "module": "KLIK POS",
  "name": "WhatsApp Message Templates",
