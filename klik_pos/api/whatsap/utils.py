@@ -9,6 +9,8 @@ from frappe import _
 from frappe.integrations.utils import make_post_request
 from frappe.desk.form.utils import get_pdf_link
 from frappe.utils import get_url
+from klik_pos.klik_pos.utils import get_current_pos_profile
+
 
 @frappe.whitelist()
 def send_whatsapp_message(
@@ -348,11 +350,18 @@ def format_phone_number(number):
 def get_document_attachment_url(doctype, docname):
     """Get PDF attachment URL for a document"""
     try:
+        site_url = frappe.utils.get_url()
         # For testing purposes, use the static PDF URL
         if doctype == "Sales Invoice":
             pdf_ = generate_and_attach_invoice_pdf(docname)
-            print("Pdf2 ", str(pdf_))
-            return "https://clik-pos.k.frappe.cloud/files/REPC-SRET-000001_PDFA3%20(14).pdf"
+
+            # # Check if we're using a local URL
+            if "127.0.0.1" in site_url or "localhost" in site_url:
+           
+                frappe.logger().warning(f"Local URL detected: {site_url}. Using static cloud PDF.")
+                return "https://clik-pos.k.frappe.cloud/files/REPC-SRET-000001_PDFA3%20(14).pdf"
+           
+            return pdf_
 
         doc = frappe.get_doc(doctype, docname)
         key = doc.get_document_share_key()
@@ -1034,6 +1043,9 @@ def generate_and_attach_invoice_pdf(invoice_name, print_format="Standard", lang=
     """
     Generate PDF for a Sales Invoice, attach it, and return full URL
     """
+    pos_profile = get_current_pos_profile()
+    if pos_profile:
+        print_format = pos_profile.custom_pos_printformat
     try:
         # Generate PDF content
         pdf_content = frappe.get_print("Sales Invoice", invoice_name, print_format, as_pdf=True)
