@@ -333,7 +333,7 @@ export default function ClosingShiftPage() {
               <select
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                disabled
+                
                 className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
                           focus:outline-none focus:ring-2 focus:ring-beveren-500
                           bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400
@@ -638,7 +638,6 @@ export default function ClosingShiftPage() {
               <select
                     value={dateFilter}
                     onChange={(e) => setDateFilter(e.target.value)}
-                    disabled
                     className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
                               focus:outline-none focus:ring-2 focus:ring-beveren-500
                               bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400
