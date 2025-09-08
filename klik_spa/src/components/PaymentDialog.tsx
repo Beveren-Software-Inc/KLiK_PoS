@@ -165,13 +165,80 @@ export default function PaymentDialog({
   // Populate sharing data from external invoice data
   useEffect(() => {
     if (externalInvoiceData && sharingMode) {
-      setSharingData({
-        email: externalInvoiceData.customer_address_doc?.email_id || externalInvoiceData.customer_email || "",
-        phone: externalInvoiceData.customer_address_doc?.phone || externalInvoiceData.customer_phone || "",
-        name: externalInvoiceData.customer_name || externalInvoiceData.customer || "",
-      });
+      console.log('External invoice data:', externalInvoiceData);
+      console.log('Customer address doc:', externalInvoiceData.customer_address_doc);
+
+      // Try multiple sources for customer contact info
+      const email = externalInvoiceData.customer_address_doc?.email_id ||
+                   externalInvoiceData.customer_email ||
+                   externalInvoiceData.email_id ||
+                   "";
+
+      const phone = externalInvoiceData.mobile_no ||
+                   externalInvoiceData.customer_address_doc?.mobile_no ||
+                   externalInvoiceData.customer_address_doc?.phone ||
+                   externalInvoiceData.customer_phone ||
+                   "";
+
+      const name = externalInvoiceData.customer_name ||
+                  externalInvoiceData.customer ||
+                  "";
+
+      // If email or phone is missing, try to fetch customer details
+      if ((!email || !phone) && externalInvoiceData.customer) {
+        fetchCustomerDetails(externalInvoiceData.customer, email, phone, name);
+      } else {
+        setSharingData({
+          email,
+          phone,
+          name,
+        });
+
+        console.log('Updated sharing data:', { email, phone, name });
+      }
     }
   }, [externalInvoiceData, sharingMode]);
+
+  // Function to fetch customer details if not available in invoice data
+  const fetchCustomerDetails = async (customerId: string, existingEmail: string, existingPhone: string, existingName: string) => {
+    try {
+      console.log('Fetching customer details for:', customerId);
+      const response = await fetch(`/api/method/klik_pos.api.customer.get_customer_info?customer_name=${customerId}`);
+      const data = await response.json();
+
+      if (data.message) {
+        const customerData = data.message;
+        console.log('Customer details fetched:', customerData);
+
+        setSharingData({
+          email: existingEmail || customerData.email_id || "",
+          phone: existingPhone || customerData.mobile_no || "",
+          name: existingName || customerData.customer_name || customerData.name || "",
+        });
+
+        console.log('Updated sharing data with customer details:', {
+          email: existingEmail || customerData.email_id || "",
+          phone: existingPhone || customerData.mobile_no || "",
+          name: existingName || customerData.customer_name || customerData.name || "",
+        });
+      } else {
+        // Fallback to existing data if fetch fails
+        setSharingData({
+          email: existingEmail,
+          phone: existingPhone,
+          name: existingName,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching customer details:', error);
+      // Fallback to existing data if fetch fails
+      setSharingData({
+        email: existingEmail,
+        phone: existingPhone,
+        name: existingName,
+      });
+    }
+  };
 
   // Load WhatsApp templates when sharing mode changes to WhatsApp
   useEffect(() => {
