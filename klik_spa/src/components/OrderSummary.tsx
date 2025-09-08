@@ -18,6 +18,7 @@ import PaymentDialog from "./PaymentDialog";
 import AddCustomerModal from "./AddCustomerModal";
 import { createDraftSalesInvoice } from "../services/salesInvoice";
 import { useCustomers } from "../hooks/useCustomers";
+import { useProducts } from "../hooks/useProducts";
 import { toast } from "react-toastify";
 import { useBatchData } from "../hooks/useProducts";
 import { getBatches } from "../utils/batch"; // or wherever you put it
@@ -64,6 +65,7 @@ export default function OrderSummary({
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const couponButtonRef = useRef<HTMLButtonElement>(null);
   const { customers, isLoading, error } = useCustomers();
+  const { refetch: refetchProducts } = useProducts();
   const navigate = useNavigate();
   const { posDetails, loading: posLoading } = usePOSDetails();
   const [prefilledCustomerName, setPrefilledCustomerName] = useState("");
@@ -273,11 +275,34 @@ export default function OrderSummary({
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleCompletePayment = (paymentData: any) => {
+  const handleCompletePayment = async (paymentData: any) => {
     // In a real app, this would process the payment and create invoice
     console.log("Processing payment:", paymentData);
     setShowPaymentDialog(false);
     handleClearCart();
+
+    // Silently refresh products to update stock availability
+    try {
+      console.log("OrderSummary: Starting product refresh after payment completion...");
+      await refetchProducts();
+      console.log("OrderSummary: Products refreshed successfully after payment completion");
+    } catch (error) {
+      console.error("OrderSummary: Failed to refresh products:", error);
+      // Don't show error to user as this is a background operation
+    }
+  };
+
+  const handleClosePaymentDialog = async () => {
+    setShowPaymentDialog(false);
+    // Silently refresh products to update stock availability
+    try {
+      console.log("OrderSummary: Starting product refresh...");
+      await refetchProducts();
+      console.log("OrderSummary: Products refreshed successfully after payment modal close");
+    } catch (error) {
+      console.error("OrderSummary: Failed to refresh products:", error);
+      // Don't show error to user as this is a background operation
+    }
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1207,7 +1232,7 @@ export default function OrderSummary({
           onClose={() => {
             setShowAddCustomerModal(false);
             setPrefilledCustomerName("");
-            setPrefilledData({}); 
+            setPrefilledData({});
           }}
           onSave={handleSaveCustomer}
           prefilledName={prefilledCustomerName}
@@ -1219,7 +1244,7 @@ export default function OrderSummary({
       {showPaymentDialog && (
         <PaymentDialog
           isOpen={showPaymentDialog}
-          onClose={() => setShowPaymentDialog(false)}
+          onClose={handleClosePaymentDialog}
           cartItems={cartItems.map((item) => ({
             ...item,
             discountedPrice: getDiscountedPrice(item),

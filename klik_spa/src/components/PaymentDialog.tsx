@@ -841,7 +841,7 @@ export default function PaymentDialog({
                   <button
                     onClick={() => {
                       onCompletePayment(null);
-                      navigate("/");
+                      // Let the parent component handle navigation after stock refresh
                     }}
                     className="w-full py-3 bg-beveren-600 text-white rounded-lg font-medium hover:bg-beveren-700 transition-colors"
                   >
