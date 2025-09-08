@@ -22,6 +22,7 @@ import { usePOSDetails } from "../hooks/usePOSProfile";
 import { useCreatePOSClosingEntry } from "../services/closingEntry";
 import BottomNavigation from "../components/BottomNavigation";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { formatCurrency } from "../utils/currency";
 
 export default function ClosingShiftPage() {
   const navigate = useNavigate();
@@ -280,7 +281,7 @@ export default function ClosingShiftPage() {
                   </div>
                   <div className="space-y-2">
                     <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                      ${stat.amount.toFixed(2)}
+                      {formatCurrency(stat.amount, posDetails?.currency || 'USD')}
                     </div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">
                       {stat.transactions} transactions
@@ -401,11 +402,11 @@ export default function ClosingShiftPage() {
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          ${invoice.totalAmount.toFixed(2)}
+                          {formatCurrency(invoice.totalAmount, invoice.currency)}
                         </div>
                         {invoice.giftCardDiscount > 0 && (
                           <div className="text-xs text-green-600 dark:text-green-400">
-                            -${invoice.giftCardDiscount.toFixed(2)} gift
+                            -{formatCurrency(invoice.giftCardDiscount, invoice.currency)} gift
                           </div>
                         )}
                       </td>
@@ -479,7 +480,7 @@ export default function ClosingShiftPage() {
                       <div className="text-sm">
                         <span className="text-gray-600 dark:text-gray-400">Opening: </span>
                         <span className="font-medium text-gray-900 dark:text-white">
-                          ${stat.openingAmount.toFixed(2)}
+                          {formatCurrency(stat.openingAmount, posDetails?.currency || 'USD')}
                         </span>
                       </div>
 
@@ -576,7 +577,7 @@ export default function ClosingShiftPage() {
                     </div>
                     <div className="space-y-2">
                       <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                        ${stat.amount.toFixed(2)}
+                        {formatCurrency(stat.amount, posDetails?.currency || 'USD')}
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">
                         {stat.transactions} transactions
@@ -713,11 +714,11 @@ export default function ClosingShiftPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          ${invoice.totalAmount.toFixed(2)}
+                          {formatCurrency(invoice.totalAmount, invoice.currency)}
                         </div>
                         {invoice.giftCardDiscount > 0 && (
                           <div className="text-xs text-green-600 dark:text-green-400">
-                            -${invoice.giftCardDiscount.toFixed(2)} gift card
+                            -{formatCurrency(invoice.giftCardDiscount, invoice.currency)} gift card
                           </div>
                         )}
                       </td>
@@ -791,7 +792,7 @@ export default function ClosingShiftPage() {
                       <div className="text-sm">
                         <span className="text-gray-600 dark:text-gray-400">Opening: </span>
                         <span className="font-medium text-gray-900 dark:text-white">
-                          ${stat.openingAmount.toFixed(2)}
+                          {formatCurrency(stat.openingAmount, posDetails?.currency || 'USD')}
                         </span>
                       </div>
 

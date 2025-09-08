@@ -69,7 +69,8 @@ def get_sales_invoices(limit=100, start=0):
                 "discount_amount",
                 "total_taxes_and_charges",
                 "custom_zatca_submit_status",
-                "custom_pos_opening_entry"
+                "custom_pos_opening_entry",
+                "currency"
             ],
             order_by="modified desc",
             limit=limit,

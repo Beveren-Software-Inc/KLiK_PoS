@@ -78,7 +78,7 @@ const fetchInvoices = async () => {
           | "Not Reported"
           | "Cleared"
           | "Not Cleared") || "Draft",
-
+      currency: invoice.currency || "USD",
       notes: invoice.remarks || "",
     }));
     // console.log("Transformed", transformed)

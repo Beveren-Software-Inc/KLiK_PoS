@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { formatCurrency } from "../utils/currency";
 import {
   FileText,
   DollarSign,
@@ -40,7 +41,7 @@ export default function CustomerDetailsPage() {
   const { customer, isLoadingC, errorC } = useCustomerDetails(customerId);
   const { invoices, isLoading, error } = useSalesInvoices();
 
-  
+
   const filterInvoiceByDate = (invoiceDateStr: string) => {
     if (dateFilter === "all") return true;
 
@@ -73,11 +74,11 @@ export default function CustomerDetailsPage() {
   // Filter invoices for this customer
   const customerInvoices = useMemo(() => {
     if (isLoading || error || !customer) return [];
-    
+
     return invoices.filter((invoice) => {
       // Filter by customer name using the actual API field
       const isCustomerInvoice = invoice.customer === customer.customer_name;
-      
+
       if (!isCustomerInvoice) return false;
 
       const matchesSearch =
@@ -85,7 +86,7 @@ export default function CustomerDetailsPage() {
         invoice.id.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesStatus = statusFilter === "all" || invoice.status === statusFilter;
-      
+
       const matchesDate = filterInvoiceByDate(invoice.date);
 
       return matchesSearch && matchesStatus && matchesDate;
@@ -130,7 +131,7 @@ export default function CustomerDetailsPage() {
  const handleReturnClick = async (invoiceName: string) => {
     try {
       const result = await createSalesReturn(invoiceName);
-     
+
       navigate(`/invoice/${result.return_invoice}`)
       toast.success(`Invoice returned: ${result.return_invoice}`);
     } catch (error: any) {
@@ -456,11 +457,11 @@ export default function CustomerDetailsPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900 dark:text-white">
-                              ${invoice.totalAmount.toFixed(2)}
+                              {formatCurrency(invoice.totalAmount, invoice.currency)}
                             </div>
                             {invoice.giftCardDiscount > 0 && (
                               <div className="text-xs text-green-600 dark:text-green-400">
-                                -${invoice.giftCardDiscount.toFixed(2)} gift card
+                                -{formatCurrency(invoice.giftCardDiscount, invoice.currency)} gift card
                               </div>
                             )}
                           </td>

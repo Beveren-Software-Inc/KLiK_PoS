@@ -103,6 +103,7 @@ export interface SalesInvoice {
   status: "Completed" | "Pending" | "Cancelled" | "Refunded" | "Paid" | "Unpaid" | "Overdue";
   refundAmount: number;
   notes: string;
+  currency: string;
   customer_address_doc?: AddressDoc;
   company_address_doc?: AddressDoc;
   company: string;
