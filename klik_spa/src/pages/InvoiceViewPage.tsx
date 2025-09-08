@@ -206,7 +206,7 @@ export default function InvoiceViewPage() {
                   onClick={() => handlePrintInvoice(invoice)}
                 >
                   <Printer size={20} />
-                  <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                  <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
                     Print Invoice
                   </span>
                 </button>
@@ -219,7 +219,7 @@ export default function InvoiceViewPage() {
                   }}
                 >
                   <MailPlus size={20} />
-                  <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                  <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
                     Send via Email
                   </span>
                 </button>
@@ -232,7 +232,7 @@ export default function InvoiceViewPage() {
                   }}
                 >
                   <MessageCirclePlus size={20} />
-                  <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                  <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
                     Send via WhatsApp
                   </span>
                 </button>
@@ -245,7 +245,7 @@ export default function InvoiceViewPage() {
                   }}
                 >
                   <MessageSquarePlus size={20} />
-                  <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                  <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
                     Send via SMS
                   </span>
                 </button>
@@ -260,7 +260,7 @@ export default function InvoiceViewPage() {
                       onClick={() => setShowSingleReturn(true)}
                     >
                       <RotateCcw size={20} />
-                      <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                      <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
                         Return Items (Single Invoice)
                       </span>
                     </button>
@@ -270,7 +270,7 @@ export default function InvoiceViewPage() {
                       onClick={() => setShowMultiReturn(true)}
                     >
                       <FileMinus size={20} />
-                      <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                      <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
                         Multi-Invoice Return
                       </span>
                     </button>
@@ -507,7 +507,7 @@ export default function InvoiceViewPage() {
         </div>
 
         {/* Fixed Footer with Return Button */}
-            {(invoice.status === "Paid" || invoice.status === "Completed") && (
+            {/* {(invoice.status === "Paid" || invoice.status === "Completed") && (
                     <div className="fixed bottom-0 left-20 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-6 py-4">
                         <div className="max-w-7xl mx-auto flex justify-end">
                         <ConfirmDialog
@@ -525,7 +525,7 @@ export default function InvoiceViewPage() {
                         />
                         </div>
                     </div>
-                    )}
+                    )} */}
 
       {/* PaymentDialog for Sharing */}
       {showPaymentDialog && (

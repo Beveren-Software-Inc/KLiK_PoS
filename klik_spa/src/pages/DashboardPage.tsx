@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { formatCurrency } from "../utils/currency"
 import {
 
   TrendingUp,
@@ -23,10 +24,12 @@ import type { SalesInvoice, DashboardStats } from "../../types"
 import RetailSidebar from "../components/RetailSidebar"
 import BottomNavigation from "../components/BottomNavigation"
 import { useMediaQuery } from "../hooks/useMediaQuery"
+import { usePOSDetails } from "../hooks/usePOSProfile"
 
 export default function DashboardPage() {
   const navigate = useNavigate()
   const isMobile = useMediaQuery("(max-width: 1024px)")
+  const { posDetails } = usePOSDetails()
   const [timeRange, setTimeRange] = useState("today")
   const [cashierFilter, setCashierFilter] = useState("all")
   const [paymentFilter, setPaymentFilter] = useState("all")
@@ -514,7 +517,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="text-right">
                       <div className="font-semibold text-gray-900 dark:text-white">
-                        ${transaction.totalAmount.toFixed(2)}
+                        {formatCurrency(transaction.totalAmount, transaction.currency || posDetails?.currency || 'USD')}
                       </div>
                       <div
                         className={`text-xs ${

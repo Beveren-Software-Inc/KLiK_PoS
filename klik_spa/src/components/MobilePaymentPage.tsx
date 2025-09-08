@@ -5,18 +5,40 @@ import { ArrowLeft } from "lucide-react"
 import PaymentDialog from "./PaymentDialog"
 import BottomNavigation from "./BottomNavigation"
 import { useCartStore } from "../stores/cartStore"
+import { useProducts } from "../hooks/useProducts"
 
 export default function MobilePaymentPage() {
   const navigate = useNavigate()
   const { cartItems, appliedCoupons, selectedCustomer, clearCart } = useCartStore()
+  const { refetch: refetchProducts } = useProducts()
 
-  const handleClose = () => {
+  const handleClose = async () => {
+    // Silently refresh products to update stock availability
+    try {
+      await refetchProducts();
+      console.log("Products refreshed after payment modal close");
+    } catch (error) {
+      console.error("Failed to refresh products:", error);
+      // Don't show error to user as this is a background operation
+    }
     navigate(-1)
   }
 
-  const handleCompletePayment = (paymentData: any) => {
+  const handleCompletePayment = async (paymentData: any) => {
     console.log('Payment completed:', paymentData)
     clearCart()
+
+    // Silently refresh products to update stock availability
+    try {
+      console.log("MobilePaymentPage: Starting product refresh after payment completion...");
+      await refetchProducts();
+      console.log("MobilePaymentPage: Products refreshed successfully after payment completion");
+    } catch (error) {
+      console.error("MobilePaymentPage: Failed to refresh products:", error);
+      // Don't show error to user as this is a background operation
+    }
+
+    // Navigate after stock refresh is complete
     navigate('/pos')
   }
 

@@ -30,9 +30,11 @@ import BottomNavigation from "../components/BottomNavigation";
 import MultiInvoiceReturn from "../components/MultiInvoiceReturn";
 import SingleInvoiceReturn from "../components/SingleInvoiceReturn";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { formatCurrency } from "../utils/currency";
 import type { SalesInvoice } from "../../types";
 import { useSalesInvoices } from "../hooks/useSalesInvoices";
 import { useCustomers } from "../hooks/useCustomers";
+import { usePOSDetails } from "../hooks/usePOSProfile";
 import { toast } from "react-toastify";
 import { createSalesReturn } from "../services/salesInvoice";
 import { useAllPaymentModes } from "../hooks/usePaymentModes";
@@ -69,6 +71,7 @@ export default function InvoiceHistoryPage() {
   const { invoices, isLoading, error } = useSalesInvoices();
   const { modes } = useAllPaymentModes();
   const { customers } = useCustomers();
+  const { posDetails } = usePOSDetails();
 
   // Keyboard event handler for Escape key
   useEffect(() => {
@@ -329,7 +332,7 @@ const getStatusBadge = (status: string) => {
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Total Amount</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
-              ${filteredInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0).toFixed(2)}
+              {formatCurrency(filteredInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0), posDetails?.currency || 'USD')}
             </p>
           </div>
           <DollarSign className="w-8 h-8 text-orange-600" />
@@ -340,10 +343,12 @@ const getStatusBadge = (status: string) => {
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Paid Amount</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
-              ${filteredInvoices
-                .filter(inv => inv.status === "Paid")
-                .reduce((sum, inv) => sum + inv.totalAmount, 0)
-                .toFixed(2)}
+              {formatCurrency(
+                filteredInvoices
+                  .filter(inv => inv.status === "Paid")
+                  .reduce((sum, inv) => sum + inv.totalAmount, 0),
+                posDetails?.currency || 'USD'
+              )}
             </p>
           </div>
           <CheckCircle className="w-8 h-8 text-orange-600" />
@@ -354,10 +359,12 @@ const getStatusBadge = (status: string) => {
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Outstanding</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
-              ${filteredInvoices
-                .filter(inv => ["Unpaid", "Partly Paid", "Overdue"].includes(inv.status))
-                .reduce((sum, inv) => sum + inv.totalAmount, 0)
-                .toFixed(2)}
+              {formatCurrency(
+                filteredInvoices
+                  .filter(inv => ["Unpaid", "Partly Paid", "Overdue"].includes(inv.status))
+                  .reduce((sum, inv) => sum + inv.totalAmount, 0),
+                posDetails?.currency || 'USD'
+              )}
             </p>
           </div>
           <AlertTriangle className="w-8 h-8 text-orange-600" />
@@ -452,11 +459,11 @@ const getStatusBadge = (status: string) => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      ${invoice.totalAmount.toFixed(2)}
+                      {formatCurrency(invoice.totalAmount, invoice.currency)}
                     </div>
                     {invoice.giftCardDiscount > 0 && (
                       <div className="text-xs text-orange-600 dark:text-green-400">
-                        -${invoice.giftCardDiscount.toFixed(2)} gift card
+                        -{formatCurrency(invoice.giftCardDiscount, invoice.currency)} gift card
                       </div>
                     )}
                   </td>
@@ -519,7 +526,7 @@ const getStatusBadge = (status: string) => {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-400">Amount:</span>
-                  <span className="font-medium text-gray-900 dark:text-white">${invoice.totalAmount.toFixed(2)}</span>
+                  <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(invoice.totalAmount, invoice.currency)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-400">Date:</span>

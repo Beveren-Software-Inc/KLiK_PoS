@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, CreditCard, Banknote, Wallet, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { formatCurrency } from '../utils/currency';
 import { useCreatePOSOpeningEntry } from '../services/opeiningEntry';
 import { usePaymentModes } from "../hooks/usePaymentModes"
 import { usePOSProfiles, usePOSDetails } from '../hooks/usePOSProfile';
@@ -257,10 +258,7 @@ const POSOpeningModal: React.FC<POSOpeningModalProps> = ({
                     <div className="flex justify-between items-center font-semibold">
                       <span>Total Opening Balance:</span>
                       <span className="text-green-600">
-                        {(() => {
-                          const currencySymbol = posDetails?.currency_symbol || posDetails?.currency || 'USD';
-                          return `${currencySymbol} ${totalAmount.toFixed(2)}`;
-                        })()}
+                        {formatCurrency(totalAmount, posDetails?.currency || 'USD')}
                       </span>
                     </div>
                   </div>
