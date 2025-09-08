@@ -1,7 +1,7 @@
 [project]
 name = "klik_pos"
 authors = [
-    { name = "Beveren Sooftware Inc", email = "simon@beverensoftware.com"}
+    { name = "Beveren Sooftware Inc", email = "info@beverensoftware.com"}
 ]
 description = "KLIK POS: A Modern Point of Sale for your Business"
 requires-python = ">=3.10"
