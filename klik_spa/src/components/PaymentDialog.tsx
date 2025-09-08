@@ -1091,13 +1091,6 @@ export default function PaymentDialog({
                         <span>Hold Order</span>
                       )}
                     </button>
-                    <button
-                      onClick={onClose}
-                      disabled={isProcessingPayment || isHoldingOrder}
-                      className="py-3 px-4 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
                   </div>
                 </div>
               </>
@@ -2113,13 +2106,6 @@ export default function PaymentDialog({
         ) : (
           <div className="border-t border-gray-200 dark:border-gray-700 p-6 flex-shrink-0 bg-white dark:bg-gray-800">
             <div className="flex justify-end space-x-4">
-              <button
-                onClick={onClose}
-                disabled={isProcessingPayment || isHoldingOrder}
-                className="px-6 py-2 border border-orange-500 text-orange-600 dark:text-orange-400 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Cancel
-              </button>
               <button
                 onClick={handleHoldOrder}
                 disabled={

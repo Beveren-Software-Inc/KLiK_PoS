@@ -101,6 +101,7 @@ export interface SalesInvoice {
   amountPaid: number;
   changeGiven: number;
   status: "Completed" | "Pending" | "Cancelled" | "Refunded" | "Paid" | "Unpaid" | "Overdue";
+  custom_zatca_submit_status?: string;
   refundAmount: number;
   notes: string;
   currency: string;
