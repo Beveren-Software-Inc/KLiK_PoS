@@ -162,6 +162,17 @@ export default function PaymentDialog({
     posDetails?.print_receipt_on_order_complete;
   const currencySymbol = posDetails?.currency_symbol;
 
+  // Populate sharing data from external invoice data
+  useEffect(() => {
+    if (externalInvoiceData && sharingMode) {
+      setSharingData({
+        email: externalInvoiceData.customer_address_doc?.email_id || externalInvoiceData.customer_email || "",
+        phone: externalInvoiceData.customer_address_doc?.phone || externalInvoiceData.customer_phone || "",
+        name: externalInvoiceData.customer_name || externalInvoiceData.customer || "",
+      });
+    }
+  }, [externalInvoiceData, sharingMode]);
+
   // Load WhatsApp templates when sharing mode changes to WhatsApp
   useEffect(() => {
     const loadWhatsAppTemplates = async () => {
@@ -2012,15 +2023,25 @@ export default function PaymentDialog({
         </div>
 
         {/* Footer - Action Buttons */}
-        {invoiceSubmitted ? (
+        {invoiceSubmitted || externalInvoiceData ? (
           <div className="border-t border-gray-200 dark:border-gray-700 p-6 flex-shrink-0 bg-white dark:bg-gray-800">
             <div className="flex justify-end space-x-4">
-              <button
-                onClick={onCompletePayment}
-                className="bg-beveren-500 px-6 py-2 border border-gray-300 dark:border-gray-600 text-white dark:text-gray-300 rounded-lg font-medium hover:bg-green-700 dark:hover:bg-gray-800 transition-colors"
-              >
-                New Order
-              </button>
+              {invoiceSubmitted && (
+                <button
+                  onClick={onCompletePayment}
+                  className="bg-beveren-500 px-6 py-2 border border-gray-300 dark:border-gray-600 text-white dark:text-gray-300 rounded-lg font-medium hover:bg-green-700 dark:hover:bg-gray-800 transition-colors"
+                >
+                  New Order
+                </button>
+              )}
+              {externalInvoiceData && (
+                <button
+                  onClick={onClose}
+                  className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  Close
+                </button>
+              )}
             </div>
           </div>
         ) : (
