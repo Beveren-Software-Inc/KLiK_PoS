@@ -757,7 +757,6 @@ export default function PaymentDialog({
                     title="Print"
                     onClick={() => {
                       handlePrintInvoice(invoiceData);
-                      navigate("/");
                     }}
                   >
                     <Printer size={18} />

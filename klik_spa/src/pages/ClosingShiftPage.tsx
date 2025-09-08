@@ -5,10 +5,13 @@ import {
   Search,
   Eye,
   MonitorX,
-  X
+  X,
+  Edit,
+  RotateCcw
 } from "lucide-react";
 
 import InvoiceViewModal from "../components/InvoiceViewModal";
+import SingleInvoiceReturn from "../components/SingleInvoiceReturn";
 import type { SalesInvoice } from "../../types";
 import { useSalesInvoices } from "../hooks/useSalesInvoices"
 import { toast } from "react-toastify";
@@ -31,6 +34,14 @@ export default function ClosingShiftPage() {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [closingAmounts, setClosingAmounts] = useState({});
+
+  // Draft Invoice Edit states
+  const [showEditOptions, setShowEditOptions] = useState(false);
+  const [selectedDraftInvoice, setSelectedDraftInvoice] = useState<SalesInvoice | null>(null);
+
+  // Single Invoice Return states
+  const [showSingleReturn, setShowSingleReturn] = useState(false);
+  const [selectedInvoiceForReturn, setSelectedInvoiceForReturn] = useState<SalesInvoice | null>(null);
   const { createClosingEntry, isCreating } = useCreatePOSClosingEntry();
 
   const { invoices, isLoading, error } = useSalesInvoices();
@@ -141,8 +152,7 @@ export default function ClosingShiftPage() {
   }
 
   const handleViewInvoice = (invoice: SalesInvoice) => {
-    setSelectedInvoice(invoice);
-    setShowInvoiceModal(true);
+    navigate(`/invoice/${invoice.id}`);
   };
 
   const handleRefund = (invoiceId: string) => {
@@ -157,6 +167,43 @@ export default function ClosingShiftPage() {
     } catch (error: any) {
       toast.error(error.message || "Failed to return invoice");
     }
+  };
+
+  const handleEditInvoice = (invoice: SalesInvoice) => {
+    setSelectedDraftInvoice(invoice);
+    setShowEditOptions(true);
+  };
+
+  // Helper function to check if invoice has items that can still be returned
+  const hasReturnableItems = (invoice: SalesInvoice) => {
+    if (!invoice || !invoice.items) {
+      console.log("No invoice or items found for:", invoice?.id);
+      return false;
+    }
+
+    const hasReturnable = invoice.items.some(item => {
+      const soldQty = item.qty || item.quantity || 0;
+      const returnedQty = item.returned_qty || 0;
+      const canReturn = returnedQty < soldQty;
+      console.log(`Item ${item.item_code}: sold=${soldQty}, returned=${returnedQty}, canReturn=${canReturn}`);
+      return canReturn;
+    });
+
+    console.log(`Invoice ${invoice.id} has returnable items: ${hasReturnable}`);
+    return hasReturnable;
+  };
+
+  // Single Invoice Return handlers
+  const handleSingleReturnClick = (invoice: SalesInvoice) => {
+    setSelectedInvoiceForReturn(invoice);
+    setShowSingleReturn(true);
+  };
+
+  const handleSingleReturnSuccess = () => {
+    setShowSingleReturn(false);
+    setSelectedInvoiceForReturn(null);
+    // Refresh the invoices list
+    window.location.reload();
   };
 
   const handleCancel = (invoiceId: string) => {
@@ -372,15 +419,25 @@ export default function ClosingShiftPage() {
                             className="text-beveren-600 hover:text-beveren-900 flex items-center space-x-1"
                           >
                             <Eye className="w-4 h-4" />
-                            <span className="hidden sm:inline">View</span>
+                            <span>View</span>
                           </button>
-                          {invoice.status === "Paid" && (
+                          {invoice.status === "Draft" && (
                             <button
-                              onClick={() => handleRefund(invoice.id)}
-                              className="text-orange-600 hover:text-orange-900 text-sm">Return</button>
+                              onClick={() => handleEditInvoice(invoice)}
+                              className="text-blue-600 hover:text-blue-900 flex items-center space-x-1"
+                            >
+                              <Edit className="w-4 h-4" />
+                              <span>Edit</span>
+                            </button>
                           )}
-                          {invoice.status === "Pending" && (
-                            <button className="text-red-600 hover:text-red-500 text-sm">Cancel</button>
+                          {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && hasReturnableItems(invoice) && (
+                            <button
+                              onClick={() => handleSingleReturnClick(invoice)}
+                              className="text-orange-600 hover:text-orange-900 flex items-center space-x-1"
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                              <span>Return</span>
+                            </button>
                           )}
                         </div>
                       </td>
@@ -676,13 +733,23 @@ export default function ClosingShiftPage() {
                             <Eye className="w-4 h-4" />
                             <span>View</span>
                           </button>
-                          {invoice.status === "Paid" && (
+                          {invoice.status === "Draft" && (
                             <button
-                              onClick={() => handleRefund(invoice.id)}
-                              className="text-orange-600 hover:text-orange-900">Return</button>
+                              onClick={() => handleEditInvoice(invoice)}
+                              className="text-blue-600 hover:text-blue-900 flex items-center space-x-1"
+                            >
+                              <Edit className="w-4 h-4" />
+                              <span>Edit</span>
+                            </button>
                           )}
-                          {invoice.status === "Pending" && (
-                            <button className="text-red-600 hover:text-red-500">Cancel</button>
+                          {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && hasReturnableItems(invoice) && (
+                            <button
+                              onClick={() => handleSingleReturnClick(invoice)}
+                              className="text-orange-600 hover:text-orange-900 flex items-center space-x-1"
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                              <span>Return</span>
+                            </button>
                           )}
                         </div>
                       </td>
@@ -773,6 +840,14 @@ export default function ClosingShiftPage() {
           onClose={() => setShowInvoiceModal(false)}
           onRefund={handleRefund}
           onCancel={handleCancel}
+        />
+
+        {/* Single Invoice Return Modal */}
+        <SingleInvoiceReturn
+          invoice={selectedInvoiceForReturn}
+          isOpen={showSingleReturn}
+          onClose={() => setShowSingleReturn(false)}
+          onSuccess={handleSingleReturnSuccess}
         />
       </div>
     </div>
