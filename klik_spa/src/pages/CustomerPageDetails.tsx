@@ -17,16 +17,19 @@ import {
   ArrowLeft,
   Clock,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  RotateCcw
 } from "lucide-react";
 
 import InvoiceViewModal from "../components/InvoiceViewModal";
+import SingleInvoiceReturn from "../components/SingleInvoiceReturn";
 import type { SalesInvoice } from "../../types";
 import { useSalesInvoices } from "../hooks/useSalesInvoices";
 import { toast } from "react-toastify";
 import { createSalesReturn } from "../services/salesInvoice";
 import RetailSidebar from "../components/RetailSidebar";
 import { useCustomerDetails } from "../hooks/useCustomers";
+import { usePOSDetails } from "../hooks/usePOSProfile";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 
 export default function CustomerDetailsPage() {
@@ -37,9 +40,14 @@ export default function CustomerDetailsPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<SalesInvoice | null>(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
+  // Single Invoice Return states
+  const [showSingleReturn, setShowSingleReturn] = useState(false);
+  const [selectedInvoiceForReturn, setSelectedInvoiceForReturn] = useState<SalesInvoice | null>(null);
+
   const { id: customerId } = useParams();
   const { customer, isLoadingC, errorC } = useCustomerDetails(customerId);
   const { invoices, isLoading, error } = useSalesInvoices();
+  const { posDetails } = usePOSDetails();
 
 
   const filterInvoiceByDate = (invoiceDateStr: string) => {
@@ -97,23 +105,59 @@ export default function CustomerDetailsPage() {
 
   const getStatusBadge = (status: string) => {
     const baseClasses = "px-2 py-1 rounded-full text-xs font-medium";
-    switch (status) {
-      case "Completed":
-      case "Paid":
+    const normalized = status?.toLowerCase() || "";
+
+    switch (normalized) {
+      // Payment statuses
+      case "paid":
         return `${baseClasses} bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400`;
-      case "Pending":
-      case "Unpaid":
+      case "unpaid":
         return `${baseClasses} bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400`;
-      case "Cancelled":
-        return `${baseClasses} bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400`;
-      case "Overdue":
-        return `${baseClasses} bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400`;
-      case "Refunded":
-      case "Return":
+      case "partly paid":
         return `${baseClasses} bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400`;
+      case "overdue":
+        return `${baseClasses} bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400`;
+      case "draft":
+        return `${baseClasses} bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400`;
+      case "return":
+        return `${baseClasses} bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400`;
+      case "cancelled":
+        return `${baseClasses} bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400`;
+
+      // ZATCA submission statuses
+      case "pending":
+        return `${baseClasses} bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400`;
+      case "reported":
+        return `${baseClasses} bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400`;
+      case "not reported":
+        return `${baseClasses} bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400`;
+      case "cleared":
+        return `${baseClasses} bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400`;
+      case "not cleared":
+        return `${baseClasses} bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400`;
+
       default:
-        return baseClasses;
+        return `${baseClasses} bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400`; // Neutral fallback
     }
+  };
+
+  // Helper function to check if invoice has items that can still be returned
+  const hasReturnableItems = (invoice: SalesInvoice) => {
+    if (!invoice || !invoice.items) {
+      console.log("No invoice or items found for:", invoice?.id);
+      return false;
+    }
+
+    const hasReturnable = invoice.items.some(item => {
+      const soldQty = item.qty || item.quantity || 0;
+      const returnedQty = item.returned_qty || 0;
+      const canReturn = returnedQty < soldQty;
+      console.log(`Item ${item.item_code}: sold=${soldQty}, returned=${returnedQty}, canReturn=${canReturn}`);
+      return canReturn;
+    });
+
+    console.log(`Invoice ${invoice.id} has returnable items:`, hasReturnable);
+    return hasReturnable;
   };
 
   const handleViewInvoice = (invoice: SalesInvoice) => {
@@ -126,6 +170,23 @@ export default function CustomerDetailsPage() {
     handleReturnClick(invoiceId);
 
     setShowInvoiceModal(false);
+  };
+
+  const handleEditInvoice = (invoice: SalesInvoice) => {
+    // Navigate to edit page or open edit modal
+    navigate(`/invoice/${invoice.id}/edit`);
+  };
+
+  const handleSingleReturnClick = (invoice: SalesInvoice) => {
+    setSelectedInvoiceForReturn(invoice);
+    setShowSingleReturn(true);
+  };
+
+  const handleSingleReturnSuccess = () => {
+    setShowSingleReturn(false);
+    setSelectedInvoiceForReturn(null);
+    // Refresh the invoices list
+    window.location.reload();
   };
 
  const handleReturnClick = async (invoiceName: string) => {
@@ -241,7 +302,7 @@ export default function CustomerDetailsPage() {
         </div>
 
         <div className="flex-1 overflow-auto pt-20 ml-20">
-          <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="px-6 py-8 max-w-none">
             {/* Customer Info Card */}
             <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 mb-6">
               <div className="flex items-start justify-between">
@@ -320,7 +381,7 @@ export default function CustomerDetailsPage() {
                   <div>
                     <p className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      ${customerMetrics.totalRevenue.toFixed(2)}
+                      {formatCurrency(customerMetrics.totalRevenue, posDetails?.currency || 'USD')}
                     </p>
                   </div>
                   <DollarSign className="w-8 h-8 text-green-600" />
@@ -332,7 +393,7 @@ export default function CustomerDetailsPage() {
                   <div>
                     <p className="text-sm text-gray-600 dark:text-gray-400">Outstanding Balance</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      ${customerMetrics.outstandingAmount.toFixed(2)}
+                      {formatCurrency(customerMetrics.outstandingAmount, posDetails?.currency || 'USD')}
                     </p>
                   </div>
                   <AlertCircle className={`w-8 h-8 ${customerMetrics.outstandingAmount > 0 ? 'text-red-600' : 'text-gray-400'}`} />
@@ -344,7 +405,7 @@ export default function CustomerDetailsPage() {
                   <div>
                     <p className="text-sm text-gray-600 dark:text-gray-400">Avg Order Value</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      ${customerMetrics.avgOrderValue.toFixed(2)}
+                      {formatCurrency(customerMetrics.avgOrderValue, posDetails?.currency || 'USD')}
                     </p>
                   </div>
                   <TrendingUp className="w-8 h-8 text-blue-600" />
@@ -420,6 +481,9 @@ export default function CustomerDetailsPage() {
                         Status
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        ZATCA Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
@@ -427,7 +491,7 @@ export default function CustomerDetailsPage() {
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
                     {customerInvoices.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                        <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                           No invoices found for this customer
                         </td>
                       </tr>
@@ -435,40 +499,35 @@ export default function CustomerDetailsPage() {
                       customerInvoices.map((invoice) => (
                         <tr key={invoice.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">
-                              {invoice.id}
+                            <div>
+                              <div className="text-sm font-medium text-gray-900 dark:text-white">{invoice.id}</div>
+                              <div className="text-sm text-gray-500 dark:text-gray-400">
+                                {invoice.date} {invoice.time}
+                              </div>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900 dark:text-white">
-                              {invoice.date}
-                            </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {invoice.time}
-                            </div>
+                            <div className="text-sm text-gray-900 dark:text-white">{invoice.date}</div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">{invoice.time}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center space-x-2">
-                              <CreditCard className="w-4 h-4 text-gray-400" />
-                              <span className="text-sm text-gray-900 dark:text-white">
-                                {invoice.paymentMethod}
-                              </span>
-                            </div>
+                            <span className="text-sm text-gray-900 dark:text-white">{invoice.paymentMethod}</span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900 dark:text-white">
                               {formatCurrency(invoice.totalAmount, invoice.currency)}
                             </div>
                             {invoice.giftCardDiscount > 0 && (
-                              <div className="text-xs text-green-600 dark:text-green-400">
+                              <div className="text-xs text-orange-600 dark:text-green-400">
                                 -{formatCurrency(invoice.giftCardDiscount, invoice.currency)} gift card
                               </div>
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={getStatusBadge(invoice.status)}>
-                              {invoice.status}
-                            </span>
+                            <span className={getStatusBadge(invoice.status)}>{invoice.status}</span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={getStatusBadge(invoice.custom_zatca_submit_status)}>{invoice.custom_zatca_submit_status}</span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex space-x-2">
@@ -479,20 +538,23 @@ export default function CustomerDetailsPage() {
                                 <Eye className="w-4 h-4" />
                                 <span>View</span>
                               </button>
-                              {invoice.status === "Paid" && (
-                            <ConfirmDialog
-                                  title="Process Return?"
-                                  description="Are you sure you want to process a return for this invoice?"
-                                  onConfirm={() => handleRefund(invoice.id)}
-                                  trigger={
-                                  <button
-                                      className="flex items-center space-x-2 px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
-                                  >
-                                <RefreshCw size={20} />
-                                <span>Return</span>
-                            </button>
-                            }
-                        />
+                              {invoice.status === "Draft" && (
+                                <button
+                                  onClick={() => handleEditInvoice(invoice)}
+                                  className="text-blue-600 hover:text-blue-900 flex items-center space-x-1"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                  <span>Edit</span>
+                                </button>
+                              )}
+                              {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && hasReturnableItems(invoice) && (
+                                <button
+                                  onClick={() => handleSingleReturnClick(invoice)}
+                                  className="text-orange-600 hover:text-orange-900 flex items-center space-x-1"
+                                >
+                                  <RotateCcw className="w-4 h-4" />
+                                  <span>Return</span>
+                                </button>
                               )}
                             </div>
                           </td>
@@ -515,6 +577,14 @@ export default function CustomerDetailsPage() {
           onCancel={(invoiceId) => {
             setShowInvoiceModal(false);
           }}
+        />
+
+        {/* Single Invoice Return Modal */}
+        <SingleInvoiceReturn
+          invoice={selectedInvoiceForReturn}
+          isOpen={showSingleReturn}
+          onClose={() => setShowSingleReturn(false)}
+          onSuccess={handleSingleReturnSuccess}
         />
       </div>
     </div>
