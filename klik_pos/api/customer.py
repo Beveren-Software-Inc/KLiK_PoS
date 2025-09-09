@@ -171,12 +171,12 @@ def create_or_update_customer(customer_data):
     try:
         if isinstance(customer_data, str):
             customer_data = frappe.parse_json(customer_data)
-        print(str(customer_data))
+        print("Data++",str(customer_data))
         # Extract main fields
         customer_name = customer_data.get("name")
         email = customer_data.get("email")
         phone = customer_data.get("phone")
-        cust_type = customer_data.get("type", "individual").lower()
+        cust_type = customer_data.get("customer_type", customer_data.get("type", "individual")).lower()
         country = customer_data.get("address", {}).get("country", "Kenya")
         name_arabic = customer_data.get("name_arabic", "")
         address = customer_data.get("address", {})
@@ -200,7 +200,8 @@ def create_or_update_customer(customer_data):
 
         # For Companies → create both Contact and Address
         if cust_type == "company":
-            contact_doc = create_or_update_contact(customer_doc.name, customer_name, email, phone)
+            contact_name = customer_data.get("contactName", customer_name)
+            contact_doc = create_or_update_contact(customer_doc.name, contact_name, email, phone)
             addr_doc = create_or_update_address(customer_doc.name, customer_name, address, country)
 
             # 🔗 Link Address to Customer
@@ -224,7 +225,7 @@ def create_or_update_customer(customer_data):
 def get_or_create_customer(name, email, phone, country, name_arabic="", data=None):
     """Create or update a Customer (Individual or Company)."""
     try:
-        cust_type = "Company" if data and data.get("type") == "company" else "Individual"
+        cust_type = "Company" if data and (data.get("customer_type") == "company" or data.get("type") == "company") else "Individual"
 
         existing = frappe.get_all("Customer", filters={"customer_name": name}, fields=["name"])
         if existing:
@@ -311,11 +312,11 @@ def create_or_update_address(customer_id, customer_name, address_data, country):
     address_fields = {
         "address_title": address_title,
         "address_type": address_data.get("addressType", "Billing"),
-        "address_line1": address_data.get("streetName", ""),
+        "address_line1": address_data.get("street", ""),
         "address_line2": address_data.get("buildingNumber", ""),
-        "city": address_data.get("subdivisionName", ""),
-        "county": address_data.get("cityName", ""),
-        "pincode": address_data.get("postalCode", ""),
+        "city": address_data.get("city", ""),
+        "county": address_data.get("city", ""),
+        "pincode": address_data.get("zipCode", ""),
         "country": country,
         "is_primary_address": 1 if address_data.get("isPrimary") else 0,
         "is_shipping_address": 0

@@ -7,16 +7,22 @@ import {
   CreditCard,
   Building,
   Save,
-  ChevronRight,
 } from "lucide-react";
 import { type Customer } from "../data/mockCustomers";
+
+// Extended customer type for form data
+type ExtendedCustomer = Customer & {
+  address: Customer['address'] & {
+    addressType?: string;
+    buildingNumber?: string;
+  };
+};
 import { useCustomerActions } from "../services/customerService";
 import { toast } from "react-toastify";
 import { usePOSDetails } from "../hooks/usePOSProfile";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import countryList from "react-select-country-list";
-import { useMemo } from "react";
 interface AddCustomerModalProps {
   customer?: Customer | null;
   onClose: () => void;
@@ -38,20 +44,20 @@ export default function AddCustomerModal({
   const isEditing = !!customer;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const { posDetails, loading: posLoading } = usePOSDetails();
+  const { posDetails } = usePOSDetails();
 
-  // Step management
-  const [currentStep, setCurrentStep] = useState(1);
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const countryOptions = countryList().getData();
 
   const [formData, setFormData] = useState({
-    customer_type: "individual" as Customer["customer_type"],
+    customer_type: "individual" as Customer["type"],
     name: "",
+    contactName: "",
     email: "",
     phone: "",
     address: {
+      addressType: "Billing",
       street: "",
+      buildingNumber: "",
       city: "",
       state: "",
       zipCode: "",
@@ -61,13 +67,13 @@ export default function AddCustomerModal({
     vatNumber: "",
     registrationScheme: "",
     registrationNumber: "",
-    preferredPaymentMethod: "cash" as Customer["preferredPaymentMethod"],
+    preferredPaymentMethod: "Cash" as Customer["preferredPaymentMethod"],
   });
 
   // Set customer type based on POS Profile business type when component mounts
   useEffect(() => {
     if (posDetails && !isEditing) {
-      let defaultCustomerType: Customer["customer_type"] = "individual";
+      let defaultCustomerType: Customer["type"] = "individual";
 
       if (posDetails.business_type === "B2B") {
         defaultCustomerType = "company";
@@ -79,30 +85,24 @@ export default function AddCustomerModal({
 
       setFormData((prev) => ({ ...prev, customer_type: defaultCustomerType }));
 
-      // For B2B and B2C company customers, show all sections at once
-      if (defaultCustomerType === "company") {
-        setCurrentStep(4);
-        setCompletedSteps(new Set([1, 2, 3, 4]));
-      }
     }
   }, [posDetails, isEditing]);
 
-  // Check if we should show all sections at once (for B2B and B2C company customers)
-  const shouldShowAllSections = () => {
-    return formData.customer_type === "company";
-  };
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (customer) {
       setFormData({
-        customer_type: customer.customer_type || "individual",
+        customer_type: customer.type || "individual",
         name: customer.name,
+        contactName: customer.contactPerson || "",
         email: customer.email,
         phone: customer.phone,
         address: {
+          addressType: (customer.address as ExtendedCustomer['address'])?.addressType || "Billing",
           street: customer.address?.street || "",
+          buildingNumber: (customer.address as ExtendedCustomer['address'])?.buildingNumber || "",
           city: customer.address?.city || "",
           state: customer.address?.state || "",
           zipCode: customer.address?.zipCode || "",
@@ -112,11 +112,8 @@ export default function AddCustomerModal({
         vatNumber: "",
         registrationScheme: "",
         registrationNumber: "",
-        preferredPaymentMethod: customer.preferredPaymentMethod || "cash",
+        preferredPaymentMethod: customer.preferredPaymentMethod || "Cash",
       });
-      // If editing, show all steps as completed
-      setCompletedSteps(new Set([1, 2, 3, 4]));
-      setCurrentStep(4);
     } else if (prefilledData && Object.keys(prefilledData).length > 0) {
       console.log("Setting prefilled data:", prefilledData);
       setFormData((prev) => ({
@@ -189,56 +186,56 @@ export default function AddCustomerModal({
     ];
   };
 
-  // Validate specific steps
-  const validateStep = (step: number): boolean => {
+  // Validate form data
+  const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (step === 1) {
-      if (formData.customer_type === "company") {
-        // For company: Basic Information - name is required
-        if (!formData.name.trim()) {
-          newErrors.name = "Full name is required";
-        }
-      } else if (formData.customer_type === "individual") {
-        // For individual: Basic + Contact - at least phone or email required
-        if (!formData.email.trim() && !formData.phone.trim()) {
-          newErrors.contact = "Either email or phone number must be provided";
-        }
-        // Email format validation if provided
-        if (
-          formData.email.trim() &&
-          !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)
-        ) {
-          newErrors.email = "Please enter a valid email address";
-        }
+    // Helper function to validate phone number (minimum 10 digits including country code)
+    const isValidPhone = (phone: string): boolean => {
+      if (!phone.trim()) return false;
+      // Remove all non-digit characters and check if it has at least 10 digits
+      const digitsOnly = phone.replace(/\D/g, '');
+      return digitsOnly.length >= 10;
+    };
+
+    // Basic validation
+    if (formData.customer_type === "company") {
+      if (!formData.name.trim()) {
+        newErrors.name = "Customer name is required";
+      }
+      if (!formData.contactName.trim()) {
+        newErrors.contactName = "Contact name is required";
+      }
+      if (!formData.email.trim() && !formData.phone.trim()) {
+        newErrors.contact = "Either email or phone number must be provided";
+      }
+      if (formData.phone.trim() && !isValidPhone(formData.phone)) {
+        newErrors.phone = "Phone number must have at least 10 digits including country code";
+      }
+    } else if (formData.customer_type === "individual") {
+      if (!formData.email.trim() && !formData.phone.trim()) {
+        newErrors.contact = "Either email or phone number must be provided";
+      } else if (formData.phone.trim() && !isValidPhone(formData.phone)) {
+        newErrors.phone = "Phone number must have at least 10 digits including country code";
       }
     }
 
-    if (step === 2 && formData.customer_type === "company") {
-      if (!formData.email.trim()) {
-        newErrors.email = "Email is required for company";
-      }
-      if (!formData.phone.trim()) {
-        newErrors.phone = "Phone number is required for company";
-      }
-
-      // Email format validation if provided
-      if (
-        formData.email.trim() &&
-        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)
-      ) {
-        newErrors.email = "Please enter a valid email address";
-      }
+    // Email format validation if provided
+    if (
+      formData.email.trim() &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)
+    ) {
+      newErrors.email = "Please enter a valid email address";
     }
 
-    if (step === 3 && formData.customer_type === "company") {
-      // ZATCA Details
+    // ZATCA validation for company (only when ZATCA is enabled)
+    if (formData.customer_type === "company" && posDetails?.is_zatca_enabled) {
       if (!formData.vatNumber.trim() && !formData.registrationNumber.trim()) {
         newErrors.vatOrRegistration =
           "Either VAT number or Registration number must be provided";
       }
 
-      if (formData.registrationScheme && !formData.registrationNumber.trim()) {
+      if (formData.registrationScheme && formData.registrationScheme !== "" && !formData.registrationNumber.trim()) {
         newErrors.registrationNumber =
           "Registration number is required when registration scheme is selected";
       }
@@ -250,77 +247,59 @@ export default function AddCustomerModal({
       }
     }
 
-    // Address validation (optional but validate format if provided)
-    const addressStep = formData.customer_type === "company" ? 4 : 2;
-    if (step === addressStep) {
-      // Note: buildingNumber is not available in current address structure
+    // Address validation for company customers (mandatory only when ZATCA is enabled)
+    if (formData.customer_type === "company" && posDetails && posDetails.is_zatca_enabled === true) {
+      if (!formData.address.street.trim()) {
+        newErrors.street = "Street address is required for company";
+      }
+      if (!formData.address.buildingNumber.trim()) {
+        newErrors.buildingNumber = "Building number is required for company";
+      } else if (formData.address.buildingNumber.trim().length !== 4) {
+        newErrors.buildingNumber = "Building number must be exactly 4 digits";
+      }
+      if (!formData.address.city.trim()) {
+        newErrors.city = "City is required for company";
+      }
+      if (!formData.address.state.trim()) {
+        newErrors.state = "State/Province is required for company";
+      }
+      if (!formData.address.zipCode.trim()) {
+        newErrors.zipCode = "Zip code is required for company";
+      }
     }
 
     setErrors(newErrors);
 
     if (Object.keys(newErrors).length > 0) {
       const firstErrorKey = Object.keys(newErrors)[0];
-      toast.error(newErrors[firstErrorKey]);
+      if (firstErrorKey) {
+        toast.error(newErrors[firstErrorKey]);
+      }
       return false;
     }
 
     return true;
   };
 
-  const proceedToNextStep = () => {
-    if (validateStep(currentStep)) {
-      setCompletedSteps((prev) => new Set([...prev, currentStep]));
-      setCurrentStep((prev) => prev + 1);
-      setErrors({});
-    }
-  };
-
-  const canProceedFromStep = (step: number): boolean => {
-    if (step === 1) {
-      if (formData.customer_type === "company") {
-        return formData.name.trim() !== "";
-      } else if (formData.customer_type === "individual") {
-        return formData.email.trim() !== "" || formData.phone.trim() !== "";
-      }
-    }
-    if (step === 2 && formData.customer_type === "company") {
-      return formData.email.trim() !== "" && formData.phone.trim() !== "";
-    }
-    if (step === 3 && formData.customer_type === "company") {
-      return (
-        formData.vatNumber.trim() !== "" ||
-        formData.registrationNumber.trim() !== ""
-      );
-    }
-    return true;
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
 
-    // Validate all completed steps
-    let isValid = true;
-    for (let step = 1; step <= currentStep; step++) {
-      if (!validateStep(step)) {
-        isValid = false;
-        break;
-      }
-    }
-
-    if (!isValid) return;
+    // Validate form
+    if (!validateForm()) return;
     setIsSubmitting(true);
 
     try {
       const customerData = {
         name: formData.name,
-        email: formData.email || undefined,
-        phone: formData.phone || undefined,
         customer_type: formData.customer_type,
+        email: formData.email,
+        phone: formData.phone,
         address: formData.address,
-        status: formData.status,
         preferredPaymentMethod: formData.preferredPaymentMethod,
         ...(formData.customer_type === "company" && {
+          contactName: formData.contactName,
           vatNumber: formData.vatNumber || undefined,
           registrationScheme: formData.registrationScheme || undefined,
           registrationNumber: formData.registrationNumber || undefined,
@@ -356,10 +335,6 @@ export default function AddCustomerModal({
 
   const registrationSchemes = [
     {
-      value: "Select Registration Scheme",
-      label: "Select Registration Scheme",
-    },
-    {
       value: "Commercial Registration number(CRN)",
       label: "Commercial Registration number(CRN)",
     },
@@ -368,6 +343,14 @@ export default function AddCustomerModal({
     { value: "700(700)", label: "700(700)" },
     { value: "MISA(SAG)", label: "MISA(SAG)" },
     { value: "Other OD(OTH)", label: "Other OD(OTH)" },
+  ];
+
+
+  const paymentMethods = [
+    { value: "Cash", label: "Cash" },
+    { value: "Bank Card", label: "Bank Card" },
+    { value: "Bank Payment", label: "Bank Payment" },
+    { value: "Credit", label: "Credit" },
   ];
 
   const addressTypes = [
@@ -385,21 +368,55 @@ export default function AddCustomerModal({
     { value: "Other", label: "Other" },
   ];
 
-  const paymentMethods = [
-    { value: "Cash", label: "Cash" },
-    { value: "Bank Card", label: "Bank Card" },
-    { value: "Bank Payment", label: "Bank Payment" },
-    { value: "Credit", label: "Credit" },
-  ];
-
   const availableCustomerTypes = getAvailableCustomerTypes();
 
-  // Determine what steps to show based on customer type
-  const getMaxSteps = () => {
-    if (formData.customer_type === "individual") return 2;
-    if (formData.customer_type === "company") return 4;
-    return 2;
+  // Check if customer can be saved
+  const canSaveCustomer = (): boolean => {
+    // Helper function to validate phone number (minimum 10 digits including country code)
+    const isValidPhone = (phone: string): boolean => {
+      if (!phone.trim()) return false;
+      // Remove all non-digit characters and check if it has at least 10 digits
+      const digitsOnly = phone.replace(/\D/g, '');
+      return digitsOnly.length >= 10;
+    };
+
+    if (formData.customer_type === "individual") {
+      // For individual customers, at least email or valid phone must be provided
+      const hasValidEmail = formData.email.trim() !== "";
+      const hasValidPhone = isValidPhone(formData.phone);
+      return hasValidEmail || hasValidPhone;
+    } else if (formData.customer_type === "company") {
+      // For company customers, basic fields are always required
+      const hasBasicFields = (
+        formData.name.trim() !== "" &&
+        formData.contactName.trim() !== "" &&
+        (formData.email.trim() !== "" || isValidPhone(formData.phone))
+      );
+
+      // Address fields are only required when ZATCA is enabled
+      const hasAddressFields = !posDetails?.is_zatca_enabled || (
+        formData.address.street.trim() !== "" &&
+        formData.address.buildingNumber.trim() !== "" &&
+        formData.address.buildingNumber.trim().length === 4 &&
+        formData.address.city.trim() !== "" &&
+        formData.address.state.trim() !== "" &&
+        formData.address.zipCode.trim() !== ""
+      );
+
+      const hasRequiredFields = hasBasicFields && hasAddressFields;
+
+      // If ZATCA is enabled, also check VAT or registration number
+      // Only check ZATCA if posDetails is loaded and ZATCA is explicitly enabled
+      if (posDetails && posDetails.is_zatca_enabled === true) {
+        const hasZatcaData = formData.vatNumber.trim() !== "" || formData.registrationNumber.trim() !== "";
+        return hasRequiredFields && hasZatcaData;
+      }
+
+      return hasRequiredFields;
+    }
+    return false;
   };
+
 
   return (
     <div
@@ -431,75 +448,23 @@ export default function AddCustomerModal({
           </div>
         )}
 
-        {/* Progress Indicator */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-4">
-            {Array.from({ length: getMaxSteps() }, (_, i) => {
-              const stepNumber = i + 1;
-              const isCompleted = completedSteps.has(stepNumber);
-              const isCurrent = currentStep === stepNumber;
-              const canShow = stepNumber <= currentStep || isCompleted;
-
-              return (
-                <div
-                  key={stepNumber}
-                  className={`flex items-center ${
-                    i < getMaxSteps() - 1 ? "flex-1" : ""
-                  }`}
-                >
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                      isCompleted
-                        ? "bg-beveren-600 text-white"
-                        : isCurrent
-                        ? "bg-beveren-100 text-beveren-600 border-2 border-beveren-600"
-                        : "bg-gray-200 text-gray-500"
-                    }`}
-                  >
-                    {stepNumber}
-                  </div>
-                  {i < getMaxSteps() - 1 && (
-                    <div
-                      className={`flex-1 h-1 mx-4 ${
-                        isCompleted ? "bg-beveren-600" : "bg-gray-200"
-                      }`}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            Step {currentStep} of {getMaxSteps()}:{" "}
-            {currentStep === 1 && formData.customer_type === "company"
-              ? "Basic Information"
-              : currentStep === 1 && formData.customer_type === "individual"
-              ? "Basic & Contact Information"
-              : currentStep === 2 && formData.customer_type === "company"
-              ? "Contact Information"
-              : currentStep === 2 && formData.customer_type === "individual"
-              ? "Address (Optional)"
-              : currentStep === 3 && formData.customer_type === "company"
-              ? "ZATCA Details"
-              : "Address (Optional)"}
-          </div>
-        </div>
 
         {/* Form */}
         <form
           onSubmit={handleSubmit}
           className={
             isFullPage
-              ? "flex-1 p-6 space-y-6 overflow-y-auto"
-              : "p-6 space-y-6"
+              ? "flex-1 flex flex-col"
+              : "flex flex-col h-full"
           }
         >
-          {/* Step 1: Customer Type & Basic Information + Contact (Individual) OR Basic Only (Company) */}
-          <div
-            className={`transition-all duration-300 ${
-              currentStep >= 1 || shouldShowAllSections() ? "block" : "hidden"
-            }`}
-          >
+          <div className={
+            isFullPage
+              ? "flex-1 p-6 space-y-6 overflow-y-auto"
+              : "flex-1 p-6 space-y-6 overflow-y-auto"
+          }>
+          {/* Customer Type & Basic Information */}
+          <div>
             {/* Customer Type Selection - Only show if B2B & B2C business type */}
             {posDetails?.business_type === "B2B & B2C" ? (
               <div className="mb-6">
@@ -527,10 +492,8 @@ export default function AddCustomerModal({
                             setFormData((prev) => ({
                               ...prev,
                               customer_type: e.target
-                                .value as Customer["customer_type"],
+                                .value as Customer["type"],
                             }));
-                            setCurrentStep(1);
-                            setCompletedSteps(new Set());
                           }}
                           className="sr-only"
                         />
@@ -607,8 +570,8 @@ export default function AddCustomerModal({
                     htmlFor="name"
                     className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                   >
-                    Full Name{" "}
-                    {formData.type === "company" && (
+                    {formData.customer_type === "company" ? "Customer Name" : "Full Name"}{" "}
+                    {formData.customer_type === "company" && (
                       <span className="text-red-500">*</span>
                     )}
                   </label>
@@ -660,7 +623,7 @@ export default function AddCustomerModal({
               </div>
             </div>
 
-            {/* Contact Information for Individual - Show in Step 1 */}
+            {/* Contact Information for Individual */}
             {formData.customer_type === "individual" && (
               <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 mt-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
@@ -716,11 +679,16 @@ export default function AddCustomerModal({
                         international
                         defaultCountry="SA"
                         value={formData.phone}
-                        onChange={(value) =>
-                          setFormData((prev) => ({ ...prev, phone: value }))
+                        onChange={(value: string | undefined) =>
+                          setFormData((prev) => ({ ...prev, phone: value || "" }))
                         }
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white"
+                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white ${
+                          errors.phone ? "border-red-500" : "border-gray-300 dark:border-gray-600"
+                        }`}
                       />
+                      {errors.phone && (
+                        <p className="text-red-500 text-xs mt-1">{errors.phone}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -730,60 +698,15 @@ export default function AddCustomerModal({
               </div>
             )}
 
-            {/* Action buttons for step 1 */}
-            <div className="flex justify-between mt-4">
-              <div className="flex space-x-3">
-                {/* Show Save button only if still on step 1 */}
-                {formData.customer_type === "individual" &&
-                  canProceedFromStep(1) &&
-                  currentStep === 1 && (
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className={`px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 ${
-                        isSubmitting ? "opacity-70 cursor-not-allowed" : ""
-                      }`}
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <span className="animate-spin">↻</span>
-                          <span>Saving...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Save size={18} />
-                          <span>Save Customer</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-              </div>
-
-              {canProceedFromStep(1) && currentStep === 1 && (
-                <button
-                  type="button"
-                  onClick={proceedToNextStep}
-                  className="px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors flex items-center space-x-2"
-                >
-                  <span>
-                    {formData.customer_type === "company"
-                      ? "Continue to Contact"
-                      : "Add Address"}
-                  </span>
-                  <ChevronRight size={16} />
-                </button>
-              )}
-            </div>
           </div>
 
-          {/* Step 2: Contact Information (Company only) OR Address (Individual) */}
-          {(currentStep >= 2 || shouldShowAllSections()) &&
-            formData.customer_type === "company" && (
+          {/* Contact Information (Company only) */}
+          {formData.customer_type === "company" && (
               <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                   <Mail size={20} className="mr-2" />
                   Contact Information
-                  {formData.type === "individual" && (
+                  {formData.customer_type === "company" && (
                     <span className="text-sm font-normal text-gray-500 ml-2">
                       (At least one required)
                     </span>
@@ -792,13 +715,38 @@ export default function AddCustomerModal({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label
+                      htmlFor="contactName"
+                      className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                    >
+                      Contact Name{" "}
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      id="contactName"
+                      value={formData.contactName}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          contactName: e.target.value,
+                        }))
+                      }
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
+                        errors.contactName ? "border-red-500" : "border-gray-300"
+                      }`}
+                      placeholder="Enter contact person name"
+                    />
+                    {errors.contactName && (
+                      <p className="text-red-500 text-xs mt-1">{errors.contactName}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label
                       htmlFor="email"
                       className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                     >
-                      Email Address{" "}
-                      {formData.type === "company" && (
-                        <span className="text-red-500">*</span>
-                      )}
+                      Email Address
                     </label>
                     <input
                       type="email"
@@ -824,77 +772,41 @@ export default function AddCustomerModal({
                     )}
                   </div>
 
-                  {/* Phone Number */}
-                  <div>
-                    <label
-                      htmlFor="phone"
-                      className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                    >
-                      Phone Number
-                    </label>
-                    <PhoneInput
-                      id="phone"
-                      international
-                      defaultCountry="SA"
-                      value={formData.phone}
-                      onChange={(value) =>
-                        setFormData((prev) => ({ ...prev, phone: value }))
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white"
-                    />
-                  </div>
+                </div>
+
+                {/* Phone Number */}
+                <div>
+                  <label
+                    htmlFor="phone"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                  >
+                    Phone Number
+                  </label>
+                  <PhoneInput
+                    id="phone"
+                    international
+                    defaultCountry="SA"
+                    value={formData.phone}
+                    onChange={(value: string | undefined) =>
+                      setFormData((prev) => ({ ...prev, phone: value || "" }))
+                    }
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white ${
+                      errors.phone ? "border-red-500" : "border-gray-300 dark:border-gray-600"
+                    }`}
+                  />
+                  {errors.phone && (
+                    <p className="text-red-500 text-xs mt-1">{errors.phone}</p>
+                  )}
                 </div>
                 {errors.contact && (
                   <p className="text-red-500 text-xs mt-1">{errors.contact}</p>
                 )}
 
-                <div className="flex justify-between mt-4">
-                  <div className="flex space-x-3">
-                    {formData.type === "individual" &&
-                      canProceedFromStep(2) && (
-                        <button
-                          type="submit"
-                          disabled={isSubmitting}
-                          className={`px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 ${
-                            isSubmitting ? "opacity-70 cursor-not-allowed" : ""
-                          }`}
-                        >
-                          {isSubmitting ? (
-                            <>
-                              <span className="animate-spin">↻</span>
-                              <span>Saving...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Save size={18} />
-                              <span>Save Customer</span>
-                            </>
-                          )}
-                        </button>
-                      )}
-                  </div>
-
-                  {canProceedFromStep(2) && currentStep === 2 && (
-                    <button
-                      type="button"
-                      onClick={proceedToNextStep}
-                      className="px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors flex items-center space-x-2"
-                    >
-                      <span>
-                        {formData.type === "company"
-                          ? "Continue to ZATCA"
-                          : "Add Address"}
-                      </span>
-                      <ChevronRight size={16} />
-                    </button>
-                  )}
-                </div>
               </div>
             )}
 
-          {/* Step 3: ZATCA Details (Company only) */}
-          {(currentStep >= 3 || shouldShowAllSections()) &&
-            formData.customer_type === "company" && (
+          {/* ZATCA Details (Company only, when ZATCA is enabled) */}
+          {formData.customer_type === "company" && posDetails && posDetails.is_zatca_enabled === true && (
               <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                   <CreditCard size={20} className="mr-2" />
@@ -972,6 +884,7 @@ export default function AddCustomerModal({
                       }
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white"
                     >
+                      <option value="">Select Registration Scheme</option>
                       {registrationSchemes.map((scheme) => (
                         <option key={scheme.value} value={scheme.value}>
                           {scheme.label}
@@ -986,7 +899,7 @@ export default function AddCustomerModal({
                       className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                     >
                       Registration Number{" "}
-                      {formData.registrationScheme ? "*" : ""}
+                      {formData.registrationScheme && formData.registrationScheme !== "" ? "*" : ""}
                     </label>
                     <input
                       type="text"
@@ -1018,292 +931,273 @@ export default function AddCustomerModal({
                   </p>
                 )}
 
-                <div className="flex justify-between mt-4">
-                  {/* <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className={`px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 ${
-                    isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
-                  }`}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <span className="animate-spin">↻</span>
-                      <span>Saving...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Save size={18} />
-                      <span>Save Customer</span>
-                    </>
-                  )}
-                </button> */}
-
-                  {canProceedFromStep(3) && currentStep === 3 && (
-                    <button
-                      type="button"
-                      onClick={proceedToNextStep}
-                      className="px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors flex items-center space-x-2"
-                    >
-                      <span>Add Address</span>
-                      <ChevronRight size={16} />
-                    </button>
-                  )}
-                </div>
               </div>
             )}
 
-          {/* Step 2: Address for Individual OR Step 4: Address for Company */}
-          {(currentStep >= 2 && formData.customer_type === "individual") ||
-          (currentStep >= 4 && formData.customer_type === "company") ||
-          shouldShowAllSections() ? (
-            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+          {/* ZATCA Required Message */}
+          {formData.customer_type === "company" && posDetails && posDetails.is_zatca_enabled === true && formData.vatNumber.trim() === "" && formData.registrationNumber.trim() === "" && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                    <strong>ZATCA E-Invoicing is enabled.</strong> Please provide either a VAT Number or Registration Number to complete the customer registration.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+         
+
+          {/* Address Section */}
+          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                 <MapPin size={20} className="mr-2" />
-                Address (Optional)
+                Address{formData.customer_type === "company" ? "" : " (Optional)"}
               </h3>
 
               <div className="space-y-4">
-                {/* Address Type + Street */}
+                {/* Address Type */}
+                <div>
+                  <label
+                    htmlFor="addressType"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                  >
+                    Address Type
+                  </label>
+                  <select
+                    id="addressType"
+                    value={formData.address.addressType}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        address: {
+                          ...prev.address,
+                          addressType: e.target.value,
+                        },
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white"
+                  >
+                    {addressTypes.map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Street + Building Number */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label
-                      htmlFor="addressType"
+                      htmlFor="street"
                       className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                     >
-                      Address Type
-                    </label>
-                    <select
-                      id="addressType"
-                      value={formData.address.addressType}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          address: {
-                            ...prev.address,
-                            addressType: e.target.value,
-                          },
-                        }))
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600
-               rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500
-               dark:bg-gray-700 dark:text-white"
-                    >
-                      <option value="">Select Address Type</option>
-                      {addressTypes.map((type) => (
-                        <option key={type.value} value={type.value}>
-                          {type.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="streetName"
-                      className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                    >
-                      Street Name{" "}
-                      {formData.customer_type === "company" && (
-                        <span className="text-red-500">*</span>
+                      Street Address{formData.customer_type === "company" && posDetails?.is_zatca_enabled && (
+                        <span className="text-red-500"> *</span>
                       )}
                     </label>
                     <input
                       type="text"
-                      id="streetName"
-                      value={formData.address.streetName}
+                      id="street"
+                      value={formData.address.street}
                       onChange={(e) =>
                         setFormData((prev) => ({
                           ...prev,
                           address: {
                             ...prev.address,
-                            streetName: e.target.value,
+                            street: e.target.value,
                           },
                         }))
                       }
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white"
-                      placeholder="Enter street name"
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white ${
+                        errors.street ? "border-red-500" : "border-gray-300 dark:border-gray-600"
+                      }`}
+                      placeholder="Enter street address"
                     />
+                    {errors.street && (
+                      <p className="text-red-500 text-xs mt-1">{errors.street}</p>
+                    )}
                   </div>
-                </div>
 
-                {/* Building + Subdivision */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label
                       htmlFor="buildingNumber"
                       className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                     >
-                      Building Number (4 digits)
-                      {formData.type === "company" && (
-                        <span className="text-red-500">*</span>
+                      Building Number (4 digits){formData.customer_type === "company" && posDetails?.is_zatca_enabled && (
+                        <span className="text-red-500"> *</span>
                       )}
                     </label>
                     <input
                       type="text"
                       id="buildingNumber"
                       value={formData.address.buildingNumber}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          address: {
-                            ...prev.address,
-                            buildingNumber: e.target.value,
-                          },
-                        }))
-                      }
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
-                        errors.buildingNumber
-                          ? "border-red-500"
-                          : "border-gray-300"
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, ''); // Only allow digits
+                        if (value.length <= 4) {
+                          setFormData((prev) => ({
+                            ...prev,
+                            address: {
+                              ...prev.address,
+                              buildingNumber: value,
+                            },
+                          }));
+                        }
+                      }}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white ${
+                        errors.buildingNumber ? "border-red-500" : "border-gray-300 dark:border-gray-600"
                       }`}
                       placeholder="1234"
                       maxLength={4}
                     />
                     {errors.buildingNumber && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {errors.buildingNumber}
-                      </p>
+                      <p className="text-red-500 text-xs mt-1">{errors.buildingNumber}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* City + State */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label
+                      htmlFor="city"
+                      className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                    >
+                      City{formData.customer_type === "company" && posDetails?.is_zatca_enabled && (
+                        <span className="text-red-500"> *</span>
+                      )}
+                    </label>
+                    <input
+                      type="text"
+                      id="city"
+                      value={formData.address.city}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          address: {
+                            ...prev.address,
+                            city: e.target.value,
+                          },
+                        }))
+                      }
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white ${
+                        errors.city ? "border-red-500" : "border-gray-300 dark:border-gray-600"
+                      }`}
+                      placeholder="Enter city"
+                    />
+                    {errors.city && (
+                      <p className="text-red-500 text-xs mt-1">{errors.city}</p>
                     )}
                   </div>
 
                   <div>
                     <label
-                      htmlFor="subdivisionName"
+                      htmlFor="state"
                       className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                     >
-                      Subdivision Name{" "}
-                      {formData.type === "company" && (
-                        <span className="text-red-500">*</span>
+                      State/Province{formData.customer_type === "company" && posDetails?.is_zatca_enabled && (
+                        <span className="text-red-500"> *</span>
                       )}
                     </label>
                     <input
                       type="text"
-                      id="subdivisionName"
-                      value={formData.address.subdivisionName}
+                      id="state"
+                      value={formData.address.state}
                       onChange={(e) =>
                         setFormData((prev) => ({
                           ...prev,
                           address: {
                             ...prev.address,
-                            subdivisionName: e.target.value,
+                            state: e.target.value,
                           },
                         }))
                       }
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white"
-                      placeholder="Enter subdivision"
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white ${
+                        errors.state ? "border-red-500" : "border-gray-300 dark:border-gray-600"
+                      }`}
+                      placeholder="Enter state/province"
                     />
+                    {errors.state && (
+                      <p className="text-red-500 text-xs mt-1">{errors.state}</p>
+                    )}
                   </div>
                 </div>
 
-                {/* City + Postal */}
+                {/* Zip Code + Country */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label
-                      htmlFor="cityName"
+                      htmlFor="zipCode"
                       className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                     >
-                      City Name{" "}
-                      {formData.type === "company" && (
-                        <span className="text-red-500">*</span>
+                      Zip Code{formData.customer_type === "company" && posDetails?.is_zatca_enabled && (
+                        <span className="text-red-500"> *</span>
                       )}
                     </label>
                     <input
                       type="text"
-                      id="cityName"
-                      value={formData.address.cityName}
+                      id="zipCode"
+                      value={formData.address.zipCode}
                       onChange={(e) =>
                         setFormData((prev) => ({
                           ...prev,
                           address: {
                             ...prev.address,
-                            cityName: e.target.value,
+                            zipCode: e.target.value,
                           },
                         }))
                       }
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white"
-                      placeholder="Enter city name"
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white ${
+                        errors.zipCode ? "border-red-500" : "border-gray-300 dark:border-gray-600"
+                      }`}
+                      placeholder="Enter zip code"
                     />
+                    {errors.zipCode && (
+                      <p className="text-red-500 text-xs mt-1">{errors.zipCode}</p>
+                    )}
                   </div>
 
                   <div>
                     <label
-                      htmlFor="postalCode"
+                      htmlFor="country"
                       className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                     >
-                      Postal Code{" "}
-                      {formData.type === "company" && (
-                        <span className="text-red-500">*</span>
-                      )}
+                      Country
                     </label>
                     <input
-                      type="text"
-                      id="postalCode"
-                      value={formData.address.postalCode}
+                      list="country-list"
+                      id="country"
+                      value={formData.address.country}
                       onChange={(e) =>
                         setFormData((prev) => ({
                           ...prev,
                           address: {
                             ...prev.address,
-                            postalCode: e.target.value,
+                            country: e.target.value,
                           },
                         }))
                       }
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white"
-                      placeholder="12345"
+                      placeholder="Select country"
                     />
+                    <datalist id="country-list">
+                      {countryOptions.map((country) => (
+                        <option key={country.value} value={country.label} />
+                      ))}
+                    </datalist>
                   </div>
                 </div>
 
-                {/* Primary Checkbox */}
-                <div className="flex items-center">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={formData.address.isPrimary}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          address: {
-                            ...prev.address,
-                            isPrimary: e.target.checked,
-                          },
-                        }))
-                      }
-                      className="w-4 h-4 text-beveren-600 bg-gray-100 border-gray-300 rounded focus:ring-beveren-500 dark:focus:ring-beveren-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-                    />
-                    <span className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Is Primary Address
-                    </span>
-                  </label>
-                </div>
               </div>
 
-              <div className="flex justify-end mt-4">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className={`px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 ${
-                    isSubmitting ? "opacity-70 cursor-not-allowed" : ""
-                  }`}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <span className="animate-spin">↻</span>
-                      <span>{isEditing ? "Updating..." : "Creating..."}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Save size={18} />
-                      <span>
-                        {isEditing ? "Update Customer" : "Save Customer"}
-                      </span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          ) : null}
+          </div>
 
           {/* Error Display */}
           {submitError && (
@@ -1311,19 +1205,39 @@ export default function AddCustomerModal({
               {submitError}
             </div>
           )}
-
-          {/* Cancel Button - Always visible */}
-          <div className="flex justify-start pt-4 border-t border-gray-200 dark:border-gray-700">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-red-500 dark:hover:bg-gray-700 transition-colors"
-            >
-              Cancel
-            </button>
           </div>
+
+          {/* Fixed Footer with Save Button */}
+          <div className="sticky bottom-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={isSubmitting || !canSaveCustomer()}
+                className={`px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 ${
+                  isSubmitting || !canSaveCustomer() ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              >
+                {isSubmitting ? (
+                  <>
+                    <span className="animate-spin">↻</span>
+                    <span>{isEditing ? "Updating..." : "Creating..."}</span>
+                  </>
+                ) : (
+                  <>
+                    <Save size={18} />
+                    <span>
+                      {isEditing ? "Update Customer" : "Save Customer"}
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
         </form>
       </div>
     </div>
   );
 }
+
+

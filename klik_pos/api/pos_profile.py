@@ -56,6 +56,17 @@ def get_pos_details():
         "custom_hide_expected_amount":pos.custom_hide_expected_amount,
         "custom_whatsap_template": getattr(pos, 'custom_whatsap_template', None),
         "custom_email_template": getattr(pos, 'custom_email_template', None),
+        "is_zatca_enabled": is_zatca_enabled(),
 
     }
     return details
+
+
+def is_zatca_enabled():
+    pos_profile = get_current_pos_profile()
+    company = pos_profile.company
+    meta = frappe.get_meta("Company")
+    if frappe.db.has_column("Company", "custom_enable_zatca_e_invoicing"):
+        return frappe.db.get_value("Company", company, "custom_enable_zatca_e_invoicing") == 1
+    return False
+
