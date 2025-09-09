@@ -116,7 +116,6 @@ def get_sales_invoices(limit=100, start=0):
                 })
 
             inv["items"] = items
-        print("Invoices ++", invoices)
         return {
             "success": True,
             "data": invoices
@@ -211,7 +210,6 @@ def get_invoice_details(invoice_id):
 
 @frappe.whitelist()
 def create_and_submit_invoice(data):
-    print("Data received in create_and_submit_invoice:", data)
     try:
         customer, items, amount_paid, sales_and_tax_charges, mode_of_payment, business_type, roundoff_amount = parse_invoice_data(data)
         doc = build_sales_invoice_doc(
@@ -273,7 +271,6 @@ def parse_invoice_data(data):
     if isinstance(data, str):
         data = json.loads(data)
 
-    print("My data", str(data))
     customer = data.get("customer", {}).get("id")
     items = data.get("items", [])
 
@@ -1062,26 +1059,21 @@ def create_multi_invoice_return(return_data):
         if isinstance(return_data, str):
             return_data = json.loads(return_data)
 
-        print(f"Multi-invoice return data: {return_data}")
 
         customer = return_data.get("customer")
         invoice_returns = return_data.get("invoice_returns", [])
 
-        print(f"Customer: {customer}")
-        print(f"Number of invoice returns: {len(invoice_returns)}")
-
+      
         created_returns = []
 
         for i, invoice_return in enumerate(invoice_returns):
             invoice_name = invoice_return.get("invoice_name")
             return_items = invoice_return.get("return_items", [])
 
-            print(f"Processing invoice {i+1}: {invoice_name} with {len(return_items)} items")
 
             if return_items:
                 # Call create_partial_return with separate parameters
                 result = create_partial_return(invoice_name, return_items)
-                print(f"Result for {invoice_name}: {result}")
                 if result.get("success"):
                     created_returns.append(result.get("return_invoice"))
                 else:

@@ -474,6 +474,50 @@ export default function OrderSummary({
     }
   }, [customers, selectedCustomer, isLoading]);
 
+  // Set default customer from POS profile when available
+  useEffect(() => {
+    console.log("Default customer useEffect triggered:", {
+      posDetails: posDetails,
+      defaultCustomer: posDetails?.default_customer,
+      selectedCustomer: selectedCustomer,
+      posLoading: posLoading
+    });
+
+    if (posDetails?.default_customer && !selectedCustomer && !posLoading) {
+      const defaultCustomer = posDetails.default_customer;
+      console.log("Setting default customer:", defaultCustomer);
+
+      // Transform the default customer data to match the Customer interface
+      const transformedCustomer: Customer = {
+        id: defaultCustomer.id,
+        name: defaultCustomer.name,
+        email: defaultCustomer.email,
+        phone: defaultCustomer.phone,
+        customer_type: defaultCustomer.customer_type === "Company" ? "company" : "individual",
+        address: {
+          street: "",
+          city: "",
+          state: "",
+          zipCode: "",
+          country: "Saudi Arabia",
+        },
+        loyaltyPoints: 0,
+        totalSpent: 0,
+        totalOrders: 0,
+        preferredPaymentMethod: "Cash",
+        notes: "",
+        tags: [],
+        status: "active",
+        createdAt: new Date().toISOString(),
+        defaultCurrency: defaultCustomer.default_currency,
+      };
+
+      setSelectedCustomer(transformedCustomer);
+      setCustomerSearchQuery(transformedCustomer.name);
+      setShowCustomerDropdown(false);
+    }
+  }, [posDetails, selectedCustomer, posLoading]);
+
   useEffect(() => {
     const fetchAndSetBatches = async () => {
       const newBatches = { ...itemBatches };

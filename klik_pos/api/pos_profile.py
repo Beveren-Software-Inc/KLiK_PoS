@@ -43,6 +43,21 @@ def get_pos_details():
     business_type = pos.custom_business_type
     print_format = pos.custom_pos_printformat
 
+    # Get default customer details if set
+    default_customer = None
+    if pos.customer:
+        customer_doc = frappe.get_doc("Customer", pos.customer)
+        default_customer = {
+            "id": customer_doc.name,
+            "name": customer_doc.customer_name,
+            "email": customer_doc.email_id or "",
+            "phone": customer_doc.mobile_no or "",
+            "customer_type": customer_doc.customer_type,
+            "territory": customer_doc.territory,
+            "customer_group": customer_doc.customer_group,
+            "default_currency": customer_doc.default_currency
+        }
+
     details = {
         "business_type": business_type,
         "print_format": print_format,
@@ -57,7 +72,7 @@ def get_pos_details():
         "custom_whatsap_template": getattr(pos, 'custom_whatsap_template', None),
         "custom_email_template": getattr(pos, 'custom_email_template', None),
         "is_zatca_enabled": is_zatca_enabled(),
-
+        "default_customer": default_customer,
     }
     return details
 
