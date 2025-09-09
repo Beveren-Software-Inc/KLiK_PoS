@@ -9,20 +9,18 @@ from klik_pos.klik_pos.utils import get_current_pos_profile
 def get_customers(limit: int = 100, start: int = 0, search: str = ""):
     """
     Fetch customers with structured primary contact & address details.
-    If a default customer is set in POS Profile, only return that.
+    Returns all customers based on business type and search criteria.
     """
 
     try:
         pos_profile = get_current_pos_profile()
-        default_customer = pos_profile.customer
         business_type = getattr(pos_profile, 'custom_business_type', 'B2C')  # Default to B2C
         company, company_currency = get_user_company_and_currency()
         result = []
         filters = {}
 
-        if default_customer:
-            filters["name"] = default_customer
-        elif search:
+        # Apply search filter if provided
+        if search:
             filters["customer_name"] = ["like", f"%{search}%"]
 
         # Apply business type filtering

@@ -14,6 +14,17 @@ interface POSProfile {
   write_off_account?: string;
   write_off_cost_center?: string;
   payment_methods?: PaymentMode[];
+  default_customer?: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    customer_type: string;
+    territory: string;
+    customer_group: string;
+    default_currency?: string;
+    company_currency?: string;
+  };
   // Add other POS Profile fields as needed
 }
 
@@ -27,11 +38,11 @@ interface UsePOSProfileReturn {
 }
 
 export function usePOSProfile(profileName: string): UsePOSProfileReturn {
-  const { 
-    data, 
-    error, 
-    isLoading, 
-    mutate 
+  const {
+    data,
+    error,
+    isLoading,
+    mutate
   } = useFrappeGetDoc<POSProfile>("POS Profile", profileName);
 
   const paymentModes = data?.payment_methods || [];
