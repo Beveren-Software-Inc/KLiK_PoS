@@ -1,5 +1,7 @@
 interface CustomerAddress {
+  addressType?: string;
   street: string;
+  buildingNumber?: string;
   city: string;
   state?: string;
   zipCode?: string;
@@ -8,10 +10,16 @@ interface CustomerAddress {
 
 interface CustomerData {
   name: string;
+  customer_type: string;
   email: string;
   phone: string;
   name_arabic?: string;
   address: CustomerAddress;
+  preferredPaymentMethod?: string;
+  contactName?: string;
+  vatNumber?: string;
+  registrationScheme?: string;
+  registrationNumber?: string;
 }
 
 export const useCustomerActions = () => {
