@@ -42,12 +42,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const token = localStorage.getItem("erpnext_token")
     const userData = localStorage.getItem("user_data")
 
-    console.log("Auth check:", {
-      hasToken: !!token,
-      hasUserData: !!userData,
-      token,
-      userData: userData ? JSON.parse(userData) : "missing"
-    })
+    // console.log("Auth check:", {
+    //   hasToken: !!token,
+    //   hasUserData: !!userData,
+    //   token,
+    //   userData: userData ? JSON.parse(userData) : "missing"
+    // })
 
     if (token && userData) {
       try {
@@ -84,7 +84,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
               setUser(updatedUser)
               localStorage.setItem("user_data", JSON.stringify(updatedUser))
-              console.log("User data refreshed:", updatedUser)
             }
           } catch (error) {
             console.warn("Failed to refresh user data, using cached data:", error)

@@ -115,7 +115,6 @@ export default function AddCustomerModal({
         preferredPaymentMethod: customer.preferredPaymentMethod || "Cash",
       });
     } else if (prefilledData && Object.keys(prefilledData).length > 0) {
-      console.log("Setting prefilled data:", prefilledData);
       setFormData((prev) => ({
         ...prev,
         name: prefilledData.name || prev.name,
