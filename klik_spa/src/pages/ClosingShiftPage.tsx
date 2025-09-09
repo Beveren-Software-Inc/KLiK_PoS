@@ -23,6 +23,7 @@ import { useCreatePOSClosingEntry } from "../services/closingEntry";
 import BottomNavigation from "../components/BottomNavigation";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { formatCurrency } from "../utils/currency";
+import { isToday, isThisWeek, isThisMonth, isThisYear } from "../utils/time";
 
 export default function ClosingShiftPage() {
   const navigate = useNavigate();
@@ -54,34 +55,31 @@ export default function ClosingShiftPage() {
   const filterInvoiceByDate = (invoiceDateStr: string) => {
     if (dateFilter === "all") return true;
 
-    const invoiceDate = new Date(invoiceDateStr);
-    const today = new Date();
-
     if (dateFilter === "today") {
-      return invoiceDate.toDateString() === today.toDateString();
+      return isToday(invoiceDateStr);
     }
 
     if (dateFilter === "yesterday") {
-      const yesterday = new Date(today);
-      yesterday.setDate(today.getDate() - 1);
-      return invoiceDate.toDateString() === yesterday.toDateString();
-    }
-
-    if (dateFilter === "week") {
-      const startOfWeek = new Date(today);
-      startOfWeek.setDate(today.getDate() - today.getDay());
-      return invoiceDate >= startOfWeek && invoiceDate <= today;
-    }
-
-    if (dateFilter === "month") {
+      const yesterday = new Date();
+      yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+      const invoiceDate = new Date(invoiceDateStr);
       return (
-        invoiceDate.getMonth() === today.getMonth() &&
-        invoiceDate.getFullYear() === today.getFullYear()
+        invoiceDate.getUTCFullYear() === yesterday.getUTCFullYear() &&
+        invoiceDate.getUTCMonth() === yesterday.getUTCMonth() &&
+        invoiceDate.getUTCDate() === yesterday.getUTCDate()
       );
     }
 
+    if (dateFilter === "week") {
+      return isThisWeek(invoiceDateStr);
+    }
+
+    if (dateFilter === "month") {
+      return isThisMonth(invoiceDateStr);
+    }
+
     if (dateFilter === "year") {
-      return invoiceDate.getFullYear() === today.getFullYear();
+      return isThisYear(invoiceDateStr);
     }
 
     return true;
@@ -333,7 +331,7 @@ export default function ClosingShiftPage() {
               <select
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                
+
                 className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
                           focus:outline-none focus:ring-2 focus:ring-beveren-500
                           bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400

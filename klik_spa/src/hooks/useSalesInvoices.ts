@@ -43,7 +43,7 @@ const fetchInvoices = async () => {
 
     const rawInvoices = resData.message.data;
 
-    const transformed: SalesInvoice[] = rawInvoices.map((invoice: any) => ({
+    const transformed: SalesInvoice[] = rawInvoices.map((invoice: Record<string, unknown>) => ({
       id: invoice.name,
       date: invoice.posting_date || new Date().toISOString().split("T")[0],
       time: invoice.posting_time || "00:00:00",
@@ -53,16 +53,16 @@ const fetchInvoices = async () => {
       customerId: invoice.customer || "",
       items: invoice.items || [],
       subtotal:
-        (invoice.base_grand_total || 0) -
-        (invoice.total_taxes_and_charges || 0) +
-        (invoice.discount_amount || 0),
-      giftCardDiscount: invoice.discount_amount || 0,
-      giftCardCode: invoice.discount_code || "",
-      taxAmount: invoice.total_taxes_and_charges || 0,
-      totalAmount: invoice.base_grand_total || 0,
+        (Number(invoice.base_grand_total) || 0) -
+        (Number(invoice.total_taxes_and_charges) || 0) +
+        (Number(invoice.discount_amount) || 0),
+      giftCardDiscount: Number(invoice.discount_amount) || 0,
+      giftCardCode: String(invoice.discount_code) || "",
+      taxAmount: Number(invoice.total_taxes_and_charges) || 0,
+      totalAmount: Number(invoice.base_grand_total) || 0,
       paymentMethod: invoice.mode_of_payment || "Cash",
-      amountPaid: invoice.base_rounded_total || 0,
-      changeGiven: invoice.change_amount || 0,
+      amountPaid: Number(invoice.base_rounded_total) || 0,
+      changeGiven: Number(invoice.change_amount) || 0,
       status:
         (invoice.status as
           | "Completed"
@@ -70,7 +70,7 @@ const fetchInvoices = async () => {
           | "Cancelled"
           | "Refunded") || "Completed",
       refundAmount:
-        invoice.status === "Refunded" ? invoice.base_grand_total || 0 : 0,
+        invoice.status === "Refunded" ? Number(invoice.base_grand_total) || 0 : 0,
       custom_zatca_submit_status:
         (invoice.custom_zatca_submit_status as
           | "Pending"
