@@ -193,10 +193,17 @@ def create_or_update_customer(customer_data):
         contact_doc = None
         addr_doc = None
         print("mania", customer_doc)
-        # For Individuals → only create contact if phone exists
+        # For Individuals → create contact if phone exists, and address if provided
         if cust_type == "individual":
             if phone:
                 contact_doc = create_or_update_contact(customer_doc.name, customer_name, email, phone)
+
+            # Create address for individual customers if address data is provided
+            if address and any(address.get(field) for field in ['street', 'city', 'state', 'zipCode']):
+                addr_doc = create_or_update_address(customer_doc.name, customer_name, address, country)
+                # 🔗 Link Address to Customer
+                if addr_doc:
+                    frappe.db.set_value("Customer", customer_doc.name, "customer_primary_address", addr_doc.name)
 
         # For Companies → create both Contact and Address
         if cust_type == "company":
