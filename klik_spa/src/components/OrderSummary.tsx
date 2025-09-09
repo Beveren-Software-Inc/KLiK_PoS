@@ -14,7 +14,7 @@ import {
 import type { CartItem, GiftCoupon } from "../../types";
 import GiftCouponPopover from "./GiftCouponPopover";
 import PaymentDialog from "./PaymentDialog";
-// import { mockCustomers, type Customer } from "../data/mockCustomers"
+import { type Customer } from "../data/mockCustomers"
 import AddCustomerModal from "./AddCustomerModal";
 import { createDraftSalesInvoice } from "../services/salesInvoice";
 import { useCustomers } from "../hooks/useCustomers";
@@ -64,7 +64,7 @@ export default function OrderSummary({
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const couponButtonRef = useRef<HTMLButtonElement>(null);
-  const { customers, isLoading, error } = useCustomers();
+  const { customers, isLoading, error, refetch: refetchCustomers } = useCustomers();
   const { refetch: refetchProducts } = useProducts();
   const navigate = useNavigate();
   const { posDetails, loading: posLoading } = usePOSDetails();
@@ -267,8 +267,86 @@ export default function OrderSummary({
     setShowCustomerDropdown(false);
   };
 
-  const handleSaveCustomer = (newCustomer: Partial<Customer>) => {
+  const handleSaveCustomer = async (newCustomer: Partial<Customer>) => {
     console.log("Saving new customer:", newCustomer);
+    console.log("Customer name from backend:", newCustomer.customer_name);
+
+    // Automatically select the newly created customer in the cart
+    if (newCustomer && newCustomer.customer_name) {
+      try {
+        // Fetch the full customer data using the customer_name returned from backend
+        const response = await fetch(`/api/method/klik_pos.api.customer.get_customer_info?customer_name=${encodeURIComponent(newCustomer.customer_name)}`);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const resData = await response.json();
+        console.log('Customer info response:', resData);
+
+        if (resData.message) {
+          // Convert the ERP customer data to our Customer format
+          const erpCustomer = resData.message;
+          const customerToSelect: Customer = {
+            id: erpCustomer.name,
+            name: erpCustomer.customer_name || erpCustomer.name,
+            email: erpCustomer.email_id || '',
+            phone: erpCustomer.mobile_no || '',
+            type: erpCustomer.customer_type === "Company" ? "company" : "individual",
+            address: {
+              street: '',
+              city: '',
+              state: '',
+              zipCode: '',
+              country: 'Saudi Arabia'
+            },
+            loyaltyPoints: erpCustomer.custom_loyalty_points || 0,
+            totalSpent: erpCustomer.custom_total_spent || 0,
+            totalOrders: erpCustomer.custom_total_orders || 0,
+            preferredPaymentMethod: 'Cash',
+            tags: erpCustomer.custom_tags?.split(',').filter(Boolean) || [],
+            status: erpCustomer.custom_status || 'active',
+            createdAt: erpCustomer.creation || new Date().toISOString()
+          };
+
+          setSelectedCustomer(customerToSelect);
+          setCustomerSearchQuery(''); // Clear the search query
+
+          // Also refresh the customers list to include the new customer
+          if (refetchCustomers) {
+            refetchCustomers();
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching customer details:', error);
+        // Fallback: create a basic customer object from the returned data
+        const customerToSelect: Customer = {
+          id: newCustomer.customer_name || '',
+          name: newCustomer.customer_name || '',
+          email: '',
+          phone: '',
+          type: 'individual',
+          address: {
+            street: '',
+            city: '',
+            state: '',
+            zipCode: '',
+            country: 'Saudi Arabia'
+          },
+          loyaltyPoints: 0,
+          totalSpent: 0,
+          totalOrders: 0,
+          preferredPaymentMethod: 'Cash',
+          tags: [],
+          status: 'active',
+          createdAt: new Date().toISOString()
+        };
+
+        setSelectedCustomer(customerToSelect);
+        setCustomerSearchQuery('');
+      }
+    }
+
     setShowAddCustomerModal(false);
     setPrefilledCustomerName(""); // Clear the prefilled name
     setPrefilledData({}); // Clear the prefilled data
