@@ -31,6 +31,7 @@ import RetailSidebar from "../components/RetailSidebar";
 import { useCustomerDetails } from "../hooks/useCustomers";
 import { usePOSDetails } from "../hooks/usePOSProfile";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { isToday, isThisWeek, isThisMonth, isThisYear } from "../utils/time";
 
 export default function CustomerDetailsPage() {
   const navigate = useNavigate();
@@ -53,28 +54,20 @@ export default function CustomerDetailsPage() {
   const filterInvoiceByDate = (invoiceDateStr: string) => {
     if (dateFilter === "all") return true;
 
-    const invoiceDate = new Date(invoiceDateStr);
-    const today = new Date();
-
     if (dateFilter === "today") {
-      return invoiceDate.toDateString() === today.toDateString();
+      return isToday(invoiceDateStr);
     }
 
     if (dateFilter === "week") {
-      const startOfWeek = new Date(today);
-      startOfWeek.setDate(today.getDate() - today.getDay());
-      return invoiceDate >= startOfWeek && invoiceDate <= today;
+      return isThisWeek(invoiceDateStr);
     }
 
     if (dateFilter === "month") {
-      return (
-        invoiceDate.getMonth() === today.getMonth() &&
-        invoiceDate.getFullYear() === today.getFullYear()
-      );
+      return isThisMonth(invoiceDateStr);
     }
 
     if (dateFilter === "year") {
-      return invoiceDate.getFullYear() === today.getFullYear();
+      return isThisYear(invoiceDateStr);
     }
 
     return true;

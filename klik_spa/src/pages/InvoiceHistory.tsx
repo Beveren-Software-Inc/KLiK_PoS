@@ -40,6 +40,7 @@ import { createSalesReturn } from "../services/salesInvoice";
 import { useAllPaymentModes } from "../hooks/usePaymentModes";
 import RetailSidebar from "../components/RetailSidebar";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { isToday, isThisWeek, isThisMonth, isThisYear } from "../utils/time";
 // import InvoiceViewPage from "./InvoiceViewPage";
 
 export default function InvoiceHistoryPage() {
@@ -107,34 +108,31 @@ export default function InvoiceHistoryPage() {
   const filterInvoiceByDate = (invoiceDateStr: string) => {
     if (dateFilter === "all") return true;
 
-    const invoiceDate = new Date(invoiceDateStr);
-    const today = new Date();
-
     if (dateFilter === "today") {
-      return invoiceDate.toDateString() === today.toDateString();
+      return isToday(invoiceDateStr);
     }
 
     if (dateFilter === "yesterday") {
-      const yesterday = new Date(today);
-      yesterday.setDate(today.getDate() - 1);
-      return invoiceDate.toDateString() === yesterday.toDateString();
-    }
-
-    if (dateFilter === "week") {
-      const startOfWeek = new Date(today);
-      startOfWeek.setDate(today.getDate() - today.getDay());
-      return invoiceDate >= startOfWeek && invoiceDate <= today;
-    }
-
-    if (dateFilter === "month") {
+      const yesterday = new Date();
+      yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+      const invoiceDate = new Date(invoiceDateStr);
       return (
-        invoiceDate.getMonth() === today.getMonth() &&
-        invoiceDate.getFullYear() === today.getFullYear()
+        invoiceDate.getUTCFullYear() === yesterday.getUTCFullYear() &&
+        invoiceDate.getUTCMonth() === yesterday.getUTCMonth() &&
+        invoiceDate.getUTCDate() === yesterday.getUTCDate()
       );
     }
 
+    if (dateFilter === "week") {
+      return isThisWeek(invoiceDateStr);
+    }
+
+    if (dateFilter === "month") {
+      return isThisMonth(invoiceDateStr);
+    }
+
     if (dateFilter === "year") {
-      return invoiceDate.getFullYear() === today.getFullYear();
+      return isThisYear(invoiceDateStr);
     }
 
     return true;

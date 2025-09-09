@@ -82,6 +82,19 @@ def get_sales_invoices(limit=100, start=0):
             full_name = frappe.db.get_value("User", inv["owner"], "full_name") or inv["owner"]
             inv["cashier_name"] = full_name
 
+            # Format posting_time from timedelta to HH:MM:SS
+            if inv.get("posting_time"):
+                if hasattr(inv["posting_time"], 'total_seconds'):
+                    # It's a timedelta object
+                    total_seconds = int(inv["posting_time"].total_seconds())
+                    hours = total_seconds // 3600
+                    minutes = (total_seconds % 3600) // 60
+                    seconds = total_seconds % 60
+                    inv["posting_time"] = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+                else:
+                    # It's already a string, keep as is
+                    inv["posting_time"] = str(inv["posting_time"])
+
             # Get items with return quantities for this invoice
             invoice_doc = frappe.get_doc("Sales Invoice", inv["name"])
             items = []
@@ -103,7 +116,7 @@ def get_sales_invoices(limit=100, start=0):
                 })
 
             inv["items"] = items
-
+        print("Invoices ++", invoices)
         return {
             "success": True,
             "data": invoices
@@ -163,6 +176,19 @@ def get_invoice_details(invoice_id):
             )
             if primary_address:
                 customer_address_doc = frappe.get_doc("Address", primary_address).as_dict()
+
+        # Format posting_time from timedelta to HH:MM:SS
+        if invoice_data.get("posting_time"):
+            if hasattr(invoice_data["posting_time"], 'total_seconds'):
+                # It's a timedelta object
+                total_seconds = int(invoice_data["posting_time"].total_seconds())
+                hours = total_seconds // 3600
+                minutes = (total_seconds % 3600) // 60
+                seconds = total_seconds % 60
+                invoice_data["posting_time"] = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+            else:
+                # It's already a string, keep as is
+                invoice_data["posting_time"] = str(invoice_data["posting_time"])
 
         return {
             "success": True,
