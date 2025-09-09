@@ -35,12 +35,12 @@ class ERPNextAPI {
       apiSecret: (import.meta as any).env?.VITE_API_SECRET || ''
     };
 
-    console.log('ERPNext API Config:', {
-      isDevelopment,
-      baseUrl: this.config.baseUrl || '[using proxy]',
-      hasApiKey: !!this.config.apiKey,
-      hasApiSecret: !!this.config.apiSecret
-    });
+    // console.log('ERPNext API Config:', {
+    //   isDevelopment,
+    //   baseUrl: this.config.baseUrl || '[using proxy]',
+    //   hasApiKey: !!this.config.apiKey,
+    //   hasApiSecret: !!this.config.apiSecret
+    // });
   }
 
   private getHeaders(includeAuth: boolean = true): HeadersInit {
@@ -269,7 +269,7 @@ class ERPNextAPI {
       }
 
       const userData = await userResponse.json();
-      console.log('Full user profile data:', userData.data);
+      // console.log('Full user profile data:', userData.data);
       return userData.data;
     } catch (error) {
       console.error('Get user profile error:', error);

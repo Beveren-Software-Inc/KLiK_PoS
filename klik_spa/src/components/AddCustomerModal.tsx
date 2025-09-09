@@ -115,7 +115,6 @@ export default function AddCustomerModal({
         preferredPaymentMethod: customer.preferredPaymentMethod || "Cash",
       });
     } else if (prefilledData && Object.keys(prefilledData).length > 0) {
-      console.log("Setting prefilled data:", prefilledData);
       setFormData((prev) => ({
         ...prev,
         name: prefilledData.name || prev.name,
@@ -570,7 +569,7 @@ export default function AddCustomerModal({
                     htmlFor="name"
                     className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                   >
-                    {formData.customer_type === "company" ? "Customer Name" : "Full Name"}{" "}
+                    Customer Name
                     {formData.customer_type === "company" && (
                       <span className="text-red-500">*</span>
                     )}
@@ -935,7 +934,7 @@ export default function AddCustomerModal({
             )}
 
           {/* ZATCA Required Message */}
-          {formData.customer_type === "company" && posDetails && posDetails.is_zatca_enabled === true && formData.vatNumber.trim() === "" && formData.registrationNumber.trim() === "" && (
+          {/* {formData.customer_type === "company" && posDetails && posDetails.is_zatca_enabled === true && formData.vatNumber.trim() === "" && formData.registrationNumber.trim() === "" && (
             <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -950,9 +949,8 @@ export default function AddCustomerModal({
                 </div>
               </div>
             </div>
-          )}
+          )} */}
 
-         
 
           {/* Address Section */}
           <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">

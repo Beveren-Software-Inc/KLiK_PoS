@@ -151,19 +151,37 @@ def get_currency_exchange_rate(from_currency: str, to_currency: str, transaction
 @frappe.whitelist()
 def get_customer_info(customer_name: str):
     """Fetch customer document by customer name."""
-    customer = frappe.get_doc("Customer", customer_name)
-    return {
-        "name": customer.name,
-        "customer_name": customer.customer_name,
-        "customer_group": customer.customer_group,
-        "territory": customer.territory,
-        "customer_type": customer.customer_type,
-        "customer_primary_contact": customer.customer_primary_contact,
-        "customer_primary_address": customer.customer_primary_address,
-        "email_id": customer.email_id,
-        "mobile_no": customer.mobile_no,
+    try:
+        # First try to find by customer_name (the actual name field)
+        customers = frappe.get_all("Customer", filters={"customer_name": customer_name}, fields=["name"])
+        if not customers:
+            # If not found by customer_name, try by document name
+            customers = frappe.get_all("Customer", filters={"name": customer_name}, fields=["name"])
 
-    }
+        if not customers:
+            return {"success": False, "error": f"Customer not found: {customer_name}"}
+
+        customer = frappe.get_doc("Customer", customers[0]["name"])
+        return {
+            "name": customer.name,
+            "customer_name": customer.customer_name,
+            "customer_group": customer.customer_group,
+            "territory": customer.territory,
+            "customer_type": customer.customer_type,
+            "customer_primary_contact": customer.customer_primary_contact,
+            "customer_primary_address": customer.customer_primary_address,
+            "email_id": customer.email_id,
+            "mobile_no": customer.mobile_no,
+            # "custom_loyalty_points": customer.custom_loyalty_points,
+            # "custom_total_spent": customer.custom_total_spent,
+            # "custom_total_orders": customer.custom_total_orders,
+            # "custom_status": customer.custom_status,
+            # "custom_tags": customer.custom_tags,
+            "creation": customer.creation
+        }
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Error fetching customer info")
+        return {"success": False, "error": str(e)}
 
 
 @frappe.whitelist()
@@ -193,10 +211,17 @@ def create_or_update_customer(customer_data):
         contact_doc = None
         addr_doc = None
         print("mania", customer_doc)
-        # For Individuals → only create contact if phone exists
+        # For Individuals → create contact if phone exists, and address if provided
         if cust_type == "individual":
             if phone:
                 contact_doc = create_or_update_contact(customer_doc.name, customer_name, email, phone)
+
+            # Create address for individual customers if address data is provided
+            if address and any(address.get(field) for field in ['street', 'city', 'state', 'zipCode']):
+                addr_doc = create_or_update_address(customer_doc.name, customer_name, address, country)
+                # 🔗 Link Address to Customer
+                if addr_doc:
+                    frappe.db.set_value("Customer", customer_doc.name, "customer_primary_address", addr_doc.name)
 
         # For Companies → create both Contact and Address
         if cust_type == "company":

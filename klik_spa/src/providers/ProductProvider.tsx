@@ -34,7 +34,7 @@ export function ProductProvider({ children }: ProductProviderProps) {
 
       if (resData?.message && Array.isArray(resData.message)) {
         setProducts(resData.message);
-        console.log("Products fetched successfully:", resData.message.length, "items");
+        // console.log("Products fetched successfully:", resData.message.length, "items");
       } else {
         throw new Error("Invalid response format");
       }
