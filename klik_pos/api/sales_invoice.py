@@ -30,10 +30,108 @@ def get_current_pos_opening_entry():
         frappe.log_error(f"Error getting current POS opening entry: {str(e)}")
         return None
 
+# @frappe.whitelist(allow_guest=True)
+# def get_sales_invoices(limit=100, start=0):
+#     try:
+#                 # Get current user's POS opening entry
+#         current_opening_entry = get_current_pos_opening_entry()
+
+#         # Check if user has administrative privileges
+#         user_roles = frappe.get_roles(frappe.session.user)
+#         is_admin_user = any(role in ["Administrator", "Sales Manager", "System Manager"] for role in user_roles)
+
+#         # Base filters
+#         filters = {}
+
+#         # If user has administrative privileges, show all invoices
+#         if is_admin_user:
+#             frappe.logger().info(f"Admin user {frappe.session.user} with roles {user_roles} - showing all invoices")
+#         # If user has an active POS opening entry, filter by it
+#         elif current_opening_entry:
+#             filters["custom_pos_opening_entry"] = current_opening_entry
+#             frappe.logger().info(f"Filtering invoices by POS opening entry: {current_opening_entry}")
+#         else:
+#             frappe.logger().info("No active POS opening entry found, showing all invoices")
+
+#         invoices = frappe.get_all(
+#             "Sales Invoice",
+#             filters=filters,
+#             fields=[
+#                 "name",
+#                 "posting_date",
+#                 "posting_time",
+#                 "owner",
+#                 "customer",
+#                 "customer_name",
+#                 "base_grand_total",
+#                 "base_rounded_total",
+#                 "status",
+#                 "discount_amount",
+#                 "total_taxes_and_charges",
+#                 "custom_zatca_submit_status",
+#                 "custom_pos_opening_entry",
+#                 "currency"
+#             ],
+#             order_by="modified desc",
+#             limit=limit,
+#             start=start
+#         )
+
+#         # Fetch full name for each owner and add item details with return quantities
+#         for inv in invoices:
+#             full_name = frappe.db.get_value("User", inv["owner"], "full_name") or inv["owner"]
+#             inv["cashier_name"] = full_name
+
+#             # Format posting_time from timedelta to HH:MM:SS
+#             if inv.get("posting_time"):
+#                 if hasattr(inv["posting_time"], 'total_seconds'):
+#                     # It's a timedelta object
+#                     total_seconds = int(inv["posting_time"].total_seconds())
+#                     hours = total_seconds // 3600
+#                     minutes = (total_seconds % 3600) // 60
+#                     seconds = total_seconds % 60
+#                     inv["posting_time"] = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+#                 else:
+#                     # It's already a string, keep as is
+#                     inv["posting_time"] = str(inv["posting_time"])
+
+#             # Get items with return quantities for this invoice
+#             invoice_doc = frappe.get_doc("Sales Invoice", inv["name"])
+#             items = []
+#             for item in invoice_doc.items:
+#                 # Get returned quantity for this item
+#                 returned_data = returned_qty(invoice_doc.customer, invoice_doc.name, item.item_code)
+#                 returned_qty_value = returned_data.get("total_returned_qty", 0)
+#                 available_qty = item.qty - returned_qty_value
+
+#                 items.append({
+#                     "item_code": item.item_code,
+#                     "item_name": item.item_name,
+#                     "qty": item.qty,
+#                     "rate": item.rate,
+#                     "amount": item.amount,
+#                     "description": item.description,
+#                     "returned_qty": returned_qty_value,
+#                     "available_qty": available_qty
+#                 })
+
+#             inv["items"] = items
+#         return {
+#             "success": True,
+#             "data": invoices
+#         }
+
+#     except Exception as e:
+#         frappe.log_error(frappe.get_traceback(), "Error fetching sales invoices")
+#         return {
+#             "success": False,
+#             "error": str(e)
+#         }
+
 @frappe.whitelist(allow_guest=True)
 def get_sales_invoices(limit=100, start=0):
     try:
-                # Get current user's POS opening entry
+        # Get current user's POS opening entry
         current_opening_entry = get_current_pos_opening_entry()
 
         # Check if user has administrative privileges
@@ -43,35 +141,41 @@ def get_sales_invoices(limit=100, start=0):
         # Base filters
         filters = {}
 
-        # If user has administrative privileges, show all invoices
         if is_admin_user:
             frappe.logger().info(f"Admin user {frappe.session.user} with roles {user_roles} - showing all invoices")
-        # If user has an active POS opening entry, filter by it
         elif current_opening_entry:
             filters["custom_pos_opening_entry"] = current_opening_entry
             frappe.logger().info(f"Filtering invoices by POS opening entry: {current_opening_entry}")
         else:
             frappe.logger().info("No active POS opening entry found, showing all invoices")
 
+        # ✅ Dynamically check if field exists
+        sales_invoice_meta = frappe.get_meta("Sales Invoice")
+        has_zatca_status = any(df.fieldname == "custom_zatca_submit_status" for df in sales_invoice_meta.fields)
+
+        fields = [
+            "name",
+            "posting_date",
+            "posting_time",
+            "owner",
+            "customer",
+            "customer_name",
+            "base_grand_total",
+            "base_rounded_total",
+            "status",
+            "discount_amount",
+            "total_taxes_and_charges",
+            "custom_pos_opening_entry",
+            "currency"
+        ]
+
+        if has_zatca_status:
+            fields.append("custom_zatca_submit_status")
+
         invoices = frappe.get_all(
             "Sales Invoice",
             filters=filters,
-            fields=[
-                "name",
-                "posting_date",
-                "posting_time",
-                "owner",
-                "customer",
-                "customer_name",
-                "base_grand_total",
-                "base_rounded_total",
-                "status",
-                "discount_amount",
-                "total_taxes_and_charges",
-                "custom_zatca_submit_status",
-                "custom_pos_opening_entry",
-                "currency"
-            ],
+            fields=fields,
             order_by="modified desc",
             limit=limit,
             start=start
@@ -82,24 +186,21 @@ def get_sales_invoices(limit=100, start=0):
             full_name = frappe.db.get_value("User", inv["owner"], "full_name") or inv["owner"]
             inv["cashier_name"] = full_name
 
-            # Format posting_time from timedelta to HH:MM:SS
+            # Format posting_time
             if inv.get("posting_time"):
                 if hasattr(inv["posting_time"], 'total_seconds'):
-                    # It's a timedelta object
                     total_seconds = int(inv["posting_time"].total_seconds())
                     hours = total_seconds // 3600
                     minutes = (total_seconds % 3600) // 60
                     seconds = total_seconds % 60
                     inv["posting_time"] = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
                 else:
-                    # It's already a string, keep as is
                     inv["posting_time"] = str(inv["posting_time"])
 
-            # Get items with return quantities for this invoice
+            # Get items with return quantities
             invoice_doc = frappe.get_doc("Sales Invoice", inv["name"])
             items = []
             for item in invoice_doc.items:
-                # Get returned quantity for this item
                 returned_data = returned_qty(invoice_doc.customer, invoice_doc.name, item.item_code)
                 returned_qty_value = returned_data.get("total_returned_qty", 0)
                 available_qty = item.qty - returned_qty_value
@@ -114,19 +215,14 @@ def get_sales_invoices(limit=100, start=0):
                     "returned_qty": returned_qty_value,
                     "available_qty": available_qty
                 })
-
             inv["items"] = items
-        return {
-            "success": True,
-            "data": invoices
-        }
+
+        return {"success": True, "data": invoices}
 
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Error fetching sales invoices")
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        return {"success": False, "error": str(e)}
+
 
 @frappe.whitelist(allow_guest=True)
 def get_invoice_details(invoice_id):
