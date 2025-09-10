@@ -591,7 +591,7 @@ export default function AddCustomerModal({
                   )}
                 </div>
 
-                {formData.customer_type === "company" && (
+                {formData.customer_type === "company" && posDetails?.is_zatca_enabled && (
                   <div>
                     <label
                       htmlFor="country"
