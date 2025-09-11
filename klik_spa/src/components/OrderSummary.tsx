@@ -65,7 +65,7 @@ export default function OrderSummary({
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const couponButtonRef = useRef<HTMLButtonElement>(null);
   const { customers, isLoading, error, refetch: refetchCustomers } = useCustomers();
-  const { refetch: refetchProducts } = useProducts();
+  const { refetch: refetchProducts, updateStockForItems } = useProducts();
   const navigate = useNavigate();
   const { posDetails, loading: posLoading } = usePOSDetails();
   const [prefilledCustomerName, setPrefilledCustomerName] = useState("");
@@ -357,17 +357,26 @@ export default function OrderSummary({
     // In a real app, this would process the payment and create invoice
     console.log("Processing payment:", paymentData);
     setShowPaymentDialog(false);
-    handleClearCart();
 
-    // Silently refresh products to update stock availability
+    // Efficiently update stock only for sold items instead of reloading all products
     try {
-      console.log("OrderSummary: Starting product refresh after payment completion...");
-      await refetchProducts();
-      console.log("OrderSummary: Products refreshed successfully after payment completion");
+      const soldItemCodes = cartItems.map(item => item.id);
+      console.log("OrderSummary: Updating stock for sold items:", soldItemCodes);
+      await updateStockForItems(soldItemCodes);
+      console.log("OrderSummary: Stock updated successfully for sold items");
     } catch (error) {
-      console.error("OrderSummary: Failed to refresh products:", error);
-      // Don't show error to user as this is a background operation
+      console.error("OrderSummary: Failed to update stock for sold items:", error);
+      // Fallback to full refresh if specific update fails
+      try {
+        console.log("OrderSummary: Falling back to full product refresh...");
+        await refetchProducts();
+        console.log("OrderSummary: Full product refresh completed");
+      } catch (fallbackError) {
+        console.error("OrderSummary: Full refresh also failed:", fallbackError);
+      }
     }
+
+    handleClearCart();
   };
 
   const handleClosePaymentDialog = async () => {

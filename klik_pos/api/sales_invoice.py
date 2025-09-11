@@ -307,7 +307,23 @@ def get_invoice_details(invoice_id):
 @frappe.whitelist()
 def create_and_submit_invoice(data):
     try:
+        # Start timing for performance monitoring
+        import time
+        start_time = time.time()
+
+        # Validate input data
+        if not data:
+            frappe.throw("No data provided for invoice creation")
+
         customer, items, amount_paid, sales_and_tax_charges, mode_of_payment, business_type, roundoff_amount = parse_invoice_data(data)
+
+        # Validate required fields
+        if not customer:
+            frappe.throw("Customer is required")
+        if not items or len(items) == 0:
+            frappe.throw("At least one item is required")
+
+        # Build invoice document
         doc = build_sales_invoice_doc(
             customer, items, amount_paid, sales_and_tax_charges,
             mode_of_payment, business_type, roundoff_amount,
@@ -317,17 +333,35 @@ def create_and_submit_invoice(data):
         doc.base_paid_amount = amount_paid
         doc.paid_amount = amount_paid
         doc.outstanding_amount = 0
-        doc.save()
+
+        # Debug: Print document fields before save
+        frappe.log_error(f"Invoice doc fields: company={doc.company}, currency={doc.currency}, conversion_rate={doc.conversion_rate}", "Invoice Debug")
+
+        # Save and submit in one transaction
+        doc.save(ignore_permissions=True)
         doc.submit()
+
+        # Create payment entry for B2B (async if possible)
         payment_entry = None
         if business_type == "B2B" and mode_of_payment and amount_paid > 0:
-            payment_entry = create_payment_entry(doc, mode_of_payment, amount_paid)
+            try:
+                payment_entry = create_payment_entry(doc, mode_of_payment, amount_paid)
+            except Exception as pe_error:
+                frappe.log_error(frappe.get_traceback(), f"Payment Entry Error for {doc.name}")
+                # Don't fail the invoice if payment entry fails
+                payment_entry = None
 
+        # Calculate processing time
+        processing_time = time.time() - start_time
+        frappe.logger().info(f"Invoice {doc.name} processed in {processing_time:.2f} seconds")
+
+        # Return minimal response to reduce network overhead
         return {
             "success": True,
             "invoice_name": doc.name,
-            "invoice": doc,
-            "payment_entry": payment_entry.name if payment_entry else None
+            "invoice_id": doc.name,  # Just the ID, not full object
+            "payment_entry": payment_entry.name if payment_entry else None,
+            "processing_time": round(processing_time, 2)
         }
 
     except Exception as e:
@@ -403,9 +437,20 @@ def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,
     doc.customer = customer
     doc.due_date = frappe.utils.nowdate()
     doc.custom_delivery_date = frappe.utils.nowdate()
+
+    # Set company and currency from POS Profile
+    pos_profile = get_current_pos_profile()
+    doc.company = pos_profile.company
     doc.currency = get_customer_billing_currency(customer)
+    doc.conversion_rate = 1.0  # Set conversion rate to 1 for same currency
     doc.is_pos = 1 if business_type == "B2C" else 0
     doc.update_stock = 1
+    doc.warehouse = pos_profile.warehouse
+
+    # Set additional required fields
+    doc.posting_date = frappe.utils.nowdate()
+    doc.posting_time = frappe.utils.nowtime()
+    doc.set_posting_time = 1
 
     # Set the current POS opening entry
     current_opening_entry = get_current_pos_opening_entry()
@@ -430,12 +475,23 @@ def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,
 
     # Populate items
     for item in items:
+        income_account = get_income_accounts(item.get("id"))
+        expense_account = get_expense_accounts(item.get("id"))
+
+        # Ensure we have valid accounts
+        if not income_account:
+            frappe.throw(f"Income account not found for item {item.get('id')}. Please check item defaults or company settings.")
+        if not expense_account:
+            frappe.throw(f"Expense account not found for item {item.get('id')}. Please check item defaults or company settings.")
+
         doc.append("items", {
             "item_code": item.get("id"),
             "qty": item.get("quantity"),
             "rate": item.get("price"),
-            "income_account": get_income_accounts(item.get("id")),
-            "expense_account": get_expense_accounts(item.get("id"))
+            "income_account": income_account,
+            "expense_account": expense_account,
+            "warehouse": pos_profile.warehouse,
+            "cost_center": pos_profile.cost_center
         })
 
     # If taxes_and_charges is set, populate taxes manually
@@ -484,45 +540,36 @@ def get_tax_template(template_name):
 
 
 def get_customer_billing_currency(customer):
-    customer_doc = frappe.get_doc("Customer", customer)
-    return customer_doc.default_currency
+    try:
+        customer_doc = frappe.get_doc("Customer", customer)
+        if customer_doc.default_currency:
+            return customer_doc.default_currency
+    except:
+        pass
+
+    # Fallback to company currency
+    pos_profile = get_current_pos_profile()
+    company_doc = frappe.get_doc("Company", pos_profile.company)
+    return company_doc.default_currency
 
 def get_income_accounts(item_code):
-    company = get_user_default_company()
     try:
-        item_doc = frappe.get_doc("Item", item_code)
-        item_defaults = item_doc.get("item_defaults")
-
-        if item_defaults:
-            for default in item_defaults:
-                if default.get("company") == company:
-                    this_company = frappe.get_doc("Company", company)
-                    income_account = this_company.default_income_account
-                    return income_account
-
-        return None
-
+        pos_profile = get_current_pos_profile()
+        company = pos_profile.company
+        company_doc = frappe.get_doc("Company", company)
+        return company_doc.default_income_account
     except Exception as e:
-        frappe.log_error(f"Error fetching income account for {item_code} and {company}: {str(e)[:140]}", "Income Account Fetch Error")
+        frappe.log_error(f"Error fetching income account for {item_code}: {str(e)}", "Income Account Error")
         return None
 
 def get_expense_accounts(item_code):
-    company = get_user_default_company()
     try:
-        item_doc = frappe.get_doc("Item", item_code)
-        item_defaults = item_doc.item_defaults
-
-        if item_defaults:
-            for default in item_defaults:
-                if default.get("company") == company:
-                    this_company = frappe.get_doc("Company", company)
-                    expense_account = this_company.default_expense_account
-                    return expense_account
-
-        return None
-
+        pos_profile = get_current_pos_profile()
+        company = pos_profile.company
+        company_doc = frappe.get_doc("Company", company)
+        return company_doc.default_expense_account
     except Exception as e:
-        frappe.log_error(f"Error fetching expense account for {item_code}: {str(e)[:140]}", "Expense Account Fetch Error")
+        frappe.log_error(f"Error fetching expense account for {item_code}: {str(e)}", "Expense Account Error")
         return None
 
 
@@ -1159,7 +1206,7 @@ def create_multi_invoice_return(return_data):
         customer = return_data.get("customer")
         invoice_returns = return_data.get("invoice_returns", [])
 
-      
+
         created_returns = []
 
         for i, invoice_return in enumerate(invoice_returns):

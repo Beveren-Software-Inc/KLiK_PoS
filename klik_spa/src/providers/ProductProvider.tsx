@@ -8,6 +8,7 @@ interface ProductContextType {
   error: string | null;
   refetchProducts: () => Promise<void>;
   updateStockOnly: (itemCode: string, newStock: number) => void;
+  updateStockForItems: (itemCodes: string[]) => Promise<void>;
   count: number;
   lastUpdated: Date | null;
 }
@@ -179,6 +180,45 @@ export function ProductProvider({ children }: ProductProviderProps) {
     console.log(`Updated stock for ${itemCode} to ${newStock}`);
   }, []);
 
+  // Update stock for multiple specific items (efficient for post-payment updates)
+  const updateStockForItems = useCallback(async (itemCodes: string[]) => {
+    if (itemCodes.length === 0) return;
+
+    try {
+      console.log(`Updating stock for ${itemCodes.length} items:`, itemCodes);
+
+      // Create comma-separated string for the API
+      const itemCodesString = itemCodes.join(',');
+
+      const response = await fetch(
+        `/api/method/klik_pos.api.item.get_items_stock_batch?item_codes=${encodeURIComponent(itemCodesString)}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const resData = await response.json();
+      console.log('Batch stock update response:', resData);
+
+      if (resData?.message && typeof resData.message === 'object') {
+        const stockUpdates = resData.message;
+
+        setProducts(prevProducts =>
+          prevProducts.map(product => ({
+            ...product,
+            available: stockUpdates[product.id] ?? product.available
+          }))
+        );
+
+        console.log(`Updated stock for ${Object.keys(stockUpdates).length} items`);
+      }
+    } catch (error) {
+      console.error('Failed to update stock for items:', error);
+      // Don't throw error to avoid breaking the payment flow
+    }
+  }, []);
+
   const refetchProducts = async () => {
     console.log("Force refreshing products...");
     await fetchProducts(true);
@@ -201,6 +241,7 @@ export function ProductProvider({ children }: ProductProviderProps) {
     error,
     refetchProducts,
     updateStockOnly,
+    updateStockForItems,
     count: products.length,
     lastUpdated,
   };

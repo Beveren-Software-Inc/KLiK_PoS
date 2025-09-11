@@ -10,7 +10,7 @@ import { useProducts } from "../hooks/useProducts"
 export default function MobilePaymentPage() {
   const navigate = useNavigate()
   const { cartItems, appliedCoupons, selectedCustomer, clearCart } = useCartStore()
-  const { refetch: refetchProducts } = useProducts()
+  const { refetch: refetchProducts, updateStockForItems } = useProducts();
 
   const handleClose = async () => {
     // Silently refresh products to update stock availability
@@ -26,18 +26,26 @@ export default function MobilePaymentPage() {
 
   const handleCompletePayment = async (paymentData: any) => {
     console.log('Payment completed:', paymentData)
-    clearCart()
 
-    // Silently refresh products to update stock availability
+    // Efficiently update stock only for sold items instead of reloading all products
     try {
-      console.log("MobilePaymentPage: Starting product refresh after payment completion...");
-      await refetchProducts();
-      console.log("MobilePaymentPage: Products refreshed successfully after payment completion");
+      const soldItemCodes = cartItems.map(item => item.id);
+      console.log("MobilePaymentPage: Updating stock for sold items:", soldItemCodes);
+      await updateStockForItems(soldItemCodes);
+      console.log("MobilePaymentPage: Stock updated successfully for sold items");
     } catch (error) {
-      console.error("MobilePaymentPage: Failed to refresh products:", error);
-      // Don't show error to user as this is a background operation
+      console.error("MobilePaymentPage: Failed to update stock for sold items:", error);
+      // Fallback to full refresh if specific update fails
+      try {
+        console.log("MobilePaymentPage: Falling back to full product refresh...");
+        await refetchProducts();
+        console.log("MobilePaymentPage: Full product refresh completed");
+      } catch (fallbackError) {
+        console.error("MobilePaymentPage: Full refresh also failed:", fallbackError);
+      }
     }
 
+    clearCart()
     // Navigate after stock refresh is complete
     navigate('/pos')
   }
