@@ -136,7 +136,7 @@ def get_items_with_balance_and_price(price_list: str = "Standard Selling"):
                 "currency": price_info["currency"],
                 "currency_symbol": price_info["currency_symbol"],
                 "available": balance,
-                "image": item.get("image") or "https://unsplash.com/photos/a-white-bowl-filled-with-different-types-of-food-VGGOHccbh0s",
+                "image": item.get("image") or "https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=300&h=300&fit=crop",
                 "sold": 0,
                 "preparationTime": 10,
                 "uom": item.get("stock_uom", "Nos")
