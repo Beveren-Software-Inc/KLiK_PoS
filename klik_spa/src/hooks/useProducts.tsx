@@ -7,9 +7,14 @@ import { useProducts as useProductsContext } from "../providers/ProductProvider"
 interface UseProductsReturn {
   products: MenuItem[];
   isLoading: boolean;
+  isRefreshingStock: boolean;
   error: string | null;
   refetch: () => Promise<void>;
+  refreshStockOnly: () => Promise<boolean>;
+  updateStockOnly: (itemCode: string, newStock: number) => void;
+  updateStockForItems: (itemCodes: string[]) => Promise<void>;
   count: number;
+  lastUpdated: Date | null;
 }
 
 type Batch = {
@@ -31,9 +36,14 @@ export function useProducts(): UseProductsReturn {
   return {
     products: context.products,
     isLoading: context.isLoading,
+    isRefreshingStock: context.isRefreshingStock,
     error: context.error,
     refetch: context.refetchProducts,
+    refreshStockOnly: context.refreshStockOnly,
+    updateStockOnly: context.updateStockOnly,
+    updateStockForItems: context.updateStockForItems,
     count: context.products.length,
+    lastUpdated: context.lastUpdated,
   };
 }
 

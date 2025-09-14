@@ -613,6 +613,9 @@ export default function PaymentDialog({
         ? "Invoice submitted successfully!"
         : "Payment completed successfully!";
       toast.success(successMessage);
+
+      // Don't clear cart immediately - let modal stay open for invoice preview
+      console.log("Invoice created successfully - modal stays open for preview");
     } catch (err) {
       const errorMessage = isB2B
         ? "Failed to submit invoice"
@@ -840,8 +843,8 @@ export default function PaymentDialog({
                 <div className="pt-4">
                   <button
                     onClick={() => {
-                      onCompletePayment(null);
-                      // Let the parent component handle navigation after stock refresh
+                      // Simply close the modal - no navigation needed
+                      onClose();
                     }}
                     className="w-full py-3 bg-beveren-600 text-white rounded-lg font-medium hover:bg-beveren-700 transition-colors"
                   >
@@ -2087,7 +2090,7 @@ export default function PaymentDialog({
             <div className="flex justify-end space-x-4">
               {invoiceSubmitted && (
                 <button
-                  onClick={onCompletePayment}
+                  onClick={onClose}
                   className="bg-beveren-500 px-6 py-2 border border-gray-300 dark:border-gray-600 text-white dark:text-gray-300 rounded-lg font-medium hover:bg-green-700 dark:hover:bg-gray-800 transition-colors"
                 >
                   New Order

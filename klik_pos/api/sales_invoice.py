@@ -355,11 +355,12 @@ def create_and_submit_invoice(data):
         processing_time = time.time() - start_time
         frappe.logger().info(f"Invoice {doc.name} processed in {processing_time:.2f} seconds")
 
-        # Return minimal response to reduce network overhead
+        # Return invoice data for print preview
         return {
             "success": True,
             "invoice_name": doc.name,
-            "invoice_id": doc.name,  # Just the ID, not full object
+            "invoice_id": doc.name,
+            "invoice": doc,  # Full invoice object for print preview
             "payment_entry": payment_entry.name if payment_entry else None,
             "processing_time": round(processing_time, 2)
         }
