@@ -101,6 +101,9 @@ def get_item_by_barcode(barcode: str):
 
 @frappe.whitelist(allow_guest=True)
 def get_items_with_balance_and_price(price_list: str = "Standard Selling"):
+    """
+    Get items with balance and price - optimized version with caching support
+    """
     pos_doc = get_current_pos_profile()
     warehouse = pos_doc.warehouse
 
@@ -146,6 +149,72 @@ def get_items_with_balance_and_price(price_list: str = "Standard Selling"):
         frappe.throw(_("Something went wrong while fetching item data."))
 
 
+
+@frappe.whitelist(allow_guest=True)
+def get_stock_updates():
+    """Get only stock updates for all items - lightweight endpoint for real-time updates."""
+    pos_doc = get_current_pos_profile()
+    warehouse = pos_doc.warehouse
+
+    try:
+        # If POS Profile has item groups → only use those
+        filters = {"disabled": 0, "is_stock_item": 1}
+        if pos_doc.item_groups:
+            item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
+            if item_group_names:
+                filters["item_group"] = ["in", item_group_names]
+
+        # Get only item codes - much faster query
+        items = frappe.get_all(
+            "Item",
+            filters=filters,
+            fields=["name"],
+            order_by="modified desc"
+        )
+
+        stock_updates = {}
+        for item in items:
+            balance = fetch_item_balance(item["name"], warehouse)
+            stock_updates[item["name"]] = balance
+
+        return stock_updates
+
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "Get Stock Updates Error")
+        frappe.throw(_("Something went wrong while fetching stock updates."))
+
+@frappe.whitelist(allow_guest=True)
+def get_item_stock(item_code: str):
+    """Get stock for a specific item - for individual updates."""
+    pos_doc = get_current_pos_profile()
+    warehouse = pos_doc.warehouse
+
+    try:
+        balance = fetch_item_balance(item_code, warehouse)
+        return {"item_code": item_code, "available": balance}
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), f"Get Item Stock Error for {item_code}")
+        return {"item_code": item_code, "available": 0}
+
+@frappe.whitelist(allow_guest=True)
+def get_items_stock_batch(item_codes: str):
+    """Get stock for multiple specific items - optimized batch update."""
+    pos_doc = get_current_pos_profile()
+    warehouse = pos_doc.warehouse
+
+    try:
+        # Parse the comma-separated item codes
+        item_codes_list = [code.strip() for code in item_codes.split(',') if code.strip()]
+
+        stock_updates = {}
+        for item_code in item_codes_list:
+            balance = fetch_item_balance(item_code, warehouse)
+            stock_updates[item_code] = balance
+
+        return stock_updates
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), f"Get Items Stock Batch Error for {item_codes}")
+        return {}
 
 @frappe.whitelist(allow_guest=True)
 def get_item_groups_for_pos():
