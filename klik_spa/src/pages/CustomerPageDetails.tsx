@@ -32,6 +32,7 @@ import { useCustomerDetails } from "../hooks/useCustomers";
 import { usePOSDetails } from "../hooks/usePOSProfile";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { isToday, isThisWeek, isThisMonth, isThisYear } from "../utils/time";
+import AddCustomerModal from "../components/AddCustomerModal";
 
 export default function CustomerDetailsPage() {
   const navigate = useNavigate();
@@ -44,6 +45,10 @@ export default function CustomerDetailsPage() {
   // Single Invoice Return states
   const [showSingleReturn, setShowSingleReturn] = useState(false);
   const [selectedInvoiceForReturn, setSelectedInvoiceForReturn] = useState<SalesInvoice | null>(null);
+
+  // Customer edit modal state
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
 
   const { id: customerId } = useParams();
   const { customer, isLoadingC, errorC } = useCustomerDetails(customerId);
@@ -193,6 +198,12 @@ export default function CustomerDetailsPage() {
     }
   };
 
+  const handleSaveCustomer = (customer: any) => {
+    console.log('Saving customer:', customer);
+    setShowAddModal(false);
+    setSelectedCustomer(null);
+  };
+
   // Calculate customer metrics
   const customerMetrics = useMemo(() => {
     const totalInvoices = customerInvoices.length;
@@ -286,7 +297,14 @@ export default function CustomerDetailsPage() {
                   </p>
                 </div>
               </div>
-              <button className="flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors">
+              <button
+                onClick={() => {
+                  console.log('Customer data being passed to modal:', customer);
+                  setSelectedCustomer(customer);
+                  setShowAddModal(true);
+                }}
+                className="flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors"
+              >
                 <Edit className="w-4 h-4" />
                 <span>Update Customer</span>
               </button>
@@ -579,6 +597,18 @@ export default function CustomerDetailsPage() {
           onClose={() => setShowSingleReturn(false)}
           onSuccess={handleSingleReturnSuccess}
         />
+
+        {/* Customer Edit Modal */}
+        {showAddModal && (
+          <AddCustomerModal
+            customer={selectedCustomer}
+            onClose={() => {
+              setShowAddModal(false);
+              setSelectedCustomer(null);
+            }}
+            onSave={handleSaveCustomer}
+          />
+        )}
       </div>
     </div>
   );
