@@ -137,11 +137,50 @@ export function useCustomerDetails(customerId: string | null) {
       try {
         const response = await fetch(`/api/method/klik_pos.api.customer.get_customer_info?customer_name=${customerId}`);
         const resData = await response.json();
-        // if (!resData.message.success) {
-        //   throw new Error(resData.error || "Failed to fetch customer");
-        // }
 
-        setCustomer(resData.message);
+        if (!resData.message || resData.message.success === false) {
+          throw new Error(resData.message?.error || "Failed to fetch customer");
+        }
+
+        // Transform the API response to match the Customer interface
+        const apiCustomer = resData.message;
+        const transformedCustomer: Customer = {
+          id: apiCustomer.name,
+          type: apiCustomer.customer_type === "Company" ? "company" : "individual",
+          name: apiCustomer.customer_name || `Customer ${apiCustomer.name.slice(0, 5)}`,
+          email: apiCustomer.email_id || "",
+          phone: apiCustomer.mobile_no || "",
+          address: {
+            addressType: "Billing",
+            street: "",
+            city: "",
+            state: "",
+            zipCode: "",
+            country: "Saudi Arabia"
+          },
+          dateOfBirth: "",
+          gender: "other",
+          loyaltyPoints: 0,
+          totalSpent: 0,
+          totalOrders: 0,
+          preferredPaymentMethod: "Cash",
+          notes: "",
+          tags: [],
+          status: "active",
+          createdAt: apiCustomer.creation || new Date().toISOString(),
+          lastVisit: undefined,
+          avatar: undefined,
+          defaultCurrency: undefined,
+          companyCurrency: undefined,
+          // Add missing fields that AddCustomerModal expects
+          contactPerson: apiCustomer.customer_name || "", // Use customer_name as contact person for individual customers
+          companyName: apiCustomer.customer_type === "Company" ? apiCustomer.customer_name : undefined,
+          taxId: "",
+          industry: "",
+          employeeCount: ""
+        };
+
+        setCustomer(transformedCustomer);
       } catch (err: unknown) {
         if (err instanceof Error) {
           setError(err.message);

@@ -285,6 +285,10 @@ def get_invoice_details(invoice_id):
                 # It's already a string, keep as is
                 invoice_data["posting_time"] = str(invoice_data["posting_time"])
 
+        # Get cashier full name from document owner
+        cashier_name = frappe.db.get_value("User", invoice_data.get("owner"), "full_name") or invoice_data.get("owner")
+        invoice_data["cashier_name"] = cashier_name
+
         return {
             "success": True,
             "data": {

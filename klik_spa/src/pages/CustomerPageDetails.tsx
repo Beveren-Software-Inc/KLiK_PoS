@@ -32,6 +32,7 @@ import { useCustomerDetails } from "../hooks/useCustomers";
 import { usePOSDetails } from "../hooks/usePOSProfile";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { isToday, isThisWeek, isThisMonth, isThisYear } from "../utils/time";
+import AddCustomerModal from "../components/AddCustomerModal";
 
 export default function CustomerDetailsPage() {
   const navigate = useNavigate();
@@ -44,6 +45,10 @@ export default function CustomerDetailsPage() {
   // Single Invoice Return states
   const [showSingleReturn, setShowSingleReturn] = useState(false);
   const [selectedInvoiceForReturn, setSelectedInvoiceForReturn] = useState<SalesInvoice | null>(null);
+
+  // Customer edit modal state
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
 
   const { id: customerId } = useParams();
   const { customer, isLoadingC, errorC } = useCustomerDetails(customerId);
@@ -76,9 +81,16 @@ export default function CustomerDetailsPage() {
   const customerInvoices = useMemo(() => {
     if (isLoading || error || !customer) return [];
 
+    console.log('CustomerPageDetails: Filtering invoices for customer:', {
+      customerName: customer.name,
+      customerId: customer.id,
+      totalInvoices: invoices.length,
+      sampleInvoice: invoices[0]
+    });
+
     return invoices.filter((invoice) => {
-      // Filter by customer name using the actual API field
-      const isCustomerInvoice = invoice.customer === customer.customer_name;
+      // Filter by customer name using the correct field mapping
+      const isCustomerInvoice = invoice.customer === customer.name;
 
       if (!isCustomerInvoice) return false;
 
@@ -93,6 +105,12 @@ export default function CustomerDetailsPage() {
       return matchesSearch && matchesStatus && matchesDate;
     });
   }, [invoices, searchQuery, statusFilter, dateFilter, isLoading, error, customer]);
+
+  // Debug log for filtered results
+  console.log('CustomerPageDetails: Filtered customer invoices:', {
+    customerInvoicesCount: customerInvoices.length,
+    customerInvoices: customerInvoices
+  });
 
 
 
@@ -193,6 +211,12 @@ export default function CustomerDetailsPage() {
     }
   };
 
+  const handleSaveCustomer = (customer: any) => {
+    console.log('Saving customer:', customer);
+    setShowAddModal(false);
+    setSelectedCustomer(null);
+  };
+
   // Calculate customer metrics
   const customerMetrics = useMemo(() => {
     const totalInvoices = customerInvoices.length;
@@ -286,7 +310,14 @@ export default function CustomerDetailsPage() {
                   </p>
                 </div>
               </div>
-              <button className="flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors">
+              <button
+                onClick={() => {
+                  console.log('Customer data being passed to modal:', customer);
+                  setSelectedCustomer(customer);
+                  setShowAddModal(true);
+                }}
+                className="flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors"
+              >
                 <Edit className="w-4 h-4" />
                 <span>Update Customer</span>
               </button>
@@ -473,9 +504,11 @@ export default function CustomerDetailsPage() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         Status
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        ZATCA Status
-                      </th>
+                      {posDetails?.is_zatca_enabled && (
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          ZATCA Status
+                        </th>
+                      )}
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         Actions
                       </th>
@@ -484,7 +517,7 @@ export default function CustomerDetailsPage() {
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
                     {customerInvoices.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                        <td colSpan={posDetails?.is_zatca_enabled ? 7 : 6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                           No invoices found for this customer
                         </td>
                       </tr>
@@ -519,9 +552,11 @@ export default function CustomerDetailsPage() {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={getStatusBadge(invoice.status)}>{invoice.status}</span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={getStatusBadge(invoice.custom_zatca_submit_status)}>{invoice.custom_zatca_submit_status}</span>
-                          </td>
+                          {posDetails?.is_zatca_enabled && (
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={getStatusBadge(invoice.custom_zatca_submit_status)}>{invoice.custom_zatca_submit_status}</span>
+                            </td>
+                          )}
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex space-x-2">
                               <button
@@ -579,6 +614,18 @@ export default function CustomerDetailsPage() {
           onClose={() => setShowSingleReturn(false)}
           onSuccess={handleSingleReturnSuccess}
         />
+
+        {/* Customer Edit Modal */}
+        {showAddModal && (
+          <AddCustomerModal
+            customer={selectedCustomer}
+            onClose={() => {
+              setShowAddModal(false);
+              setSelectedCustomer(null);
+            }}
+            onSave={handleSaveCustomer}
+          />
+        )}
       </div>
     </div>
   );

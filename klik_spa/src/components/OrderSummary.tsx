@@ -373,7 +373,7 @@ export default function OrderSummary({
       const success = await refreshStockOnly();
       if (success) {
         console.log("OrderSummary: Stock refreshed successfully - cashier can now see updated availability");
-        toast.success("Stock updated - ready for next order!");
+        // toast.success("Stock updated - ready for next order!");
       } else {
         console.log("OrderSummary: No stock updates needed");
         toast.info("Stock is up to date");
