@@ -94,7 +94,7 @@ export async function createSalesInvoiceOptimized(data: any) {
   });
 }
 
-// Performance tips for live site optimization
+// Performance tips for live site optimization: by Mania
 export const PERFORMANCE_TIPS = {
   database: [
     "Enable database query caching",

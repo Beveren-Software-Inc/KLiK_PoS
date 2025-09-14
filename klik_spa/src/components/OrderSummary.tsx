@@ -65,7 +65,7 @@ export default function OrderSummary({
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const couponButtonRef = useRef<HTMLButtonElement>(null);
   const { customers, isLoading, error, refetch: refetchCustomers } = useCustomers();
-  const { refetch: refetchProducts, updateStockForItems } = useProducts();
+  const { refetch: refetchProducts, refreshStockOnly, updateStockForItems } = useProducts();
   const navigate = useNavigate();
   const { posDetails, loading: posLoading } = usePOSDetails();
   const [prefilledCustomerName, setPrefilledCustomerName] = useState("");
@@ -354,41 +354,34 @@ export default function OrderSummary({
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleCompletePayment = async (paymentData: any) => {
-    // In a real app, this would process the payment and create invoice
-    console.log("Processing payment:", paymentData);
-    setShowPaymentDialog(false);
-
-    // Efficiently update stock only for sold items instead of reloading all products
-    try {
-      const soldItemCodes = cartItems.map(item => item.id);
-      console.log("OrderSummary: Updating stock for sold items:", soldItemCodes);
-      await updateStockForItems(soldItemCodes);
-      console.log("OrderSummary: Stock updated successfully for sold items");
-    } catch (error) {
-      console.error("OrderSummary: Failed to update stock for sold items:", error);
-      // Fallback to full refresh if specific update fails
-      try {
-        console.log("OrderSummary: Falling back to full product refresh...");
-        await refetchProducts();
-        console.log("OrderSummary: Full product refresh completed");
-      } catch (fallbackError) {
-        console.error("OrderSummary: Full refresh also failed:", fallbackError);
-      }
-    }
-
-    handleClearCart();
+    // Payment completed and invoice created - modal stays open for preview
+    console.log("OrderSummary: Payment completed, invoice created - modal stays open for preview");
+    // Don't close modal or clear cart - let user see invoice preview
+    // Cart will be cleared when modal is closed via "New Order" button
   };
 
   const handleClosePaymentDialog = async () => {
     setShowPaymentDialog(false);
-    // Silently refresh products to update stock availability
+
+    // Clear cart when closing modal (New Order clicked)
+    console.log("OrderSummary: Closing payment modal - clearing cart for next order");
+    handleClearCart();
+
+    // Refresh stock so cashier can see updated availability
     try {
-      console.log("OrderSummary: Starting product refresh...");
-      await refetchProducts();
-      console.log("OrderSummary: Products refreshed successfully after payment modal close");
-    } catch (error) {
-      console.error("OrderSummary: Failed to refresh products:", error);
-      // Don't show error to user as this is a background operation
+      console.log("OrderSummary: Starting lightweight stock refresh...");
+      const success = await refreshStockOnly();
+      if (success) {
+        console.log("OrderSummary: Stock refreshed successfully - cashier can now see updated availability");
+        toast.success("Stock updated - ready for next order!");
+      } else {
+        console.log("OrderSummary: No stock updates needed");
+        toast.info("Stock is up to date");
+      }
+    } catch (error: any) {
+      console.error("OrderSummary: Failed to refresh stock:", error);
+      const errorMessage = error?.message || "Unknown error";
+      toast.error(`Failed to update stock: ${errorMessage}`);
     }
   };
 
@@ -485,16 +478,16 @@ export default function OrderSummary({
 
   // Set default customer from POS profile when available
   useEffect(() => {
-    console.log("Default customer useEffect triggered:", {
-      posDetails: posDetails,
-      defaultCustomer: posDetails?.default_customer,
-      selectedCustomer: selectedCustomer,
-      posLoading: posLoading
-    });
+    // console.log("Default customer useEffect triggered:", {
+    //   posDetails: posDetails,
+    //   defaultCustomer: posDetails?.default_customer,
+    //   selectedCustomer: selectedCustomer,
+    //   posLoading: posLoading
+    // });
 
     if (posDetails?.default_customer && !selectedCustomer && !posLoading) {
       const defaultCustomer = posDetails.default_customer;
-      console.log("Setting default customer:", defaultCustomer);
+      // console.log("Setting default customer:", defaultCustomer);
 
       // Transform the default customer data to match the Customer interface
       const transformedCustomer: Customer = {
@@ -1339,6 +1332,29 @@ export default function OrderSummary({
               Clear Cart
             </button>
           </div>
+
+          {/* Debug: Test Stock Update Button */}
+          {/* <div className="mb-3">
+            <button
+              onClick={async () => {
+                try {
+                  console.log("Testing stock update...");
+                  const success = await refreshStockOnly();
+                  if (success) {
+                    toast.success("Stock update test successful!");
+                  } else {
+                    toast.info("Stock update test completed - no changes needed");
+                  }
+                } catch (error: any) {
+                  console.error("Stock update test failed:", error);
+                  toast.error(`Stock update test failed: ${error?.message || "Unknown error"}`);
+                }
+              }}
+              className="w-full px-4 py-2 bg-gray-500 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors text-sm"
+            >
+              Test Stock Update
+            </button>
+          </div> */}
 
           {/* Pay Button */}
           <button

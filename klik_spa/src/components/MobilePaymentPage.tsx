@@ -10,44 +10,28 @@ import { useProducts } from "../hooks/useProducts"
 export default function MobilePaymentPage() {
   const navigate = useNavigate()
   const { cartItems, appliedCoupons, selectedCustomer, clearCart } = useCartStore()
-  const { refetch: refetchProducts, updateStockForItems } = useProducts();
+  const { refetch: refetchProducts, refreshStockOnly, updateStockForItems } = useProducts();
 
   const handleClose = async () => {
-    // Silently refresh products to update stock availability
+    // Clear cart when closing payment page (New Order clicked)
+    console.log("MobilePaymentPage: Closing payment page - clearing cart for next order");
+    clearCart();
+
+    // Simple stock refresh and navigate back
     try {
-      await refetchProducts();
-      console.log("Products refreshed after payment modal close");
+      await refreshStockOnly();
+      console.log("Stock refreshed after payment modal close");
     } catch (error) {
-      console.error("Failed to refresh products:", error);
-      // Don't show error to user as this is a background operation
+      console.error("Failed to refresh stock:", error);
     }
     navigate(-1)
   }
 
   const handleCompletePayment = async (paymentData: any) => {
     console.log('Payment completed:', paymentData)
-
-    // Efficiently update stock only for sold items instead of reloading all products
-    try {
-      const soldItemCodes = cartItems.map(item => item.id);
-      console.log("MobilePaymentPage: Updating stock for sold items:", soldItemCodes);
-      await updateStockForItems(soldItemCodes);
-      console.log("MobilePaymentPage: Stock updated successfully for sold items");
-    } catch (error) {
-      console.error("MobilePaymentPage: Failed to update stock for sold items:", error);
-      // Fallback to full refresh if specific update fails
-      try {
-        console.log("MobilePaymentPage: Falling back to full product refresh...");
-        await refetchProducts();
-        console.log("MobilePaymentPage: Full product refresh completed");
-      } catch (fallbackError) {
-        console.error("MobilePaymentPage: Full refresh also failed:", fallbackError);
-      }
-    }
-
-    clearCart()
-    // Navigate after stock refresh is complete
-    navigate('/pos')
+    // Don't clear cart immediately - let user see invoice preview
+    // Cart will be cleared when user closes the payment page
+    console.log("MobilePaymentPage: Payment completed - cart will be cleared when page is closed");
   }
 
   const handleHoldOrder = (orderData: any) => {
