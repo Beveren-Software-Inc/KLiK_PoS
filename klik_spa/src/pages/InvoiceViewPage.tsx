@@ -21,19 +21,27 @@ import {
   AlertTriangle,
   RotateCcw,
   Users,
-  FileMinus
+  FileMinus,
+  Receipt,
+  TrendingUp,
+  Clock,
+  CreditCard,
+  Percent
 } from "lucide-react";
 
 
 import RetailSidebar from "../components/RetailSidebar";
 import PaymentDialog from "../components/PaymentDialog";
 import { useInvoiceDetails } from "../hooks/useInvoiceDetails";
+import { useCustomerStatistics } from "../hooks/useCustomerStatistics";
 import { createSalesReturn } from "../services/salesInvoice";
 import { toast } from "react-toastify";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { DisplayPrintPreview, handlePrintInvoice } from "../utils/invoicePrint";
 import SingleInvoiceReturn from "../components/SingleInvoiceReturn";
 import MultiInvoiceReturn from "../components/MultiInvoiceReturn";
+import { formatCurrency } from "../utils/currency";
+import AddCustomerModal from "../components/AddCustomerModal";
 
 export default function InvoiceViewPage() {
 
@@ -41,6 +49,7 @@ export default function InvoiceViewPage() {
   const invoiceId = id ?? ""
 
   const { invoice, isLoading, error } = useInvoiceDetails(invoiceId);
+  const { statistics: customerStats, isLoading: statsLoading } = useCustomerStatistics(invoice?.customer || null);
   const navigate = useNavigate()
 
   // PaymentDialog state for sharing
@@ -51,13 +60,17 @@ export default function InvoiceViewPage() {
   const [showSingleReturn, setShowSingleReturn] = useState(false)
   const [showMultiReturn, setShowMultiReturn] = useState(false)
 
+  // Customer edit modal state
+  const [showCustomerEditModal, setShowCustomerEditModal] = useState(false)
+  const [customerData, setCustomerData] = useState<any>(null)
+  const [isLoadingCustomer, setIsLoadingCustomer] = useState(false)
+
 
   const handleBackClick = () => {
     navigate(`/invoice`)
   };
 
 
-  const formatCurrency = (amount) => `$${amount?.toFixed(2) || '0.00'}`;
 
   const getStatusBadge = (status) => {
     const baseClasses = "px-3 py-1 rounded-full text-sm font-medium flex items-center space-x-1";
@@ -90,13 +103,67 @@ export default function InvoiceViewPage() {
     }
   };
 
-  const handleEditCustomer = () => {
-    console.log("Not implemented")
+  const handleEditCustomer = async () => {
+    if (!invoice?.customer) {
+      toast.error("Customer information not available");
+      return;
+    }
+
+    setIsLoadingCustomer(true);
+    try {
+      const response = await fetch(`/api/method/klik_pos.api.customer.get_customer_info?customer_name=${encodeURIComponent(invoice.customer)}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      if (result?.message?.success !== false) {
+        // Transform the API response to match the Customer interface expected by AddCustomerModal
+        const customerInfo = result.message;
+        const transformedCustomer = {
+          id: customerInfo.name,
+          name: customerInfo.customer_name,
+          type: customerInfo.customer_type?.toLowerCase() === 'company' ? 'company' : 'individual',
+          email: customerInfo.email_id || '',
+          phone: customerInfo.mobile_no || '',
+          address: {
+            addressType: 'Billing',
+            street: '',
+            city: '',
+            state: '',
+            zipCode: '',
+            country: 'Saudi Arabia',
+          },
+          status: 'active' as const,
+          preferredPaymentMethod: 'Cash' as const,
+        };
+
+        setCustomerData(transformedCustomer);
+        setShowCustomerEditModal(true);
+      } else {
+        throw new Error(result?.message?.error || 'Failed to fetch customer details');
+      }
+    } catch (error: any) {
+      console.error('Error fetching customer details:', error);
+      toast.error(error.message || 'Failed to fetch customer details');
+    } finally {
+      setIsLoadingCustomer(false);
+    }
   };
 
   const handleSingleReturnSuccess = (returnInvoice: string) => {
     toast.success(`Return invoice created: ${returnInvoice}`);
     navigate(`/invoice/${returnInvoice}`);
+  };
+
+  const handleSaveCustomer = (updatedCustomer: any) => {
+    console.log('Saving customer:', updatedCustomer);
+    setShowCustomerEditModal(false);
+    setCustomerData(null);
+    toast.success('Customer updated successfully!');
+    // Optionally refresh the invoice data to show updated customer info
   };
 
   const handleMultiReturnSuccess = (returnInvoices: string[]) => {
@@ -238,15 +305,12 @@ export default function InvoiceViewPage() {
                 </button>
 
                 <button
-                  className="group relative p-2 text-purple-600 hover:bg-purple-100 dark:text-purple-400 dark:hover:bg-purple-900 rounded-lg transition-all duration-200"
-                  onClick={() => {
-                    setSharingMode('sms')
-                    setShowPaymentDialog(true)
-                  }}
+                  className="group relative p-2 text-gray-400 cursor-not-allowed opacity-50"
+                  disabled
                 >
                   <MessageSquarePlus size={20} />
                   <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
-                    Send via SMS
+                    SMS (Disabled)
                   </span>
                 </button>
 
@@ -326,7 +390,7 @@ export default function InvoiceViewPage() {
                           </div>
                           <div className="flex justify-between">
                             <span className="text-sm text-gray-600 dark:text-gray-400">Cashier:</span>
-                            <span className="text-sm text-gray-900 dark:text-white">{invoice.cashier}</span>
+                            <span className="text-sm text-gray-900 dark:text-white">{invoice.cashier_name || invoice.owner}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-sm text-gray-600 dark:text-gray-400">Payment:</span>
@@ -370,10 +434,10 @@ export default function InvoiceViewPage() {
                               {item.qty}
                             </td>
                             <td className="px-6 py-4 text-right text-sm text-gray-900 dark:text-white">
-                              {formatCurrency(item.rate)}
+                              {formatCurrency(item.rate, invoice.currency)}
                             </td>
                             <td className="px-6 py-4 text-right text-sm font-medium text-gray-900 dark:text-white">
-                              {formatCurrency(item.amount)}
+                              {formatCurrency(item.amount, invoice.currency)}
                             </td>
                           </tr>
                         ))}
@@ -381,29 +445,95 @@ export default function InvoiceViewPage() {
                     </table>
                   </div>
 
+                  {/* Tax Details Section */}
+                  {invoice.taxes && invoice.taxes.length > 0 && (
+                    <div className="px-6 py-4 bg-beveren-50 dark:bg-beveren-900/20 border-t border-gray-200 dark:border-gray-600">
+                      <div className="flex items-center space-x-2 mb-3">
+                        <Percent className="w-5 h-5 text-beveren-600 dark:text-beveren-400" />
+                        <h4 className="text-sm font-semibold text-beveren-900 dark:text-beveren-100">Tax Details</h4>
+                      </div>
+                      <div className="space-y-2">
+                        {invoice.taxes.map((tax, index) => (
+                          <div key={index} className="flex justify-between items-center text-sm">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-beveren-700 dark:text-beveren-300 font-medium">{tax.account_head}</span>
+                              <span className="text-beveren-600 dark:text-beveren-400">({tax.rate}%)</span>
+                              {tax.included_in_print_rate === 1 && (
+                                <span className="px-2 py-1 bg-beveren-100 dark:bg-beveren-800 text-beveren-800 dark:text-beveren-200 text-xs rounded-full">
+                                  Inclusive
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-beveren-900 dark:text-beveren-100 font-semibold">
+                              {formatCurrency(tax.tax_amount, invoice.currency)}
+                            </span>
+                          </div>
+                        ))}
+                        <div className="flex justify-between items-center text-sm pt-2 border-t border-beveren-200 dark:border-beveren-700">
+                          <span className="text-beveren-700 dark:text-beveren-300 font-semibold">Total Tax:</span>
+                          <span className="text-beveren-900 dark:text-beveren-100 font-bold">
+                            {formatCurrency(invoice.total_taxes_and_charges, invoice.currency)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Totals */}
                   <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700">
                     <div className="flex justify-end">
-                      <div className="w-64 space-y-2">
+                      <div className="w-80 space-y-2">
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
-                          <span className="text-gray-900 dark:text-white">{formatCurrency(invoice.total)}</span>
+                          <span className="text-gray-900 dark:text-white">{formatCurrency(invoice.total, invoice.currency)}</span>
                         </div>
+
+                        {invoice.total_taxes_and_charges > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">Tax:</span>
+                            <span className="text-gray-900 dark:text-white">{formatCurrency(invoice.total_taxes_and_charges, invoice.currency)}</span>
+                          </div>
+                        )}
+
+                        {invoice.rounding_adjustment !== 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">Rounding:</span>
+                            <span className="text-gray-900 dark:text-white">{formatCurrency(invoice.rounding_adjustment, invoice.currency)}</span>
+                          </div>
+                        )}
+
                         {invoice.giftCardDiscount > 0 && (
                           <div className="flex justify-between text-sm">
                             <span className="text-gray-600 dark:text-gray-400">Gift Card Discount:</span>
-                            <span className="text-green-600 dark:text-green-400">-{formatCurrency(invoice.giftCardDiscount)}</span>
+                            <span className="text-green-600 dark:text-green-400">-{formatCurrency(invoice.giftCardDiscount, invoice.currency)}</span>
                           </div>
                         )}
+
                         <hr className="border-gray-300 dark:border-gray-600" />
+
                         <div className="flex justify-between text-lg font-bold">
-                          <span className="text-gray-900 dark:text-white">Total:</span>
-                          <span className="text-gray-900 dark:text-white">{formatCurrency(invoice.grand_total)}</span>
+                          <span className="text-gray-900 dark:text-white">Grand Total:</span>
+                          <span className="text-gray-900 dark:text-white">{formatCurrency(invoice.grand_total, invoice.currency)}</span>
                         </div>
+
+                        {invoice.paid_amount > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">Paid Amount:</span>
+                            <span className="text-beveren-600 dark:text-beveren-400">{formatCurrency(invoice.paid_amount, invoice.currency)}</span>
+                          </div>
+                        )}
+
+                        {invoice.outstanding_amount > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">Outstanding:</span>
+                            <span className="text-orange-600 dark:text-orange-400">{formatCurrency(invoice.outstanding_amount, invoice.currency)}</span>
+                          </div>
+                        )}
+
                         {invoice.status === "Refunded" && invoice.refundAmount && (
                           <div className="flex justify-between text-sm border-t border-gray-300 dark:border-gray-600 pt-2">
                             <span className="text-red-600 dark:text-red-400">Refunded Amount:</span>
-                            <span className="text-red-600 dark:text-red-400">{formatCurrency(invoice.refundAmount)}</span>
+                            <span className="text-red-600 dark:text-red-400">{formatCurrency(invoice.refundAmount, invoice.currency)}</span>
                           </div>
                         )}
                       </div>
@@ -416,10 +546,44 @@ export default function InvoiceViewPage() {
                       <h4 className="text-sm font-medium text-purple-900 dark:text-purple-100 mb-2">Gift Card Applied:</h4>
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-purple-700 dark:text-purple-300">Code: {invoice.giftCardCode}</span>
-                        <span className="text-sm font-semibold text-purple-900 dark:text-purple-100">-{formatCurrency(invoice.giftCardDiscount)}</span>
+                        <span className="text-sm font-semibold text-purple-900 dark:text-purple-100">-{formatCurrency(invoice.giftCardDiscount, invoice.currency)}</span>
                       </div>
                     </div>
                   )}
+
+                  {/* Payment Details */}
+                  <div className="px-6 py-4 bg-orange-50 dark:bg-orange-900/20 border-t border-gray-200 dark:border-gray-600">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <CreditCard className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                      <h4 className="text-sm font-semibold text-orange-900 dark:text-orange-100">Payment Details</h4>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-orange-700 dark:text-orange-300">Payment Method:</span>
+                          <span className="text-orange-900 dark:text-orange-100 font-medium">{invoice.paymentMethod || 'Cash'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-orange-700 dark:text-orange-300">Status:</span>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(invoice.status)}`}>
+                            {invoice.status}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-orange-700 dark:text-orange-300">Paid Amount:</span>
+                          <span className="text-orange-900 dark:text-orange-100 font-semibold">{formatCurrency(invoice.paid_amount || 0, invoice.currency)}</span>
+                        </div>
+                        {invoice.outstanding_amount > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-red-700 dark:text-red-300">Outstanding:</span>
+                            <span className="text-red-900 dark:text-red-100 font-semibold">{formatCurrency(invoice.outstanding_amount, invoice.currency)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Notes */}
                   {invoice.notes && (
@@ -442,10 +606,15 @@ export default function InvoiceViewPage() {
                       </h3>
                       <button
                         onClick={handleEditCustomer}
-                        className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg"
+                        disabled={isLoadingCustomer}
+                        className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Edit Customer"
                       >
-                        <Edit size={16} />
+                        {isLoadingCustomer ? (
+                          <RefreshCw size={16} className="animate-spin" />
+                        ) : (
+                          <Edit size={16} />
+                        )}
                       </button>
                     </div>
                   </div>
@@ -472,32 +641,68 @@ export default function InvoiceViewPage() {
 
                     <hr className="border-gray-200 dark:border-gray-600" />
 
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium text-gray-900 dark:text-white">Customer Stats</h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
-                          <div className="flex items-center space-x-2">
-                            <Package className="w-4 h-4 text-beveren-600" />
-                            <div>
-                              <p className="text-sm text-gray-600 dark:text-gray-400">Total Orders</p>
-                              <p className="text-lg font-semibold text-gray-900 dark:text-white">{invoice.customer_address_doc?.email_id}</p>
+                    {/* Customer Statistics */}
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-2">
+                        <TrendingUp className="w-5 h-5 text-beveren-600" />
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Customer Statistics</h4>
+                      </div>
+
+                      {statsLoading ? (
+                        <div className="flex items-center justify-center py-4">
+                          <RefreshCw className="w-4 h-4 animate-spin text-gray-400" />
+                          <span className="ml-2 text-sm text-gray-500">Loading statistics...</span>
+                        </div>
+                      ) : customerStats ? (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-gradient-to-r from-beveren-50 to-beveren-100 dark:from-beveren-900/20 dark:to-beveren-800/20 rounded-lg p-4 border border-beveren-200 dark:border-beveren-700">
+                              <div className="flex items-center space-x-3">
+                                <div className="p-2 bg-beveren-600 rounded-lg">
+                                  <Package className="w-4 h-4 text-white" />
+                                </div>
+                                <div>
+                                  <p className="text-xs text-beveren-700 dark:text-beveren-300 font-medium">Total Orders</p>
+                                  <p className="text-xl font-bold text-beveren-900 dark:text-beveren-100">
+                                    {customerStats.total_orders}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-lg p-4 border border-orange-200 dark:border-orange-700">
+                              <div className="flex items-center space-x-3">
+                                <div className="p-2 bg-orange-600 rounded-lg">
+                                  <DollarSign className="w-4 h-4 text-white" />
+                                </div>
+                                <div>
+                                  <p className="text-xs text-orange-700 dark:text-orange-300 font-medium">Total Spent</p>
+                                  <p className="text-xl font-bold text-orange-900 dark:text-orange-100">
+                                    {formatCurrency(customerStats.total_spent, invoice.currency)}
+                                  </p>
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
-                          <div className="flex items-center space-x-2">
-                            <DollarSign className="w-4 h-4 text-green-600" />
-                            <div>
-                              <p className="text-sm text-gray-600 dark:text-gray-400">Total Spent</p>
-                              <p className="text-lg font-semibold text-gray-900 dark:text-white">{invoice.customer_address_doc?.email_id}</p>
+
+                          {customerStats.last_visit && (
+                            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                              <div className="flex items-center space-x-2">
+                                <Clock className="w-4 h-4 text-gray-500" />
+                                <span className="text-sm text-gray-600 dark:text-gray-400">Last Visit:</span>
+                                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {new Date(customerStats.last_visit).toLocaleDateString()}
+                                </span>
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </div>
-                      </div>
-                      <div className="flex items-center space-x-2 text-sm">
-                        <Calendar className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-600 dark:text-gray-400">Last Order: {invoice.customer_address_doc?.email_id}</span>
-                      </div>
+                      ) : (
+                        <div className="text-center py-4">
+                          <AlertTriangle className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                          <p className="text-sm text-gray-500">Unable to load customer statistics</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -594,6 +799,18 @@ export default function InvoiceViewPage() {
         onClose={() => setShowMultiReturn(false)}
         onSuccess={handleMultiReturnSuccess}
       />
+
+      {/* Customer Edit Modal */}
+      {showCustomerEditModal && customerData && (
+        <AddCustomerModal
+          customer={customerData}
+          onClose={() => {
+            setShowCustomerEditModal(false);
+            setCustomerData(null);
+          }}
+          onSave={handleSaveCustomer}
+        />
+      )}
 
       </div>
     </div>

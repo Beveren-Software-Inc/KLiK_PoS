@@ -1162,15 +1162,9 @@ export default function PaymentDialog({
               </button>
 
               <button
-                className={`p-2 rounded-lg ${
-                  sharingMode === "sms"
-                    ? "bg-purple-100 text-teal-700"
-                    : "text-teal-600 hover:bg-purple-100"
-                } dark:text-teal-400 dark:hover:bg-teal-900`}
-                title="Text Message"
-                onClick={() =>
-                  setSharingMode(sharingMode === "sms" ? null : "sms")
-                }
+                className="p-2 rounded-lg text-gray-400 cursor-not-allowed opacity-50"
+                title="Text Message (Disabled)"
+                disabled
               >
                 <MessageSquarePlus size={20} />
               </button>
