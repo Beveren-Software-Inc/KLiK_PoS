@@ -21,7 +21,7 @@ import { useCustomers } from "../hooks/useCustomers";
 import { useProducts } from "../hooks/useProducts";
 import { toast } from "react-toastify";
 import { useBatchData } from "../hooks/useProducts";
-import { getBatches } from "../utils/batch"; // or wherever you put it
+import { getBatches } from "../utils/batch"; 
 import { useNavigate } from "react-router-dom";
 import { usePOSDetails } from "../hooks/usePOSProfile";
 
@@ -90,7 +90,6 @@ export default function OrderSummary({
       }
     >
   >({});
-  // const { getBatches } = useBatchData();
 
   const [itemBatches, setItemBatches] = useState<
     Record<string, { batch_no: string; qty: number }[]>
@@ -120,7 +119,7 @@ export default function OrderSummary({
       );
     }
 
-    return Math.max(0, discountedPrice); // Ensure price doesn't go negative
+    return Math.max(0, discountedPrice);
   };
 
   // Calculate subtotal with item-level discounts
@@ -207,7 +206,6 @@ export default function OrderSummary({
         setShowAddCustomerModal(true);
         setShowCustomerDropdown(false);
       } else if (filteredCustomers.length === 1) {
-        // If there's exactly one match, select it
         handleCustomerSelect(filteredCustomers[0]);
       }
       // If multiple matches, do nothing (let user choose from dropdown)
@@ -354,7 +352,6 @@ export default function OrderSummary({
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleCompletePayment = async (paymentData: any) => {
-    // Payment completed and invoice created - modal stays open for preview
     console.log("OrderSummary: Payment completed, invoice created - modal stays open for preview");
     // Don't close modal or clear cart - let user see invoice preview
     // Cart will be cleared when modal is closed via "New Order" button
@@ -415,7 +412,6 @@ export default function OrderSummary({
   };
 
   const handleClearCart = () => {
-    // Handle clearing the cart - remove all items immediately
     if (cartItems.length === 0) return;
 
     // Use dedicated clear function if available
