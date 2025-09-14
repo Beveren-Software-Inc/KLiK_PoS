@@ -81,9 +81,16 @@ export default function CustomerDetailsPage() {
   const customerInvoices = useMemo(() => {
     if (isLoading || error || !customer) return [];
 
+    console.log('CustomerPageDetails: Filtering invoices for customer:', {
+      customerName: customer.name,
+      customerId: customer.id,
+      totalInvoices: invoices.length,
+      sampleInvoice: invoices[0]
+    });
+
     return invoices.filter((invoice) => {
-      // Filter by customer name using the actual API field
-      const isCustomerInvoice = invoice.customer === customer.customer_name;
+      // Filter by customer name using the correct field mapping
+      const isCustomerInvoice = invoice.customer === customer.name;
 
       if (!isCustomerInvoice) return false;
 
@@ -98,6 +105,12 @@ export default function CustomerDetailsPage() {
       return matchesSearch && matchesStatus && matchesDate;
     });
   }, [invoices, searchQuery, statusFilter, dateFilter, isLoading, error, customer]);
+
+  // Debug log for filtered results
+  console.log('CustomerPageDetails: Filtered customer invoices:', {
+    customerInvoicesCount: customerInvoices.length,
+    customerInvoices: customerInvoices
+  });
 
 
 
@@ -491,9 +504,11 @@ export default function CustomerDetailsPage() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         Status
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        ZATCA Status
-                      </th>
+                      {posDetails?.is_zatca_enabled && (
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          ZATCA Status
+                        </th>
+                      )}
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         Actions
                       </th>
@@ -502,7 +517,7 @@ export default function CustomerDetailsPage() {
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
                     {customerInvoices.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                        <td colSpan={posDetails?.is_zatca_enabled ? 7 : 6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                           No invoices found for this customer
                         </td>
                       </tr>
@@ -537,9 +552,11 @@ export default function CustomerDetailsPage() {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={getStatusBadge(invoice.status)}>{invoice.status}</span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={getStatusBadge(invoice.custom_zatca_submit_status)}>{invoice.custom_zatca_submit_status}</span>
-                          </td>
+                          {posDetails?.is_zatca_enabled && (
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={getStatusBadge(invoice.custom_zatca_submit_status)}>{invoice.custom_zatca_submit_status}</span>
+                            </td>
+                          )}
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex space-x-2">
                               <button
