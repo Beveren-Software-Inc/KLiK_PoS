@@ -8,7 +8,7 @@ interface WhatsAppTestProps {
 
 export const WhatsAppTest: React.FC<WhatsAppTestProps> = ({
   mobile = '',
-  message = 'Hello from KLIK POS!'
+  message = 'Hello from KLiK PoS!'
 }) => {
   const [phoneNumber, setPhoneNumber] = useState(mobile);
   const [messageText, setMessageText] = useState(message);

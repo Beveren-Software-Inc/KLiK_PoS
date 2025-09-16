@@ -31,7 +31,7 @@ export default function RetailSidebar() {
         >
           <img
             src="/assets/klik_pos/klik_spa/beveren-logo-180.png"
-            alt="KLIK POS"
+            alt="KLiK PoS"
             className="w-12 h-12 rounded-full object-cover"
           />
         </div>

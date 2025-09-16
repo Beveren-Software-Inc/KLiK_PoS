@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"FcIZ54cymf\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Klik POS</span>\",\"col\":12}},{\"id\":\"r_0-ZqR6Xv\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Klik POS\",\"col\":3}}]",
+ "content": "[{\"id\":\"FcIZ54cymf\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">KLiK PoS</span>\",\"col\":12}},{\"id\":\"r_0-ZqR6Xv\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"KLiK PoS\",\"col\":3}}]",
  "creation": "2025-08-03 17:52:00.628296",
  "custom_blocks": [],
  "docstatus": 0,
@@ -10,12 +10,12 @@
  "idx": 0,
  "indicator_color": "blue",
  "is_hidden": 0,
- "label": "Klik POS",
+ "label": "KLiK PoS",
  "links": [],
  "modified": "2025-08-03 17:58:55.207849",
  "modified_by": "Administrator",
- "module": "KLIK POS",
- "name": "Klik POS",
+ "module": "KLiK PoS",
+ "name": "KLiK PoS",
  "number_cards": [],
  "owner": "Administrator",
  "parent_page": "",
@@ -27,10 +27,10 @@
   {
    "color": "Grey",
    "doc_view": "List",
-   "label": "Klik POS",
+   "label": "KLiK PoS",
    "type": "URL",
    "url": "/klik_pos"
   }
  ],
- "title": "Klik POS"
+ "title": "KLiK PoS"
 }

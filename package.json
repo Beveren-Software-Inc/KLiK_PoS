@@ -1,7 +1,7 @@
 {
   "name": "klik_pos",
   "version": "1.0.0",
-  "description": "KLIK POS: A Modern Point of Sale for your Business",
+  "description": "KLiK PoS: A Modern Point of Sale for your Business",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",

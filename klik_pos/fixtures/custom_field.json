@@ -29,7 +29,7 @@
   "insert_after": "select_print_heading",
   "is_system_generated": 0,
   "is_virtual": 0,
-  "label": "Klik POS Settings",
+  "label": "KLiK PoS Settings",
   "length": 0,
   "link_filters": null,
   "mandatory_depends_on": null,
