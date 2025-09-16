@@ -182,6 +182,28 @@ export default function RetailPOSLayout() {
 
   // Show error state with retry option
   if (error) {
+    const getUserFriendlyError = (errorMessage: string): string => {
+      if (errorMessage.includes('HTTP 403') || errorMessage.includes('403')) {
+        return "Access denied. Please check your permissions or contact your administrator.";
+      }
+      if (errorMessage.includes('HTTP 401') || errorMessage.includes('401')) {
+        return "Authentication required. Please log in again.";
+      }
+      if (errorMessage.includes('HTTP 404') || errorMessage.includes('404')) {
+        return "Product service not available. Please contact your administrator.";
+      }
+      if (errorMessage.includes('HTTP 500') || errorMessage.includes('500')) {
+        return "Server error. Please try again later.";
+      }
+      if (errorMessage.includes('Network error') || errorMessage.includes('fetch')) {
+        return "Unable to connect to the server. Please check your internet connection.";
+      }
+      if (errorMessage.includes('Authentication required')) {
+        return "Please log in to access products.";
+      }
+      return errorMessage;
+    };
+
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center p-8">
@@ -196,7 +218,7 @@ export default function RetailPOSLayout() {
             </svg>
           </div>
           <h2 className="text-xl font-semibold text-gray-800 mb-2">Failed to Load Products</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
+          <p className="text-gray-600 mb-4">{getUserFriendlyError(error)}</p>
           <button
             onClick={refetch}
             className="bg-beveren-600 text-white px-6 py-2 rounded-lg hover:bg-beveren-700 transition-colors"

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import type { MenuItem } from '../../types';
+import { useAuth } from '../hooks/useAuth';
 
 interface ProductContextType {
   products: MenuItem[];
@@ -27,6 +28,8 @@ const CACHE_EXPIRY_KEY = 'klik_pos_products_cache_expiry';
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export function ProductProvider({ children }: ProductProviderProps) {
+  const { isAuthenticated, loading: authLoading } = useAuth();
+
   const [products, setProducts] = useState<MenuItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshingStock, setIsRefreshingStock] = useState<boolean>(false);
@@ -287,6 +290,19 @@ export function ProductProvider({ children }: ProductProviderProps) {
   };
 
   useEffect(() => {
+    // Don't fetch products until authentication is complete
+    if (authLoading) {
+      return;
+    }
+
+    // If not authenticated, don't fetch products
+    if (!isAuthenticated) {
+      setIsLoading(false);
+      setError("Authentication required to load products");
+      return;
+    }
+
+    // Authentication is complete, fetch products
     fetchProducts();
 
     // Set up periodic stock updates as fallback
@@ -295,7 +311,7 @@ export function ProductProvider({ children }: ProductProviderProps) {
     return () => {
       clearInterval(stockUpdateInterval);
     };
-  }, []);
+  }, [isAuthenticated, authLoading]);
 
   const value: ProductContextType = {
     products,
