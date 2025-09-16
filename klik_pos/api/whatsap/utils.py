@@ -1,5 +1,5 @@
 """
-WhatsApp Utility Functions for KLIK POS
+WhatsApp Utility Functions for KLiK PoS
 Standalone functions for sending WhatsApp messages from both backend and frontend
 """
 

@@ -34,12 +34,27 @@ export default function MobilePOSLayout({
   const { t } = useI18n()
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
-  const { posDetails } = usePOSDetails()
+  const { posDetails, loading: posLoading } = usePOSDetails()
   const { cartItems, addToCart } = useCartStore()
   const navigate = useNavigate()
   const [showUserMenu, setShowUserMenu] = useState(false)
+
+  // Initialize viewMode based on POS profile
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Initialize viewMode when POS details finish loading
+  useEffect(() => {
+    if (!posLoading && posDetails) {
+      const defaultView = posDetails.custom_default_view
+      if (defaultView === 'List View') {
+        setViewMode('list')
+      } else if (defaultView === 'Grid View') {
+        setViewMode('grid')
+      }
+      // If no custom_default_view is set, keep the default 'grid'
+    }
+  }, [posDetails, posLoading])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -58,10 +73,10 @@ export default function MobilePOSLayout({
   const handleLogout = async () => {
     try {
       await logout()
-      window.location.href = "/login"
+      window.location.href = "/klik_pos/login"
     } catch (error) {
       console.error('Logout error:', error)
-      window.location.href = "/login"
+      window.location.href = "/klik_pos/login"
     }
   }
 
@@ -87,8 +102,8 @@ export default function MobilePOSLayout({
       <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center space-x-3">
-            <img src="/assets/klik_pos/klik_spa/beveren-logo-180.png" alt="KLIK POS" className="w-8 h-8 rounded-full object-cover" />
-            <span className="font-bold text-beveren-600 dark:text-beveren-400">KLIK POS</span>
+            <img src="/assets/klik_pos/klik_spa/beveren-logo-180.png" alt="KLiK PoS" className="w-8 h-8 rounded-full object-cover" />
+            <span className="font-bold text-beveren-600 dark:text-beveren-400">KLiK PoS</span>
             {scannerOnly && (
               <div className="bg-blue-600/90 text-white px-2 py-1 rounded-md text-xs font-medium">
                 <div className="flex items-center space-x-1">
@@ -243,7 +258,16 @@ export default function MobilePOSLayout({
 
       {/* Products Grid */}
       <div className="flex-1 overflow-y-auto">
-        <ProductGrid items={items} onAddToCart={addToCart} isMobile={true} scannerOnly={scannerOnly} viewMode={viewMode} />
+        {posLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-beveren-600 mx-auto mb-4"></div>
+              <p className="text-gray-500 dark:text-gray-400">Loading view preferences...</p>
+            </div>
+          </div>
+        ) : (
+          <ProductGrid items={items} onAddToCart={addToCart} isMobile={true} scannerOnly={scannerOnly} viewMode={viewMode} />
+        )}
       </div>
 
       {/* Floating Cart Button */}

@@ -104,9 +104,26 @@ class ERPNextAPI {
         console.error('Login failed with status:', response.status);
         const errorText = await response.text();
         console.error('Error response body:', errorText);
+
+        // Parse error response if it's JSON
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.message) {
+            errorMessage = errorData.message;
+          } else if (errorData.exc) {
+            errorMessage = errorData.exc;
+          }
+        } catch (parseError) {
+          // If not JSON, use the text as is
+          if (errorText && errorText.trim()) {
+            errorMessage = errorText;
+          }
+        }
+
         return {
           success: false,
-          message: `HTTP ${response.status}: ${response.statusText}`
+          message: errorMessage
         };
       }
 
@@ -199,9 +216,25 @@ class ERPNextAPI {
         };
       }
 
+      if (error instanceof Error) {
+        if (error.message.includes('timeout')) {
+          return {
+            success: false,
+            message: 'Connection timeout. Please try again.'
+          };
+        }
+
+        if (error.message.includes('Failed to fetch')) {
+          return {
+            success: false,
+            message: 'Unable to connect to the server. Please check your internet connection.'
+          };
+        }
+      }
+
       return {
         success: false,
-        message: `Network error: ${error instanceof Error ? error.message : 'Unknown error'}`
+        message: 'An unexpected error occurred. Please try again.'
       };
     }
   }

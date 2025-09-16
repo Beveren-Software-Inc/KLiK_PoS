@@ -69,7 +69,7 @@ interface WhatsAppData {
 //     apiEndpoint = '/api/method/klik_pos.api.whatsapp.send_simple_whatsapp';
 //     requestData = {
 //       mobile_no: data.mobile_no,
-//       message: data.message || 'Hello from KLIK POS!'
+//       message: data.message || 'Hello from KLiK PoS!'
 //     };
 //   }
 

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 import { useI18n } from "../hooks/useI18n"
 import { useAuth } from "../hooks/useAuth"
 import { useTheme } from "../hooks/useTheme"
+import { usePOSDetails } from "../hooks/usePOSProfile"
 import { Settings, LogOut, Moon, Sun, Mail, Grid3X3, List } from "lucide-react"
 import CategoryTabs from "./CategoryTabs"
 import ProductGrid from "./ProductGrid"
@@ -35,9 +36,25 @@ export default function MenuGrid({
   const { t } = useI18n()
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
+  const { posDetails, loading: posLoading } = usePOSDetails()
   const [showUserMenu, setShowUserMenu] = useState(false)
+
+  // Initialize viewMode based on POS profile
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Initialize viewMode when POS details finish loading
+  useEffect(() => {
+    if (!posLoading && posDetails) {
+      const defaultView = posDetails.custom_default_view
+      if (defaultView === 'List View') {
+        setViewMode('list')
+      } else if (defaultView === 'Grid View') {
+        setViewMode('grid')
+      }
+      // If no custom_default_view is set, keep the default 'grid'
+    }
+  }, [posDetails, posLoading])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -56,10 +73,10 @@ export default function MenuGrid({
   const handleLogout = async () => {
     try {
       await logout()
-      window.location.href = "/login"
+      window.location.href = "/klik_pos/login"
     } catch (error) {
       console.error('Logout error:', error)
-      window.location.href = "/login"
+      window.location.href = "/klik_pos/login"
     }
   }
 
@@ -205,7 +222,16 @@ export default function MenuGrid({
 
       {/* Products Grid */}
       <div className="flex-1 overflow-y-auto">
-        <ProductGrid items={items} onAddToCart={onAddToCart} scannerOnly={scannerOnly} viewMode={viewMode} />
+        {posLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-beveren-600 mx-auto mb-4"></div>
+              <p className="text-gray-500 dark:text-gray-400">Loading view preferences...</p>
+            </div>
+          </div>
+        ) : (
+          <ProductGrid items={items} onAddToCart={onAddToCart} scannerOnly={scannerOnly} viewMode={viewMode} />
+        )}
       </div>
     </div>
   )

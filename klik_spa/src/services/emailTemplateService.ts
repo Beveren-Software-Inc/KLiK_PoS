@@ -121,7 +121,7 @@ export function processEmailTemplate(template: string, parameters: Record<string
     '{{vehicle}}': parameters.vehicle || '',
     '{{invoice_total}}': parameters.invoice_total || '0',
     '{{invoice_number}}': parameters.invoice_number || '',
-    '{{company_name}}': parameters.company_name || 'KLIK POS',
+    '{{company_name}}': parameters.company_name || 'KLiK PoS',
     '{{date}}': parameters.date || new Date().toLocaleDateString(),
   };
 

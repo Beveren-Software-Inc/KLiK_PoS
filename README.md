@@ -1,6 +1,6 @@
-### KLIK POS
+### KLiK PoS
 
-KLIK POS: A Modern Point of Sale for your Business
+KLiK PoS: A Modern Point of Sale for your Business
 
 ### Installation
 
@@ -33,7 +33,7 @@ Pre-commit is configured to use the following tools for checking and formatting 
 mit
 
 
-# KLIK POS UI/SPA
+# KLiK PoS UI/SPA
 
 A modern, responsive Point of Sale System built with React, TypeScript, and Vite. Designed for retail businesses with both desktop and mobile interfaces.
 

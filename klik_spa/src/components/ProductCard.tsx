@@ -27,13 +27,22 @@ return (
       } ${isMobile ? "touch-manipulation" : ""}`}
       onClick={() => !isDisabled && onAddToCart(item)}
     >
+      {/* Image - Maintain same size for consistency */}
       <div className="relative">
-        <img
-          src={item.image || "/placeholder.svg?height=120&width=120"}
-          alt={item.name}
-          className={`w-full object-cover ${isMobile ? "h-24" : "h-32"}`}
-          crossOrigin="anonymous"
-        />
+        {item.image ? (
+          <img
+            src={item.image}
+            alt={item.name}
+            className={`w-full object-cover ${isMobile ? "h-24" : "h-32"}`}
+            crossOrigin="anonymous"
+          />
+        ) : (
+          <div className={`w-full ${isMobile ? "h-24" : "h-32"} bg-gray-100 dark:bg-gray-700 flex items-center justify-center`}>
+            <div className="text-gray-400 dark:text-gray-500 text-sm font-medium">
+              No Image
+            </div>
+          </div>
+        )}
         {item.discount && (
           <div className="absolute top-2 left-2 bg-red-500 text-white px-1.5 py-0.5 rounded-md text-xs font-bold">
             -{item.discount}%

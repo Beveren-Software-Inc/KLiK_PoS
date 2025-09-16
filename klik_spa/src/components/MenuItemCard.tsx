@@ -26,14 +26,20 @@ export default function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) {
         </div>
       )}
 
-      {/* Image - Smaller aspect ratio */}
-      <div className="aspect-[4/3] rounded-lg overflow-hidden mb-3">
-        <img
-          src={item.image || "/placeholder.svg"}
-          alt={item.name}
-          className="w-full h-full object-cover"
-          crossOrigin="anonymous"
-        />
+      {/* Image - Maintain same size for consistency */}
+      <div className="aspect-[4/3] rounded-lg overflow-hidden mb-3 bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+        {item.image ? (
+          <img
+            src={item.image}
+            alt={item.name}
+            className="w-full h-full object-cover"
+            crossOrigin="anonymous"
+          />
+        ) : (
+          <div className="text-gray-400 dark:text-gray-500 text-sm font-medium">
+            No Image
+          </div>
+        )}
       </div>
 
       {/* Content */}

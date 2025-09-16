@@ -2,23 +2,15 @@ import type React from "react"
 import { useState } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { useAuth } from "../hooks/useAuth"
-import erpnextAPI from "../services/erpnext-api"
 
 export default function LoginPage() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
-  const [connectionStatus, setConnectionStatus] = useState("")
   const navigate = useNavigate()
   const location = useLocation()
   const { login } = useAuth()
-
-  const testConnection = async () => {
-    setConnectionStatus("Testing connection...")
-    const result = await erpnextAPI.testConnection()
-    setConnectionStatus(result.success ? "✅ " + result.message : "❌ " + result.message)
-  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,13 +25,56 @@ export default function LoginPage() {
         const from = (location.state as any)?.from?.pathname || "/pos"
         navigate(from, { replace: true })
       } else {
-        setError(result.message)
+        // Show user-friendly error messages
+        setError(getUserFriendlyErrorMessage(result.message))
       }
     } catch (err) {
-      setError("Login failed. Please try again.")
+      setError("An unexpected error occurred. Please try again.")
     } finally {
       setLoading(false)
     }
+  }
+
+  const getUserFriendlyErrorMessage = (message: string): string => {
+    // Handle common HTTP error codes and convert to user-friendly messages
+    if (message.includes('HTTP 401') || message.includes('401')) {
+      return "Invalid username or password. Please check your credentials and try again."
+    }
+    if (message.includes('HTTP 403') || message.includes('403')) {
+      return "Access denied. Please contact your administrator."
+    }
+    if (message.includes('HTTP 404') || message.includes('404')) {
+      return "Login service not available. Please contact your administrator."
+    }
+    if (message.includes('HTTP 500') || message.includes('500')) {
+      return "Server error. Please try again later or contact your administrator."
+    }
+    if (message.includes('Network error') || message.includes('fetch')) {
+      return "Unable to connect to the server. Please check your internet connection."
+    }
+    if (message.includes('timeout')) {
+      return "Connection timeout. Please try again."
+    }
+    if (message.includes('Invalid credentials') || message.includes('incorrect')) {
+      return "Invalid username or password. Please check your credentials and try again."
+    }
+    if (message.includes('User not found')) {
+      return "User not found. Please check your username and try again."
+    }
+    if (message.includes('Account disabled')) {
+      return "Your account has been disabled. Please contact your administrator."
+    }
+    if (message.includes('Too many attempts')) {
+      return "Too many login attempts. Please wait a few minutes before trying again."
+    }
+
+    // If it's already a user-friendly message, return as is
+    if (message && !message.includes('HTTP') && !message.includes('Error:')) {
+      return message
+    }
+
+    // Default fallback
+    return "Login failed. Please check your credentials and try again."
   }
 
   return (
@@ -49,13 +84,13 @@ export default function LoginPage() {
 
       <div className="relative z-10 w-full max-w-sm">
         {/* Login Card */}
-        <div className="bg-white rounded-2xl shadow-2xl p-6 backdrop-blur-sm bg-white/95">
+        <div className="bg-white/95 rounded-2xl shadow-2xl p-6 backdrop-blur-sm">
           {/* Logo Section */}
           <div className="text-center mb-6">
             <div className="flex justify-center mb-4">
-              <img src="https://beverensoftware.com/wp-content/uploads/2023/06/cropped-15-1-180x180.png" alt="KLIK POS" className="w-16 h-16 rounded-full shadow-lg" />
+              <img src="https://beverensoftware.com/wp-content/uploads/2023/06/cropped-15-1-180x180.png" alt="KLiK PoS" className="w-16 h-16 rounded-full shadow-lg" />
             </div>
-            <h1 className="text-3xl font-bold text-beveren-800">KLIK POS</h1>
+            <h1 className="text-3xl font-bold text-beveren-800">KLiK PoS</h1>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
@@ -111,12 +146,6 @@ export default function LoginPage() {
               </div>
             )}
 
-            {connectionStatus && (
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-                <p className="text-sm text-blue-600 font-medium text-center">{connectionStatus}</p>
-              </div>
-            )}
-
             <button
               type="submit"
               disabled={loading}
@@ -130,14 +159,6 @@ export default function LoginPage() {
               ) : (
                 "Sign In"
               )}
-            </button>
-
-            <button
-              type="button"
-              onClick={testConnection}
-              className="w-full mt-2 bg-gray-500 text-white font-bold py-2 px-4 rounded-xl hover:bg-gray-600 focus:outline-none focus:ring-4 focus:ring-gray-300 transition-all duration-300"
-            >
-              Test Connection
             </button>
           </form>
         </div>

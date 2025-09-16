@@ -3,13 +3,13 @@ import { useAuth } from "../hooks/useAuth"
 import { useTheme } from "../hooks/useTheme"
 import { useI18n } from "../hooks/useI18n"
 import { useNavigate } from "react-router-dom"
-import { 
-  User, 
-  Mail, 
-  Shield, 
-  Palette, 
-  Globe, 
-  Save, 
+import {
+  User,
+  Mail,
+  Shield,
+  Palette,
+  Globe,
+  Save,
   Camera,
   Moon,
   Sun,
@@ -44,10 +44,10 @@ export default function SettingsPage() {
   const handleLogout = async () => {
     try {
       await logout()
-      window.location.href = "/login"
+      navigate("/login")
     } catch (error) {
       console.error('Logout error:', error)
-      window.location.href = "/login"
+      navigate("/login")
     }
   }
 
@@ -166,7 +166,7 @@ export default function SettingsPage() {
                   {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
                 </p>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {theme === 'dark' 
+                  {theme === 'dark'
                     ? 'Using dark theme for better low-light viewing'
                     : 'Using light theme for optimal daytime viewing'
                   }

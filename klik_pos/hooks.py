@@ -1,7 +1,7 @@
 app_name = "klik_pos"
-app_title = "KLIK POS"
+app_title = "KLiK PoS"
 app_publisher = "Beveren Sooftware Inc"
-app_description = "KLIK POS: A Modern Point of Sale for your Business"
+app_description = "KLiK PoS: A Modern Point of Sale for your Business"
 app_email = "info@beverensoftware.com"
 app_license = "mit"
 
@@ -15,7 +15,7 @@ app_license = "mit"
 # 	{
 # 		"name": "klik_pos",
 # 		"logo": "/assets/klik_pos/logo.png",
-# 		"title": "KLIK POS",
+# 		"title": "KLiK PoS",
 # 		"route": "/klik_pos",
 # 		"has_permission": "klik_pos.api.permission.has_app_permission"
 # 	}
@@ -45,7 +45,8 @@ fixtures = [
                     "POS Profile-custom_use_scanner_fully",
                     "POS Profile-custom_whatsapp_template",
                     "Sales Invoice-custom_pos_opening_entry",
-                    "POS Profile-custom_email_template"
+                    "POS Profile-custom_email_template",
+                    "POS Profile-custom_default_view",
                 ),
             ]
         ],
@@ -56,7 +57,7 @@ add_to_apps_screen = [
 	{
 		"name": "klik_pos",
  		"logo": "/assets/klik_pos/logo.png",
- 		"title": "KLIK POS",
+ 		"title": "KLiK PoS",
  		"route": "/klik_pos",
 	}
 ]

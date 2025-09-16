@@ -69,6 +69,8 @@ def get_pos_details():
         "custom_allow_credit_sales":pos.custom_allow_credit_sales,
         "custom_allow_return":pos.custom_allow_return,
         "custom_hide_expected_amount":pos.custom_hide_expected_amount,
+        "hide_unavailable_items":pos.hide_unavailable_items,
+        "custom_default_view": getattr(pos, 'custom_default_view', 'Grid View'),
         "custom_whatsap_template": getattr(pos, 'custom_whatsap_template', None),
         "custom_email_template": getattr(pos, 'custom_email_template', None),
         "is_zatca_enabled": is_zatca_enabled(),

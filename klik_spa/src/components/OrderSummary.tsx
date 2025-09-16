@@ -21,7 +21,7 @@ import { useCustomers } from "../hooks/useCustomers";
 import { useProducts } from "../hooks/useProducts";
 import { toast } from "react-toastify";
 import { useBatchData } from "../hooks/useProducts";
-import { getBatches } from "../utils/batch"; 
+import { getBatches } from "../utils/batch";
 import { useNavigate } from "react-router-dom";
 import { usePOSDetails } from "../hooks/usePOSProfile";
 
@@ -553,10 +553,6 @@ export default function OrderSummary({
       {/* Header */}
       {!isMobile && (
         <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-          <h2 className="text-xl font-semibold font-medium text-gray-900 dark:text-white mb-3">
-            Shopping Cart
-          </h2>
-
           {/* Customer Search */}
           <div className="relative">
             <div className="flex items-center">
@@ -808,16 +804,26 @@ export default function OrderSummary({
                       </button>
                     </div>
 
-                    {/* Product Image */}
+                    {/* Product Image - Maintain same size for consistency */}
                     <div className="flex-shrink-0">
-                      <img
-                        src={item.image || "/placeholder.svg"}
-                        alt={item.name}
-                        className={`${
+                      {item.image ? (
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className={`${
+                            isMobile ? "w-16 h-16" : "w-12 h-12"
+                          } rounded-lg object-cover`}
+                          crossOrigin="anonymous"
+                        />
+                      ) : (
+                        <div className={`${
                           isMobile ? "w-16 h-16" : "w-12 h-12"
-                        } rounded-lg object-cover`}
-                        crossOrigin="anonymous"
-                      />
+                        } rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center`}>
+                          <div className="text-gray-400 dark:text-gray-500 text-xs font-medium">
+                            No Image
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Product Info */}
@@ -1180,18 +1186,17 @@ export default function OrderSummary({
               : "p-6 border-t border-gray-100 dark:border-gray-700"
           } space-y-4`}
         >
-          <div className="space-y-3">
-            <div className="flex justify-between text-sm">
+          {/* <div className="space-y-3"> */}
+            {/* <div className="flex justify-between text-sm">
               <span className="font-medium text-gray-700 dark:text-gray-300">
                 Items
               </span>
               <span className="font-semibold text-gray-900 dark:text-white">
                 {cartItems.length}
               </span>
-            </div>
+            </div> */}
 
-            {/* Original Subtotal (before item discounts) */}
-            <div className="flex justify-between text-sm">
+            {/* <div className="flex justify-between text-sm">
               <span className="font-medium text-gray-700 dark:text-gray-300">
                 Original Subtotal
               </span>
@@ -1203,7 +1208,6 @@ export default function OrderSummary({
               </span>
             </div>
 
-            {/* Item-level Discounts */}
             {totalItemDiscount > 0 && (
               <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
                 <span className="font-medium flex items-center">
@@ -1217,7 +1221,6 @@ export default function OrderSummary({
               </div>
             )}
 
-            {/* Subtotal after item discounts */}
             <div className="flex justify-between text-sm">
               <span className="font-medium text-gray-700 dark:text-gray-300">
                 Subtotal
@@ -1226,10 +1229,9 @@ export default function OrderSummary({
                 {currency_symbol}
                 {subtotal.toFixed(2)}
               </span>
-            </div>
+            </div> */}
 
-            {/* Gift Coupons */}
-            {appliedCoupons.length > 0 && (
+            {/* {appliedCoupons.length > 0 && (
               <div className="space-y-2">
                 {appliedCoupons.map((coupon) => (
                   <div
@@ -1252,7 +1254,7 @@ export default function OrderSummary({
                   </div>
                 ))}
               </div>
-            )}
+            )} */}
 
             {/* Gift Coupon Button with Popover */}
             {/* <div className="relative">
@@ -1274,7 +1276,7 @@ export default function OrderSummary({
               />
             </div> */}
 
-            <div className="flex justify-between font-bold text-lg pt-3 border-t border-gray-100 dark:border-gray-700">
+            {/* <div className="flex justify-between font-bold text-lg pt-3 border-t border-gray-100 dark:border-gray-700">
               <span className="text-gray-900 dark:text-white">Total</span>
               <span className="text-gray-900 dark:text-white">
                 {currency_symbol}
@@ -1283,15 +1285,15 @@ export default function OrderSummary({
             </div>
 
             {/* Total Savings Summary */}
-            {totalItemDiscount + couponDiscount > 0 && (
+            {/* {totalItemDiscount + couponDiscount > 0 && (
               <div className="text-center py-2 px-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
                 <span className="text-sm font-medium text-green-800 dark:text-green-300">
                   Total Savings: {currency_symbol}
                   {(totalItemDiscount + couponDiscount).toFixed(2)}
                 </span>
               </div>
-            )}
-          </div>
+            )} */}
+          {/* </div>  */}
 
           {/* Action Buttons */}
           <div className={`grid grid-cols-2 gap-3 ${isMobile ? "mb-3" : ""}`}>
