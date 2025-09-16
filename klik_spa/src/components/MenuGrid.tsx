@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 import { useI18n } from "../hooks/useI18n"
 import { useAuth } from "../hooks/useAuth"
 import { useTheme } from "../hooks/useTheme"
+import { usePOSDetails } from "../hooks/usePOSProfile"
 import { Settings, LogOut, Moon, Sun, Mail, Grid3X3, List } from "lucide-react"
 import CategoryTabs from "./CategoryTabs"
 import ProductGrid from "./ProductGrid"
@@ -35,9 +36,31 @@ export default function MenuGrid({
   const { t } = useI18n()
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
+  const { posDetails } = usePOSDetails()
   const [showUserMenu, setShowUserMenu] = useState(false)
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  
+  // Get default view from POS profile, fallback to 'grid'
+  const getDefaultViewMode = (): 'grid' | 'list' => {
+    const defaultView = posDetails?.custom_default_view
+    if (defaultView === 'List View') return 'list'
+    if (defaultView === 'Grid View') return 'grid'
+    return 'grid' // fallback
+  }
+  
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(getDefaultViewMode())
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Update viewMode when posDetails loads
+  useEffect(() => {
+    if (posDetails?.custom_default_view) {
+      const defaultView = posDetails.custom_default_view
+      if (defaultView === 'List View') {
+        setViewMode('list')
+      } else if (defaultView === 'Grid View') {
+        setViewMode('grid')
+      }
+    }
+  }, [posDetails])
 
   // Close dropdown when clicking outside
   useEffect(() => {
