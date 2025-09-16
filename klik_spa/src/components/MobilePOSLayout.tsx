@@ -58,10 +58,10 @@ export default function MobilePOSLayout({
   const handleLogout = async () => {
     try {
       await logout()
-      window.location.href = "/login"
+      window.location.href = "/klik_pos/login"
     } catch (error) {
       console.error('Logout error:', error)
-      window.location.href = "/login"
+      window.location.href = "/klik_pos/login"
     }
   }
 

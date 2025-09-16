@@ -29,11 +29,11 @@ export default function NavBar() {
   const handleLogout = async () => {
     try {
       await logout()
-      window.location.href = "/login"
+      window.location.href = "/klik_pos/login"
     } catch (error) {
       console.error('Logout error:', error)
       // Still redirect even if logout fails
-      window.location.href = "/login"
+      window.location.href = "/klik_pos/login"
     }
   }
 
@@ -125,7 +125,7 @@ export default function NavBar() {
                       <Settings size={16} className="mr-3 text-gray-500" />
                       <span>Settings</span>
                     </Link>
-                    
+
                     <button
                       onClick={() => {
                         toggleTheme()
@@ -141,7 +141,7 @@ export default function NavBar() {
                       )}
                       <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
                     </button>
-                    
+
                     <button
                       onClick={() => {
                         setLanguage(language === "en" ? "ar" : "en")
@@ -153,9 +153,9 @@ export default function NavBar() {
                       <span className="mr-3 text-gray-500">🌐</span>
                       <span>{language === "en" ? "Switch to Arabic" : "Switch to English"}</span>
                     </button>
-                    
+
                     <div className="border-t border-gray-100 my-1"></div>
-                    
+
                     <button
                       onClick={() => {
                         handleLogout()
