@@ -47,8 +47,8 @@ export default function CategoryTabs({
   const categories = [
     {
       id: "all",
-      name: "All Menu",
-      icon: itemGroupIconMap["All Menu"] ?? "📦",
+      name: "All Items",
+      icon: itemGroupIconMap["All Items"] ?? "📦",
       count: total_item_count
     },
     ...itemGroups.map((group) => ({

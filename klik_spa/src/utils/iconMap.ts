@@ -14,5 +14,5 @@ export const itemGroupIconMap: Record<string, string> = {
   Seafood: "🦞",
   Snacks: "🍿",
   Dessert: "🍰",
-  "All Menu": "🍽️",
+  "All Items": "🛍️",
 };
