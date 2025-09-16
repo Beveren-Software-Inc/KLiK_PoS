@@ -80,8 +80,7 @@ export default function OrderSummary({
       {/* Header */}
       {!isMobile && (
         <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-          <h2 className="text-xl font-semibold font-medium text-gray-900 dark:text-white mb-3">Shopping Cart</h2>
-          
+
           {/* Customer Search */}
           <div className="relative">
             <div className="flex items-center">
@@ -98,7 +97,7 @@ export default function OrderSummary({
                   onFocus={() => setShowCustomerDropdown(customerSearchQuery.length > 0)}
                   className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
-                
+
                 {/* Customer Dropdown */}
                 {showCustomerDropdown && filteredCustomers.length > 0 && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
@@ -129,7 +128,7 @@ export default function OrderSummary({
                   </div>
                 )}
               </div>
-              
+
               <button
                 onClick={() => setShowAddCustomerModal(true)}
                 className="ml-2 p-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors"
@@ -138,7 +137,7 @@ export default function OrderSummary({
                 <UserPlus size={16} />
               </button>
             </div>
-            
+
             {/* Selected Customer Display */}
             {selectedCustomer && (
               <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
@@ -194,7 +193,7 @@ export default function OrderSummary({
               <UserPlus size={16} />
             </button>
           </div>
-          
+
           {selectedCustomer && (
             <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <div className="flex items-center justify-between">

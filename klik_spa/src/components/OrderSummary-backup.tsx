@@ -53,7 +53,6 @@ export default function OrderSummary({
       {/* Header */}
       {!isMobile && (
         <div className="h-20 px-6 border-b border-gray-100 dark:border-gray-700 flex items-center">
-          <h2 className="text-xl font-semibold font-medium text-gray-900 dark:text-white">Shopping Cart</h2>
         </div>
       )}
 

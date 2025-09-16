@@ -31,9 +31,8 @@ export default function CartPage() {
               <ArrowLeft className="w-6 h-6 text-gray-600 dark:text-gray-400" />
             </button>
             <img src="/assets/klik_pos/klik_spa/beveren-logo-180.png" alt="KLiK PoS" className="w-8 h-8 rounded-full object-cover" />
-            <span className="font-bold text-xl text-gray-900 dark:text-white">Shopping Cart</span>
           </div>
-          
+
           <div className="text-sm text-gray-500 dark:text-gray-400">
             {cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}
           </div>

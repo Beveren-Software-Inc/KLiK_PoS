@@ -21,7 +21,7 @@ import { useCustomers } from "../hooks/useCustomers";
 import { useProducts } from "../hooks/useProducts";
 import { toast } from "react-toastify";
 import { useBatchData } from "../hooks/useProducts";
-import { getBatches } from "../utils/batch"; 
+import { getBatches } from "../utils/batch";
 import { useNavigate } from "react-router-dom";
 import { usePOSDetails } from "../hooks/usePOSProfile";
 
@@ -553,10 +553,6 @@ export default function OrderSummary({
       {/* Header */}
       {!isMobile && (
         <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-          <h2 className="text-xl font-semibold font-medium text-gray-900 dark:text-white mb-3">
-            Shopping Cart
-          </h2>
-
           {/* Customer Search */}
           <div className="relative">
             <div className="flex items-center">
