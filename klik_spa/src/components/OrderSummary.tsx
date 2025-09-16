@@ -804,16 +804,26 @@ export default function OrderSummary({
                       </button>
                     </div>
 
-                    {/* Product Image */}
+                    {/* Product Image - Maintain same size for consistency */}
                     <div className="flex-shrink-0">
-                      <img
-                        src={item.image || "/placeholder.svg"}
-                        alt={item.name}
-                        className={`${
+                      {item.image ? (
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className={`${
+                            isMobile ? "w-16 h-16" : "w-12 h-12"
+                          } rounded-lg object-cover`}
+                          crossOrigin="anonymous"
+                        />
+                      ) : (
+                        <div className={`${
                           isMobile ? "w-16 h-16" : "w-12 h-12"
-                        } rounded-lg object-cover`}
-                        crossOrigin="anonymous"
-                      />
+                        } rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center`}>
+                          <div className="text-gray-400 dark:text-gray-500 text-xs font-medium">
+                            No Image
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Product Info */}

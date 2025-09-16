@@ -53,7 +53,7 @@ export function useBarcodeScanner(onAddToCart: (item: any) => void): UseBarcodeS
             category: data.message.item_group || 'General',
             price: data.message.price || 0,
             available: data.message.available || 0,
-            image: data.message.image || 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=300&h=300&fit=crop',
+            image: data.message.image,
             sold: 0
           }
           onAddToCart(item)
