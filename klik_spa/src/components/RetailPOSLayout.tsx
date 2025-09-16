@@ -26,6 +26,7 @@ export default function RetailPOSLayout() {
   // Get POS details including scanner-only setting
   const { posDetails } = usePOSDetails()
   const useScannerOnly = posDetails?.custom_use_scanner_fully || false
+  const hideUnavailableItems = posDetails?.hide_unavailable_items || false
 
     // Use media query to detect mobile/tablet screens
   const isMobile = useMediaQuery("(max-width: 1024px)")
@@ -151,6 +152,11 @@ export default function RetailPOSLayout() {
   }, [searchQuery, handleBarcodeDetected])
 
   const filteredItems = menuItems.filter((item) => {
+    // Availability filter - hide items with 0 quantity if hide_unavailable_items is enabled
+    if (hideUnavailableItems && item.available <= 0) {
+      return false
+    }
+
     // Category filter
     const matchesCategory = selectedCategory === "all" || item.category === selectedCategory
 
