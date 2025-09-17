@@ -137,6 +137,44 @@ export default function DashboardPage() {
 
   const paymentMethodsData = calculatePaymentMethods()
 
+  // ZATCA status distribution from invoices
+  const calculateZatcaStatus = () => {
+    const statusCounts: { [key: string]: number } = {}
+    filteredInvoices.forEach(inv => {
+      const status = (inv.custom_zatca_submit_status || 'Draft') as string
+      statusCounts[status] = (statusCounts[status] || 0) + 1
+    })
+    const total = Object.values(statusCounts).reduce((a, b) => a + b, 0)
+
+    // Match colors used in Invoice History badges
+    const colorMapByNormalized: { [key: string]: string } = {
+      'pending': '#f59e0b',       // yellow-500
+      'reported': '#3b82f6',      // blue-500
+      'not reported': '#9ca3af',  // gray-400/500
+      'cleared': '#16a34a',       // green-600
+      'not cleared': '#ef4444',   // red-500
+      'draft': '#6b7280',         // gray-500
+    }
+
+    const segments = Object.entries(statusCounts).map(([status, count]) => {
+      const normalized = status.toLowerCase()
+      const color = colorMapByNormalized[normalized] || '#9ca3af'
+      return {
+        status,
+        count,
+        percentage: total > 0 ? (count / total) * 100 : 0,
+        color,
+      }
+    })
+
+    return {
+      total,
+      segments: segments.sort((a, b) => b.count - a.count),
+    }
+  }
+
+  const zatcaData = calculateZatcaStatus()
+
   // Calculate top performer based on doc owner (cashier)
   const calculateTopPerformer = () => {
     const cashierStats: { [key: string]: { name: string; sales: number; transactions: number } } = {}
@@ -520,6 +558,61 @@ export default function DashboardPage() {
 
           {/* Additional Stats Row */}
           <div className="grid grid-cols-1 gap-4 mb-6">
+            {/* ZATCA Status Bar Chart (mobile) */}
+            {posDetails?.is_zatca_enabled && zatcaData.total > 0 && (
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">ZATCA Status</h3>
+                  <BarChart3 className="w-5 h-5 text-gray-400" />
+                </div>
+                <div className="h-48 flex items-end justify-between space-x-2 mb-4">
+                  {zatcaData.segments.map((segment, index) => {
+                    const maxCount = Math.max(...zatcaData.segments.map(s => s.count))
+                    const height = maxCount > 0 ? (segment.count / maxCount) * 180 : 4
+
+                    return (
+                      <div key={segment.status} className="flex flex-col items-center flex-1 group">
+                        <div className="relative w-full">
+                          <div
+                            className="w-full rounded-t hover:opacity-80 transition-opacity cursor-pointer"
+                            style={{
+                              height: `${height}px`,
+                              minHeight: "4px",
+                              backgroundColor: segment.color
+                            }}
+                            title={`${segment.status}: ${segment.count} (${Math.round(segment.percentage)}%)`}
+                          ></div>
+                          <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                            {segment.count}
+                          </div>
+                        </div>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center leading-tight">
+                          {segment.status}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="space-y-2">
+                  {zatcaData.segments.map(segment => (
+                    <div key={segment.status} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: segment.color }}></span>
+                        <span className="text-gray-700 dark:text-gray-300">{segment.status}</span>
+                      </div>
+                      <span className="text-gray-600 dark:text-gray-400">
+                        {segment.count} ({Math.round(segment.percentage)}%)
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-600">
+                  <div className="text-center text-sm text-gray-600 dark:text-gray-400">
+                    Total Invoices: <span className="font-semibold text-beveren-600 dark:text-beveren-400">{zatcaData.total}</span>
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Gift Card Usage */}
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-4">
@@ -1075,6 +1168,61 @@ export default function DashboardPage() {
 
         {/* Additional Stats Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          {/* ZATCA Status Bar Chart (desktop) */}
+          {posDetails?.is_zatca_enabled && zatcaData.total > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">ZATCA Status</h3>
+                <BarChart3 className="w-5 h-5 text-gray-400" />
+              </div>
+              <div className="h-64 flex items-end justify-between space-x-3 mb-6">
+                {zatcaData.segments.map((segment, index) => {
+                  const maxCount = Math.max(...zatcaData.segments.map(s => s.count))
+                  const height = maxCount > 0 ? (segment.count / maxCount) * 200 : 4
+
+                  return (
+                    <div key={segment.status} className="flex flex-col items-center flex-1 group">
+                      <div className="relative w-full">
+                        <div
+                          className="w-full rounded-t hover:opacity-80 transition-opacity cursor-pointer"
+                          style={{
+                            height: `${height}px`,
+                            minHeight: "4px",
+                            backgroundColor: segment.color
+                          }}
+                          title={`${segment.status}: ${segment.count} (${Math.round(segment.percentage)}%)`}
+                        ></div>
+                        <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                          {segment.count}
+                        </div>
+                      </div>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 mt-3 text-center leading-tight">
+                        {segment.status}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="space-y-3">
+                {zatcaData.segments.map(segment => (
+                  <div key={segment.status} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: segment.color }}></span>
+                      <span className="text-gray-700 dark:text-gray-300">{segment.status}</span>
+                    </div>
+                    <span className="text-gray-600 dark:text-gray-400">
+                      {segment.count} ({Math.round(segment.percentage)}%)
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
+                <div className="text-center text-sm text-gray-600 dark:text-gray-400">
+                  Total Invoices: <span className="font-semibold text-beveren-600 dark:text-beveren-400">{zatcaData.total}</span>
+                </div>
+              </div>
+            </div>
+          )}
           {/* Enhanced Gift Card Usage - HIDDEN (not currently used) */}
           {/* <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">

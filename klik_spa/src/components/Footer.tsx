@@ -12,7 +12,7 @@ export default function Footer() {
   }
 
   return (
-    <footer className="fixed bottom-0 left-0 right-0 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 z-10">
+    <footer className="fixed bottom-0 left-0 right-0 bg-beveren-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 z-10">
   <div className="w-full py-1 flex justify-between items-center px-4">
     <div className="mx-auto text-xs text-gray-600 dark:text-gray-400">
       © {new Date().getFullYear()}
