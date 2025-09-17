@@ -25,18 +25,21 @@ import RetailSidebar from "../components/RetailSidebar"
 import BottomNavigation from "../components/BottomNavigation"
 import { useMediaQuery } from "../hooks/useMediaQuery"
 import { usePOSDetails } from "../hooks/usePOSProfile"
+import { useSalesInvoices } from "../hooks/useSalesInvoices"
 
 export default function DashboardPage() {
   const navigate = useNavigate()
   const isMobile = useMediaQuery("(max-width: 1024px)")
   const { posDetails } = usePOSDetails()
+  const { invoices, isLoading: invoicesLoading, error: invoicesError } = useSalesInvoices()
   const [timeRange, setTimeRange] = useState("today")
   const [cashierFilter, setCashierFilter] = useState("all")
   const [paymentFilter, setPaymentFilter] = useState("all")
   const [showFilters, setShowFilters] = useState(false)
+  const [salesByHourGraphType, setSalesByHourGraphType] = useState<"bar" | "line">("bar")
   const stats = mockDashboardStats
 
-  const uniqueCashiers = [...new Set(mockSalesInvoices.map((invoice: SalesInvoice) => invoice.cashier))]
+  const uniqueCashiers = [...new Set(invoices.map((invoice: SalesInvoice) => invoice.cashier))]
 
   const getStatsForRange = () => {
     switch (timeRange) {
@@ -54,7 +57,7 @@ export default function DashboardPage() {
   const currentStats = getStatsForRange()
 
   // Filter data based on selected filters
-  const filteredInvoices = mockSalesInvoices.filter((invoice) => {
+  const filteredInvoices = invoices.filter((invoice) => {
     const matchesCashier = cashierFilter === "all" || invoice.cashier === cashierFilter
     const matchesPayment = paymentFilter === "all" || invoice.paymentMethod === paymentFilter
 
@@ -77,6 +80,109 @@ export default function DashboardPage() {
         : 0,
     totalItems: filteredInvoices.reduce((sum: number, inv: SalesInvoice) => sum + inv.items.length, 0),
   }
+
+  // Calculate sales by hour for today only using posting_time
+  const calculateSalesByHour = () => {
+    if (timeRange !== "today") return []
+
+    const today = new Date().toISOString().split("T")[0]
+    const todayInvoices = filteredInvoices.filter(inv => inv.date === today)
+    const hourlySales: { [key: string]: number } = {}
+
+    // Initialize all hours with 0 (9 AM to 8 PM)
+    for (let i = 9; i <= 20; i++) {
+      const hour = `${i.toString().padStart(2, '0')}:00`
+      hourlySales[hour] = 0
+    }
+
+    // Aggregate total revenue by hour using posting_time
+    todayInvoices.forEach(invoice => {
+      // Extract hour from posting_time (format: HH:MM:SS)
+      const timeParts = invoice.time.split(':')
+      if (timeParts.length >= 2) {
+        const hour = `${timeParts[0].padStart(2, '0')}:00`
+        if (hourlySales.hasOwnProperty(hour)) {
+          hourlySales[hour] += invoice.totalAmount
+        }
+      }
+    })
+
+    return Object.entries(hourlySales).map(([hour, sales]) => ({ hour, sales }))
+  }
+
+  const salesByHourData = calculateSalesByHour()
+
+  // Calculate payment methods from real invoice data
+  const calculatePaymentMethods = () => {
+    const paymentMethods: { [key: string]: { amount: number; transactions: number } } = {}
+
+    filteredInvoices.forEach(invoice => {
+      const method = invoice.paymentMethod || 'Cash'
+      if (!paymentMethods[method]) {
+        paymentMethods[method] = { amount: 0, transactions: 0 }
+      }
+      paymentMethods[method].amount += invoice.totalAmount
+      paymentMethods[method].transactions += 1
+    })
+
+    const totalAmount = Object.values(paymentMethods).reduce((sum, method) => sum + method.amount, 0)
+
+    return Object.entries(paymentMethods).map(([method, data]) => ({
+      method,
+      amount: data.amount,
+      percentage: totalAmount > 0 ? (data.amount / totalAmount) * 100 : 0,
+      transactions: data.transactions
+    }))
+  }
+
+  const paymentMethodsData = calculatePaymentMethods()
+
+  // Calculate top performer based on doc owner (cashier)
+  const calculateTopPerformer = () => {
+    const cashierStats: { [key: string]: { name: string; sales: number; transactions: number } } = {}
+
+    filteredInvoices.forEach(invoice => {
+      const cashier = invoice.cashier || 'Unknown'
+      if (!cashierStats[cashier]) {
+        cashierStats[cashier] = { name: cashier, sales: 0, transactions: 0 }
+      }
+      cashierStats[cashier].sales += invoice.totalAmount
+      cashierStats[cashier].transactions += 1
+    })
+
+    const sortedCashiers = Object.values(cashierStats).sort((a, b) => b.sales - a.sales)
+    return sortedCashiers[0] || null
+  }
+
+  const topPerformer = calculateTopPerformer()
+
+  // Calculate top selling products from invoices
+  const calculateTopProducts = () => {
+    const productStats: { [key: string]: { name: string; sales: number; revenue: number } } = {}
+
+    filteredInvoices.forEach(invoice => {
+      invoice.items.forEach(item => {
+        const productKey = item.item_code || item.item_name || 'Unknown'
+        if (!productStats[productKey]) {
+          productStats[productKey] = { name: item.item_name || item.item_code || 'Unknown', sales: 0, revenue: 0 }
+        }
+        productStats[productKey].sales += item.qty || 0
+        productStats[productKey].revenue += (item.rate || 0) * (item.qty || 0)
+      })
+    })
+
+    return Object.entries(productStats)
+      .map(([key, data]) => ({ id: key, ...data }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5)
+  }
+
+  const topProducts = calculateTopProducts()
+
+  // Get recent transactions (last 5 invoices)
+  const recentTransactions = filteredInvoices
+    .sort((a, b) => new Date(b.date + ' ' + b.time).getTime() - new Date(a.date + ' ' + a.time).getTime())
+    .slice(0, 5)
 
   // Mobile layout: full-width content and persistent bottom navigation
   if (isMobile) {
@@ -261,38 +367,105 @@ export default function DashboardPage() {
 
           {/* Charts Row */}
           <div className="grid grid-cols-1 gap-4 mb-6">
-            {/* Sales by Hour Chart */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Sales by Hour</h3>
-                <div className="flex items-center space-x-2">
-                  <Clock className="w-5 h-5 text-gray-400" />
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Peak: 13:00</span>
-                </div>
-              </div>
-              <div className="h-48 flex items-end justify-between space-x-1">
-                {stats.salesByHour.map((item: { hour: string; sales: number }, index: number) => (
-                  <div key={index} className="flex flex-col items-center flex-1 group">
-                    <div className="relative">
-                      <div
-                        className="w-full bg-beveren-600 dark:bg-beveren-500 rounded-t hover:bg-beveren-700 dark:hover:bg-beveren-400 transition-colors cursor-pointer"
-                        style={{
-                          height: `${(item.sales / Math.max(...stats.salesByHour.map((s: { hour: string; sales: number }) => s.sales))) * 180}px`,
-                          minHeight: "4px",
-                        }}
-                        title={`${item.hour}: $${item.sales.toFixed(2)}`}
-                      ></div>
-                      <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                        ${item.sales.toFixed(0)}
-                      </div>
+            {/* Sales by Hour Chart - Only show for today */}
+            {timeRange === "today" && salesByHourData.length > 0 && (
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Sales by Hour (Today)</h3>
+                  <div className="flex items-center space-x-3">
+                    {/* Graph Type Toggle */}
+                    <div className="flex items-center space-x-1">
+                      <button
+                        onClick={() => setSalesByHourGraphType("bar")}
+                        className={`px-2 py-1 text-xs rounded transition-colors ${
+                          salesByHourGraphType === "bar"
+                            ? "bg-beveren-600 text-white"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                        }`}
+                      >
+                        Bar
+                      </button>
+                      <button
+                        onClick={() => setSalesByHourGraphType("line")}
+                        className={`px-2 py-1 text-xs rounded transition-colors ${
+                          salesByHourGraphType === "line"
+                            ? "bg-beveren-600 text-white"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                        }`}
+                      >
+                        Line
+                      </button>
                     </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 mt-2 transform -rotate-45 origin-top-left">
-                      {item.hour}
+                    <div className="flex items-center space-x-2">
+                      <Clock className="w-4 h-4 text-gray-400" />
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        Peak: {salesByHourData.reduce((max, item) => item.sales > max.sales ? item : max, salesByHourData[0])?.hour || "N/A"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="h-48 flex items-end justify-between space-x-1">
+                  {salesByHourData.map((item: { hour: string; sales: number }, index: number) => {
+                    const maxSales = Math.max(...salesByHourData.map(s => s.sales))
+                    const height = maxSales > 0 ? (item.sales / maxSales) * 180 : 4
+
+                    return (
+                      <div key={index} className="flex flex-col items-center flex-1 group">
+                        <div className="relative w-full">
+                          {salesByHourGraphType === "bar" ? (
+                            <div
+                              className="w-full bg-beveren-600 dark:bg-beveren-500 rounded-t hover:bg-beveren-700 dark:hover:bg-beveren-400 transition-colors cursor-pointer"
+                              style={{
+                                height: `${height}px`,
+                                minHeight: "4px",
+                              }}
+                              title={`${item.hour}: $${item.sales.toFixed(2)}`}
+                            ></div>
+                          ) : (
+                            <div className="relative w-full h-full">
+                              {/* Line graph implementation */}
+                              <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                {index > 0 && (
+                                  <line
+                                    x1="0"
+                                    y1={`${100 - (salesByHourData[index - 1].sales / maxSales) * 100}`}
+                                    x2="100"
+                                    y2={`${100 - (item.sales / maxSales) * 100}`}
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    className="text-beveren-600 dark:text-beveren-400"
+                                  />
+                                )}
+                                <circle
+                                  cx="100"
+                                  cy={`${100 - (item.sales / maxSales) * 100}`}
+                                  r="2"
+                                  fill="currentColor"
+                                  className="text-beveren-600 dark:text-beveren-400"
+                                />
+                              </svg>
+                            </div>
+                          )}
+                          <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                            ${item.sales.toFixed(0)}
+                          </div>
+                        </div>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 mt-2 transform -rotate-45 origin-top-left">
+                          {item.hour}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="mt-3 text-center">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Total Revenue: <span className="font-semibold text-beveren-600 dark:text-beveren-400">
+                      ${salesByHourData.reduce((sum, item) => sum + item.sales, 0).toFixed(2)}
                     </span>
                   </div>
-                ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Payment Methods Chart */}
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
@@ -301,42 +474,45 @@ export default function DashboardPage() {
                 <PieChart className="w-5 h-5 text-gray-400" />
               </div>
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-4 h-4 bg-orange-500 rounded"></div>
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Cash</span>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-semibold text-gray-900 dark:text-white">
-                      ${stats.paymentMethods.cash.amount.toFixed(2)}
+                {paymentMethodsData.map((method, index) => {
+                  const colors = ['bg-orange-500', 'bg-beveren-600', 'bg-green-500', 'bg-purple-500', 'bg-pink-500']
+                  const color = colors[index % colors.length]
+                  return (
+                    <div key={method.method} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-4 h-4 ${color} rounded`}></div>
+                        <span className="text-sm text-gray-700 dark:text-gray-300">{method.method}</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-gray-900 dark:text-white">
+                          ${method.amount.toFixed(2)}
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          {method.percentage.toFixed(1)}% • {method.transactions} txns
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                      {stats.paymentMethods.cash.percentage}% • {stats.paymentMethods.cash.transactions} txns
-                    </div>
+                  )
+                })}
+                {paymentMethodsData.length === 0 && (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    No payment data available for selected period
                   </div>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-4 h-4 bg-beveren-600 rounded"></div>
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Debit Card</span>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-semibold text-gray-900 dark:text-white">
-                      ${stats.paymentMethods.debitCard.amount.toFixed(2)}
-                    </div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                      {stats.paymentMethods.debitCard.percentage}% • {stats.paymentMethods.debitCard.transactions} txns
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <div className="flex rounded-lg overflow-hidden h-4">
-                    <div className="bg-orange-500" style={{ width: `${stats.paymentMethods.cash.percentage}%` }}></div>
-                    <div
-                      className="bg-beveren-600"
-                      style={{ width: `${stats.paymentMethods.debitCard.percentage}%` }}
-                    ></div>
-                  </div>
+                )}
+              </div>
+              <div className="mt-4">
+                <div className="flex rounded-lg overflow-hidden h-4">
+                  {paymentMethodsData.map((method, index) => {
+                    const colors = ['bg-orange-500', 'bg-beveren-600', 'bg-green-500', 'bg-purple-500', 'bg-pink-500']
+                    const color = colors[index % colors.length]
+                    return (
+                      <div
+                        key={method.method}
+                        className={color}
+                        style={{ width: `${method.percentage}%` }}
+                      ></div>
+                    )
+                  })}
                 </div>
               </div>
             </div>
@@ -384,33 +560,35 @@ export default function DashboardPage() {
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Top Performer</h3>
                 <Users className="w-5 h-5 text-beveren-600" />
               </div>
-              <div className="text-center">
-                <div className="w-16 h-16 bg-beveren-600 rounded-full flex items-center justify-center mx-auto mb-3 relative">
-                  <span className="text-white font-bold text-xl">
-                    {stats.salesByCashier[0].name
-                      .split(" ")
-                      .map((n: string) => n[0])
-                      .join("")}
-                  </span>
-                  <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center">
-                    <span className="text-xs">👑</span>
+              {topPerformer ? (
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-beveren-600 rounded-full flex items-center justify-center mx-auto mb-3 relative">
+                    <span className="text-white font-bold text-xl">
+                      {topPerformer.name
+                        .split(" ")
+                        .map((n: string) => n[0])
+                        .join("")}
+                    </span>
+                    <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center">
+                      <span className="text-xs">👑</span>
+                    </div>
+                  </div>
+                  <h4 className="font-semibold text-gray-900 dark:text-white">{topPerformer.name}</h4>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                    {topPerformer.transactions} transactions
+                  </p>
+                  <p className="text-lg font-bold text-beveren-600 dark:text-beveren-400">
+                    ${topPerformer.sales.toFixed(2)}
+                  </p>
+                  <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                    {filteredStats.totalRevenue > 0 ? ((topPerformer.sales / filteredStats.totalRevenue) * 100).toFixed(1) : 0}% of total sales
                   </div>
                 </div>
-                <h4 className="font-semibold text-gray-900 dark:text-white">{stats.salesByCashier[0].name}</h4>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                  {stats.salesByCashier[0].transactions} transactions
-                </p>
-                <p className="text-lg font-bold text-beveren-600 dark:text-beveren-400">
-                  ${stats.salesByCashier[0].sales.toFixed(2)}
-                </p>
-                <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                  {(
-                    (stats.salesByCashier[0].sales / stats.salesByCashier.reduce((sum: number, c: { name: string; sales: number; transactions: number; id: string }) => sum + c.sales, 0)) *
-                    100
-                  ).toFixed(1)}
-                  % of team sales
+              ) : (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  No sales data available for selected period
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Weekly Trend */}
@@ -456,7 +634,7 @@ export default function DashboardPage() {
                 <button className="text-sm text-beveren-600 dark:text-beveren-400 hover:underline">View All</button>
               </div>
               <div className="space-y-3">
-                {stats.topProducts.map((product: { id: string; name: string; category: string; sales: number; revenue: number }, index: number) => (
+                {topProducts.map((product, index) => (
                   <div
                     key={product.id}
                     className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
@@ -468,18 +646,23 @@ export default function DashboardPage() {
                       <div>
                         <div className="font-medium text-gray-900 dark:text-white">{product.name}</div>
                         <div className="text-sm text-gray-500 dark:text-gray-400 capitalize">
-                          {product.category} • {product.sales} sold
+                          {product.sales} sold
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="font-semibold text-gray-900 dark:text-white">${product.revenue.toFixed(2)}</div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
-                        ${(product.revenue / product.sales).toFixed(2)} avg
+                        ${product.sales > 0 ? (product.revenue / product.sales).toFixed(2) : '0.00'} avg
                       </div>
                     </div>
                   </div>
                 ))}
+                {topProducts.length === 0 && (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    No product data available for selected period
+                  </div>
+                )}
               </div>
             </div>
 
@@ -495,7 +678,7 @@ export default function DashboardPage() {
                 </button>
               </div>
               <div className="space-y-3">
-                {stats.recentTransactions.map((transaction: SalesInvoice) => (
+                {recentTransactions.map((transaction) => (
                   <div
                     key={transaction.id}
                     className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
@@ -533,6 +716,11 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 ))}
+                {recentTransactions.length === 0 && (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    No transactions available for selected period
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -734,38 +922,105 @@ export default function DashboardPage() {
 
         {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          {/* Fixed Sales by Hour Chart */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Sales by Hour</h3>
-              <div className="flex items-center space-x-2">
-                <Clock className="w-5 h-5 text-gray-400" />
-                <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:inline">Peak: 13:00</span>
-              </div>
-            </div>
-            <div className="h-48 sm:h-64 flex items-end justify-between space-x-1">
-              {stats.salesByHour.map((item: { hour: string; sales: number }, index: number) => (
-                <div key={index} className="flex flex-col items-center flex-1 group">
-                  <div className="relative">
-                    <div
-                      className="w-full bg-beveren-600 dark:bg-beveren-500 rounded-t hover:bg-beveren-700 dark:hover:bg-beveren-400 transition-colors cursor-pointer"
-                      style={{
-                        height: `${(item.sales / Math.max(...stats.salesByHour.map((s: { hour: string; sales: number }) => s.sales))) * 180}px`,
-                        minHeight: "4px",
-                      }}
-                      title={`${item.hour}: $${item.sales.toFixed(2)}`}
-                    ></div>
-                    <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                      ${item.sales.toFixed(0)}
-                    </div>
+          {/* Sales by Hour Chart - Only show for today */}
+          {timeRange === "today" && salesByHourData.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Sales by Hour (Today)</h3>
+                <div className="flex items-center space-x-4">
+                  {/* Graph Type Toggle */}
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => setSalesByHourGraphType("bar")}
+                      className={`px-3 py-1 text-xs rounded-lg transition-colors ${
+                        salesByHourGraphType === "bar"
+                          ? "bg-beveren-600 text-white"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600"
+                      }`}
+                    >
+                      Bar
+                    </button>
+                    <button
+                      onClick={() => setSalesByHourGraphType("line")}
+                      className={`px-3 py-1 text-xs rounded-lg transition-colors ${
+                        salesByHourGraphType === "line"
+                          ? "bg-beveren-600 text-white"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600"
+                      }`}
+                    >
+                      Line
+                    </button>
                   </div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 mt-2 transform -rotate-45 origin-top-left">
-                    {item.hour}
+                  <div className="flex items-center space-x-2">
+                    <Clock className="w-5 h-5 text-gray-400" />
+                    <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:inline">
+                      Peak: {salesByHourData.reduce((max, item) => item.sales > max.sales ? item : max, salesByHourData[0])?.hour || "N/A"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="h-48 sm:h-64 flex items-end justify-between space-x-1">
+                {salesByHourData.map((item: { hour: string; sales: number }, index: number) => {
+                  const maxSales = Math.max(...salesByHourData.map(s => s.sales))
+                  const height = maxSales > 0 ? (item.sales / maxSales) * 180 : 4
+
+                  return (
+                    <div key={index} className="flex flex-col items-center flex-1 group">
+                      <div className="relative w-full">
+                        {salesByHourGraphType === "bar" ? (
+                          <div
+                            className="w-full bg-beveren-600 dark:bg-beveren-500 rounded-t hover:bg-beveren-700 dark:hover:bg-beveren-400 transition-colors cursor-pointer"
+                            style={{
+                              height: `${height}px`,
+                              minHeight: "4px",
+                            }}
+                            title={`${item.hour}: $${item.sales.toFixed(2)}`}
+                          ></div>
+                        ) : (
+                          <div className="relative w-full h-full">
+                            {/* Line graph implementation */}
+                            <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                              {index > 0 && (
+                                <line
+                                  x1="0"
+                                  y1={`${100 - (salesByHourData[index - 1].sales / maxSales) * 100}`}
+                                  x2="100"
+                                  y2={`${100 - (item.sales / maxSales) * 100}`}
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  className="text-beveren-600 dark:text-beveren-400"
+                                />
+                              )}
+                              <circle
+                                cx="100"
+                                cy={`${100 - (item.sales / maxSales) * 100}`}
+                                r="3"
+                                fill="currentColor"
+                                className="text-beveren-600 dark:text-beveren-400"
+                              />
+                            </svg>
+                          </div>
+                        )}
+                        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                          ${item.sales.toFixed(0)}
+                        </div>
+                      </div>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 mt-2 transform -rotate-45 origin-top-left">
+                        {item.hour}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="mt-4 text-center">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Total Revenue: <span className="font-semibold text-beveren-600 dark:text-beveren-400">
+                    ${salesByHourData.reduce((sum, item) => sum + item.sales, 0).toFixed(2)}
                   </span>
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Enhanced Payment Methods Chart */}
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
@@ -774,51 +1029,54 @@ export default function DashboardPage() {
               <PieChart className="w-5 h-5 text-gray-400" />
             </div>
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="w-4 h-4 bg-orange-500 rounded"></div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Cash</span>
-                </div>
-                <div className="text-right">
-                  <div className="font-semibold text-gray-900 dark:text-white">
-                    ${stats.paymentMethods.cash.amount.toFixed(2)}
+              {paymentMethodsData.map((method, index) => {
+                const colors = ['bg-orange-500', 'bg-beveren-600', 'bg-green-500', 'bg-purple-500', 'bg-pink-500']
+                const color = colors[index % colors.length]
+                return (
+                  <div key={method.method} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-4 h-4 ${color} rounded`}></div>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{method.method}</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-semibold text-gray-900 dark:text-white">
+                        ${method.amount.toFixed(2)}
+                      </div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        {method.percentage.toFixed(1)}% • {method.transactions} txns
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                    {stats.paymentMethods.cash.percentage}% • {stats.paymentMethods.cash.transactions} txns
-                  </div>
+                )
+              })}
+              {paymentMethodsData.length === 0 && (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  No payment data available for selected period
                 </div>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="w-4 h-4 bg-beveren-600 rounded"></div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Debit Card</span>
-                </div>
-                <div className="text-right">
-                  <div className="font-semibold text-gray-900 dark:text-white">
-                    ${stats.paymentMethods.debitCard.amount.toFixed(2)}
-                  </div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                    {stats.paymentMethods.debitCard.percentage}% • {stats.paymentMethods.debitCard.transactions} txns
-                  </div>
-                </div>
-              </div>
-              <div className="mt-4">
-                <div className="flex rounded-lg overflow-hidden h-4">
-                  <div className="bg-orange-500" style={{ width: `${stats.paymentMethods.cash.percentage}%` }}></div>
-                  <div
-                    className="bg-beveren-600"
-                    style={{ width: `${stats.paymentMethods.debitCard.percentage}%` }}
-                  ></div>
-                </div>
+              )}
+            </div>
+            <div className="mt-4">
+              <div className="flex rounded-lg overflow-hidden h-4">
+                {paymentMethodsData.map((method, index) => {
+                  const colors = ['bg-orange-500', 'bg-beveren-600', 'bg-green-500', 'bg-purple-500', 'bg-pink-500']
+                  const color = colors[index % colors.length]
+                  return (
+                    <div
+                      key={method.method}
+                      className={color}
+                      style={{ width: `${method.percentage}%` }}
+                    ></div>
+                  )
+                })}
               </div>
             </div>
           </div>
         </div>
 
         {/* Additional Stats Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          {/* Enhanced Gift Card Usage */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          {/* Enhanced Gift Card Usage - HIDDEN (not currently used) */}
+          {/* <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Gift Card Usage</h3>
               <Gift className="w-5 h-5 text-orange-600" />
@@ -849,7 +1107,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Enhanced Top Cashier */}
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
@@ -857,37 +1115,39 @@ export default function DashboardPage() {
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Top Performer</h3>
               <Users className="w-5 h-5 text-beveren-600" />
             </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-beveren-600 rounded-full flex items-center justify-center mx-auto mb-3 relative">
-                <span className="text-white font-bold text-xl">
-                  {stats.salesByCashier[0].name
-                    .split(" ")
-                    .map((n: string) => n[0])
-                    .join("")}
-                </span>
-                <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center">
-                  <span className="text-xs">👑</span>
+            {topPerformer ? (
+              <div className="text-center">
+                <div className="w-16 h-16 bg-beveren-600 rounded-full flex items-center justify-center mx-auto mb-3 relative">
+                  <span className="text-white font-bold text-xl">
+                    {topPerformer.name
+                      .split(" ")
+                      .map((n: string) => n[0])
+                      .join("")}
+                  </span>
+                  <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center">
+                    <span className="text-xs">👑</span>
+                  </div>
+                </div>
+                <h4 className="font-semibold text-gray-900 dark:text-white">{topPerformer.name}</h4>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                  {topPerformer.transactions} transactions
+                </p>
+                <p className="text-lg font-bold text-beveren-600 dark:text-beveren-400">
+                  ${topPerformer.sales.toFixed(2)}
+                </p>
+                <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                  {filteredStats.totalRevenue > 0 ? ((topPerformer.sales / filteredStats.totalRevenue) * 100).toFixed(1) : 0}% of total sales
                 </div>
               </div>
-              <h4 className="font-semibold text-gray-900 dark:text-white">{stats.salesByCashier[0].name}</h4>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                {stats.salesByCashier[0].transactions} transactions
-              </p>
-              <p className="text-lg font-bold text-beveren-600 dark:text-beveren-400">
-                ${stats.salesByCashier[0].sales.toFixed(2)}
-              </p>
-              <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                {(
-                  (stats.salesByCashier[0].sales / stats.salesByCashier.reduce((sum: number, c: { name: string; sales: number; transactions: number; id: string }) => sum + c.sales, 0)) *
-                  100
-                ).toFixed(1)}
-                % of team sales
+            ) : (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                No sales data available for selected period
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Fixed Weekly Trend */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
+          {/* Fixed Weekly Trend - HIDDEN (will implement real data later) */}
+          {/* <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Weekly Trend</h3>
               <Calendar className="w-5 h-5 text-gray-400" />
@@ -917,7 +1177,7 @@ export default function DashboardPage() {
                 Best day: <span className="font-semibold text-beveren-600 dark:text-beveren-400">Friday</span>
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Bottom Section */}
@@ -929,7 +1189,7 @@ export default function DashboardPage() {
               <button className="text-sm text-beveren-600 dark:text-beveren-400 hover:underline">View All</button>
             </div>
             <div className="space-y-4">
-              {stats.topProducts.map((product: { id: string; name: string; category: string; sales: number; revenue: number }, index: number) => (
+              {topProducts.map((product, index) => (
                 <div
                   key={product.id}
                   className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
@@ -941,18 +1201,23 @@ export default function DashboardPage() {
                     <div>
                       <div className="font-medium text-gray-900 dark:text-white">{product.name}</div>
                       <div className="text-sm text-gray-500 dark:text-gray-400 capitalize">
-                        {product.category} • {product.sales} sold
+                        {product.sales} sold
                       </div>
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="font-semibold text-gray-900 dark:text-white">${product.revenue.toFixed(2)}</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                      ${(product.revenue / product.sales).toFixed(2)} avg
+                      ${product.sales > 0 ? (product.revenue / product.sales).toFixed(2) : '0.00'} avg
                     </div>
                   </div>
                 </div>
               ))}
+              {topProducts.length === 0 && (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  No product data available for selected period
+                </div>
+              )}
             </div>
           </div>
 
@@ -968,7 +1233,7 @@ export default function DashboardPage() {
               </button>
             </div>
             <div className="space-y-4">
-              {stats.recentTransactions.map((transaction: SalesInvoice) => (
+              {recentTransactions.map((transaction) => (
                 <div
                   key={transaction.id}
                   className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
@@ -1006,6 +1271,11 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ))}
+              {recentTransactions.length === 0 && (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  No transactions available for selected period
+                </div>
+              )}
             </div>
           </div>
         </div>
