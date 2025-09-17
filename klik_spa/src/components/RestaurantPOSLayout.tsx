@@ -174,7 +174,7 @@ export default function RetailPOSLayout() {
   return (
     <>
       {scannerOnlyIndicator}
-      <div className="flex h-screen bg-gray-50">
+      <div className="flex h-screen bg-gray-50 pb-8">
       {/* Sidebar */}
       <RetailSidebar />
 

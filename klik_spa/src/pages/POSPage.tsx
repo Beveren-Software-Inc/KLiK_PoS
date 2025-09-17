@@ -14,13 +14,13 @@ export default function MainPOSScreen() {
   const [currentUser, setCurrentUser] = useState(null)
   const [userLoading, setUserLoading] = useState(true)
   const [userError, setUserError] = useState(null)
-  
+
   // Check POS opening status
-  const { 
-    hasOpenEntry, 
-    isLoading: statusLoading, 
-    error: statusError, 
-    refetch 
+  const {
+    hasOpenEntry,
+    isLoading: statusLoading,
+    error: statusError,
+    refetch
   } = usePOSOpeningStatus()
 
 useEffect(() => {
@@ -28,11 +28,11 @@ useEffect(() => {
       try {
         setUserLoading(true)
         setUserError(null)
-        
+
         erpnextAPI.initializeSession()
-        
+
         const userProfile = await erpnextAPI.getCurrentUserProfile()
-        
+
         if (userProfile) {
           setCurrentUser({
             name: userProfile.name,
@@ -93,7 +93,7 @@ useEffect(() => {
 
   const handleOpeningClose = () => {
     setShowOpeningModal(false)
-   
+
   }
 
   // Show loading screen while checking status
@@ -110,10 +110,10 @@ useEffect(() => {
   }
 
   return (
-    <div className={`min-h-screen bg-gray-50 ${isRTL ? "rtl" : "ltr"}`}>
+    <div className={`min-h-screen bg-gray-50 ${isRTL ? "rtl" : "ltr"} pb-12`}>
       {/* Show POS Layout only when ready */}
       {posReady && <RetailPOSLayout />}
-      
+
       {/* Show a placeholder or message when POS is not ready */}
       {!posReady && !showOpeningModal && (
         <div className="flex items-center justify-center min-h-screen">
