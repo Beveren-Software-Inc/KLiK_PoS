@@ -46,7 +46,7 @@ def fetch_item_price(item_code: str, price_list: str) -> dict:
                 default_symbol = frappe.db.get_value("Currency", default_currency, "symbol") or default_currency
 
                 return {
-                    "price": item_doc.standard_rate or 0,
+                    "price": item_doc.valuation_rate or 0,
                     "currency": default_currency,
                     "currency_symbol": default_symbol
                 }
@@ -75,9 +75,9 @@ def fetch_item_price(item_code: str, price_list: str) -> dict:
             item_doc = frappe.get_doc("Item", item_code)
             default_currency = frappe.get_value("Company", frappe.defaults.get_user_default("Company"), "default_currency") or "SAR"
             default_symbol = frappe.db.get_value("Currency", default_currency, "symbol") or default_currency
-
+            print("Here is the item doc", item_doc.valuation_rate)
             return {
-                "price": item_doc.standard_rate or 0,
+                "price": item_doc.valuation_rate or 0,
                 "currency": default_currency,
                 "currency_symbol": default_symbol
             }
