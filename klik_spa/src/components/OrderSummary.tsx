@@ -61,6 +61,9 @@ export default function OrderSummary({
     null
   );
 
+  // Track if user has manually removed the default customer
+  const [userRemovedDefaultCustomer, setUserRemovedDefaultCustomer] = useState(false);
+
   // Debug selectedCustomer changes
   useEffect(() => {
 
@@ -209,7 +212,7 @@ export default function OrderSummary({
         setPrefilledCustomerName(trimmedValue);
         setShowAddCustomerModal(true);
         setShowCustomerDropdown(false);
-      } else if (filteredCustomers.length === 1) {
+      } else if (filteredCustomers.length === 1 && !userRemovedDefaultCustomer) {
         handleCustomerSelect(filteredCustomers[0]);
       }
       // If multiple matches, do nothing (let user choose from dropdown)
@@ -268,6 +271,7 @@ export default function OrderSummary({
     setSelectedCustomer(customer);
     setCustomerSearchQuery(customer.name);
     setShowCustomerDropdown(false);
+    setUserRemovedDefaultCustomer(false); // Reset flag when user explicitly selects a customer
   };
 
   const handleSaveCustomer = async (newCustomer: Partial<Customer>) => {
@@ -473,16 +477,13 @@ export default function OrderSummary({
 
   // Set default customer from POS profile when available
   useEffect(() => {
-    // console.log("Default customer useEffect triggered:", {
-    //   posDetails: posDetails,
-    //   defaultCustomer: posDetails?.default_customer,
-    //   selectedCustomer: selectedCustomer,
-    //   posLoading: posLoading
-    // });
-
-    if (posDetails?.default_customer && !selectedCustomer && !posLoading) {
+    // Only auto-select default customer if:
+    // 1. POS details are loaded
+    // 2. There's a default customer configured
+    // 3. No customer is currently selected
+    // 4. User hasn't manually removed the default customer
+    if (posDetails?.default_customer && !selectedCustomer && !posLoading && !userRemovedDefaultCustomer) {
       const defaultCustomer = posDetails.default_customer;
-      // console.log("Setting default customer:", defaultCustomer);
       console.log("Default customer details:", defaultCustomer);
       // Transform the default customer data to match the Customer interface
       const transformedCustomer: Customer = {
@@ -513,7 +514,7 @@ export default function OrderSummary({
       setCustomerSearchQuery(transformedCustomer.name);
       setShowCustomerDropdown(false);
     }
-  }, [posDetails, selectedCustomer, posLoading]);
+  }, [posDetails, selectedCustomer, posLoading, userRemovedDefaultCustomer]);
 
   useEffect(() => {
     const fetchAndSetBatches = async () => {
@@ -659,6 +660,7 @@ export default function OrderSummary({
                     onClick={() => {
                       setSelectedCustomer(null);
                       setCustomerSearchQuery("");
+                      setUserRemovedDefaultCustomer(true);
                     }}
                     className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                   >
@@ -777,6 +779,7 @@ export default function OrderSummary({
                   onClick={() => {
                     setSelectedCustomer(null);
                     setCustomerSearchQuery("");
+                    setUserRemovedDefaultCustomer(true);
                   }}
                   className="text-gray-400 hover:text-gray-600"
                 >
