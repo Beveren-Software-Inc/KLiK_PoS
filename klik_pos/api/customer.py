@@ -34,7 +34,6 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
             print(f"No customer type filter applied - showing all customers (business_type: {business_type})")
         # For "B2B & B2C", no customer_type filter is applied (show all)
 
-        print(f"Final filters applied: {filters}")
         customer_names = frappe.get_all(
             "Customer",
             filters=filters,
@@ -83,7 +82,6 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
                 "custom_last_visit": customer_stats.get("last_visit"),
                 # "exchange_rate": get_currency_exchange_rate(company_currency, doc.default_currency)
             })
-        print("Results", result)
         return {"success": True, "data": result}
 
     except Exception:
@@ -124,7 +122,6 @@ def get_customer_addresses(customer: str):
             fields=["name", "address_line1", "address_line2", "city", "state", "country", "pincode"],
             order_by="creation desc"
         )
-        print("Address", addresses)
         return addresses
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), f"Error fetching addresses for customer {customer}")
@@ -192,7 +189,6 @@ def create_or_update_customer(customer_data):
     try:
         if isinstance(customer_data, str):
             customer_data = frappe.parse_json(customer_data)
-        print("Data++",str(customer_data))
         # Extract main fields
         customer_name = customer_data.get("name")
         email = customer_data.get("email")
@@ -213,7 +209,6 @@ def create_or_update_customer(customer_data):
 
         contact_doc = None
         addr_doc = None
-        print("mania", customer_doc)
         # For Individuals → create contact if phone exists, and address if provided
         if cust_type == "individual":
             if phone:
