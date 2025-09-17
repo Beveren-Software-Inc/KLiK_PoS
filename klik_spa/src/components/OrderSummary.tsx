@@ -24,6 +24,7 @@ import { useBatchData } from "../hooks/useProducts";
 import { getBatches } from "../utils/batch";
 import { useNavigate } from "react-router-dom";
 import { usePOSDetails } from "../hooks/usePOSProfile";
+import { useCustomerStatistics } from "../hooks/useCustomerStatistics";
 
 // Extended CartItem interface to include discount properties
 interface ExtendedCartItem extends CartItem {
@@ -59,6 +60,14 @@ export default function OrderSummary({
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
     null
   );
+
+  // Track if user has manually removed the default customer
+  const [userRemovedDefaultCustomer, setUserRemovedDefaultCustomer] = useState(false);
+
+  // Debug selectedCustomer changes
+  useEffect(() => {
+
+  }, [selectedCustomer]);
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
@@ -68,6 +77,9 @@ export default function OrderSummary({
   const { refetch: refetchProducts, refreshStockOnly, updateStockForItems } = useProducts();
   const navigate = useNavigate();
   const { posDetails, loading: posLoading } = usePOSDetails();
+
+  // Get customer statistics for the selected customer
+  const { statistics: customerStats, isLoading: statsLoading } = useCustomerStatistics(selectedCustomer?.id || null);
   const [prefilledCustomerName, setPrefilledCustomerName] = useState("");
   const [prefilledData, setPrefilledData] = useState<{
     name?: string;
@@ -155,7 +167,6 @@ export default function OrderSummary({
 
         // Check if it's an email
         if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedValue)) {
-          console.log("Detected email:", trimmedValue);
           prefilledData = { email: trimmedValue };
         }
         // Check if it's a phone number (contains mostly digits with some special characters)
@@ -163,7 +174,6 @@ export default function OrderSummary({
           /^[\d\s\+\-\(\)]+$/.test(trimmedValue) &&
           trimmedValue.replace(/[\s\+\-\(\)]/g, "").length >= 7
         ) {
-          console.log("Detected phone:", trimmedValue);
           // Format phone number with Saudi Arabia country code if it doesn't already have one
           let formattedPhone = trimmedValue;
           const cleanNumber = trimmedValue.replace(/[\s\+\-\(\)]/g, "");
@@ -188,10 +198,7 @@ export default function OrderSummary({
             formattedPhone = "+" + cleanNumber;
           }
 
-          console.log(
-            "Formatted phone with Saudi Arabia code:",
-            formattedPhone
-          );
+
           prefilledData = { phone: formattedPhone };
         }
         // Otherwise treat as name
@@ -205,7 +212,7 @@ export default function OrderSummary({
         setPrefilledCustomerName(trimmedValue);
         setShowAddCustomerModal(true);
         setShowCustomerDropdown(false);
-      } else if (filteredCustomers.length === 1) {
+      } else if (filteredCustomers.length === 1 && !userRemovedDefaultCustomer) {
         handleCustomerSelect(filteredCustomers[0]);
       }
       // If multiple matches, do nothing (let user choose from dropdown)
@@ -260,14 +267,14 @@ export default function OrderSummary({
   };
 
   const handleCustomerSelect = (customer: Customer) => {
+
     setSelectedCustomer(customer);
     setCustomerSearchQuery(customer.name);
     setShowCustomerDropdown(false);
+    setUserRemovedDefaultCustomer(false); // Reset flag when user explicitly selects a customer
   };
 
   const handleSaveCustomer = async (newCustomer: Partial<Customer>) => {
-    console.log("Saving new customer:", newCustomer);
-    console.log("Customer name from backend:", newCustomer.customer_name);
 
     // Automatically select the newly created customer in the cart
     if (newCustomer && newCustomer.customer_name) {
@@ -280,7 +287,6 @@ export default function OrderSummary({
         }
 
         const resData = await response.json();
-        console.log('Customer info response:', resData);
 
         if (resData.message) {
           // Convert the ERP customer data to our Customer format
@@ -366,7 +372,6 @@ export default function OrderSummary({
 
     // Refresh stock so cashier can see updated availability
     try {
-      console.log("OrderSummary: Starting lightweight stock refresh...");
       const success = await refreshStockOnly();
       if (success) {
         console.log("OrderSummary: Stock refreshed successfully - cashier can now see updated availability");
@@ -391,11 +396,9 @@ export default function OrderSummary({
 
     try {
       // Creates a draft invoice and saves the order
-      console.log("Creating draft invoice:", orderData);
       setShowPaymentDialog(false);
 
       const result = await createDraftSalesInvoice(orderData);
-      console.log("Draft invoice result:", result);
 
       if (result && result.success) {
         handleClearCart();
@@ -474,17 +477,14 @@ export default function OrderSummary({
 
   // Set default customer from POS profile when available
   useEffect(() => {
-    // console.log("Default customer useEffect triggered:", {
-    //   posDetails: posDetails,
-    //   defaultCustomer: posDetails?.default_customer,
-    //   selectedCustomer: selectedCustomer,
-    //   posLoading: posLoading
-    // });
-
-    if (posDetails?.default_customer && !selectedCustomer && !posLoading) {
+    // Only auto-select default customer if:
+    // 1. POS details are loaded
+    // 2. There's a default customer configured
+    // 3. No customer is currently selected
+    // 4. User hasn't manually removed the default customer
+    if (posDetails?.default_customer && !selectedCustomer && !posLoading && !userRemovedDefaultCustomer) {
       const defaultCustomer = posDetails.default_customer;
-      // console.log("Setting default customer:", defaultCustomer);
-
+      console.log("Default customer details:", defaultCustomer);
       // Transform the default customer data to match the Customer interface
       const transformedCustomer: Customer = {
         id: defaultCustomer.id,
@@ -514,7 +514,7 @@ export default function OrderSummary({
       setCustomerSearchQuery(transformedCustomer.name);
       setShowCustomerDropdown(false);
     }
-  }, [posDetails, selectedCustomer, posLoading]);
+  }, [posDetails, selectedCustomer, posLoading, userRemovedDefaultCustomer]);
 
   useEffect(() => {
     const fetchAndSetBatches = async () => {
@@ -614,6 +614,18 @@ export default function OrderSummary({
             {/* Selected Customer Display */}
             {selectedCustomer && (
               <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                {/* Debug: Log customer data */}
+                {console.log("Selected Customer Data (Mobile):", {
+                  name: selectedCustomer,
+                  phone: selectedCustomer.phone,
+                  phoneType: typeof selectedCustomer.phone,
+                  phoneLength: selectedCustomer.phone?.length,
+                  phoneNotNA: selectedCustomer.phone !== "N/A",
+                  phoneTruthy: !!selectedCustomer.phone,
+                  totalOrders: selectedCustomer.totalOrders,
+                  realTimeOrders: customerStats?.total_orders,
+                  loyaltyPoints: selectedCustomer.loyaltyPoints
+                })}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     {getCustomerTypeIcon(selectedCustomer)}
@@ -622,8 +634,25 @@ export default function OrderSummary({
                         {selectedCustomer.name}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {selectedCustomer.loyaltyPoints} points •{" "}
-                        {selectedCustomer.totalOrders} orders
+                        {/* Debug phone rendering */}
+                        {console.log("Phone rendering check:", {
+                          phone: selectedCustomer.phone,
+                          phoneExists: !!selectedCustomer.phone,
+                          phoneNotNA: selectedCustomer.phone !== "N/A",
+                          shouldShowPhone: selectedCustomer.phone && selectedCustomer.phone !== "N/A"
+                        })}
+                        {selectedCustomer.phone && selectedCustomer.phone !== "N/A" && selectedCustomer.phone.trim() !== "" && (
+                          <span>{selectedCustomer.phone}</span>
+                        )}
+                        {selectedCustomer.phone && selectedCustomer.phone !== "N/A" && selectedCustomer.phone.trim() !== "" && (customerStats?.total_orders || 0) > 0 && (
+                          <span className="mx-2">•</span>
+                        )}
+                        {(customerStats?.total_orders || 0) > 0 && (
+                          <span>{customerStats?.total_orders || 0} orders</span>
+                        )}
+                        {(!selectedCustomer.phone || selectedCustomer.phone === "N/A" || selectedCustomer.phone.trim() === "") && (customerStats?.total_orders || 0) === 0 && (
+                          <span className="text-gray-400 italic">No additional info</span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -631,6 +660,7 @@ export default function OrderSummary({
                     onClick={() => {
                       setSelectedCustomer(null);
                       setCustomerSearchQuery("");
+                      setUserRemovedDefaultCustomer(true);
                     }}
                     className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                   >
@@ -703,6 +733,18 @@ export default function OrderSummary({
 
           {selectedCustomer && (
             <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              {/* Debug: Log customer data */}
+              {console.log("Selected Customer Data:", {
+                name: selectedCustomer.name,
+                phone: selectedCustomer.phone,
+                phoneType: typeof selectedCustomer.phone,
+                phoneLength: selectedCustomer.phone?.length,
+                phoneNotNA: selectedCustomer.phone !== "N/A",
+                phoneTruthy: !!selectedCustomer.phone,
+                totalOrders: selectedCustomer.totalOrders,
+                realTimeOrders: customerStats?.total_orders,
+                loyaltyPoints: selectedCustomer.loyaltyPoints
+              })}
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   {getCustomerTypeIcon(selectedCustomer)}
@@ -711,7 +753,25 @@ export default function OrderSummary({
                       {selectedCustomer.name}
                     </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {selectedCustomer.loyaltyPoints} points
+                      {/* Debug phone rendering */}
+                      {console.log("Phone rendering check (Desktop):", {
+                        phone: selectedCustomer.phone,
+                        phoneExists: !!selectedCustomer.phone,
+                        phoneNotNA: selectedCustomer.phone !== "N/A",
+                        shouldShowPhone: selectedCustomer.phone && selectedCustomer.phone !== "N/A"
+                      })}
+                      {selectedCustomer.phone && selectedCustomer.phone !== "N/A" && selectedCustomer.phone.trim() !== "" && (
+                        <span>{selectedCustomer.phone}</span>
+                      )}
+                      {selectedCustomer.phone && selectedCustomer.phone !== "N/A" && selectedCustomer.phone.trim() !== "" && (customerStats?.total_orders || 0) > 0 && (
+                        <span className="mx-2">•</span>
+                      )}
+                      {(customerStats?.total_orders || 0) > 0 && (
+                        <span>{customerStats?.total_orders || 0} orders</span>
+                      )}
+                      {(!selectedCustomer.phone || selectedCustomer.phone === "N/A" || selectedCustomer.phone.trim() === "") && (customerStats?.total_orders || 0) === 0 && (
+                        <span className="text-gray-400 italic">No additional info</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -719,6 +779,7 @@ export default function OrderSummary({
                   onClick={() => {
                     setSelectedCustomer(null);
                     setCustomerSearchQuery("");
+                    setUserRemovedDefaultCustomer(true);
                   }}
                   className="text-gray-400 hover:text-gray-600"
                 >
@@ -804,9 +865,9 @@ export default function OrderSummary({
                       </button>
                     </div>
 
-                    {/* Product Image - Maintain same size for consistency */}
-                    <div className="flex-shrink-0">
-                      {item.image ? (
+                    {/* Product Image - Only show if image exists */}
+                    {item.image && (
+                      <div className="flex-shrink-0">
                         <img
                           src={item.image}
                           alt={item.name}
@@ -815,16 +876,8 @@ export default function OrderSummary({
                           } rounded-lg object-cover`}
                           crossOrigin="anonymous"
                         />
-                      ) : (
-                        <div className={`${
-                          isMobile ? "w-16 h-16" : "w-12 h-12"
-                        } rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center`}>
-                          <div className="text-gray-400 dark:text-gray-500 text-xs font-medium">
-                            No Image
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
                     {/* Product Info */}
                     <div className="flex-1 min-w-0 px-3">
@@ -1182,9 +1235,9 @@ export default function OrderSummary({
         <div
           className={`${
             isMobile
-              ? "flex-shrink-0 p-4 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 shadow-lg"
-              : "p-6 border-t border-gray-100 dark:border-gray-700"
-          } space-y-4`}
+              ? "flex-shrink-0 p-3 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 shadow-lg"
+              : "p-4 border-t border-gray-100 dark:border-gray-700"
+          } space-y-3`}
         >
           {/* <div className="space-y-3"> */}
             {/* <div className="flex justify-between text-sm">
@@ -1319,13 +1372,13 @@ export default function OrderSummary({
 
                 handleHoldOrder(orderData);
               }}
-              className="px-4 py-3 border border-beveren-600 text-beveren-600 dark:text-beveren-400 rounded-xl font-medium hover:bg-beveren-600 hover:text-white transition-colors"
+              className="px-3 py-2 border border-beveren-600 text-beveren-600 dark:text-beveren-400 rounded-lg font-medium hover:bg-beveren-600 hover:text-white transition-colors text-sm"
             >
               Hold
             </button>
             <button
               onClick={handleClearCart}
-              className="px-4 py-3 border border-red-500 text-red-600 dark:text-red-400 rounded-xl font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              className="px-3 py-2 border border-red-500 text-red-600 dark:text-red-400 rounded-lg font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm"
             >
               Clear Cart
             </button>
@@ -1360,8 +1413,8 @@ export default function OrderSummary({
               if (!validateCustomer()) return;
               setShowPaymentDialog(true);
             }}
-            className={`w-full bg-beveren-600 text-white rounded-2xl font-semibold hover:bg-beveren-700 transition-colors ${
-              isMobile ? "py-4 text-lg" : "py-4"
+            className={`w-full bg-beveren-600 text-white rounded-xl font-semibold hover:bg-beveren-700 transition-colors ${
+              isMobile ? "py-3 text-base" : "py-2 text-sm"
             }`}
           >
             Checkout {currency_symbol}

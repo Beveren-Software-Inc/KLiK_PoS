@@ -234,7 +234,7 @@ export default function InvoiceViewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex pb-12">
       <RetailSidebar />
       <div className="flex-1 flex flex-col overflow-hidden ml-20">
         {/* Header */}

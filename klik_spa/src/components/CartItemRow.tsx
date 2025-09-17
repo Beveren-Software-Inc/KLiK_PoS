@@ -14,16 +14,13 @@ export default function CartItemRow({ item, onUpdateQty }: CartItemRowProps) {
   return (
     <div className="flex items-center justify-between py-2">
       <div className="flex items-center space-x-3">
-        <div className="w-12 h-12 rounded object-cover bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-          {item.imageURL ? (
+        {/* Only show image if it exists */}
+        {item.imageURL && (
+          <div className="w-12 h-12 rounded object-cover bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
             <img src={item.imageURL} alt={item.nameEn} className="w-12 h-12 rounded object-cover" />
-          ) : (
-            <div className="text-gray-400 dark:text-gray-500 text-xs font-medium">
-              No Image
-            </div>
-          )}
-        </div>
-        <div>
+          </div>
+        )}
+        <div className={item.imageURL ? "" : "flex-1"}>
           <div className="font-medium text-sm">{isRTL ? item.nameAr : item.nameEn}</div>
           <div className="text-xs text-gray-600">{isRTL ? item.nameEn : item.nameAr}</div>
         </div>
