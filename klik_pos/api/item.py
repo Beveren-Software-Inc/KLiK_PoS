@@ -16,6 +16,7 @@ def fetch_item_balance(item_code: str, warehouse: str) -> float:
         return 0
 
 def fetch_item_price(item_code: str, price_list: str) -> dict:
+   
     """Get item price from Item Price doctype. If price_list is null, get latest price without price_list filter."""
     try:
         # If price_list is null or empty, get latest price without price_list filter
@@ -137,13 +138,13 @@ def get_item_by_barcode(barcode: str):
         frappe.throw(_("Error fetching item by barcode: {0}").format(str(e)))
 
 @frappe.whitelist(allow_guest=True)
-def get_items_with_balance_and_price(price_list: str = "Standard Selling"):
+def get_items_with_balance_and_price():
     """
     Get items with balance and price - optimized version with caching support
     """
     pos_doc = get_current_pos_profile()
     warehouse = pos_doc.warehouse
-
+    price_list = pos_doc.selling_price_list
     try:
         # If POS Profile has item groups → only use those
         filters = {"disabled": 0, "is_stock_item": 1}

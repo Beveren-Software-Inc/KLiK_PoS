@@ -78,7 +78,7 @@ export function ProductProvider({ children }: ProductProviderProps) {
   const fetchProductsFromAPI = async (): Promise<MenuItem[]> => {
     const priceList = "Standard Selling";
     const response = await fetch(
-      `/api/method/klik_pos.api.item.get_items_with_balance_and_price?price_list=${encodeURIComponent(priceList)}`
+      `/api/method/klik_pos.api.item.get_items_with_balance_and_price`
     );
 
     if (!response.ok) {
