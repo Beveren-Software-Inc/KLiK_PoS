@@ -12,10 +12,14 @@ export default function MobilePaymentPage() {
   const { cartItems, appliedCoupons, selectedCustomer, clearCart } = useCartStore()
   const { refetch: refetchProducts, refreshStockOnly, updateStockForItems } = useProducts();
 
-  const handleClose = async () => {
-    // Clear cart when closing payment page (New Order clicked)
-    console.log("MobilePaymentPage: Closing payment page - clearing cart for next order");
-    clearCart();
+  const handleClose = async (paymentCompleted?: boolean) => {
+    // Only clear cart if payment was completed
+    if (paymentCompleted) {
+      console.log("MobilePaymentPage: Payment was completed - clearing cart for next order");
+      clearCart();
+    } else {
+      console.log("MobilePaymentPage: Payment was not completed - keeping cart items");
+    }
 
     // Simple stock refresh and navigate back
     try {
