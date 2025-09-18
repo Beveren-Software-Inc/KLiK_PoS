@@ -363,12 +363,16 @@ export default function OrderSummary({
     // Cart will be cleared when modal is closed via "New Order" button
   };
 
-  const handleClosePaymentDialog = async () => {
+  const handleClosePaymentDialog = async (paymentCompleted?: boolean) => {
     setShowPaymentDialog(false);
 
-    // Clear cart when closing modal (New Order clicked)
-    console.log("OrderSummary: Closing payment modal - clearing cart for next order");
-    handleClearCart();
+    // Only clear cart if payment was completed
+    if (paymentCompleted) {
+      console.log("OrderSummary: Payment was completed - clearing cart for next order");
+      handleClearCart();
+    } else {
+      console.log("OrderSummary: Payment was not completed - keeping cart items");
+    }
 
     // Refresh stock so cashier can see updated availability
     try {

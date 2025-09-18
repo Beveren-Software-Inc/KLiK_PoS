@@ -8,7 +8,7 @@ export class PerformanceMonitor {
     this.timers.set(label, performance.now());
     console.log(`🚀 Starting: ${label}`);
   }
-
+Phone rendering check: {phone: '', phoneExists: false, phoneNotNA: true, shouldShowPhone: ''}
   static end(label: string): number {
     const startTime = this.timers.get(label);
     if (!startTime) {

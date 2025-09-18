@@ -44,7 +44,7 @@ import {
 
 interface PaymentDialogProps {
   isOpen: boolean;
-  onClose: () => void;
+  onClose: (paymentCompleted?: boolean) => void;
   cartItems: CartItem[];
   appliedCoupons: GiftCoupon[];
   selectedCustomer: Customer | null;
@@ -1179,7 +1179,7 @@ export default function PaymentDialog({
             </div>
           ) : (
             <button
-              onClick={onClose}
+              onClick={() => onClose(invoiceSubmitted)}
               disabled={isProcessingPayment || isHoldingOrder}
               className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             >
