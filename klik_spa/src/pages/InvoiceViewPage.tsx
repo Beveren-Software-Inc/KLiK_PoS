@@ -693,11 +693,11 @@ export default function InvoiceViewPage() {
                     <div className="space-y-3">
                       <div className="flex items-center space-x-3 text-sm">
                         <Mail className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-600 dark:text-gray-400">{invoice.customer_address_doc?.email_id}</span>
+                        <span className="text-gray-600 dark:text-gray-400">{invoice.customer_email}</span>
                       </div>
                       <div className="flex items-center space-x-3 text-sm">
                         <Phone className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-600 dark:text-gray-400">{invoice.customer_address_doc?.phone}</span>
+                        <span className="text-gray-600 dark:text-gray-400">{invoice.customer_mobile_no}</span>
                       </div>
                       <div className="flex items-start space-x-3 text-sm">
                         <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
