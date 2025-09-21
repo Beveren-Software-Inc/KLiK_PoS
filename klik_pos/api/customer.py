@@ -148,7 +148,7 @@ def get_currency_exchange_rate(from_currency: str, to_currency: str, transaction
 
 @frappe.whitelist()
 def get_customer_info(customer_name: str):
-    """Fetch customer document by customer name."""
+    """Fetch comprehensive customer document by customer name."""
     try:
         # First try to find by customer_name (the actual name field)
         customers = frappe.get_all("Customer", filters={"customer_name": customer_name}, fields=["name"])
@@ -160,7 +160,29 @@ def get_customer_info(customer_name: str):
             return {"success": False, "error": f"Customer not found: {customer_name}"}
 
         customer = frappe.get_doc("Customer", customers[0]["name"])
-        return {
+
+        # Get primary contact details
+        contact_data = None
+        if customer.customer_primary_contact:
+            contact_data = frappe.db.get_value(
+                "Contact",
+                customer.customer_primary_contact,
+                ["first_name", "last_name", "email_id", "phone", "mobile_no"],
+                as_dict=True
+            )
+
+        # Get primary address details
+        address_data = None
+        if customer.customer_primary_address:
+            address_data = frappe.db.get_value(
+                "Address",
+                customer.customer_primary_address,
+                ["address_line1", "address_line2", "city", "state", "country", "pincode"],
+                as_dict=True
+            )
+
+        # Prepare base customer data
+        customer_data = {
             "name": customer.name,
             "customer_name": customer.customer_name,
             "customer_group": customer.customer_group,
@@ -170,13 +192,24 @@ def get_customer_info(customer_name: str):
             "customer_primary_address": customer.customer_primary_address,
             "email_id": customer.email_id,
             "mobile_no": customer.mobile_no,
-            # "custom_loyalty_points": customer.custom_loyalty_points,
-            # "custom_total_spent": customer.custom_total_spent,
-            # "custom_total_orders": customer.custom_total_orders,
-            # "custom_status": customer.custom_status,
-            # "custom_tags": customer.custom_tags,
-            "creation": customer.creation
+            "creation": customer.creation,
+            "contact_data": contact_data,
+            "address_data": address_data
         }
+
+        # Add ZATCA details for company customers
+        if customer.customer_type == "Company":
+            customer_data.update({
+                "vat_number": getattr(customer, 'custom_vat_number', ''),
+                "registration_scheme": getattr(customer, 'custom_registration_scheme', ''),
+                "registration_number": getattr(customer, 'custom_registration_number', ''),
+                "payment_method": getattr(customer, 'custom_payment_method', 'Cash'),
+                "industry": getattr(customer, 'custom_industry', ''),
+                "employee_count": getattr(customer, 'custom_employee_count', ''),
+                "company_name": customer.customer_name
+            })
+
+        return customer_data
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Error fetching customer info")
         return {"success": False, "error": str(e)}
@@ -392,6 +425,7 @@ def create_or_update_address(customer_id, customer_name, address_data, country):
         "address_line1": address_data.get("street", ""),
         "address_line2": address_data.get("buildingNumber", ""),
         "city": address_data.get("city", ""),
+        "state": address_data.get("state", ""),
         "county": address_data.get("city", ""),
         "pincode": address_data.get("zipCode", ""),
         "country": country,
@@ -432,10 +466,12 @@ def update_customer(customer_id, customer_data):
         email = customer_data.get("email")
         phone = customer_data.get("phone")
         customer_name = customer_data.get("name", customer.customer_name)
+        address_data = customer_data.get("address", {})
+        country = address_data.get("country", "Saudi Arabia")
 
         # Update customer fields
         for key, value in customer_data.items():
-            if key not in ["email", "phone"]:  # Skip email/phone as they go to Contact
+            if key not in ["email", "phone", "address"]:  # Skip email/phone/address as they go to Contact/Address
                 setattr(customer, key, value)
 
         customer.ignore_version = True
@@ -474,6 +510,17 @@ def update_customer(customer_id, customer_data):
                 frappe.log_error(frappe.get_traceback(), f"Error updating contact for customer {customer_id}")
                 # Don't fail the whole operation if contact update fails
 
+        # Update address if address data is provided
+        if address_data and any(address_data.get(field) for field in ['street', 'city', 'state', 'zipCode', 'buildingNumber']):
+            try:
+                addr_doc = create_or_update_address(customer_id, customer_name, address_data, country)
+                # Link Address to Customer if it was created/updated
+                if addr_doc:
+                    frappe.db.set_value("Customer", customer_id, "customer_primary_address", addr_doc.name)
+            except Exception as address_error:
+                frappe.log_error(frappe.get_traceback(), f"Error updating address for customer {customer_id}")
+                # Don't fail the whole operation if address update fails
+
         return {
             "success": True,
             "updated_customer": customer.name
@@ -496,8 +543,8 @@ def get_customer_statistics(customer_id):
             "Sales Invoice",
             filters={
                 "customer": customer_id,
-                "docstatus": 1, 
-                "is_return": 0,  
+                "docstatus": 1,
+                "is_return": 0,
                 "status": ["!=", "Cancelled"]
             }
         )

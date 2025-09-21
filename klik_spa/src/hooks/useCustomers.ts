@@ -127,22 +127,23 @@ export function useCustomerDetails(customerId: string | null) {
           id: apiCustomer.name,
           type: apiCustomer.customer_type === "Company" ? "company" : "individual",
           name: apiCustomer.customer_name || `Customer ${apiCustomer.name.slice(0, 5)}`,
-          email: apiCustomer.email_id || "",
-          phone: apiCustomer.mobile_no || "",
+          email: apiCustomer.contact_data?.email_id || apiCustomer.email_id || "",
+          phone: apiCustomer.contact_data?.mobile_no || apiCustomer.contact_data?.phone || apiCustomer.mobile_no || "",
           address: {
             addressType: "Billing",
-            street: "",
-            city: "",
-            state: "",
-            zipCode: "",
-            country: "Saudi Arabia" // Default country
+            street: apiCustomer.address_data?.address_line1 || "",
+            buildingNumber: apiCustomer.address_data?.address_line2 || "",
+            city: apiCustomer.address_data?.city || "",
+            state: apiCustomer.address_data?.state || "",
+            zipCode: apiCustomer.address_data?.pincode || "",
+            country: apiCustomer.address_data?.country || "Saudi Arabia"
           },
           dateOfBirth: "",
           gender: "other",
           loyaltyPoints: 0,
           totalSpent: 0,
           totalOrders: 0,
-          preferredPaymentMethod: "Cash",
+          preferredPaymentMethod: apiCustomer.payment_method || "Cash",
           notes: "",
           tags: [],
           status: "active",
@@ -152,13 +153,17 @@ export function useCustomerDetails(customerId: string | null) {
           defaultCurrency: undefined,
           companyCurrency: undefined,
           customer_group: apiCustomer.customer_group || "All Customer Groups",
-          territory: apiCustomer.territory || "Saudi Arabia",
+          territory: apiCustomer.territory || "All Territories",
           // Add missing fields that AddCustomerModal expects
-          contactPerson: apiCustomer.customer_name || "", // Use customer_name as contact person for individual customers
+          contactPerson: apiCustomer.contact_data ?
+            `${apiCustomer.contact_data.first_name || ''} ${apiCustomer.contact_data.last_name || ''}`.trim() || apiCustomer.customer_name :
+            apiCustomer.customer_name || "",
           companyName: apiCustomer.customer_type === "Company" ? apiCustomer.customer_name : undefined,
-          taxId: "",
-          industry: "",
-          employeeCount: ""
+          taxId: apiCustomer.vat_number || "",
+          industry: apiCustomer.industry || "",
+          employeeCount: apiCustomer.employee_count || "",
+          registrationScheme: apiCustomer.registration_scheme || "",
+          registrationNumber: apiCustomer.registration_number || ""
         };
 
         setCustomer(transformedCustomer);

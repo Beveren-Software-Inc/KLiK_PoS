@@ -158,18 +158,30 @@ export default function InvoiceViewPage() {
           id: customerInfo.name,
           name: customerInfo.customer_name,
           type: customerInfo.customer_type?.toLowerCase() === 'company' ? 'company' : 'individual',
-          email: customerInfo.email_id || '',
-          phone: customerInfo.mobile_no || '',
+          email: customerInfo.contact_data?.email_id || customerInfo.email_id || '',
+          phone: customerInfo.contact_data?.mobile_no || customerInfo.contact_data?.phone || customerInfo.mobile_no || '',
           address: {
             addressType: 'Billing',
-            street: '',
-            city: '',
-            state: '',
-            zipCode: '',
-            country: 'Saudi Arabia',
+            street: customerInfo.address_data?.address_line1 || '',
+            buildingNumber: customerInfo.address_data?.address_line2 || '',
+            city: customerInfo.address_data?.city || '',
+            state: customerInfo.address_data?.state || '',
+            zipCode: customerInfo.address_data?.pincode || '',
+            country: customerInfo.address_data?.country || 'Saudi Arabia',
           },
           status: 'active' as const,
-          preferredPaymentMethod: 'Cash' as const,
+          preferredPaymentMethod: customerInfo.payment_method || 'Cash' as const,
+          customer_group: customerInfo.customer_group || 'All Customer Groups',
+          territory: customerInfo.territory || 'All Territories',
+          contactPerson: customerInfo.contact_data ?
+            `${customerInfo.contact_data.first_name || ''} ${customerInfo.contact_data.last_name || ''}`.trim() || customerInfo.customer_name :
+            customerInfo.customer_name || "",
+          companyName: customerInfo.customer_type === "Company" ? customerInfo.customer_name : undefined,
+          taxId: customerInfo.vat_number || "",
+          industry: customerInfo.industry || "",
+          employeeCount: customerInfo.employee_count || "",
+          registrationScheme: customerInfo.registration_scheme || "",
+          registrationNumber: customerInfo.registration_number || ""
         };
 
         setCustomerData(transformedCustomer);

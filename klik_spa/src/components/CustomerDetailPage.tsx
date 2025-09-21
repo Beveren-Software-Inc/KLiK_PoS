@@ -325,6 +325,7 @@ export default function CustomerDetailPage() {
                       <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Address</p>
                       <div className="text-gray-900 dark:text-white">
                         <p>{customer.address.street}</p>
+                        {customer.address.buildingNumber && <p>{customer.address.buildingNumber}</p>}
                         <p>{customer.address.city}, {customer.address.state}</p>
                         <p>{customer.address.zipCode}</p>
                         <p>{customer.address.country}</p>

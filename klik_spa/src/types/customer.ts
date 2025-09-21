@@ -22,6 +22,8 @@ export interface Customer {
   taxId?: string
   industry?: string
   employeeCount?: string
+  registrationScheme?: string
+  registrationNumber?: string
   // Common fields
   loyaltyPoints: number
   totalSpent: number
