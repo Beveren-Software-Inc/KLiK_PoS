@@ -1,14 +1,14 @@
 import React, { useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { 
-  ArrowLeft, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Calendar, 
-  Crown, 
-  Star, 
-  CreditCard, 
+import {
+  ArrowLeft,
+  Mail,
+  Phone,
+  MapPin,
+  Calendar,
+  Crown,
+  Star,
+  CreditCard,
   ShoppingBag,
   Edit,
   MoreVertical,
@@ -22,13 +22,14 @@ import {
   Hash,
   Briefcase
 } from "lucide-react"
-import { getCustomerById, type Customer } from "../data/mockCustomers"
+import { useCustomerDetails } from "../hooks/useCustomers"
 import AddCustomerModal from "./AddCustomerModal"
+import type { Customer } from "../types/customer"
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const customer = id ? getCustomerById(id) : null
+  const { customer, isLoading, error } = useCustomerDetails(id || null)
   const [showEditModal, setShowEditModal] = useState(false)
 
   const handleSaveCustomer = (updatedCustomer: Partial<Customer>) => {
@@ -37,6 +38,34 @@ export default function CustomerDetailPage() {
     setShowEditModal(false)
     // For now, we'll just close the modal since we're using mock data
     // In a real implementation, you'd update the customer and refresh the data
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-beveren-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-300">Loading customer details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Error Loading Customer</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">{error}</p>
+          <button
+            onClick={() => navigate('/customers')}
+            className="bg-beveren-600 text-white px-6 py-3 rounded-lg hover:bg-beveren-700 transition-colors"
+          >
+            Back to Customers
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (!customer) {
@@ -193,7 +222,7 @@ export default function CustomerDetailPage() {
                 </div>
               </div>
               <div className="mt-4 md:mt-0">
-                <button 
+                <button
                   onClick={() => setShowEditModal(true)}
                   className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
                 >

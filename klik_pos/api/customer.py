@@ -26,10 +26,8 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
         # Apply business type filtering
         if business_type == "B2B":
             filters["customer_type"] = "Company"
-            print(f"Applied B2B filter: Company customers only")
         elif business_type == "B2C":
             filters["customer_type"] = "Individual"
-            print(f"Applied B2C filter: Individual customers only")
         else:
             print(f"No customer type filter applied - showing all customers (business_type: {business_type})")
         # For "B2B & B2C", no customer_type filter is applied (show all)
@@ -52,7 +50,7 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
             contact = frappe.db.get_value(
                 "Contact",
                 {"name": doc.customer_primary_contact},
-                ["first_name", "last_name", "email_id", "phone"],
+                ["first_name", "last_name", "email_id", "phone", "mobile_no"],
                 as_dict=True,
             ) if doc.customer_primary_contact else None
 

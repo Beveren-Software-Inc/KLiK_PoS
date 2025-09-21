@@ -4,8 +4,9 @@ import { useState } from "react"
 import { Minus, Plus, CreditCard, X, Tag, Search, UserPlus, User, Building } from "lucide-react"
 import type { CartItem, GiftCoupon } from "../../types"
 import GiftCouponSelector from "./GiftCouponSelector"
-import { mockCustomers, type Customer } from "../data/mockCustomers"
 import AddCustomerModal from "./AddCustomerModal"
+import { useCustomers } from "../hooks/useCustomers"
+import type { Customer } from "../types/customer"
 
 interface OrderSummaryProps {
   cartItems: CartItem[]
@@ -31,6 +32,9 @@ export default function OrderSummary({
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false)
 
+  // Use real customer data
+  const { customers, isLoading: customersLoading } = useCustomers(customerSearchQuery)
+
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
   // Calculate coupon discount
@@ -41,10 +45,8 @@ export default function OrderSummary({
   const tax = taxableAmount * 0.15
   const total = taxableAmount + tax
 
-  // Filtered customers based on search query
-  const filteredCustomers = mockCustomers.filter((customer) =>
-    `${customer.firstName} ${customer.lastName}`.toLowerCase().includes(customerSearchQuery.toLowerCase())
-  )
+  // Filtered customers based on search query (now handled by API)
+  const filteredCustomers = customers
 
   return (
     <div

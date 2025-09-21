@@ -8,7 +8,7 @@ import {
   Building,
   Save,
 } from "lucide-react";
-import { type Customer } from "../data/mockCustomers";
+import { type Customer } from "../types/customer";
 
 // Extended customer type for form data
 type ExtendedCustomer = Customer & {
