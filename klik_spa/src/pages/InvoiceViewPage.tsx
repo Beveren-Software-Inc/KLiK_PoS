@@ -13,16 +13,13 @@ import {
   Phone,
   Mail,
   MapPin,
-  Calendar,
   DollarSign,
   Package,
   FileText,
   CheckCircle,
   AlertTriangle,
   RotateCcw,
-  Users,
   FileMinus,
-  Receipt,
   TrendingUp,
   Clock,
   CreditCard,
@@ -156,7 +153,6 @@ export default function InvoiceViewPage() {
   };
 
   const handleSingleReturnSuccess = (returnInvoice: string) => {
-    toast.success(`Return invoice created: ${returnInvoice}`);
     navigate(`/invoice/${returnInvoice}`);
   };
 

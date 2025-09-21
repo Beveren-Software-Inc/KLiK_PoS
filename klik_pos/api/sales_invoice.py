@@ -1190,7 +1190,7 @@ def create_partial_return(invoice_name, return_items):
         return {
             "success": True,
             "return_invoice": return_doc.name,
-            "message": f"Partial return created successfully: {return_doc.name}"
+            "message": f"Return created successfully: {return_doc.name}"
         }
 
     except Exception as e:
