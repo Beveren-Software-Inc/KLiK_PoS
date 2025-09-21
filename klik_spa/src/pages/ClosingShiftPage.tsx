@@ -55,12 +55,11 @@ export default function ClosingShiftPage() {
   const { invoices, isLoading, isLoadingMore, error, hasMore, totalLoaded, loadMore } = useSalesInvoices();
   const { modes } = useAllPaymentModes()
   const { posDetails } = usePOSDetails();
-
+  
   const hideExpectedAmount = posDetails?.custom_hide_expected_amount || false;
 
   const filterInvoiceByDate = (invoiceDateStr: string) => {
     if (dateFilter === "all") return true;
-
     if (dateFilter === "today") {
       return isToday(invoiceDateStr);
     }
@@ -143,17 +142,41 @@ export default function ClosingShiftPage() {
       const matchesStatus = statusFilter === "all" || invoice.status === statusFilter;
       const matchesPayment = paymentFilter === "all" || invoice.paymentMethod === paymentFilter;
       const matchesDate = filterInvoiceByDate(invoice.date);
-
       // Filter by POS profile - only show invoices for the current POS profile
       const matchesPOSProfile = !posDetails?.name || invoice.posProfile === posDetails.name;
-
       // Filter by POS opening entry - only show invoices for the current opening entry
       const matchesOpeningEntry = !posDetails?.current_opening_entry ||
         (invoice.custom_pos_opening_entry && invoice.custom_pos_opening_entry === posDetails.current_opening_entry);
-
+      console.log({matchesPOSProfile, matchesOpeningEntry, invoice, posDetails});
       return matchesSearch && matchesPayment && matchesStatus && matchesDate && matchesPOSProfile && matchesOpeningEntry;
     });
+    
   }, [invoices, searchQuery, statusFilter, dateFilter, paymentFilter, isLoading, error, posDetails]);
+
+  // Payment Stats Calculation - Calculate from filtered invoices
+  const paymentStats = useMemo(() => {
+    const stats = modes.reduce((acc, mode) => {
+      acc[mode.name] = {
+        name: mode.name,
+        openingAmount: mode.openingAmount || 0,
+        amount: 0, // Will be calculated from filtered invoices
+        transactions: 0 // Will be calculated from filtered invoices
+      };
+      return acc;
+    }, {});
+  
+    // Calculate amounts and transactions from filtered invoices
+    filteredInvoices.forEach(invoice => {
+      if (invoice.paymentMethod && stats[invoice.paymentMethod]) {
+        stats[invoice.paymentMethod].amount += invoice.totalAmount || 0;
+        stats[invoice.paymentMethod].transactions += 1;
+      }
+    });
+
+    return stats;
+  }, [modes, filteredInvoices]);
+
+  const total = Object.values(paymentStats).reduce((sum, stat) => sum + stat.amount, 0);
 
   // Loading state
   if (isLoading) {
@@ -274,19 +297,6 @@ export default function ClosingShiftPage() {
     console.log("Cancelling invoice:", invoiceId);
     setShowInvoiceModal(false);
   };
-
-  // Payment Stats Calculation
-  const paymentStats = modes.reduce((acc, mode) => {
-    acc[mode.name] = {
-      name: mode.name,
-      openingAmount: mode.openingAmount || 0,
-      amount: mode.amount || 0,
-      transactions: mode.transactions || 0
-    };
-    return acc;
-  }, {});
-
-  const total = Object.values(paymentStats).reduce((sum, stat) => sum + stat.amount, 0);
 
   const handleClosingAmountChange = (modeName, value) => {
     setClosingAmounts(prev => ({

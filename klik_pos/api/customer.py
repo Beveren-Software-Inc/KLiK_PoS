@@ -39,7 +39,7 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
                 "name", "customer_name", "customer_type",
                 "customer_group", "territory", "default_currency"
             ],
-            order_by="modified desc",
+            order_by="creation desc",
             limit=limit,
             start=start,
         )

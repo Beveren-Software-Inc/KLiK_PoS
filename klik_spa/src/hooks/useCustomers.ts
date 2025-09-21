@@ -90,11 +90,16 @@ export function useCustomers(searchQuery?: string) {
     fetchCustomers(searchQuery);
   }, [searchQuery]);
 
+  const addCustomer = (newCustomer: Customer) => {
+    setCustomers(prev => [newCustomer, ...prev]);
+  };
+
   return {
     customers,
     isLoading,
     error,
-    refetch: fetchCustomers
+    refetch: fetchCustomers,
+    addCustomer
   };
 }
 

@@ -27,21 +27,39 @@ export default function CustomersPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [prefilledData, setPrefilledData] = useState<{name?: string, email?: string, phone?: string}>({})
 
-  // Use the customers hook with search
-  const { customers, isLoading, error } = useCustomers(searchQuery)
+  // Use the customers hook without search (fetch all customers once)
+  const { customers, isLoading, error, addCustomer } = useCustomers()
 
-  // Filter and search customers (now handled by API)
+  // Filter and search customers (client-side filtering for smooth experience)
   const filteredCustomers = useMemo(() => {
     if (isLoading) return []
     if (error) return []
 
-    // Sort by last visit (most recent first)
-    return customers.sort((a, b) => {
-      const dateA = a.lastVisit ? new Date(a.lastVisit).getTime() : 0
-      const dateB = b.lastVisit ? new Date(b.lastVisit).getTime() : 0
+    let filtered = customers
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = customers.filter(customer => {
+        const name = customer.name.toLowerCase()
+        const email = customer.email?.toLowerCase() || ''
+        const phone = customer.phone || ''
+        const id = customer.id.toLowerCase()
+
+        return name.includes(query) ||
+               email.includes(query) ||
+               phone.includes(query) ||
+               id.includes(query)
+      })
+    }
+
+    // Sort by creation date (most recent first)
+    return filtered.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
       return dateB - dateA
     })
-  }, [customers, isLoading, error])
+  }, [customers, searchQuery, isLoading, error])
 
   // Stats calculation
   const stats = useMemo(() => {
@@ -378,12 +396,23 @@ export default function CustomersPage() {
                 setSelectedCustomer(null)
                 setPrefilledData({})
               }}
-              onSave={(customer: Partial<Customer>) => {
-                console.log('Saving customer:', customer)
-                setShowAddModal(false)
-                setSelectedCustomer(null)
-                setPrefilledData({})
-              }}
+          onSave={(customer: Partial<Customer>) => {
+            console.log('Saving customer:', customer)
+
+            // If it's a new customer (not editing), reload the page to show the new customer
+            if (!selectedCustomer && customer.id) {
+              console.log('New customer created, reloading page to show updated list')
+              // Small delay to ensure the backend has processed the creation
+              setTimeout(() => {
+                window.location.reload()
+              }, 500)
+            } else {
+              // For editing existing customers, just close the modal
+              setShowAddModal(false)
+              setSelectedCustomer(null)
+              setPrefilledData({})
+            }
+          }}
               prefilledData={prefilledData}
             />
           </>
@@ -609,10 +638,21 @@ export default function CustomersPage() {
               setPrefilledData({}) // Clear prefilled data
           }}
           onSave={(customer: Partial<Customer>) => {
-            console.log('Saving customer:', customer)
-            setShowAddModal(false)
-            setSelectedCustomer(null)
+            console.log('Saving customer (desktop):', customer)
+
+            // If it's a new customer (not editing), reload the page to show the new customer
+            if (!selectedCustomer && customer.id) {
+              console.log('New customer created, reloading page to show updated list')
+              // Small delay to ensure the backend has processed the creation
+              setTimeout(() => {
+                window.location.reload()
+              }, 500)
+            } else {
+              // For editing existing customers, just close the modal
+              setShowAddModal(false)
+              setSelectedCustomer(null)
               setPrefilledData({}) // Clear prefilled data
+            }
           }}
             prefilledData={prefilledData}
         />

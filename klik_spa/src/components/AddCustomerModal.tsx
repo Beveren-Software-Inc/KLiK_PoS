@@ -350,7 +350,15 @@ export default function AddCustomerModal({
         const newCustomer = await createCustomer(customerData);
         onSave({
           ...newCustomer,
-          id: newCustomer.name,
+          id: newCustomer.customer_name,
+          name: formData.name,
+          type: formData.customer_type,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          preferredPaymentMethod: formData.preferredPaymentMethod,
+          customer_group: formData.customer_group,
+          territory: formData.territory,
         });
       }
 
