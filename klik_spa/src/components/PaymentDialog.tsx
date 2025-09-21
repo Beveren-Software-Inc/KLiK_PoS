@@ -482,7 +482,15 @@ export default function PaymentDialog({
   if (isLoading || posLoading) return <div className="p-6">Loading...</div>;
   if (error) return <div className="p-6 text-red-500">Error: {error}</div>;
 
-  const paymentMethods: PaymentMethod[] = modes.map((mode) => {
+  // Sort modes to put default payment method first
+  const sortedModes = [...modes].sort((a, b) => {
+    // Default payment method (default === 1) should come first
+    if (a.default === 1 && b.default !== 1) return -1;
+    if (a.default !== 1 && b.default === 1) return 1;
+    return 0; // Keep original order for non-default methods
+  });
+
+  const paymentMethods: PaymentMethod[] = sortedModes.map((mode) => {
     const { icon, color } = getIconAndColor(mode.type || "Default");
     return {
       id: mode.mode_of_payment,
