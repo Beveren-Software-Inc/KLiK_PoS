@@ -52,7 +52,7 @@ export default function ClosingShiftPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<SalesInvoice | null>(null);
 
-  const { invoices, isLoading, error } = useSalesInvoices();
+  const { invoices, isLoading, isLoadingMore, error, hasMore, totalLoaded, loadMore } = useSalesInvoices();
   const { modes } = useAllPaymentModes()
   const { posDetails } = usePOSDetails();
 

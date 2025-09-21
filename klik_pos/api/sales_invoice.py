@@ -129,7 +129,7 @@ def get_current_pos_opening_entry():
 #         }
 
 @frappe.whitelist(allow_guest=True)
-def get_sales_invoices(limit=100, start=0):
+def get_sales_invoices(limit=100, start=0, search=""):
     try:
         # Get current user's POS opening entry
         current_opening_entry = get_current_pos_opening_entry()
@@ -148,6 +148,12 @@ def get_sales_invoices(limit=100, start=0):
             frappe.logger().info(f"Filtering invoices by POS opening entry: {current_opening_entry}")
         else:
             frappe.logger().info("No active POS opening entry found, showing all invoices")
+
+        # Add search filter if provided
+        if search and search.strip():
+            search_term = search.strip()
+            # For comprehensive search, we'll use SQL with OR conditions
+            # This will be handled in the query below
 
         # ✅ Dynamically check if field exists
         sales_invoice_meta = frappe.get_meta("Sales Invoice")
@@ -173,14 +179,65 @@ def get_sales_invoices(limit=100, start=0):
         if has_zatca_status:
             fields.append("custom_zatca_submit_status")
 
-        invoices = frappe.get_all(
-            "Sales Invoice",
-            filters=filters,
-            fields=fields,
-            order_by="modified desc",
-            limit=limit,
-            start=start
-        )
+        # Get total count first
+        if search and search.strip():
+            # Use SQL for comprehensive search
+            search_term = search.strip()
+            base_conditions = []
+
+            # Add role-based filtering
+            if is_admin_user:
+                pass  # No additional filters for admin
+            elif current_opening_entry:
+                base_conditions.append(f"custom_pos_opening_entry = '{current_opening_entry}'")
+
+            # Build search conditions
+            search_conditions = [
+                f"name LIKE '%{search_term}%'",
+                f"customer_name LIKE '%{search_term}%'",
+                f"customer LIKE '%{search_term}%'"
+            ]
+
+            # Combine base conditions with search
+            where_clause = ""
+            if base_conditions:
+                where_clause = f"WHERE ({' AND '.join(base_conditions)}) AND ({' OR '.join(search_conditions)})"
+            else:
+                where_clause = f"WHERE {' OR '.join(search_conditions)}"
+
+            # Get total count with search
+            count_query = f"""
+                SELECT COUNT(*) as total
+                FROM `tabSales Invoice`
+                {where_clause}
+            """
+            total_count = frappe.db.sql(count_query, as_dict=True)[0]['total']
+
+            # Get invoices with search
+            fields_str = ', '.join([f'`{field}`' for field in fields])
+            if has_zatca_status:
+                fields_str += ', `custom_zatca_submit_status`'
+
+            query = f"""
+                SELECT {fields_str}
+                FROM `tabSales Invoice`
+                {where_clause}
+                ORDER BY modified DESC
+                LIMIT {limit} OFFSET {start}
+            """
+            invoices = frappe.db.sql(query, as_dict=True)
+        else:
+            # Use regular frappe.get_all for non-search queries
+            total_count = frappe.db.count("Sales Invoice", filters=filters)
+
+            invoices = frappe.get_all(
+                "Sales Invoice",
+                filters=filters,
+                fields=fields,
+                order_by="modified desc",
+                limit=limit,
+                start=start
+            )
 
         # Fetch full name for each owner and add item details with return quantities
         for inv in invoices:
@@ -218,7 +275,7 @@ def get_sales_invoices(limit=100, start=0):
                 })
             inv["items"] = items
 
-        return {"success": True, "data": invoices}
+        return {"success": True, "data": invoices, "total_count": total_count}
 
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Error fetching sales invoices")
@@ -1253,14 +1310,12 @@ def delete_draft_invoice(invoice_id):
         # Get the invoice document
         invoice_doc = frappe.get_doc("Sales Invoice", invoice_id)
 
-        # Check if invoice is in Draft status
         if invoice_doc.status != "Draft":
             return {
                 "success": False,
                 "error": f"Cannot delete invoice {invoice_id}. Only Draft invoices can be deleted. Current status: {invoice_doc.status}"
             }
 
-        # Delete the invoice
         invoice_doc.delete()
 
         return {

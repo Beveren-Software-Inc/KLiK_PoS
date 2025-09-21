@@ -34,6 +34,7 @@ import { formatCurrency } from "../utils/currency";
 import type { SalesInvoice } from "../../types";
 import { useSalesInvoices } from "../hooks/useSalesInvoices";
 import { useCustomers } from "../hooks/useCustomers";
+import { useUserInfo } from "../hooks/useUserInfo";
 import { usePOSDetails } from "../hooks/usePOSProfile";
 import { toast } from "react-toastify";
 import { createSalesReturn, deleteDraftInvoice } from "../services/salesInvoice";
@@ -47,7 +48,7 @@ export default function InvoiceHistoryPage() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery("(max-width: 1024px)");
   const [activeTab, setActiveTab] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState("all");
   const [cashierFilter, setCashierFilter] = useState("all");
@@ -73,10 +74,22 @@ export default function InvoiceHistoryPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<SalesInvoice | null>(null);
 
-  const { invoices, isLoading, error } = useSalesInvoices();
+  const { invoices, isLoading, isLoadingMore, error, hasMore, totalLoaded, totalCount, loadMore } = useSalesInvoices(searchTerm);
   const { modes } = useAllPaymentModes();
   const { customers } = useCustomers();
   const { posDetails } = usePOSDetails();
+  const { userInfo, isLoading: userInfoLoading } = useUserInfo();
+
+  // Role-based filtering
+  const isAdminUser = userInfo?.is_admin_user || false;
+  const currentUserCashier = userInfo?.full_name || "";
+
+  // Set default cashier filter for non-admin users
+  useEffect(() => {
+    if (!isAdminUser && currentUserCashier && cashierFilter === "all") {
+      setCashierFilter(currentUserCashier);
+    }
+  }, [isAdminUser, currentUserCashier, cashierFilter]);
 
   // Keyboard event handler for Escape key
   useEffect(() => {
@@ -188,20 +201,15 @@ const getStatusBadge = (status: string) => {
     if (error) return [];
 
     return invoices.filter((invoice) => {
-      const matchesSearch =
-        searchQuery === "" ||
-        invoice.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        invoice.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (invoice.cashier && invoice.cashier.toLowerCase().includes(searchQuery.toLowerCase()));
-
+      // Server-side search is handled by the API, so we only apply client-side filters
       const matchesStatus = activeTab === "all" || invoice.status === activeTab;
       const matchesPayment = paymentFilter === "all" || invoice.paymentMethod === paymentFilter;
       const matchesCashier = cashierFilter === "all" || invoice.cashier === cashierFilter;
       const matchesDate = filterInvoiceByDate(invoice.date);
 
-      return matchesSearch && matchesPayment && matchesCashier && matchesStatus && matchesDate;
+      return matchesPayment && matchesCashier && matchesStatus && matchesDate;
     });
-  }, [invoices, searchQuery, activeTab, dateFilter, paymentFilter, cashierFilter, isLoading, error]);
+  }, [invoices, activeTab, dateFilter, paymentFilter, cashierFilter, isLoading, error]);
 
   const uniqueCashiers = useMemo(() => {
     return [...new Set(invoices.map(invoice => invoice.cashier).filter(Boolean))];
@@ -235,7 +243,7 @@ const getStatusBadge = (status: string) => {
   };
 
   // Loading state
-  if (isLoading) {
+  if (isLoading || userInfoLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
@@ -273,8 +281,8 @@ const getStatusBadge = (status: string) => {
           <input
             type="text"
             placeholder="Search invoices..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
           />
         </div>
@@ -293,7 +301,10 @@ const getStatusBadge = (status: string) => {
         <select
           value={cashierFilter}
           onChange={(e) => setCashierFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          disabled={!isAdminUser}
+          className={`px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+            !isAdminUser ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
         >
           <option value="all">All Cashiers</option>
           {uniqueCashiers.map((cashier) => (
@@ -302,6 +313,9 @@ const getStatusBadge = (status: string) => {
             </option>
           ))}
         </select>
+        {!isAdminUser && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Showing only your transactions</p>
+        )}
         <select
           value={paymentFilter}
           onChange={(e) => setPaymentFilter(e.target.value)}
@@ -315,6 +329,13 @@ const getStatusBadge = (status: string) => {
           ))}
         </select>
       </div>
+        {hasMore && (
+          <div className="mt-3 text-center">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Search works on all invoices in the database. Load more invoices to see additional results.
+            </p>
+          </div>
+        )}
     </div>
   );
 
@@ -324,7 +345,12 @@ const getStatusBadge = (status: string) => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Total Invoices</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">{filteredInvoices.length}</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalCount}</p>
+            {hasMore && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Showing {totalLoaded} of {totalCount}
+              </p>
+            )}
           </div>
           <FileText className="w-8 h-8 text-orange-600" />
         </div>
@@ -576,6 +602,39 @@ const getStatusBadge = (status: string) => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Load More Button */}
+      {hasMore && (
+        <div className="flex justify-center mt-8">
+          <button
+            onClick={loadMore}
+            disabled={isLoadingMore}
+            className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+              isLoadingMore
+                ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                : 'bg-beveren-600 text-white hover:bg-beveren-700'
+            }`}
+          >
+            {isLoadingMore ? (
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span>Loading...</span>
+              </div>
+            ) : (
+              `Load More (${totalLoaded}/${totalCount})`
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Show message when all invoices are loaded */}
+      {!hasMore && totalLoaded > 0 && (
+        <div className="text-center mt-8 py-4">
+          <p className="text-gray-600 dark:text-gray-400">
+            All {totalCount} invoices loaded
+          </p>
         </div>
       )}
     </div>
