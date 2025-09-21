@@ -489,10 +489,13 @@ export default function CustomerDetailsPage() {
                         Invoice
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Date
+                        Customer
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Payment Method
+                        Cashier
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Payment
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         Amount
@@ -502,7 +505,7 @@ export default function CustomerDetailsPage() {
                       </th>
                       {posDetails?.is_zatca_enabled && (
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          ZATCA Status
+                          Zatca Status
                         </th>
                       )}
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -513,7 +516,7 @@ export default function CustomerDetailsPage() {
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
                     {customerInvoices.length === 0 ? (
                       <tr>
-                        <td colSpan={posDetails?.is_zatca_enabled ? 7 : 6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                        <td colSpan={posDetails?.is_zatca_enabled ? 8 : 7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                           No invoices found for this customer
                         </td>
                       </tr>
@@ -529,8 +532,10 @@ export default function CustomerDetailsPage() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900 dark:text-white">{invoice.date}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">{invoice.time}</div>
+                            <div className="text-sm text-gray-900 dark:text-white">{invoice.customer}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                            {invoice.cashier}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className="text-sm text-gray-900 dark:text-white">{invoice.paymentMethod}</span>
@@ -550,34 +555,31 @@ export default function CustomerDetailsPage() {
                           </td>
                           {posDetails?.is_zatca_enabled && (
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={getStatusBadge(invoice.custom_zatca_submit_status)}>{invoice.custom_zatca_submit_status}</span>
+                              <span className={getStatusBadge(invoice.customZatcaSubmitStatus)}>{invoice.customZatcaSubmitStatus}</span>
                             </td>
                           )}
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex space-x-2">
                               <button
                                 onClick={() => handleViewInvoice(invoice)}
-                                className="text-beveren-600 hover:text-beveren-900 flex items-center space-x-1"
+                                className="text-beveren-600 hover:text-beveren-900 dark:text-beveren-400 dark:hover:text-beveren-300"
                               >
-                                <Eye className="w-4 h-4" />
-                                <span>View</span>
+                                View
                               </button>
                               {invoice.status === "Draft" && (
                                 <button
                                   onClick={() => handleEditInvoice(invoice)}
-                                  className="text-blue-600 hover:text-blue-900 flex items-center space-x-1"
+                                  className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
                                 >
-                                  <Edit className="w-4 h-4" />
-                                  <span>Edit</span>
+                                  Edit
                                 </button>
                               )}
                               {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && hasReturnableItems(invoice) && (
                                 <button
                                   onClick={() => handleSingleReturnClick(invoice)}
-                                  className="text-orange-600 hover:text-orange-900 flex items-center space-x-1"
+                                  className="text-orange-600 hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-300"
                                 >
-                                  <RotateCcw className="w-4 h-4" />
-                                  <span>Return</span>
+                                  Return
                                 </button>
                               )}
                             </div>
