@@ -83,7 +83,15 @@ const POSOpeningModal: React.FC<POSOpeningModalProps> = ({
   // Update payment methods when payment modes are loaded
   useEffect(() => {
     if (paymentModes && paymentModes.length > 0) {
-      const methods = paymentModes.map((payment: any) => ({
+      // Sort payment modes to put default payment method first
+      const sortedPaymentModes = [...paymentModes].sort((a, b) => {
+        // Default payment method (default === 1) should come first
+        if (a.default === 1 && b.default !== 1) return -1;
+        if (a.default !== 1 && b.default === 1) return 1;
+        return 0; // Keep original order for non-default methods
+      });
+
+      const methods = sortedPaymentModes.map((payment: any) => ({
         mode_of_payment: payment.mode_of_payment,
         opening_amount: 0,
         type: payment.type || 'General',
