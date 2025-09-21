@@ -1,4 +1,3 @@
-import { useCartStore } from '../stores/cartStore';
 import { getDraftInvoiceItems } from '../services/salesInvoice';
 import { toast } from 'react-toastify';
 import { cacheDraftInvoiceItems } from './draftInvoiceCache';
@@ -46,32 +45,28 @@ export async function addDraftInvoiceToCart(invoiceId: string): Promise<boolean>
     }
 
     // Extract customer information from invoice data
-    let customer: Customer | null = null;
-
-    if (invoiceData.customer) {
-      customer = {
-        id: invoiceData.customer,
-        name: invoiceData.customer_name || invoiceData.customer,
-        type: 'individual', // Default type, could be enhanced based on customer data
-        email: invoiceData.customer_email || '',
-        phone: invoiceData.customer_mobile_no || '',
-        address: {
-          addressType: 'Billing',
-          street: invoiceData.customer_address_line1 || '',
-          city: invoiceData.customer_city || '',
-          state: invoiceData.customer_state || '',
-          zipCode: invoiceData.customer_pincode || '',
-          country: invoiceData.customer_country || 'Saudi Arabia',
-        },
-        status: 'active',
-        preferredPaymentMethod: 'Cash',
-        loyaltyPoints: 0,
-        totalSpent: 0,
-        totalOrders: 0,
-        tags: [],
-        createdAt: new Date().toISOString(),
-      };
-    }
+    const customer: Customer | null = invoiceData.customer ? {
+      id: invoiceData.customer,
+      name: invoiceData.customer_name || invoiceData.customer,
+      type: 'individual' as const,
+      email: invoiceData.customer_email || '',
+      phone: invoiceData.customer_mobile_no || '',
+      address: {
+        addressType: 'Billing' as const,
+        street: invoiceData.customer_address_line1 || '',
+        city: invoiceData.customer_city || '',
+        state: invoiceData.customer_state || '',
+        zipCode: invoiceData.customer_pincode || '',
+        country: invoiceData.customer_country || 'Saudi Arabia',
+      },
+      status: 'active' as const,
+      preferredPaymentMethod: 'Cash' as const,
+      loyaltyPoints: 0,
+      totalSpent: 0,
+      totalOrders: 0,
+      tags: [],
+      createdAt: new Date().toISOString(),
+    } : null;
 
     // Cache the items and customer instead of adding directly to cart
     cacheDraftInvoiceItems(invoiceId, cartItems, customer);

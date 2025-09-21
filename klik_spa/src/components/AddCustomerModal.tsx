@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   X,
   User,
@@ -95,6 +95,7 @@ export default function AddCustomerModal({
   const [customerGroups, setCustomerGroups] = useState<Array<{name: string, customer_group_name: string}>>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
   const { getCustomerGroups } = useCustomerActions();
+  const formInitializedRef = useRef(false);
 
   // Fetch customer groups
   useEffect(() => {
@@ -110,11 +111,11 @@ export default function AddCustomerModal({
     };
 
     fetchData();
-  }, [getCustomerGroups]);
+  }, []); // Remove getCustomerGroups from dependencies to prevent infinite loop
 
   useEffect(() => {
-    if (customer) {
-      setFormData({
+    if (customer && !formInitializedRef.current) {
+      const newFormData = {
         customer_type: customer.type || "individual",
         name: customer.name,
         contactName: customer.contactPerson || "",
@@ -136,22 +137,31 @@ export default function AddCustomerModal({
         preferredPaymentMethod: customer.preferredPaymentMethod || "Cash",
         customer_group: customer.customer_group || "All Customer Groups",
         territory: customer.territory || "Saudi Arabia",
-      });
-    } else if (prefilledData && Object.keys(prefilledData).length > 0) {
+      };
+      setFormData(newFormData);
+      formInitializedRef.current = true;
+    } else if (prefilledData && Object.keys(prefilledData).length > 0 && !formInitializedRef.current) {
       setFormData((prev) => ({
         ...prev,
         name: prefilledData.name || prev.name,
         email: prefilledData.email || prev.email,
         phone: prefilledData.phone || prev.phone,
       }));
-    } else if (prefilledName) {
+      formInitializedRef.current = true;
+    } else if (prefilledName && !formInitializedRef.current) {
       // Fallback to old prefilledName prop
       setFormData((prev) => ({
         ...prev,
         name: prefilledName,
       }));
+      formInitializedRef.current = true;
     }
-  }, [customer, prefilledName, prefilledData]);
+  }, [customer?.id, customer?.name, prefilledName, prefilledData]); // Only depend on stable customer properties
+
+  // Reset form initialization when customer changes
+  useEffect(() => {
+    formInitializedRef.current = false;
+  }, [customer?.id]);
 
   const isB2B = posDetails?.business_type === "B2B";
   const isB2C = posDetails?.business_type === "B2C";

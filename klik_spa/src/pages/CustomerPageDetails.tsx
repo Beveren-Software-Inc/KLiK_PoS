@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { formatCurrency } from "../utils/currency";
+import { usePOSDetails } from "../hooks/usePOSProfile";
 import {
   FileText,
   DollarSign,
