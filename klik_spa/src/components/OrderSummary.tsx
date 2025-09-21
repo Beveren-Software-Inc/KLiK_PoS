@@ -25,6 +25,7 @@ import { getBatches } from "../utils/batch";
 import { useNavigate } from "react-router-dom";
 import { usePOSDetails } from "../hooks/usePOSProfile";
 import { useCustomerStatistics } from "../hooks/useCustomerStatistics";
+import { useCartStore } from "../stores/cartStore";
 
 // Extended CartItem interface to include discount properties
 interface ExtendedCartItem extends CartItem {
@@ -57,9 +58,7 @@ export default function OrderSummary({
   isMobile = false,
 }: OrderSummaryProps) {
   const [showCouponPopover, setShowCouponPopover] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
-    null
-  );
+  const { selectedCustomer, setSelectedCustomer } = useCartStore();
 
   // Track if user has manually removed the default customer
   const [userRemovedDefaultCustomer, setUserRemovedDefaultCustomer] = useState(false);

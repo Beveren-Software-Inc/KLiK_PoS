@@ -2,6 +2,7 @@ import { useCartStore } from '../stores/cartStore';
 import { getDraftInvoiceItems } from '../services/salesInvoice';
 import { toast } from 'react-toastify';
 import { cacheDraftInvoiceItems } from './draftInvoiceCache';
+import type { Customer } from '../../types';
 
 export interface InvoiceItem {
   item_code: string;
@@ -23,17 +24,12 @@ export interface CartItem {
 
 export async function addDraftInvoiceToCart(invoiceId: string): Promise<boolean> {
   try {
-    console.log('Fetching draft invoice items for:', invoiceId);
     // Fetch draft invoice items
     const invoiceData = await getDraftInvoiceItems(invoiceId);
-    console.log('Invoice data received:', invoiceData);
 
     if (!invoiceData || !invoiceData.items || !Array.isArray(invoiceData.items)) {
-      console.error('No items found in draft invoice. Invoice data:', invoiceData);
       throw new Error('No items found in draft invoice');
     }
-
-    console.log('Items found:', invoiceData.items.length);
 
     // Convert invoice items to cart items
     const cartItems: CartItem[] = [];
@@ -49,8 +45,36 @@ export async function addDraftInvoiceToCart(invoiceId: string): Promise<boolean>
       cartItems.push(cartItem);
     }
 
-    // Cache the items instead of adding directly to cart
-    cacheDraftInvoiceItems(invoiceId, cartItems);
+    // Extract customer information from invoice data
+    let customer: Customer | null = null;
+
+    if (invoiceData.customer) {
+      customer = {
+        id: invoiceData.customer,
+        name: invoiceData.customer_name || invoiceData.customer,
+        type: 'individual', // Default type, could be enhanced based on customer data
+        email: invoiceData.customer_email || '',
+        phone: invoiceData.customer_mobile_no || '',
+        address: {
+          addressType: 'Billing',
+          street: invoiceData.customer_address_line1 || '',
+          city: invoiceData.customer_city || '',
+          state: invoiceData.customer_state || '',
+          zipCode: invoiceData.customer_pincode || '',
+          country: invoiceData.customer_country || 'Saudi Arabia',
+        },
+        status: 'active',
+        preferredPaymentMethod: 'Cash',
+        loyaltyPoints: 0,
+        totalSpent: 0,
+        totalOrders: 0,
+        tags: [],
+        createdAt: new Date().toISOString(),
+      };
+    }
+
+    // Cache the items and customer instead of adding directly to cart
+    cacheDraftInvoiceItems(invoiceId, cartItems, customer);
 
     return true;
 

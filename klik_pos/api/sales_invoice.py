@@ -347,13 +347,42 @@ def get_invoice_details(invoice_id):
         cashier_name = frappe.db.get_value("User", invoice_data.get("owner"), "full_name") or invoice_data.get("owner")
         invoice_data["cashier_name"] = cashier_name
 
+        # Get customer contact information
+        customer_email = ""
+        customer_mobile_no = ""
+        customer_address_line1 = ""
+        customer_city = ""
+        customer_state = ""
+        customer_pincode = ""
+        customer_country = ""
+
+        if invoice.customer:
+            customer_doc = frappe.get_doc("Customer", invoice.customer)
+            customer_email = customer_doc.email_id or ""
+            customer_mobile_no = customer_doc.mobile_no or ""
+
+            # Get address information from customer_address_doc
+            if customer_address_doc:
+                customer_address_line1 = customer_address_doc.get("address_line1", "")
+                customer_city = customer_address_doc.get("city", "")
+                customer_state = customer_address_doc.get("state", "")
+                customer_pincode = customer_address_doc.get("pincode", "")
+                customer_country = customer_address_doc.get("country", "")
+
         return {
             "success": True,
             "data": {
                 **invoice_data,
                 "items": items,
                 "company_address_doc": company_address_doc,
-                "customer_address_doc": customer_address_doc
+                "customer_address_doc": customer_address_doc,
+                "customer_email": customer_email,
+                "customer_mobile_no": customer_mobile_no,
+                "customer_address_line1": customer_address_line1,
+                "customer_city": customer_city,
+                "customer_state": customer_state,
+                "customer_pincode": customer_pincode,
+                "customer_country": customer_country
             }
         }
 
