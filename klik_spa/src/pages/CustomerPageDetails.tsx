@@ -24,7 +24,7 @@ import {
 import InvoiceViewModal from "../components/InvoiceViewModal";
 import SingleInvoiceReturn from "../components/SingleInvoiceReturn";
 import type { SalesInvoice } from "../../types";
-import { useSalesInvoices } from "../hooks/useSalesInvoices";
+import { useCustomerInvoices } from "../hooks/useCustomerInvoices";
 import { toast } from "react-toastify";
 import { createSalesReturn } from "../services/salesInvoice";
 import RetailSidebar from "../components/RetailSidebar";
@@ -52,7 +52,7 @@ export default function CustomerDetailsPage() {
 
   const { id: customerId } = useParams();
   const { customer, isLoadingC, errorC } = useCustomerDetails(customerId);
-  const { invoices, isLoading, error } = useSalesInvoices();
+  const { invoices, isLoading, error, hasMore, totalLoaded, loadMore } = useCustomerInvoices(customer?.name || "");
   const { posDetails } = usePOSDetails();
 
 
@@ -89,11 +89,7 @@ export default function CustomerDetailsPage() {
     });
 
     return invoices.filter((invoice) => {
-      // Filter by customer name using the correct field mapping
-      const isCustomerInvoice = invoice.customer === customer.name;
-
-      if (!isCustomerInvoice) return false;
-
+      // Invoices are already filtered by customer in the hook, so we only apply other filters
       const matchesSearch =
         searchQuery === "" ||
         invoice.id.toLowerCase().includes(searchQuery.toLowerCase());
@@ -594,6 +590,39 @@ export default function CustomerDetailsPage() {
               </div>
             </div>
           </div>
+
+          {/* Load More Button for Customer Invoices */}
+          {hasMore && (
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={loadMore}
+                disabled={isLoading}
+                className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                  isLoading
+                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                    : 'bg-beveren-600 text-white hover:bg-beveren-700'
+                }`}
+              >
+                {isLoading ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Loading...</span>
+                  </div>
+                ) : (
+                  `Load More Customer Invoices (${totalLoaded} loaded)`
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Show message when all customer invoices are loaded */}
+          {!hasMore && totalLoaded > 0 && (
+            <div className="text-center mt-6 py-4">
+              <p className="text-gray-600 dark:text-gray-400">
+                All {totalLoaded} customer invoices loaded
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Invoice View Modal */}
