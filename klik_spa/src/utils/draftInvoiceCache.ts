@@ -1,26 +1,28 @@
 import { useCartStore } from '../stores/cartStore';
-import type { CartItem } from '../../types';
+import type { CartItem, Customer } from '../../types';
 
 interface DraftInvoiceCache {
   items: CartItem[];
   timestamp: number;
   invoiceId: string;
+  customer: Customer | null;
 }
 
 const CACHE_KEY = 'draft-invoice-cache';
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-export function cacheDraftInvoiceItems(invoiceId: string, items: CartItem[]): void {
+export function cacheDraftInvoiceItems(invoiceId: string, items: CartItem[], customer: Customer | null): void {
   const cache: DraftInvoiceCache = {
     items,
     timestamp: Date.now(),
-    invoiceId
+    invoiceId,
+    customer
   };
 
   localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
 }
 
-export function getCachedDraftInvoiceItems(): CartItem[] | null {
+export function getCachedDraftInvoiceItems(): DraftInvoiceCache | null {
   try {
     const cached = localStorage.getItem(CACHE_KEY);
 
@@ -39,7 +41,7 @@ export function getCachedDraftInvoiceItems(): CartItem[] | null {
       return null;
     }
 
-    return cache.items;
+    return cache;
   } catch (error) {
     console.error('Error retrieving cached draft invoice items:', error);
     clearDraftInvoiceCache();
@@ -52,15 +54,20 @@ export function clearDraftInvoiceCache(): void {
 }
 
 export function loadCachedItemsToCart(): boolean {
-  const cachedItems = getCachedDraftInvoiceItems();
-  if (!cachedItems || cachedItems.length === 0) {
+  const cachedData = getCachedDraftInvoiceItems();
+  if (!cachedData || cachedData.items.length === 0) {
     return false;
   }
 
-  const { addToCart, updateQuantity } = useCartStore.getState();
+  const { addToCart, updateQuantity, setSelectedCustomer } = useCartStore.getState();
+
+  // Set customer if available
+  if (cachedData.customer) {
+    setSelectedCustomer(cachedData.customer);
+  }
 
   // Add cached items to cart
-  for (const item of cachedItems) {
+  for (const item of cachedData.items) {
     // Convert CartItem to the format expected by addToCart
     const cartItem = {
       id: item.id,
