@@ -1,8 +1,7 @@
-
 import { useEffect, useState, useCallback } from "react";
 import type { SalesInvoice } from "../../types";
 
-export function useSalesInvoices(searchTerm: string = "") {
+export function useCustomerInvoices(customerName: string) {
   const [invoices, setInvoices] = useState<SalesInvoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -15,6 +14,12 @@ export function useSalesInvoices(searchTerm: string = "") {
   const LIMIT = 100;
 
   const fetchInvoices = useCallback(async (page = 0, append = false) => {
+    if (!customerName) {
+      setInvoices([]);
+      setIsLoading(false);
+      return;
+    }
+
     if (append) {
       setIsLoadingMore(true);
     } else {
@@ -23,9 +28,10 @@ export function useSalesInvoices(searchTerm: string = "") {
 
     try {
       const start = page * LIMIT;
-      console.log(`Fetching sales invoices - page: ${page}, start: ${start}, limit: ${LIMIT}, search: ${searchTerm}`);
+      console.log(`Fetching customer invoices - customer: ${customerName}, page: ${page}, start: ${start}, limit: ${LIMIT}`);
 
-      const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
+      // Search for invoices by customer name
+      const searchParam = `&search=${encodeURIComponent(customerName)}`;
       const response = await fetch(
         `/api/method/klik_pos.api.sales_invoice.get_sales_invoices?limit=${LIMIT}&start=${start}${searchParam}`,
         {
@@ -38,7 +44,7 @@ export function useSalesInvoices(searchTerm: string = "") {
         }
       );
 
-      console.log('Sales invoices response:', {
+      console.log('Customer invoices response:', {
         status: response.status,
         statusText: response.statusText,
         ok: response.ok
@@ -49,10 +55,10 @@ export function useSalesInvoices(searchTerm: string = "") {
       }
 
       const resData = await response.json();
-      console.log('Sales invoices data:', resData);
+      console.log('Customer invoices data:', resData);
 
       if (!resData.message || !resData.message.success) {
-        throw new Error(resData.message?.error || resData.error || "Failed to fetch invoices");
+        throw new Error(resData.message?.error || resData.error || "Failed to fetch customer invoices");
       }
 
       const rawInvoices = resData.message.data;
@@ -67,89 +73,68 @@ export function useSalesInvoices(searchTerm: string = "") {
         id: invoice.name,
         date: invoice.posting_date || new Date().toISOString().split("T")[0],
         time: invoice.posting_time || "00:00:00",
-        cashier: invoice.cashier_name,
-        cashierId: invoice.owner || "",
-        customer: invoice.customer_name || "",
-        customerId: invoice.customer || "",
-        items: invoice.items || [],
-        subtotal:
-          (Number(invoice.base_grand_total) || 0) -
-          (Number(invoice.total_taxes_and_charges) || 0) +
-          (Number(invoice.discount_amount) || 0),
-        giftCardDiscount: Number(invoice.discount_amount) || 0,
-        giftCardCode: String(invoice.discount_code) || "",
-        taxAmount: Number(invoice.total_taxes_and_charges) || 0,
+        cashier: invoice.cashier_name || "Unknown",
+        customer: invoice.customer_name || invoice.customer || "Walk-in Customer",
         totalAmount: Number(invoice.base_grand_total) || 0,
-        paymentMethod: invoice.mode_of_payment || "Cash",
-        amountPaid: Number(invoice.base_rounded_total) || 0,
-        changeGiven: Number(invoice.change_amount) || 0,
-        status:
-          (invoice.status as
-            | "Completed"
-            | "Pending"
-            | "Cancelled"
-            | "Refunded") || "Completed",
-        refundAmount:
-          invoice.status === "Refunded" ? Number(invoice.base_grand_total) || 0 : 0,
-        custom_zatca_submit_status:
-          (invoice.custom_zatca_submit_status as
-            | "Pending"
-            | "Reported"
-            | "Not Reported"
-            | "Cleared"
-            | "Not Cleared") || "Draft",
-        currency: invoice.currency || "USD",
-        notes: invoice.remarks || "",
+        status: invoice.status || "Draft",
+        paymentMethod: invoice.payment_method || "Cash",
+        discount: Number(invoice.discount_amount) || 0,
+        tax: Number(invoice.total_taxes_and_charges) || 0,
+        items: invoice.items || [],
         posProfile: invoice.pos_profile || "",
-        custom_pos_opening_entry: invoice.custom_pos_opening_entry || "",
+        customPosOpeningEntry: invoice.custom_pos_opening_entry || "",
+        currency: invoice.currency || "USD",
+        name: invoice.name,
+        customZatcaSubmitStatus: invoice.custom_zatca_submit_status || null
       }));
 
+      // Filter to only include invoices for this specific customer
+      const customerSpecificInvoices = transformed.filter(invoice =>
+        invoice.customer === customerName
+      );
+
       if (append) {
-        setInvoices(prev => [...prev, ...transformed]);
-        setTotalLoaded(prev => prev + newInvoicesCount);
+        setInvoices(prev => [...prev, ...customerSpecificInvoices]);
+        setTotalLoaded(prev => prev + customerSpecificInvoices.length);
       } else {
-        setInvoices(transformed);
-        setTotalLoaded(newInvoicesCount);
+        setInvoices(customerSpecificInvoices);
+        setTotalLoaded(customerSpecificInvoices.length);
       }
 
       setCurrentPage(page);
       setError(null);
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
+      console.error('Error fetching customer invoices:', err);
       setError(err.message || "Unknown error occurred");
     } finally {
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [searchTerm]);
+  }, [customerName]);
 
   const loadMore = useCallback(() => {
-    if (!isLoadingMore && hasMore) {
+    if (!isLoadingMore && hasMore && customerName) {
       fetchInvoices(currentPage + 1, true);
     }
-  }, [currentPage, isLoadingMore, hasMore, fetchInvoices]);
+  }, [currentPage, isLoadingMore, hasMore, fetchInvoices, customerName]);
 
   const refetch = useCallback(() => {
-    setCurrentPage(0);
-    setTotalLoaded(0);
-    setHasMore(true);
-    fetchInvoices(0, false);
-  }, [fetchInvoices]);
-
-  useEffect(() => {
-    fetchInvoices(0, false);
-  }, [fetchInvoices]);
-
-  // Refetch when search term changes
-  useEffect(() => {
-    if (searchTerm !== undefined) {
+    if (customerName) {
       setCurrentPage(0);
       setTotalLoaded(0);
       setHasMore(true);
       fetchInvoices(0, false);
     }
-  }, [searchTerm, fetchInvoices]);
+  }, [fetchInvoices, customerName]);
+
+  useEffect(() => {
+    if (customerName) {
+      fetchInvoices(0, false);
+    } else {
+      setInvoices([]);
+      setIsLoading(false);
+    }
+  }, [fetchInvoices, customerName]);
 
   return {
     invoices,

@@ -17,12 +17,11 @@ import {
   Edit,
   Users,
   ShoppingCart,
-  CreditCard,
-  Send,
   RotateCcw,
-  Files,
+
   FileMinus,
-  FileSymlink
+
+
 } from "lucide-react";
 
 import InvoiceViewModal from "../components/InvoiceViewModal";
@@ -34,11 +33,13 @@ import { formatCurrency } from "../utils/currency";
 import type { SalesInvoice } from "../../types";
 import { useSalesInvoices } from "../hooks/useSalesInvoices";
 import { useCustomers } from "../hooks/useCustomers";
+import { useUserInfo } from "../hooks/useUserInfo";
 import { usePOSDetails } from "../hooks/usePOSProfile";
 import { toast } from "react-toastify";
-import { createSalesReturn } from "../services/salesInvoice";
+import { createSalesReturn, deleteDraftInvoice } from "../services/salesInvoice";
 import { useAllPaymentModes } from "../hooks/usePaymentModes";
 import RetailSidebar from "../components/RetailSidebar";
+import { addDraftInvoiceToCart } from "../utils/draftInvoiceToCart";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { isToday, isThisWeek, isThisMonth, isThisYear } from "../utils/time";
 // import InvoiceViewPage from "./InvoiceViewPage";
@@ -47,7 +48,7 @@ export default function InvoiceHistoryPage() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery("(max-width: 1024px)");
   const [activeTab, setActiveTab] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState("all");
   const [cashierFilter, setCashierFilter] = useState("all");
@@ -61,18 +62,39 @@ export default function InvoiceHistoryPage() {
   const [selectedCustomer, setSelectedCustomer] = useState("");
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
 
-  // Draft Invoice Edit states
-  const [showEditOptions, setShowEditOptions] = useState(false);
-  const [selectedDraftInvoice, setSelectedDraftInvoice] = useState<SalesInvoice | null>(null);
 
   // Single Invoice Return states
   const [showSingleReturn, setShowSingleReturn] = useState(false);
   const [selectedInvoiceForReturn, setSelectedInvoiceForReturn] = useState<SalesInvoice | null>(null);
 
-  const { invoices, isLoading, error } = useSalesInvoices();
+  // Delete confirmation states
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<SalesInvoice | null>(null);
+
+  // Edit draft invoice dialog states
+  const [showEditDraftDialog, setShowEditDraftDialog] = useState(false);
+  const [draftInvoiceToEdit, setDraftInvoiceToEdit] = useState<SalesInvoice | null>(null);
+
+  // Original edit options states
+  const [showEditOptions, setShowEditOptions] = useState(false);
+  const [selectedDraftInvoice, setSelectedDraftInvoice] = useState<SalesInvoice | null>(null);
+
+  const { invoices, isLoading, isLoadingMore, error, hasMore, totalLoaded, totalCount, loadMore } = useSalesInvoices(searchTerm);
   const { modes } = useAllPaymentModes();
   const { customers } = useCustomers();
   const { posDetails } = usePOSDetails();
+  const { userInfo, isLoading: userInfoLoading } = useUserInfo();
+
+  // Role-based filtering
+  const isAdminUser = userInfo?.is_admin_user || false;
+  const currentUserCashier = userInfo?.full_name || "";
+
+  // Set default cashier filter for non-admin users
+  useEffect(() => {
+    if (!isAdminUser && currentUserCashier && cashierFilter === "all") {
+      setCashierFilter(currentUserCashier);
+    }
+  }, [isAdminUser, currentUserCashier, cashierFilter]);
 
   // Keyboard event handler for Escape key
   useEffect(() => {
@@ -184,20 +206,15 @@ const getStatusBadge = (status: string) => {
     if (error) return [];
 
     return invoices.filter((invoice) => {
-      const matchesSearch =
-        searchQuery === "" ||
-        invoice.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        invoice.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (invoice.cashier && invoice.cashier.toLowerCase().includes(searchQuery.toLowerCase()));
-
+      // Server-side search is handled by the API, so we only apply client-side filters
       const matchesStatus = activeTab === "all" || invoice.status === activeTab;
       const matchesPayment = paymentFilter === "all" || invoice.paymentMethod === paymentFilter;
       const matchesCashier = cashierFilter === "all" || invoice.cashier === cashierFilter;
       const matchesDate = filterInvoiceByDate(invoice.date);
 
-      return matchesSearch && matchesPayment && matchesCashier && matchesStatus && matchesDate;
+      return matchesPayment && matchesCashier && matchesStatus && matchesDate;
     });
-  }, [invoices, searchQuery, activeTab, dateFilter, paymentFilter, cashierFilter, isLoading, error]);
+  }, [invoices, activeTab, dateFilter, paymentFilter, cashierFilter, isLoading, error]);
 
   const uniqueCashiers = useMemo(() => {
     return [...new Set(invoices.map(invoice => invoice.cashier).filter(Boolean))];
@@ -231,7 +248,7 @@ const getStatusBadge = (status: string) => {
   };
 
   // Loading state
-  if (isLoading) {
+  if (isLoading || userInfoLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
@@ -269,8 +286,8 @@ const getStatusBadge = (status: string) => {
           <input
             type="text"
             placeholder="Search invoices..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
           />
         </div>
@@ -289,7 +306,10 @@ const getStatusBadge = (status: string) => {
         <select
           value={cashierFilter}
           onChange={(e) => setCashierFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          disabled={!isAdminUser}
+          className={`px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+            !isAdminUser ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
         >
           <option value="all">All Cashiers</option>
           {uniqueCashiers.map((cashier) => (
@@ -298,6 +318,9 @@ const getStatusBadge = (status: string) => {
             </option>
           ))}
         </select>
+        {!isAdminUser && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Showing only your transactions</p>
+        )}
         <select
           value={paymentFilter}
           onChange={(e) => setPaymentFilter(e.target.value)}
@@ -311,6 +334,13 @@ const getStatusBadge = (status: string) => {
           ))}
         </select>
       </div>
+        {hasMore && (
+          <div className="mt-3 text-center">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Search works on all invoices in the database. Load more invoices to see additional results.
+            </p>
+          </div>
+        )}
     </div>
   );
 
@@ -320,7 +350,12 @@ const getStatusBadge = (status: string) => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Total Invoices</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">{filteredInvoices.length}</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalCount}</p>
+            {hasMore && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Showing {totalLoaded} of {totalCount}
+              </p>
+            )}
           </div>
           <FileText className="w-8 h-8 text-orange-600" />
         </div>
@@ -484,8 +519,8 @@ const getStatusBadge = (status: string) => {
                       </button>
                       {invoice.status === "Draft" && (
                         <button
-                          onClick={() => handleEditInvoice(invoice)}
-                          className="text-blue-600 hover:text-blue-900 flex items-center space-x-1"
+                          onClick={() => handleEditDraftClick(invoice)}
+                          className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 flex items-center space-x-1"
                         >
                           <Edit className="w-4 h-4" />
                           <span>Edit</span>
@@ -499,6 +534,15 @@ const getStatusBadge = (status: string) => {
                         >
                           <RotateCcw className="w-4 h-4" />
                           <span>Return</span>
+                        </button>
+                      )}
+                      {invoice.status === "Draft" && (
+                        <button
+                          onClick={() => handleDeleteClick(invoice)}
+                          className="text-red-600 hover:text-red-900 flex items-center space-x-1"
+                        >
+                          <FileMinus className="w-4 h-4" />
+                          <span>Delete</span>
                         </button>
                       )}
                     </div>
@@ -546,10 +590,11 @@ const getStatusBadge = (status: string) => {
                 </button>
                 {invoice.status === "Draft" && (
                   <button
-                    onClick={() => handleEditInvoice(invoice)}
-                    className="flex-1 text-xs px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                    onClick={() => handleEditDraftClick(invoice)}
+                    className="flex-1 text-xs px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center justify-center space-x-1"
                   >
-                    Edit
+                    <Edit className="w-3 h-3" />
+                    <span>Edit</span>
                   </button>
                 )}
                   {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && hasReturnableItems(invoice) && (
@@ -565,6 +610,39 @@ const getStatusBadge = (status: string) => {
           ))}
         </div>
       )}
+
+      {/* Load More Button */}
+      {hasMore && (
+        <div className="flex justify-center mt-8">
+          <button
+            onClick={loadMore}
+            disabled={isLoadingMore}
+            className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+              isLoadingMore
+                ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                : 'bg-beveren-600 text-white hover:bg-beveren-700'
+            }`}
+          >
+            {isLoadingMore ? (
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span>Loading...</span>
+              </div>
+            ) : (
+              `Load More (${totalLoaded}/${totalCount})`
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Show message when all invoices are loaded */}
+      {!hasMore && totalLoaded > 0 && (
+        <div className="text-center mt-8 py-4">
+          <p className="text-gray-600 dark:text-gray-400">
+            All {totalCount} invoices loaded
+          </p>
+        </div>
+      )}
     </div>
   );
 
@@ -572,10 +650,6 @@ const getStatusBadge = (status: string) => {
     navigate(`/invoice/${invoice.id}`);
   };
 
-  const handleEditInvoice = (invoice: SalesInvoice) => {
-    setSelectedDraftInvoice(invoice);
-    setShowEditOptions(true);
-  };
 
     // Helper function to check if invoice has items that can still be returned
   const hasReturnableItems = (invoice: SalesInvoice) => {
@@ -602,6 +676,75 @@ const getStatusBadge = (status: string) => {
   //     toast.success("Invoice deleted successfully");
   //   }
   // };
+
+  // Delete invoice handlers
+  const handleDeleteClick = (invoice: SalesInvoice) => {
+    if (invoice.status !== "Draft") {
+      toast.error("Only draft invoices can be deleted");
+      return;
+    }
+    setInvoiceToDelete(invoice);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!invoiceToDelete) return;
+
+    try {
+      await deleteDraftInvoice(invoiceToDelete.id);
+      toast.success(`Draft invoice ${invoiceToDelete.id} deleted successfully`);
+      setShowDeleteConfirm(false);
+      setInvoiceToDelete(null);
+      // Refresh the invoices list
+      window.location.reload();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete invoice");
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirm(false);
+    setInvoiceToDelete(null);
+  };
+
+  // Edit draft invoice handlers
+  const handleEditDraftClick = (invoice: SalesInvoice) => {
+    if (invoice.status !== "Draft") {
+      toast.error("Only draft invoices can be edited");
+      return;
+    }
+    setSelectedDraftInvoice(invoice);
+    setShowEditOptions(true);
+  };
+
+  const handleGoToCart = async (invoice: SalesInvoice) => {
+    try {
+      const success = await addDraftInvoiceToCart(invoice.id);
+      if (success) {
+        setShowEditOptions(false);
+        setSelectedDraftInvoice(null);
+        // Add a longer delay to ensure cart state is fully persisted before navigation
+        setTimeout(() => {
+          navigate('/pos'); // Navigate directly to POS page
+        }, 500);
+      }
+    } catch (error: any) {
+      console.error("Error going to cart:", error);
+      toast.error(error.message || "Failed to add items to cart");
+    }
+  };
+
+  const handleGoToPayment = () => {
+    // Navigate to payment page for this invoice
+    setShowEditOptions(false);
+    setSelectedDraftInvoice(null);
+    navigate(`/payment/${selectedDraftInvoice?.id}`);
+  };
+
+  const handleCloseEditOptions = () => {
+    setShowEditOptions(false);
+    setSelectedDraftInvoice(null);
+  };
 
   const handleRefund = (invoiceId: string) => {
     handleReturnClick(invoiceId);
@@ -643,37 +786,6 @@ const getStatusBadge = (status: string) => {
       window.location.reload();
     };
 
-    // Draft Invoice Edit Option handlers
-  const handleGoToCart = () => {
-    navigate('/pos');
-    setShowEditOptions(false);
-    setSelectedDraftInvoice(null);
-  };
-
-  const handleGoToPayment = () => {
-    // Go back to the main POS cart page where they can use the normal payment flow
-    navigate('/pos');
-    setShowEditOptions(false);
-    setSelectedDraftInvoice(null);
-    toast.info('Navigate to the cart and use the Checkout button to process payment');
-  };
-
-  const handleSubmitInvoice = async () => {
-    if (selectedDraftInvoice) {
-      try {
-        toast.success(`Invoice ${selectedDraftInvoice.id} submitted successfully`);
-      } catch (error: any) {
-        toast.error(error.message || "Failed to submit invoice");
-      }
-    }
-    setShowEditOptions(false);
-    setSelectedDraftInvoice(null);
-  };
-
-  const handleCloseEditOptions = () => {
-    setShowEditOptions(false);
-    setSelectedDraftInvoice(null);
-  };
 
   const handleCustomerSelect = (customer: string) => {
     if (!customer) {
@@ -851,60 +963,6 @@ const getStatusBadge = (status: string) => {
           customers={customers}
         />
 
-        {/* Draft Invoice Edit Options Modal */}
-        {showEditOptions && selectedDraftInvoice && (
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-md relative">
-              {/* Click outside to close */}
-              <div
-                className="absolute inset-0 -z-10"
-                onClick={handleCloseEditOptions}
-              />
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Draft Invoice</h2>
-                  <button
-                    onClick={handleCloseEditOptions}
-                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                  >
-                    <XCircle className="w-5 h-5" />
-                  </button>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                  Invoice: {selectedDraftInvoice.id}
-                </p>
-              </div>
-              <div className="p-6">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-                  What would you like to do with this draft invoice?
-                </p>
-                <div className="space-y-3">
-                  <button
-                    onClick={handleGoToCart}
-                    className="w-full flex items-center justify-center space-x-3 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
-                  >
-                    <ShoppingCart className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    <span className="font-medium text-blue-900 dark:text-blue-100">Go to Cart</span>
-                  </button>
-                  <button
-                    onClick={handleGoToPayment}
-                    className="w-full flex items-center justify-center space-x-3 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
-                  >
-                    <CreditCard className="w-5 h-5 text-orange-600 dark:text-green-400" />
-                    <span className="font-medium text-green-900 dark:text-green-100">Payment</span>
-                  </button>
-                  <button
-                    onClick={handleSubmitInvoice}
-                    className="w-full flex items-center justify-center space-x-3 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
-                  >
-                    <Send className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                    <span className="font-medium text-orange-900 dark:text-orange-100">Submit Invoice</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Bottom Navigation */}
         <BottomNavigation />
@@ -1076,7 +1134,28 @@ const getStatusBadge = (status: string) => {
           customers={customers}
         />
 
-        {/* Draft Invoice Edit Options Modal */}
+
+        {/* Single Invoice Return Modal */}
+        <SingleInvoiceReturn
+          invoice={selectedInvoiceForReturn}
+          isOpen={showSingleReturn}
+          onClose={() => setShowSingleReturn(false)}
+          onSuccess={handleSingleReturnSuccess}
+        />
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmDialog
+          isOpen={showDeleteConfirm}
+          onClose={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+          title="Delete Draft Invoice"
+          message={`Are you sure you want to delete draft invoice ${invoiceToDelete?.id}? This action cannot be undone.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          confirmButtonClass="bg-red-600 hover:bg-red-700 text-white"
+        />
+
+        {/* Original Draft Invoice Edit Options Modal */}
         {showEditOptions && selectedDraftInvoice && (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
             <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-md relative">
@@ -1105,7 +1184,7 @@ const getStatusBadge = (status: string) => {
                 </p>
                 <div className="space-y-3">
                   <button
-                    onClick={handleGoToCart}
+                    onClick={() => handleGoToCart(selectedDraftInvoice)}
                     className="w-full flex items-center justify-center space-x-3 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
                   >
                     <ShoppingCart className="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -1113,31 +1192,16 @@ const getStatusBadge = (status: string) => {
                   </button>
                   <button
                     onClick={handleGoToPayment}
-                    className="w-full flex items-center justify-center space-x-3 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
+                    className="w-full flex items-center justify-center space-x-3 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-colors"
                   >
-                    <CreditCard className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                    <span className="font-medium text-green-900 dark:text-green-100">Payment</span>
-                  </button>
-                  <button
-                    onClick={handleSubmitInvoice}
-                    className="w-full flex items-center justify-center space-x-3 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
-                  >
-                    <Send className="w-5 h-5 text-orange-600 dark:text-purple-400" />
-                    <span className="font-medium text-purple-900 dark:text-purple-100">Submit Invoice</span>
+                    <FileText className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                    <span className="font-medium text-orange-900 dark:text-orange-100">Submit Payment</span>
                   </button>
                 </div>
               </div>
             </div>
           </div>
         )}
-
-        {/* Single Invoice Return Modal */}
-        <SingleInvoiceReturn
-          invoice={selectedInvoiceForReturn}
-          isOpen={showSingleReturn}
-          onClose={() => setShowSingleReturn(false)}
-          onSuccess={handleSingleReturnSuccess}
-        />
       </div>
     </div>
   );

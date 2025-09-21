@@ -145,7 +145,7 @@ export default function SingleInvoiceReturn({
       const result = await createPartialReturn(invoiceName, itemsToReturn);
 
       if (result.success) {
-        toast.success(result.message || 'Return created successfully');
+        toast.success('Return created successfully');
         onSuccess(result.returnInvoice!);
         onClose();
       } else {

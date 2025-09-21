@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom"
 import { ArrowLeft } from "lucide-react"
 import AddCustomerModal from "./AddCustomerModal"
 import BottomNavigation from "./BottomNavigation"
-import type { Customer } from "../data/mockCustomers"
+import type { Customer } from "../types/customer"
 
 export default function MobileAddCustomerPage() {
   const navigate = useNavigate()

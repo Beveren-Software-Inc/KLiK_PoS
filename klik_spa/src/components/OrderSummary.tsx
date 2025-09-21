@@ -14,7 +14,7 @@ import {
 import type { CartItem, GiftCoupon } from "../../types";
 import GiftCouponPopover from "./GiftCouponPopover";
 import PaymentDialog from "./PaymentDialog";
-import { type Customer } from "../data/mockCustomers"
+import { type Customer } from "../types/customer"
 import AddCustomerModal from "./AddCustomerModal";
 import { createDraftSalesInvoice } from "../services/salesInvoice";
 import { useCustomers } from "../hooks/useCustomers";
@@ -591,7 +591,7 @@ export default function OrderSummary({
                               {customer.name}
                             </div>
                             <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                              {customer.email} • {customer.phone}
+                               {customer.phone} • {customer.email}
                             </div>
                           </div>
                           {/* {customer.status === "vip" && (

@@ -13,16 +13,13 @@ import {
   Phone,
   Mail,
   MapPin,
-  Calendar,
   DollarSign,
   Package,
   FileText,
   CheckCircle,
   AlertTriangle,
   RotateCcw,
-  Users,
   FileMinus,
-  Receipt,
   TrendingUp,
   Clock,
   CreditCard,
@@ -34,7 +31,8 @@ import RetailSidebar from "../components/RetailSidebar";
 import PaymentDialog from "../components/PaymentDialog";
 import { useInvoiceDetails } from "../hooks/useInvoiceDetails";
 import { useCustomerStatistics } from "../hooks/useCustomerStatistics";
-import { createSalesReturn } from "../services/salesInvoice";
+import { usePOSDetails } from "../hooks/usePOSProfile";
+import { createSalesReturn, deleteDraftInvoice } from "../services/salesInvoice";
 import { toast } from "react-toastify";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { DisplayPrintPreview, handlePrintInvoice } from "../utils/invoicePrint";
@@ -50,6 +48,7 @@ export default function InvoiceViewPage() {
 
   const { invoice, isLoading, error } = useInvoiceDetails(invoiceId);
   const { statistics: customerStats, isLoading: statsLoading } = useCustomerStatistics(invoice?.customer || null);
+  const { posDetails } = usePOSDetails();
   const navigate = useNavigate()
 
   // PaymentDialog state for sharing
@@ -65,9 +64,42 @@ export default function InvoiceViewPage() {
   const [customerData, setCustomerData] = useState<any>(null)
   const [isLoadingCustomer, setIsLoadingCustomer] = useState(false)
 
+  // Delete confirmation state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
 
   const handleBackClick = () => {
     navigate(`/invoice`)
+  };
+
+  // Delete invoice handlers
+  const handleDeleteClick = () => {
+    if (!invoice) return;
+    console.log("Invoice object in detail page:", invoice);
+    if (invoice.status !== "Draft") {
+      toast.error("Only draft invoices can be deleted");
+      return;
+    }
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!invoice) return;
+
+    try {
+      console.log("Attempting to delete invoice:", invoice.name || invoice.id, "Status:", invoice.status);
+      await deleteDraftInvoice(invoice.name || invoice.id);
+      toast.success(`Draft invoice ${invoice.name || invoice.id} deleted successfully`);
+      setShowDeleteConfirm(false);
+      navigate('/invoice');
+    } catch (error: any) {
+      console.error("Delete error:", error);
+      toast.error(error.message || "Failed to delete invoice");
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirm(false);
   };
 
 
@@ -154,7 +186,6 @@ export default function InvoiceViewPage() {
   };
 
   const handleSingleReturnSuccess = (returnInvoice: string) => {
-    toast.success(`Return invoice created: ${returnInvoice}`);
     navigate(`/invoice/${returnInvoice}`);
   };
 
@@ -291,28 +322,35 @@ export default function InvoiceViewPage() {
                   </span>
                 </button>
 
-                <button
-                  className="group relative p-2 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900 rounded-lg transition-all duration-200"
-                  onClick={() => {
-                    setSharingMode('whatsapp')
-                    setShowPaymentDialog(true)
-                  }}
-                >
-                  <MessageCirclePlus size={20} />
-                  <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
-                    Send via WhatsApp
-                  </span>
-                </button>
+                {posDetails?.custom_enable_whatsapp && (
+                  <button
+                    className="group relative p-2 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900 rounded-lg transition-all duration-200"
+                    onClick={() => {
+                      setSharingMode('whatsapp')
+                      setShowPaymentDialog(true)
+                    }}
+                  >
+                    <MessageCirclePlus size={20} />
+                    <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                      Send via WhatsApp
+                    </span>
+                  </button>
+                )}
 
-                <button
-                  className="group relative p-2 text-gray-400 cursor-not-allowed opacity-50"
-                  disabled
-                >
-                  <MessageSquarePlus size={20} />
-                  <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
-                    SMS (Disabled)
-                  </span>
-                </button>
+                {posDetails?.custom_enable_sms && (
+                  <button
+                    className="group relative p-2 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900 rounded-lg transition-all duration-200"
+                    onClick={() => {
+                      setSharingMode('sms')
+                      setShowPaymentDialog(true)
+                    }}
+                  >
+                    <MessageSquarePlus size={20} />
+                    <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                      Send via SMS
+                    </span>
+                  </button>
+                )}
 
                 {/* Return Buttons */}
                 {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && !invoice.is_return && hasReturnableItems() && (
@@ -336,6 +374,22 @@ export default function InvoiceViewPage() {
                       <FileMinus size={20} />
                       <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
                         Multi-Invoice Return
+                      </span>
+                    </button>
+                  </>
+                )}
+
+                {/* Delete Button for Draft Invoices */}
+                {invoice.status === "Draft" && (
+                  <>
+                    <div className="w-px h-6 bg-gray-300 dark:bg-gray-600"></div>
+                    <button
+                      className="group relative p-2 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900 rounded-lg transition-all duration-200"
+                      onClick={handleDeleteClick}
+                    >
+                      <FileMinus size={20} />
+                      <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                        Delete Draft Invoice
                       </span>
                     </button>
                   </>
@@ -811,6 +865,18 @@ export default function InvoiceViewPage() {
           onSave={handleSaveCustomer}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Draft Invoice"
+        message={`Are you sure you want to delete draft invoice ${invoice?.name || invoice?.id}? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmButtonClass="bg-red-600 hover:bg-red-700 text-white"
+      />
 
       </div>
     </div>

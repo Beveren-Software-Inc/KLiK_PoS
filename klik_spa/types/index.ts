@@ -110,6 +110,8 @@ export interface SalesInvoice {
   company: string;
   posting_date: string;
   posting_time: string;
+  posProfile?: string;
+  custom_pos_opening_entry?: string;
 }
 
 

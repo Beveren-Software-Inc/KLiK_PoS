@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { formatCurrency } from "../utils/currency"
+import { formatCurrency, getCurrencySymbol } from "../utils/currency"
 import {
 
   TrendingUp,
@@ -26,13 +26,22 @@ import BottomNavigation from "../components/BottomNavigation"
 import { useMediaQuery } from "../hooks/useMediaQuery"
 import { usePOSDetails } from "../hooks/usePOSProfile"
 import { useSalesInvoices } from "../hooks/useSalesInvoices"
+import { useUserInfo } from "../hooks/useUserInfo"
 
 export default function DashboardPage() {
   const navigate = useNavigate()
   const isMobile = useMediaQuery("(max-width: 1024px)")
   const { posDetails } = usePOSDetails()
   const { invoices, isLoading: invoicesLoading, error: invoicesError } = useSalesInvoices()
+  const { userInfo, isLoading: userInfoLoading } = useUserInfo()
   const [timeRange, setTimeRange] = useState("today")
+
+  // Get currency symbol from POS details
+  const currencySymbol = getCurrencySymbol(posDetails?.currency || 'USD')
+
+  // Role-based access control
+  const isAdminUser = userInfo?.is_admin_user || false
+  const currentUserCashier = userInfo?.full_name || "Unknown"
   const [cashierFilter, setCashierFilter] = useState("all")
   const [paymentFilter, setPaymentFilter] = useState("all")
   const [showFilters, setShowFilters] = useState(false)
@@ -40,6 +49,26 @@ export default function DashboardPage() {
   const stats = mockDashboardStats
 
   const uniqueCashiers = [...new Set(invoices.map((invoice: SalesInvoice) => invoice.cashier))]
+
+  // Set default cashier filter based on user role
+  useEffect(() => {
+    if (userInfo && !isAdminUser) {
+      // For non-admin users, set cashier filter to current user
+      setCashierFilter(currentUserCashier)
+    }
+  }, [userInfo, isAdminUser, currentUserCashier])
+
+  // Loading state - must be after all hooks
+  if (userInfoLoading || invoicesLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-beveren-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-300">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   const getStatsForRange = () => {
     switch (timeRange) {
@@ -56,7 +85,7 @@ export default function DashboardPage() {
 
   const currentStats = getStatsForRange()
 
-  // Filter data based on selected filters
+  // Filter data based on selected filters and user role
   const filteredInvoices = invoices.filter((invoice) => {
     const matchesCashier = cashierFilter === "all" || invoice.cashier === cashierFilter
     const matchesPayment = paymentFilter === "all" || invoice.paymentMethod === paymentFilter
@@ -68,7 +97,10 @@ export default function DashboardPage() {
       (timeRange === "week" && new Date(invoice.date) >= new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)) ||
       (timeRange === "month" && new Date(invoice.date) >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
 
-    return matchesCashier && matchesPayment && matchesTime
+    // Role-based filtering: Non-admin users only see invoices for their POS profile
+    const matchesPOSProfile = isAdminUser || !posDetails?.name || invoice.posProfile === posDetails.name
+
+    return matchesCashier && matchesPayment && matchesTime && matchesPOSProfile
   })
 
   const filteredStats = {
@@ -272,7 +304,10 @@ export default function DashboardPage() {
                   <select
                     value={cashierFilter}
                     onChange={(e) => setCashierFilter(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    disabled={!isAdminUser}
+                    className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                      !isAdminUser ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
                   >
                     <option value="all">All Cashiers</option>
                     {uniqueCashiers.map((cashier: string) => (
@@ -281,6 +316,11 @@ export default function DashboardPage() {
                       </option>
                     ))}
                   </select>
+                  {!isAdminUser && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Showing only your transactions
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -319,11 +359,12 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</p>
                   <p className="text-xl font-bold text-gray-900 dark:text-white">
-                    $
-                    {(cashierFilter !== "all" || paymentFilter !== "all"
-                      ? filteredStats.totalRevenue
-                      : currentStats.totalRevenue
-                    ).toFixed(2)}
+                    {formatCurrency(
+                      (cashierFilter !== "all" || paymentFilter !== "all"
+                        ? filteredStats.totalRevenue
+                        : currentStats.totalRevenue
+                      ), posDetails?.currency || 'USD'
+                    )}
                   </p>
                   <div className="flex items-center mt-2">
                     <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
@@ -363,11 +404,12 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Avg Order Value</p>
                   <p className="text-xl font-bold text-gray-900 dark:text-white">
-                    $
-                    {(cashierFilter !== "all" || paymentFilter !== "all"
-                      ? filteredStats.averageOrderValue
-                      : currentStats.averageOrderValue
-                    ).toFixed(2)}
+                    {formatCurrency(
+                      (cashierFilter !== "all" || paymentFilter !== "all"
+                        ? filteredStats.averageOrderValue
+                        : currentStats.averageOrderValue
+                      ), posDetails?.currency || 'USD'
+                    )}
                   </p>
                   <div className="flex items-center mt-2">
                     <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
@@ -457,7 +499,7 @@ export default function DashboardPage() {
                                 height: `${height}px`,
                                 minHeight: "4px",
                               }}
-                              title={`${item.hour}: $${item.sales.toFixed(2)}`}
+                              title={`${item.hour}: ${formatCurrency(item.sales, posDetails?.currency || 'USD')}`}
                             ></div>
                           ) : (
                             <div className="relative w-full h-full">
@@ -485,7 +527,7 @@ export default function DashboardPage() {
                             </div>
                           )}
                           <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                            ${item.sales.toFixed(0)}
+                            {formatCurrency(item.sales, posDetails?.currency || 'USD')}
                           </div>
                         </div>
                         <span className="text-xs text-gray-500 dark:text-gray-400 mt-2 transform -rotate-45 origin-top-left">
@@ -498,7 +540,7 @@ export default function DashboardPage() {
                 <div className="mt-3 text-center">
                   <div className="text-sm text-gray-600 dark:text-gray-400">
                     Total Revenue: <span className="font-semibold text-beveren-600 dark:text-beveren-400">
-                      ${salesByHourData.reduce((sum, item) => sum + item.sales, 0).toFixed(2)}
+                      {formatCurrency(salesByHourData.reduce((sum, item) => sum + item.sales, 0), posDetails?.currency || 'USD')}
                     </span>
                   </div>
                 </div>
@@ -523,7 +565,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="text-right">
                         <div className="font-semibold text-gray-900 dark:text-white">
-                          ${method.amount.toFixed(2)}
+                          {formatCurrency(method.amount, posDetails?.currency || 'USD')}
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                           {method.percentage.toFixed(1)}% • {method.transactions} txns
@@ -623,7 +665,7 @@ export default function DashboardPage() {
                 <div className="flex justify-between p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                   <span className="text-sm text-gray-600 dark:text-gray-400">Total Redeemed</span>
                   <span className="font-semibold text-gray-900 dark:text-white">
-                    ${stats.giftCardUsage.totalRedeemed.toFixed(2)}
+                    {formatCurrency(stats.giftCardUsage.totalRedeemed, posDetails?.currency || 'USD')}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -635,7 +677,7 @@ export default function DashboardPage() {
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600 dark:text-gray-400">Avg Discount</span>
                   <span className="font-semibold text-orange-600 dark:text-orange-400">
-                    ${stats.giftCardUsage.averageDiscount.toFixed(2)}
+                    {formatCurrency(stats.giftCardUsage.averageDiscount, posDetails?.currency || 'USD')}
                   </span>
                 </div>
                 <div className="pt-2 border-t border-gray-200 dark:border-gray-600">
@@ -671,7 +713,7 @@ export default function DashboardPage() {
                     {topPerformer.transactions} transactions
                   </p>
                   <p className="text-lg font-bold text-beveren-600 dark:text-beveren-400">
-                    ${topPerformer.sales.toFixed(2)}
+                    {formatCurrency(topPerformer.sales, posDetails?.currency || 'USD')}
                   </p>
                   <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
                     {filteredStats.totalRevenue > 0 ? ((topPerformer.sales / filteredStats.totalRevenue) * 100).toFixed(1) : 0}% of total sales
@@ -700,10 +742,10 @@ export default function DashboardPage() {
                           height: `${(item.sales / Math.max(...stats.salesByDay.map((s: { day: string; sales: number }) => s.sales))) * 60}px`,
                           minHeight: "4px",
                         }}
-                        title={`${item.day}: $${item.sales.toFixed(2)}`}
+                        title={`${item.day}: ${formatCurrency(item.sales, posDetails?.currency || 'USD')}`}
                       ></div>
                       <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-700 text-white text-xs px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                        ${item.sales.toFixed(0)}
+                        {formatCurrency(item.sales, posDetails?.currency || 'USD')}
                       </div>
                     </div>
                     <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">{item.day}</span>
@@ -744,9 +786,9 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-semibold text-gray-900 dark:text-white">${product.revenue.toFixed(2)}</div>
+                      <div className="font-semibold text-gray-900 dark:text-white">{formatCurrency(product.revenue, posDetails?.currency || 'USD')}</div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
-                        ${product.sales > 0 ? (product.revenue / product.sales).toFixed(2) : '0.00'} avg
+                        {formatCurrency(product.sales > 0 ? (product.revenue / product.sales) : 0, posDetails?.currency || 'USD')} avg
                       </div>
                     </div>
                   </div>
@@ -882,7 +924,10 @@ export default function DashboardPage() {
                 <select
                   value={cashierFilter}
                   onChange={(e) => setCashierFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  disabled={!isAdminUser}
+                  className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                    !isAdminUser ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                 >
                   <option value="all">All Cashiers</option>
                   {uniqueCashiers.map((cashier: string) => (
@@ -891,6 +936,11 @@ export default function DashboardPage() {
                     </option>
                   ))}
                 </select>
+                {!isAdminUser && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Showing only your transactions
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -929,11 +979,12 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</p>
                 <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                  $
-                  {(cashierFilter !== "all" || paymentFilter !== "all"
-                    ? filteredStats.totalRevenue
-                    : currentStats.totalRevenue
-                  ).toFixed(2)}
+                  {formatCurrency(
+                    (cashierFilter !== "all" || paymentFilter !== "all"
+                      ? filteredStats.totalRevenue
+                      : currentStats.totalRevenue
+                    ), posDetails?.currency || 'USD'
+                  )}
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
@@ -973,11 +1024,12 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Avg Order Value</p>
                 <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                  $
-                  {(cashierFilter !== "all" || paymentFilter !== "all"
-                    ? filteredStats.averageOrderValue
-                    : currentStats.averageOrderValue
-                  ).toFixed(2)}
+                  {formatCurrency(
+                    (cashierFilter !== "all" || paymentFilter !== "all"
+                      ? filteredStats.averageOrderValue
+                      : currentStats.averageOrderValue
+                    ), posDetails?.currency || 'USD'
+                  )}
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
@@ -1067,7 +1119,7 @@ export default function DashboardPage() {
                               height: `${height}px`,
                               minHeight: "4px",
                             }}
-                            title={`${item.hour}: $${item.sales.toFixed(2)}`}
+                            title={`${item.hour}: ${formatCurrency(item.sales, posDetails?.currency || 'USD')}`}
                           ></div>
                         ) : (
                           <div className="relative w-full h-full">
@@ -1095,7 +1147,7 @@ export default function DashboardPage() {
                           </div>
                         )}
                         <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                          ${item.sales.toFixed(0)}
+                          {formatCurrency(item.sales, posDetails?.currency || 'USD')}
                         </div>
                       </div>
                       <span className="text-xs text-gray-500 dark:text-gray-400 mt-2 transform -rotate-45 origin-top-left">
@@ -1108,7 +1160,7 @@ export default function DashboardPage() {
               <div className="mt-4 text-center">
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                   Total Revenue: <span className="font-semibold text-beveren-600 dark:text-beveren-400">
-                    ${salesByHourData.reduce((sum, item) => sum + item.sales, 0).toFixed(2)}
+                    {formatCurrency(salesByHourData.reduce((sum, item) => sum + item.sales, 0), posDetails?.currency || 'USD')}
                   </span>
                 </div>
               </div>
@@ -1133,7 +1185,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="text-right">
                       <div className="font-semibold text-gray-900 dark:text-white">
-                        ${method.amount.toFixed(2)}
+                        {formatCurrency(method.amount, posDetails?.currency || 'USD')}
                       </div>
                       <div className="text-sm text-gray-500 dark:text-gray-400">
                         {method.percentage.toFixed(1)}% • {method.transactions} txns
@@ -1281,7 +1333,7 @@ export default function DashboardPage() {
                   {topPerformer.transactions} transactions
                 </p>
                 <p className="text-lg font-bold text-beveren-600 dark:text-beveren-400">
-                  ${topPerformer.sales.toFixed(2)}
+                  {formatCurrency(topPerformer.sales, posDetails?.currency || 'USD')}
                 </p>
                 <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
                   {filteredStats.totalRevenue > 0 ? ((topPerformer.sales / filteredStats.totalRevenue) * 100).toFixed(1) : 0}% of total sales
@@ -1310,10 +1362,10 @@ export default function DashboardPage() {
                         height: `${(item.sales / Math.max(...stats.salesByDay.map((s: { day: string; sales: number }) => s.sales))) * 60}px`,
                         minHeight: "4px",
                       }}
-                      title={`${item.day}: $${item.sales.toFixed(2)}`}
+                      title={`${item.day}: ${formatCurrency(item.sales, posDetails?.currency || 'USD')}`}
                     ></div>
                     <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-700 text-white text-xs px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                      ${item.sales.toFixed(0)}
+                      {formatCurrency(item.sales, posDetails?.currency || 'USD')}
                     </div>
                   </div>
                   <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">{item.day}</span>
@@ -1354,9 +1406,9 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-semibold text-gray-900 dark:text-white">${product.revenue.toFixed(2)}</div>
+                    <div className="font-semibold text-gray-900 dark:text-white">{formatCurrency(product.revenue, posDetails?.currency || 'USD')}</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                      ${product.sales > 0 ? (product.revenue / product.sales).toFixed(2) : '0.00'} avg
+                      {formatCurrency(product.sales > 0 ? (product.revenue / product.sales) : 0, posDetails?.currency || 'USD')} avg
                     </div>
                   </div>
                 </div>
@@ -1403,7 +1455,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="text-right">
                     <div className="font-semibold text-gray-900 dark:text-white">
-                      ${transaction.totalAmount.toFixed(2)}
+                      {formatCurrency(transaction.totalAmount, transaction.currency || posDetails?.currency || 'USD')}
                     </div>
                     <div
                       className={`text-xs ${

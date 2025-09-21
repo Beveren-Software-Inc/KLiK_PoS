@@ -6,6 +6,7 @@ import PaymentDialog from "./PaymentDialog"
 import BottomNavigation from "./BottomNavigation"
 import { useCartStore } from "../stores/cartStore"
 import { useProducts } from "../hooks/useProducts"
+import { clearDraftInvoiceCache } from "../utils/draftInvoiceCache"
 
 export default function MobilePaymentPage() {
   const navigate = useNavigate()
@@ -17,6 +18,8 @@ export default function MobilePaymentPage() {
     if (paymentCompleted) {
       console.log("MobilePaymentPage: Payment was completed - clearing cart for next order");
       clearCart();
+      // Clear draft invoice cache since payment is completed
+      clearDraftInvoiceCache();
     } else {
       console.log("MobilePaymentPage: Payment was not completed - keeping cart items");
     }

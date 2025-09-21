@@ -12,13 +12,16 @@ import BarcodeScannerModal from "./BarcodeScanner"
 import { useBarcodeScanner } from "../hooks/useBarcodeScanner"
 import type { MenuItem, CartItem, GiftCoupon } from "../../types"
 import { useMediaQuery } from "../hooks/useMediaQuery"
+import { useCartStore } from "../stores/cartStore"
 
 export default function RetailPOSLayout() {
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
-  const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [appliedCoupons, setAppliedCoupons] = useState<GiftCoupon[]>([])
   const [showScanner, setShowScanner] = useState(false)
+
+  // Use cart store instead of local state
+  const { cartItems, addToCart, updateQuantity, removeItem, clearCart } = useCartStore()
 
   // Use professional data management
   const { products: menuItems, isLoading: loading, error, refetch } = useProducts()
@@ -48,23 +51,15 @@ export default function RetailPOSLayout() {
   const addItemToCart = (item: MenuItem) => {
     const existingItem = cartItems.find((cartItem) => cartItem.id === item.id)
     if (existingItem) {
-      setCartItems(
-        cartItems.map((cartItem) =>
-          cartItem.id === item.id ? { ...cartItem, quantity: cartItem.quantity + 1 } : cartItem,
-        ),
-      )
+      updateQuantity(item.id, existingItem.quantity + 1)
     } else {
-      setCartItems([
-        ...cartItems,
-        {
-          id: item.id,
-          name: item.name,
-          category: item.category,
-          price: item.price,
-          image: item.image,
-          quantity: 1,
-        },
-      ])
+      addToCart({
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        price: item.price,
+        image: item.image,
+      })
     }
 
     // Show success message for barcode scanning
@@ -75,18 +70,18 @@ export default function RetailPOSLayout() {
 
   const handleUpdateQuantity = (id: string, quantity: number) => {
     if (quantity <= 0) {
-      setCartItems(cartItems.filter((item) => item.id !== id))
+      removeItem(id)
     } else {
-      setCartItems(cartItems.map((item) => (item.id === id ? { ...item, quantity } : item)))
+      updateQuantity(id, quantity)
     }
   }
 
   const handleRemoveItem = (id: string) => {
-    setCartItems(cartItems.filter((item) => item.id !== id))
+    removeItem(id)
   }
 
   const handleClearCart = () => {
-    setCartItems([])
+    clearCart()
   }
 
   const handleApplyCoupon = (coupon: GiftCoupon) => {

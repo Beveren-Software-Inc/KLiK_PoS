@@ -9,33 +9,44 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogDescription,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
+interface ControlledConfirmDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title?: string;
+  message?: string;
+  confirmText?: string;
+  cancelText?: string;
+  confirmButtonClass?: string;
+}
+
 export function ConfirmDialog({
-  children,
+  isOpen,
+  onClose,
   onConfirm,
   title = "Are you sure?",
-  description = "This action cannot be undone.",
-  trigger,
-}: {
-  title?: string;
-  description?: string;
-  trigger: React.ReactNode;
-  onConfirm: () => void;
-  children?: React.ReactNode;
-}) {
+  message = "This action cannot be undone.",
+  confirmText = "Continue",
+  cancelText = "Cancel",
+  confirmButtonClass = "bg-red-600 hover:bg-red-700 text-white"
+}: ControlledConfirmDialogProps) {
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
+    <AlertDialog open={isOpen} onOpenChange={onClose}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
+          <AlertDialogDescription>{message}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>Continue</AlertDialogAction>
+          <AlertDialogCancel onClick={onClose}>{cancelText}</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={onConfirm}
+            className={confirmButtonClass}
+          >
+            {confirmText}
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

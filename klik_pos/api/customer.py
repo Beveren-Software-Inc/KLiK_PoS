@@ -26,10 +26,8 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
         # Apply business type filtering
         if business_type == "B2B":
             filters["customer_type"] = "Company"
-            print(f"Applied B2B filter: Company customers only")
         elif business_type == "B2C":
             filters["customer_type"] = "Individual"
-            print(f"Applied B2C filter: Individual customers only")
         else:
             print(f"No customer type filter applied - showing all customers (business_type: {business_type})")
         # For "B2B & B2C", no customer_type filter is applied (show all)
@@ -45,14 +43,13 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
             limit=limit,
             start=start,
         )
-
         for cust in customer_names:
             doc = frappe.get_doc("Customer", cust.name)
 
             contact = frappe.db.get_value(
                 "Contact",
                 {"name": doc.customer_primary_contact},
-                ["first_name", "last_name", "email_id", "phone"],
+                ["first_name", "last_name", "email_id", "phone", "mobile_no"],
                 as_dict=True,
             ) if doc.customer_primary_contact else None
 
@@ -82,6 +79,7 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
                 "custom_last_visit": customer_stats.get("last_visit"),
                 # "exchange_rate": get_currency_exchange_rate(company_currency, doc.default_currency)
             })
+
         return {"success": True, "data": result}
 
     except Exception:
@@ -250,6 +248,10 @@ def get_or_create_customer(name, email, phone, country, name_arabic="", data=Non
     try:
         cust_type = "Company" if data and (data.get("customer_type") == "company" or data.get("type") == "company") else "Individual"
 
+        # Get customer_group and territory from data, with defaults
+        customer_group = data.get("customer_group", "All Customer Groups") if data else "All Customer Groups"
+        territory = data.get("territory", country) if data else country
+
         existing = frappe.get_all("Customer", filters={"customer_name": name}, fields=["name"])
         if existing:
             # Update existing
@@ -259,6 +261,8 @@ def get_or_create_customer(name, email, phone, country, name_arabic="", data=Non
             doc.custom_country = country
             doc.customer_type = cust_type
             doc.customer_name_in_arabic = name_arabic
+            doc.customer_group = customer_group
+            doc.territory = territory
 
             if cust_type == "Company":
                 doc.custom_vat_number = data.get("vatNumber")
@@ -277,6 +281,8 @@ def get_or_create_customer(name, email, phone, country, name_arabic="", data=Non
                 "email_id": email,
                 "mobile_no": phone,
                 "custom_country": country,
+                "customer_group": customer_group,
+                "territory": territory,
                 "status": data.get("status", "Active") if data else "Active",
                 "custom_vat_number": data.get("vatNumber") if cust_type == "Company" else None,
                 "custom_payment_method": data.get("preferredPaymentMethod") if cust_type=="Company" else None,
@@ -285,19 +291,67 @@ def get_or_create_customer(name, email, phone, country, name_arabic="", data=Non
             })
             doc.insert()
         return doc
-
-        # Handle address creation if provided
-
-
     except Exception as e:
-        frappe.log_error(frappe.get_traceback(), "Customer Creation Failed")
-        frappe.throw(f"Failed to create/update customer: {e}")
+        frappe.log_error(frappe.get_traceback(), "Error in get_or_create_customer")
+        raise e
+
+
+@frappe.whitelist(allow_guest=True)
+def get_customer_groups():
+    """Fetch customer groups based on POS profile configuration."""
+    try:
+        pos_profile = get_current_pos_profile()
+
+        # Check if POS profile has customer groups configured
+        if hasattr(pos_profile, 'customer_groups') and pos_profile.customer_groups:
+            # Get customer groups from POS profile configuration
+            customer_group_names = [d.customer_group for d in pos_profile.customer_groups if d.customer_group]
+
+            customer_groups = frappe.get_all(
+                "Customer Group",
+                filters={"name": ["in", customer_group_names]},
+                fields=["name", "customer_group_name"],
+                order_by="customer_group_name asc"
+            )
+        else:
+            # Fallback: fetch all customer groups if none configured in POS profile
+            customer_groups = frappe.get_all(
+                "Customer Group",
+                fields=["name", "customer_group_name"],
+                order_by="customer_group_name asc"
+            )
+
+        # Check if "All Customer Groups" already exists, if not add it
+        has_all_groups = any(group["name"] == "All Customer Groups" for group in customer_groups)
+        if not has_all_groups:
+            customer_groups.insert(0, {"name": "All Customer Groups", "customer_group_name": "All Customer Groups"})
+
+        return {"success": True, "data": customer_groups}
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Error fetching customer groups")
+        return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist(allow_guest=True)
+def get_territories():
+    """Fetch all territories for dropdown selection."""
+    try:
+        territories = frappe.get_all(
+            "Territory",
+            fields=["name", "territory_name"],
+            order_by="territory_name asc"
+        )
+
+        return {"success": True, "data": territories}
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Error fetching territories")
+        return {"success": False, "error": str(e)}
 
 
 def create_or_update_contact(customer, customer_name, email, phone):
     existing_contact = frappe.get_all(
         "Contact",
-        filters={"email_id": email, "link_name": customer},
+        filters={"link_name": customer},
         limit=1
     )
 
@@ -305,20 +359,48 @@ def create_or_update_contact(customer, customer_name, email, phone):
         # load existing document
         doc = frappe.get_doc("Contact", existing_contact[0].name)
         doc.first_name = customer_name
-        doc.phone = phone
-        doc.email_id = email
+
+        # Update email in child table
+        if email:
+            doc.email_ids = []
+            doc.append("email_ids", {
+                "email_id": email,
+                "is_primary": 1
+            })
+
+        # Update phone in child table
+        if phone:
+            doc.phone_nos = []
+            doc.append("phone_nos", {
+                "phone": phone,
+                "is_primary_mobile_no": 1,
+                "is_primary_phone": 1
+            })
     else:
         # create new document properly
         doc = frappe.get_doc({
             "doctype": "Contact",
             "first_name": customer_name,
-            "email_id": email,
-            "phone": phone,
             "links": [{
                 "link_doctype": "Customer",
                 "link_name": customer
             }]
         })
+
+        # Add email to child table
+        if email:
+            doc.append("email_ids", {
+                "email_id": email,
+                "is_primary": 1
+            })
+
+        # Add phone to child table
+        if phone:
+            doc.append("phone_nos", {
+                "phone": phone,
+                "is_primary_mobile_no": 1,
+                "is_primary_phone": 1
+            })
 
     doc.save(ignore_permissions=True)
     return doc
@@ -374,11 +456,55 @@ def update_customer(customer_id, customer_data):
     try:
         customer = frappe.get_doc("Customer", customer_id)
 
+        # Extract email and phone for contact update
+        email = customer_data.get("email")
+        phone = customer_data.get("phone")
+        customer_name = customer_data.get("name", customer.customer_name)
+
+        # Update customer fields
         for key, value in customer_data.items():
-            setattr(customer, key, value)
+            if key not in ["email", "phone"]:  # Skip email/phone as they go to Contact
+                setattr(customer, key, value)
+
+        # Also update email_id and mobile_no on Customer doctype for consistency
+        if email:
+            customer.email_id = email
+        if phone:
+            customer.mobile_no = phone
 
         customer.ignore_version = True
         customer.save()
+
+        # Update the primary contact if email or phone changed
+        if customer.customer_primary_contact and (email or phone):
+            try:
+                contact_doc = frappe.get_doc("Contact", customer.customer_primary_contact)
+
+                # Update email in child table
+                if email:
+                    # Clear existing email entries
+                    contact_doc.email_ids = []
+                    # Add new email entry
+                    contact_doc.append("email_ids", {
+                        "email_id": email,
+                        "is_primary": 1
+                    })
+
+                # Update phone in child table
+                if phone:
+                    # Clear existing phone entries
+                    contact_doc.phone_nos = []
+                    # Add new phone entry
+                    contact_doc.append("phone_nos", {
+                        "phone": phone,
+                        "is_primary_mobile_no": 1,
+                        "is_primary_phone": 1
+                    })
+
+                contact_doc.save()
+            except Exception as contact_error:
+                frappe.log_error(frappe.get_traceback(), f"Error updating contact for customer {customer_id}")
+                # Don't fail the whole operation if contact update fails
 
         return {
             "success": True,

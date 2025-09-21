@@ -6,6 +6,8 @@ import { usePOSOpeningStatus } from '../hooks/usePOSOpeningEntry'
 import RetailPOSLayout from "../components/RetailPOSLayout"
 import POSOpeningModal from '../components/PosOpeningEntryDialog'
 import erpnextAPI from '../services/erpnext-api'
+import { loadCachedItemsToCart, hasCachedDraftInvoiceItems } from '../utils/draftInvoiceCache'
+import { useCartStore } from '../stores/cartStore'
 
 export default function MainPOSScreen() {
   const { isRTL } = useI18n()
@@ -14,6 +16,10 @@ export default function MainPOSScreen() {
   const [currentUser, setCurrentUser] = useState(null)
   const [userLoading, setUserLoading] = useState(true)
   const [userError, setUserError] = useState(null)
+  const [cacheLoaded, setCacheLoaded] = useState(false)
+
+  // Use cart store hook to ensure re-renders
+  const { cartItems } = useCartStore()
 
   // Check POS opening status
   const {
@@ -67,6 +73,23 @@ useEffect(() => {
     fetchCurrentUser()
   }, [])
 
+  // Load cached draft invoice items when POS becomes ready
+  useEffect(() => {
+    if (posReady && !cacheLoaded) {
+      // Add a small delay to ensure everything is loaded
+      setTimeout(() => {
+        const hasCached = hasCachedDraftInvoiceItems();
+
+        if (hasCached) {
+          loadCachedItemsToCart();
+        }
+
+        // Mark cache as loaded to prevent multiple executions
+        setCacheLoaded(true);
+      }, 1000); // 1 second delay
+    }
+  }, [posReady, cacheLoaded]);
+
   // Check opening entry status when component mounts
   useEffect(() => {
     if (!statusLoading && !statusError) {
@@ -88,6 +111,8 @@ useEffect(() => {
   const handleOpeningSuccess = () => {
     setShowOpeningModal(false)
     setPosReady(true)
+    // Reset cache loaded flag when opening new POS session
+    setCacheLoaded(false)
     refetch()
   }
 
@@ -111,6 +136,7 @@ useEffect(() => {
 
   return (
     <div className={`min-h-screen bg-gray-50 ${isRTL ? "rtl" : "ltr"} pb-12`}>
+
       {/* Show POS Layout only when ready */}
       {posReady && <RetailPOSLayout />}
 

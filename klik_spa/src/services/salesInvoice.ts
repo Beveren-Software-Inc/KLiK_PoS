@@ -1,9 +1,6 @@
 
-import { getCSRFToken } from "../utils/csrf";
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function createDraftSalesInvoice(data: any) {
-  // const csrfToken = getCSRFToken();
 const csrfToken = window.csrf_token;
   const response = await fetch('/api/method/klik_pos.api.sales_invoice.create_draft_invoice', {
     method: 'POST',
@@ -117,5 +114,59 @@ export async function getInvoiceDetails(invoiceName: string) {
       success: false,
       error: error.message || 'Failed to get invoice details'
     };
+  }
+}
+
+export async function deleteDraftInvoice(invoiceId: string) {
+  const csrfToken = window.csrf_token;
+
+  const response = await fetch('/api/method/klik_pos.api.sales_invoice.delete_draft_invoice', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Frappe-CSRF-Token': csrfToken
+    },
+    body: JSON.stringify({ invoice_id: invoiceId }),
+    credentials: 'include'
+  });
+
+  const result = await response.json();
+  console.log("Delete invoice result:", result);
+
+  if (!response.ok || !result.message || result.message.success === false) {
+    const serverMsg = result._server_messages
+      ? JSON.parse(result._server_messages)[0]
+      : result.message?.error || 'Failed to delete invoice';
+    throw new Error(serverMsg);
+  }
+
+  return result.message;
+}
+
+export async function getDraftInvoiceItems(invoiceId: string) {
+  const response = await fetch(`/api/method/klik_pos.api.sales_invoice.get_invoice_details?invoice_id=${invoiceId}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include'
+  });
+
+  const result = await response.json();
+  console.log("Draft invoice items result:", result);
+
+  if (!response.ok || !result.message) {
+    const serverMsg = result._server_messages
+      ? JSON.parse(result._server_messages)[0]
+      : result.message?.error || 'Failed to fetch draft invoice items';
+    throw new Error(serverMsg);
+  }
+
+  // The backend returns { success: true, data: { ... } }
+  // We need to return the data part
+  if (result.message.success && result.message.data) {
+    return result.message.data;
+  } else {
+    throw new Error(result.message.error || 'Failed to fetch draft invoice items');
   }
 }

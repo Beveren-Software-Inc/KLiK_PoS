@@ -24,12 +24,13 @@ import {
 import InvoiceViewModal from "../components/InvoiceViewModal";
 import SingleInvoiceReturn from "../components/SingleInvoiceReturn";
 import type { SalesInvoice } from "../../types";
-import { useSalesInvoices } from "../hooks/useSalesInvoices";
+import { useCustomerInvoices } from "../hooks/useCustomerInvoices";
 import { toast } from "react-toastify";
 import { createSalesReturn } from "../services/salesInvoice";
 import RetailSidebar from "../components/RetailSidebar";
 import { useCustomerDetails } from "../hooks/useCustomers";
-import { usePOSDetails } from "../hooks/usePOSProfile";
+import EditDraftInvoiceDialog from "../components/EditDraftInvoiceDialog";
+import { addDraftInvoiceToCart } from "../utils/draftInvoiceToCart";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { isToday, isThisWeek, isThisMonth, isThisYear } from "../utils/time";
 import AddCustomerModal from "../components/AddCustomerModal";
@@ -50,9 +51,13 @@ export default function CustomerDetailsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
 
+  // Edit draft invoice dialog states
+  const [showEditDraftDialog, setShowEditDraftDialog] = useState(false);
+  const [draftInvoiceToEdit, setDraftInvoiceToEdit] = useState<SalesInvoice | null>(null);
+
   const { id: customerId } = useParams();
   const { customer, isLoadingC, errorC } = useCustomerDetails(customerId);
-  const { invoices, isLoading, error } = useSalesInvoices();
+  const { invoices, isLoading, error, hasMore, totalLoaded, loadMore } = useCustomerInvoices(customer?.name || "");
   const { posDetails } = usePOSDetails();
 
 
@@ -89,11 +94,7 @@ export default function CustomerDetailsPage() {
     });
 
     return invoices.filter((invoice) => {
-      // Filter by customer name using the correct field mapping
-      const isCustomerInvoice = invoice.customer === customer.name;
-
-      if (!isCustomerInvoice) return false;
-
+      // Invoices are already filtered by customer in the hook, so we only apply other filters
       const matchesSearch =
         searchQuery === "" ||
         invoice.id.toLowerCase().includes(searchQuery.toLowerCase());
@@ -184,8 +185,38 @@ export default function CustomerDetailsPage() {
   };
 
   const handleEditInvoice = (invoice: SalesInvoice) => {
-    // Navigate to edit page or open edit modal
-    navigate(`/invoice/${invoice.id}/edit`);
+    if (invoice.status !== "Draft") {
+      toast.error("Only draft invoices can be edited");
+      return;
+    }
+    setDraftInvoiceToEdit(invoice);
+    setShowEditDraftDialog(true);
+  };
+
+  const handleGoToCart = async (invoice: SalesInvoice) => {
+    try {
+      const success = await addDraftInvoiceToCart(invoice.id);
+      if (success) {
+        setShowEditDraftDialog(false);
+        setDraftInvoiceToEdit(null);
+        navigate('/'); // Navigate to home screen
+      }
+    } catch (error: any) {
+      console.error("Error going to cart:", error);
+      toast.error(error.message || "Failed to add items to cart");
+    }
+  };
+
+  const handleSubmitPayment = (invoice: SalesInvoice) => {
+    // Navigate to payment page for this invoice
+    setShowEditDraftDialog(false);
+    setDraftInvoiceToEdit(null);
+    navigate(`/payment/${invoice.id}`);
+  };
+
+  const handleEditDraftCancel = () => {
+    setShowEditDraftDialog(false);
+    setDraftInvoiceToEdit(null);
   };
 
   const handleSingleReturnClick = (invoice: SalesInvoice) => {
@@ -493,10 +524,13 @@ export default function CustomerDetailsPage() {
                         Invoice
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Date
+                        Customer
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Payment Method
+                        Cashier
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Payment
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         Amount
@@ -506,7 +540,7 @@ export default function CustomerDetailsPage() {
                       </th>
                       {posDetails?.is_zatca_enabled && (
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          ZATCA Status
+                          Zatca Status
                         </th>
                       )}
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -517,7 +551,7 @@ export default function CustomerDetailsPage() {
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
                     {customerInvoices.length === 0 ? (
                       <tr>
-                        <td colSpan={posDetails?.is_zatca_enabled ? 7 : 6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                        <td colSpan={posDetails?.is_zatca_enabled ? 8 : 7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                           No invoices found for this customer
                         </td>
                       </tr>
@@ -533,8 +567,10 @@ export default function CustomerDetailsPage() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900 dark:text-white">{invoice.date}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">{invoice.time}</div>
+                            <div className="text-sm text-gray-900 dark:text-white">{invoice.customer}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                            {invoice.cashier}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className="text-sm text-gray-900 dark:text-white">{invoice.paymentMethod}</span>
@@ -554,34 +590,31 @@ export default function CustomerDetailsPage() {
                           </td>
                           {posDetails?.is_zatca_enabled && (
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={getStatusBadge(invoice.custom_zatca_submit_status)}>{invoice.custom_zatca_submit_status}</span>
+                              <span className={getStatusBadge(invoice.customZatcaSubmitStatus)}>{invoice.customZatcaSubmitStatus}</span>
                             </td>
                           )}
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex space-x-2">
                               <button
                                 onClick={() => handleViewInvoice(invoice)}
-                                className="text-beveren-600 hover:text-beveren-900 flex items-center space-x-1"
+                                className="text-beveren-600 hover:text-beveren-900 dark:text-beveren-400 dark:hover:text-beveren-300"
                               >
-                                <Eye className="w-4 h-4" />
-                                <span>View</span>
+                                View
                               </button>
                               {invoice.status === "Draft" && (
                                 <button
                                   onClick={() => handleEditInvoice(invoice)}
-                                  className="text-blue-600 hover:text-blue-900 flex items-center space-x-1"
+                                  className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
                                 >
-                                  <Edit className="w-4 h-4" />
-                                  <span>Edit</span>
+                                  Edit
                                 </button>
                               )}
                               {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && hasReturnableItems(invoice) && (
                                 <button
                                   onClick={() => handleSingleReturnClick(invoice)}
-                                  className="text-orange-600 hover:text-orange-900 flex items-center space-x-1"
+                                  className="text-orange-600 hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-300"
                                 >
-                                  <RotateCcw className="w-4 h-4" />
-                                  <span>Return</span>
+                                  Return
                                 </button>
                               )}
                             </div>
@@ -594,6 +627,39 @@ export default function CustomerDetailsPage() {
               </div>
             </div>
           </div>
+
+          {/* Load More Button for Customer Invoices */}
+          {hasMore && (
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={loadMore}
+                disabled={isLoading}
+                className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                  isLoading
+                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                    : 'bg-beveren-600 text-white hover:bg-beveren-700'
+                }`}
+              >
+                {isLoading ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Loading...</span>
+                  </div>
+                ) : (
+                  `Load More Customer Invoices (${totalLoaded} loaded)`
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Show message when all customer invoices are loaded */}
+          {!hasMore && totalLoaded > 0 && (
+            <div className="text-center mt-6 py-4">
+              <p className="text-gray-600 dark:text-gray-400">
+                All {totalLoaded} customer invoices loaded
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Invoice View Modal */}
@@ -626,6 +692,15 @@ export default function CustomerDetailsPage() {
             onSave={handleSaveCustomer}
           />
         )}
+
+        {/* Edit Draft Invoice Dialog */}
+        <EditDraftInvoiceDialog
+          isOpen={showEditDraftDialog}
+          onClose={handleEditDraftCancel}
+          invoice={draftInvoiceToEdit}
+          onGoToCart={handleGoToCart}
+          onSubmitPayment={handleSubmitPayment}
+        />
       </div>
     </div>
   );

@@ -14,7 +14,7 @@ import {
 } from "lucide-react"
 import { useCustomers } from "../hooks/useCustomers" // Import the hook
 import AddCustomerModal from "./AddCustomerModal"
-import type { Customer } from "../data/mockCustomers"
+import type { Customer } from "../types/customer"
 import RetailSidebar from "./RetailSidebar"
 import BottomNavigation from "./BottomNavigation"
 import { useMediaQuery } from "../hooks/useMediaQuery"

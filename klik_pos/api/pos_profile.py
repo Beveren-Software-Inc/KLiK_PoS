@@ -3,6 +3,7 @@
 import frappe
 from frappe import _
 from klik_pos.klik_pos.utils import get_current_pos_profile
+from klik_pos.api.sales_invoice import get_current_pos_opening_entry
 
 
 @frappe.whitelist()
@@ -43,6 +44,9 @@ def get_pos_details():
     business_type = pos.custom_business_type
     print_format = pos.custom_pos_printformat
 
+    # Get current POS opening entry
+    current_opening_entry = get_current_pos_opening_entry()
+
     # Get default customer details if set
     default_customer = None
     if pos.customer:
@@ -59,6 +63,7 @@ def get_pos_details():
         }
 
     details = {
+        "name": pos.name,
         "business_type": business_type,
         "print_format": print_format,
         "currency":pos.currency,
@@ -73,8 +78,11 @@ def get_pos_details():
         "custom_default_view": getattr(pos, 'custom_default_view', 'Grid View'),
         "custom_whatsap_template": getattr(pos, 'custom_whatsap_template', None),
         "custom_email_template": getattr(pos, 'custom_email_template', None),
+        "custom_enable_whatsapp": getattr(pos, 'custom_enable_whatsapp', 0),
+        "custom_enable_sms": getattr(pos, 'custom_enable_sms', 0),
         "is_zatca_enabled": is_zatca_enabled(),
         "default_customer": default_customer,
+        "current_opening_entry": current_opening_entry,
     }
     return details
 
