@@ -47,6 +47,8 @@ fixtures = [
                     "Sales Invoice-custom_pos_opening_entry",
                     "POS Profile-custom_email_template",
                     "POS Profile-custom_default_view",
+                    "POS Profile-custom_enable_whatsapp",
+                    "POS Profile-custom_enable_sms",
                 ),
             ]
         ],
