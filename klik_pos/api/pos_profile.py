@@ -78,6 +78,8 @@ def get_pos_details():
         "custom_default_view": getattr(pos, 'custom_default_view', 'Grid View'),
         "custom_whatsap_template": getattr(pos, 'custom_whatsap_template', None),
         "custom_email_template": getattr(pos, 'custom_email_template', None),
+        "custom_enable_whatsapp": getattr(pos, 'custom_enable_whatsapp', 0),
+        "custom_enable_sms": getattr(pos, 'custom_enable_sms', 0),
         "is_zatca_enabled": is_zatca_enabled(),
         "default_customer": default_customer,
         "current_opening_entry": current_opening_entry,

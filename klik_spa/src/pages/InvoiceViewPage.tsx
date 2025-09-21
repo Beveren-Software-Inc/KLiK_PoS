@@ -34,6 +34,7 @@ import RetailSidebar from "../components/RetailSidebar";
 import PaymentDialog from "../components/PaymentDialog";
 import { useInvoiceDetails } from "../hooks/useInvoiceDetails";
 import { useCustomerStatistics } from "../hooks/useCustomerStatistics";
+import { usePOSDetails } from "../hooks/usePOSProfile";
 import { createSalesReturn } from "../services/salesInvoice";
 import { toast } from "react-toastify";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
@@ -50,6 +51,7 @@ export default function InvoiceViewPage() {
 
   const { invoice, isLoading, error } = useInvoiceDetails(invoiceId);
   const { statistics: customerStats, isLoading: statsLoading } = useCustomerStatistics(invoice?.customer || null);
+  const { posDetails } = usePOSDetails();
   const navigate = useNavigate()
 
   // PaymentDialog state for sharing
@@ -291,28 +293,35 @@ export default function InvoiceViewPage() {
                   </span>
                 </button>
 
-                <button
-                  className="group relative p-2 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900 rounded-lg transition-all duration-200"
-                  onClick={() => {
-                    setSharingMode('whatsapp')
-                    setShowPaymentDialog(true)
-                  }}
-                >
-                  <MessageCirclePlus size={20} />
-                  <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
-                    Send via WhatsApp
-                  </span>
-                </button>
+                {posDetails?.custom_enable_whatsapp && (
+                  <button
+                    className="group relative p-2 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900 rounded-lg transition-all duration-200"
+                    onClick={() => {
+                      setSharingMode('whatsapp')
+                      setShowPaymentDialog(true)
+                    }}
+                  >
+                    <MessageCirclePlus size={20} />
+                    <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                      Send via WhatsApp
+                    </span>
+                  </button>
+                )}
 
-                <button
-                  className="group relative p-2 text-gray-400 cursor-not-allowed opacity-50"
-                  disabled
-                >
-                  <MessageSquarePlus size={20} />
-                  <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
-                    SMS (Disabled)
-                  </span>
-                </button>
+                {posDetails?.custom_enable_sms && (
+                  <button
+                    className="group relative p-2 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900 rounded-lg transition-all duration-200"
+                    onClick={() => {
+                      setSharingMode('sms')
+                      setShowPaymentDialog(true)
+                    }}
+                  >
+                    <MessageSquarePlus size={20} />
+                    <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                      Send via SMS
+                    </span>
+                  </button>
+                )}
 
                 {/* Return Buttons */}
                 {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && !invoice.is_return && hasReturnableItems() && (

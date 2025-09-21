@@ -601,7 +601,7 @@ export default function DashboardPage() {
           {/* Additional Stats Row */}
           <div className="grid grid-cols-1 gap-4 mb-6">
             {/* ZATCA Status Bar Chart (mobile) */}
-            {/* {posDetails?.is_zatca_enabled && zatcaData.total > 0 && (
+            {posDetails?.is_zatca_enabled && zatcaData.total > 0 && (
               <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">ZATCA Status</h3>
@@ -654,7 +654,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
-            )} */}
+            )}
             {/* Gift Card Usage */}
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-4">
@@ -1221,7 +1221,7 @@ export default function DashboardPage() {
         {/* Additional Stats Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
           {/* ZATCA Status Bar Chart (desktop) */}
-          {/* {posDetails?.is_zatca_enabled && zatcaData.total > 0 && (
+          {posDetails?.is_zatca_enabled && zatcaData.total > 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">ZATCA Status</h3>
@@ -1274,7 +1274,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
-          )} */}
+          )}
           {/* Enhanced Gift Card Usage - HIDDEN (not currently used) */}
           {/* <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">

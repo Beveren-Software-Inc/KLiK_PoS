@@ -1157,14 +1157,22 @@ export default function PaymentDialog({
                 onClick={() =>
                   setSharingMode(sharingMode === "whatsapp" ? null : "whatsapp")
                 }
+                style={{ display: posDetails?.custom_enable_whatsapp ? 'block' : 'none' }}
               >
                 <MessageCirclePlus size={20} />
               </button>
 
               <button
-                className="p-2 rounded-lg text-gray-400 cursor-not-allowed opacity-50"
-                title="Text Message (Disabled)"
-                disabled
+                className={`p-2 rounded-lg ${
+                  sharingMode === "sms"
+                    ? "bg-blue-100 text-blue-700"
+                    : "text-blue-600 hover:bg-blue-100"
+                } dark:text-blue-400 dark:hover:bg-blue-900`}
+                title="SMS"
+                onClick={() =>
+                  setSharingMode(sharingMode === "sms" ? null : "sms")
+                }
+                style={{ display: posDetails?.custom_enable_sms ? 'block' : 'none' }}
               >
                 <MessageSquarePlus size={20} />
               </button>
