@@ -350,7 +350,7 @@ const getStatusBadge = (status: string) => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Total Invoices</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalCount}</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{filteredInvoices.length}</p>
             {hasMore && (
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 Showing {totalLoaded} of {totalCount}

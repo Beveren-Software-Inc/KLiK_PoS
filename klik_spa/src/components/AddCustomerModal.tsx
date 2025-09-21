@@ -69,7 +69,7 @@ export default function AddCustomerModal({
     registrationNumber: "",
     preferredPaymentMethod: "Cash" as Customer["preferredPaymentMethod"],
     customer_group: "All Customer Groups",
-    territory: "Saudi Arabia",
+    territory: "All Territories",
   });
 
   // Set customer type based on POS Profile business type when component mounts
@@ -94,24 +94,33 @@ export default function AddCustomerModal({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [customerGroups, setCustomerGroups] = useState<Array<{name: string, customer_group_name: string}>>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
-  const { getCustomerGroups } = useCustomerActions();
+  const [territories, setTerritories] = useState<Array<{name: string, territory_name: string}>>([]);
+  const [loadingTerritories, setLoadingTerritories] = useState(true);
+  const { getCustomerGroups, getTerritories } = useCustomerActions();
   const formInitializedRef = useRef(false);
 
-  // Fetch customer groups
+  // Fetch customer groups and territories
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // Fetch customer groups
         const groupsData = await getCustomerGroups();
         setCustomerGroups(groupsData);
         setLoadingGroups(false);
+
+        // Fetch territories
+        const territoriesData = await getTerritories();
+        setTerritories(territoriesData);
+        setLoadingTerritories(false);
       } catch (error) {
-        console.error('Error fetching customer groups:', error);
+        console.error('Error fetching customer groups or territories:', error);
         setLoadingGroups(false);
+        setLoadingTerritories(false);
       }
     };
 
     fetchData();
-  }, []); // Remove getCustomerGroups from dependencies to prevent infinite loop
+  }, [getCustomerGroups, getTerritories]);
 
   useEffect(() => {
     if (customer && !formInitializedRef.current) {
@@ -136,7 +145,7 @@ export default function AddCustomerModal({
         registrationNumber: "",
         preferredPaymentMethod: customer.preferredPaymentMethod || "Cash",
         customer_group: customer.customer_group || "All Customer Groups",
-        territory: customer.territory || "Saudi Arabia",
+        territory: customer.territory || "All Territories",
       };
       setFormData(newFormData);
       formInitializedRef.current = true;
@@ -156,7 +165,7 @@ export default function AddCustomerModal({
       }));
       formInitializedRef.current = true;
     }
-  }, [customer?.id, customer?.name, prefilledName, prefilledData]); // Only depend on stable customer properties
+  }, [customer?.id, customer?.name, prefilledName, prefilledData, customer]); // Only depend on stable customer properties
 
   // Reset form initialization when customer changes
   useEffect(() => {
@@ -700,16 +709,27 @@ export default function AddCustomerModal({
                   >
                     Territory
                   </label>
-                  <input
-                    type="text"
+                  <select
                     id="territory"
                     value={formData.territory}
                     onChange={(e) =>
                       setFormData((prev) => ({ ...prev, territory: e.target.value }))
                     }
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white"
-                    placeholder="Enter territory"
-                  />
+                    disabled={loadingTerritories}
+                  >
+                    <option value="All Territories">All Territories</option>
+                    {territories.map((territory) => (
+                      <option key={territory.name} value={territory.name}>
+                        {territory.territory_name || territory.name}
+                      </option>
+                    ))}
+                  </select>
+                  {loadingTerritories && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Loading territories...
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

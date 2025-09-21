@@ -496,8 +496,8 @@ def get_customer_statistics(customer_id):
             "Sales Invoice",
             filters={
                 "customer": customer_id,
-                "docstatus": 1,  # Submitted invoices only
-                "is_return": 0,   # Exclude return invoices
+                "docstatus": 1, 
+                "is_return": 0,  
                 "status": ["!=", "Cancelled"]
             }
         )

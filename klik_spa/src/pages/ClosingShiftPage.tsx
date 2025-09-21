@@ -159,8 +159,8 @@ export default function ClosingShiftPage() {
       acc[mode.name] = {
         name: mode.name,
         openingAmount: mode.openingAmount || 0,
-        amount: 0, // Will be calculated from filtered invoices
-        transactions: 0 // Will be calculated from filtered invoices
+        amount: 0, 
+        transactions: 0 
       };
       return acc;
     }, {});
