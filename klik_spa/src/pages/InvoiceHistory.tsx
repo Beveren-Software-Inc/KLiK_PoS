@@ -36,7 +36,7 @@ import { useSalesInvoices } from "../hooks/useSalesInvoices";
 import { useCustomers } from "../hooks/useCustomers";
 import { usePOSDetails } from "../hooks/usePOSProfile";
 import { toast } from "react-toastify";
-import { createSalesReturn } from "../services/salesInvoice";
+import { createSalesReturn, deleteDraftInvoice } from "../services/salesInvoice";
 import { useAllPaymentModes } from "../hooks/usePaymentModes";
 import RetailSidebar from "../components/RetailSidebar";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
@@ -68,6 +68,10 @@ export default function InvoiceHistoryPage() {
   // Single Invoice Return states
   const [showSingleReturn, setShowSingleReturn] = useState(false);
   const [selectedInvoiceForReturn, setSelectedInvoiceForReturn] = useState<SalesInvoice | null>(null);
+
+  // Delete confirmation states
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<SalesInvoice | null>(null);
 
   const { invoices, isLoading, error } = useSalesInvoices();
   const { modes } = useAllPaymentModes();
@@ -501,6 +505,15 @@ const getStatusBadge = (status: string) => {
                           <span>Return</span>
                         </button>
                       )}
+                      {invoice.status === "Draft" && (
+                        <button
+                          onClick={() => handleDeleteClick(invoice)}
+                          className="text-red-600 hover:text-red-900 flex items-center space-x-1"
+                        >
+                          <FileMinus className="w-4 h-4" />
+                          <span>Delete</span>
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -602,6 +615,36 @@ const getStatusBadge = (status: string) => {
   //     toast.success("Invoice deleted successfully");
   //   }
   // };
+
+  // Delete invoice handlers
+  const handleDeleteClick = (invoice: SalesInvoice) => {
+    if (invoice.status !== "Draft") {
+      toast.error("Only draft invoices can be deleted");
+      return;
+    }
+    setInvoiceToDelete(invoice);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!invoiceToDelete) return;
+
+    try {
+      await deleteDraftInvoice(invoiceToDelete.id);
+      toast.success(`Draft invoice ${invoiceToDelete.id} deleted successfully`);
+      setShowDeleteConfirm(false);
+      setInvoiceToDelete(null);
+      // Refresh the invoices list
+      window.location.reload();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete invoice");
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirm(false);
+    setInvoiceToDelete(null);
+  };
 
   const handleRefund = (invoiceId: string) => {
     handleReturnClick(invoiceId);
@@ -1137,6 +1180,18 @@ const getStatusBadge = (status: string) => {
           isOpen={showSingleReturn}
           onClose={() => setShowSingleReturn(false)}
           onSuccess={handleSingleReturnSuccess}
+        />
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmDialog
+          isOpen={showDeleteConfirm}
+          onClose={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+          title="Delete Draft Invoice"
+          message={`Are you sure you want to delete draft invoice ${invoiceToDelete?.id}? This action cannot be undone.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          confirmButtonClass="bg-red-600 hover:bg-red-700 text-white"
         />
       </div>
     </div>

@@ -32,7 +32,7 @@ import PaymentDialog from "../components/PaymentDialog";
 import { useInvoiceDetails } from "../hooks/useInvoiceDetails";
 import { useCustomerStatistics } from "../hooks/useCustomerStatistics";
 import { usePOSDetails } from "../hooks/usePOSProfile";
-import { createSalesReturn } from "../services/salesInvoice";
+import { createSalesReturn, deleteDraftInvoice } from "../services/salesInvoice";
 import { toast } from "react-toastify";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { DisplayPrintPreview, handlePrintInvoice } from "../utils/invoicePrint";
@@ -64,9 +64,42 @@ export default function InvoiceViewPage() {
   const [customerData, setCustomerData] = useState<any>(null)
   const [isLoadingCustomer, setIsLoadingCustomer] = useState(false)
 
+  // Delete confirmation state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
 
   const handleBackClick = () => {
     navigate(`/invoice`)
+  };
+
+  // Delete invoice handlers
+  const handleDeleteClick = () => {
+    if (!invoice) return;
+    console.log("Invoice object in detail page:", invoice);
+    if (invoice.status !== "Draft") {
+      toast.error("Only draft invoices can be deleted");
+      return;
+    }
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!invoice) return;
+
+    try {
+      console.log("Attempting to delete invoice:", invoice.name || invoice.id, "Status:", invoice.status);
+      await deleteDraftInvoice(invoice.name || invoice.id);
+      toast.success(`Draft invoice ${invoice.name || invoice.id} deleted successfully`);
+      setShowDeleteConfirm(false);
+      navigate('/invoice');
+    } catch (error: any) {
+      console.error("Delete error:", error);
+      toast.error(error.message || "Failed to delete invoice");
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirm(false);
   };
 
 
@@ -341,6 +374,22 @@ export default function InvoiceViewPage() {
                       <FileMinus size={20} />
                       <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
                         Multi-Invoice Return
+                      </span>
+                    </button>
+                  </>
+                )}
+
+                {/* Delete Button for Draft Invoices */}
+                {invoice.status === "Draft" && (
+                  <>
+                    <div className="w-px h-6 bg-gray-300 dark:bg-gray-600"></div>
+                    <button
+                      className="group relative p-2 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900 rounded-lg transition-all duration-200"
+                      onClick={handleDeleteClick}
+                    >
+                      <FileMinus size={20} />
+                      <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                        Delete Draft Invoice
                       </span>
                     </button>
                   </>
@@ -816,6 +865,18 @@ export default function InvoiceViewPage() {
           onSave={handleSaveCustomer}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Draft Invoice"
+        message={`Are you sure you want to delete draft invoice ${invoice?.name || invoice?.id}? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmButtonClass="bg-red-600 hover:bg-red-700 text-white"
+      />
 
       </div>
     </div>

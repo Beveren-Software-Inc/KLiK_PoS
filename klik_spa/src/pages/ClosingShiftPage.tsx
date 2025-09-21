@@ -22,6 +22,8 @@ import { usePOSDetails } from "../hooks/usePOSProfile";
 import { useCreatePOSClosingEntry } from "../services/closingEntry";
 import BottomNavigation from "../components/BottomNavigation";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { deleteDraftInvoice } from "../services/salesInvoice";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { formatCurrency } from "../utils/currency";
 import { isToday, isThisWeek, isThisMonth, isThisYear } from "../utils/time";
 
@@ -45,6 +47,10 @@ export default function ClosingShiftPage() {
   const [showSingleReturn, setShowSingleReturn] = useState(false);
   const [selectedInvoiceForReturn, setSelectedInvoiceForReturn] = useState<SalesInvoice | null>(null);
   const { createClosingEntry, isCreating } = useCreatePOSClosingEntry();
+
+  // Delete confirmation states
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<SalesInvoice | null>(null);
 
   const { invoices, isLoading, error } = useSalesInvoices();
   const { modes } = useAllPaymentModes()
@@ -181,6 +187,36 @@ export default function ClosingShiftPage() {
 
   const handleViewInvoice = (invoice: SalesInvoice) => {
     navigate(`/invoice/${invoice.id}`);
+  };
+
+  // Delete invoice handlers
+  const handleDeleteClick = (invoice: SalesInvoice) => {
+    if (invoice.status !== "Draft") {
+      toast.error("Only draft invoices can be deleted");
+      return;
+    }
+    setInvoiceToDelete(invoice);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!invoiceToDelete) return;
+
+    try {
+      await deleteDraftInvoice(invoiceToDelete.id);
+      toast.success(`Draft invoice ${invoiceToDelete.id} deleted successfully`);
+      setShowDeleteConfirm(false);
+      setInvoiceToDelete(null);
+      // Refresh the invoices list
+      window.location.reload();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete invoice");
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirm(false);
+    setInvoiceToDelete(null);
   };
 
   const handleRefund = (invoiceId: string) => {
@@ -464,6 +500,15 @@ export default function ClosingShiftPage() {
                             >
                               <Edit className="w-4 h-4" />
                               <span>Edit</span>
+                            </button>
+                          )}
+                          {invoice.status === "Draft" && (
+                            <button
+                              onClick={() => handleDeleteClick(invoice)}
+                              className="text-red-600 hover:text-red-900 flex items-center space-x-1"
+                            >
+                              <MonitorX className="w-4 h-4" />
+                              <span>Delete</span>
                             </button>
                           )}
                           {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && hasReturnableItems(invoice) && (
@@ -785,6 +830,15 @@ export default function ClosingShiftPage() {
                               <span>Edit</span>
                             </button>
                           )}
+                          {invoice.status === "Draft" && (
+                            <button
+                              onClick={() => handleDeleteClick(invoice)}
+                              className="text-red-600 hover:text-red-900 flex items-center space-x-1"
+                            >
+                              <MonitorX className="w-4 h-4" />
+                              <span>Delete</span>
+                            </button>
+                          )}
                           {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && hasReturnableItems(invoice) && (
                             <button
                               onClick={() => handleSingleReturnClick(invoice)}
@@ -891,6 +945,18 @@ export default function ClosingShiftPage() {
           isOpen={showSingleReturn}
           onClose={() => setShowSingleReturn(false)}
           onSuccess={handleSingleReturnSuccess}
+        />
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmDialog
+          isOpen={showDeleteConfirm}
+          onClose={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+          title="Delete Draft Invoice"
+          message={`Are you sure you want to delete draft invoice ${invoiceToDelete?.id}? This action cannot be undone.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          confirmButtonClass="bg-red-600 hover:bg-red-700 text-white"
         />
       </div>
     </div>

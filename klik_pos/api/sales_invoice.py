@@ -1241,3 +1241,41 @@ def create_multi_invoice_return(return_data):
             "success": False,
             "message": str(e)
         }
+
+
+@frappe.whitelist()
+def delete_draft_invoice(invoice_id):
+    """
+    Delete a draft sales invoice.
+    Only allows deletion of Draft status invoices.
+    """
+    try:
+        # Get the invoice document
+        invoice_doc = frappe.get_doc("Sales Invoice", invoice_id)
+
+        # Check if invoice is in Draft status
+        if invoice_doc.status != "Draft":
+            return {
+                "success": False,
+                "error": f"Cannot delete invoice {invoice_id}. Only Draft invoices can be deleted. Current status: {invoice_doc.status}"
+            }
+
+        # Delete the invoice
+        invoice_doc.delete()
+
+        return {
+            "success": True,
+            "message": f"Draft invoice {invoice_id} deleted successfully"
+        }
+
+    except frappe.DoesNotExistError:
+        return {
+            "success": False,
+            "error": f"Invoice {invoice_id} not found"
+        }
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), f"Error deleting draft invoice {invoice_id}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
