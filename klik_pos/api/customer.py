@@ -43,7 +43,7 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
             limit=limit,
             start=start,
         )
-
+        print("Customer names fetched", len(customer_names))
         for cust in customer_names:
             doc = frappe.get_doc("Customer", cust.name)
 
@@ -80,6 +80,8 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
                 "custom_last_visit": customer_stats.get("last_visit"),
                 # "exchange_rate": get_currency_exchange_rate(company_currency, doc.default_currency)
             })
+            
+        print("Customers fetched", len(result))
         return {"success": True, "data": result}
 
     except Exception:
