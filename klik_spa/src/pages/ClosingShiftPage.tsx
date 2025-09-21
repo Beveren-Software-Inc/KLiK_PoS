@@ -375,10 +375,7 @@ export default function ClosingShiftPage() {
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
 
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                          focus:outline-none focus:ring-2 focus:ring-beveren-500
-                          bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400
-                          cursor-not-allowed"
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
                 <option value="all">All Time</option>
                 <option value="today">Today</option>
@@ -690,10 +687,7 @@ export default function ClosingShiftPage() {
               <select
                     value={dateFilter}
                     onChange={(e) => setDateFilter(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                              focus:outline-none focus:ring-2 focus:ring-beveren-500
-                              bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400
-                              cursor-not-allowed"
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
                     <option value="all">All Time</option>
                     <option value="today">Today</option>
