@@ -17,12 +17,11 @@ import {
   Edit,
   Users,
   ShoppingCart,
-  CreditCard,
-  Send,
   RotateCcw,
-  Files,
+
   FileMinus,
-  FileSymlink
+
+
 } from "lucide-react";
 
 import InvoiceViewModal from "../components/InvoiceViewModal";
@@ -40,6 +39,7 @@ import { toast } from "react-toastify";
 import { createSalesReturn, deleteDraftInvoice } from "../services/salesInvoice";
 import { useAllPaymentModes } from "../hooks/usePaymentModes";
 import RetailSidebar from "../components/RetailSidebar";
+import { addDraftInvoiceToCart } from "../utils/draftInvoiceToCart";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { isToday, isThisWeek, isThisMonth, isThisYear } from "../utils/time";
 // import InvoiceViewPage from "./InvoiceViewPage";
@@ -62,9 +62,6 @@ export default function InvoiceHistoryPage() {
   const [selectedCustomer, setSelectedCustomer] = useState("");
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
 
-  // Draft Invoice Edit states
-  const [showEditOptions, setShowEditOptions] = useState(false);
-  const [selectedDraftInvoice, setSelectedDraftInvoice] = useState<SalesInvoice | null>(null);
 
   // Single Invoice Return states
   const [showSingleReturn, setShowSingleReturn] = useState(false);
@@ -73,6 +70,14 @@ export default function InvoiceHistoryPage() {
   // Delete confirmation states
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<SalesInvoice | null>(null);
+
+  // Edit draft invoice dialog states
+  const [showEditDraftDialog, setShowEditDraftDialog] = useState(false);
+  const [draftInvoiceToEdit, setDraftInvoiceToEdit] = useState<SalesInvoice | null>(null);
+
+  // Original edit options states
+  const [showEditOptions, setShowEditOptions] = useState(false);
+  const [selectedDraftInvoice, setSelectedDraftInvoice] = useState<SalesInvoice | null>(null);
 
   const { invoices, isLoading, isLoadingMore, error, hasMore, totalLoaded, totalCount, loadMore } = useSalesInvoices(searchTerm);
   const { modes } = useAllPaymentModes();
@@ -514,8 +519,8 @@ const getStatusBadge = (status: string) => {
                       </button>
                       {invoice.status === "Draft" && (
                         <button
-                          onClick={() => handleEditInvoice(invoice)}
-                          className="text-blue-600 hover:text-blue-900 flex items-center space-x-1"
+                          onClick={() => handleEditDraftClick(invoice)}
+                          className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 flex items-center space-x-1"
                         >
                           <Edit className="w-4 h-4" />
                           <span>Edit</span>
@@ -585,10 +590,11 @@ const getStatusBadge = (status: string) => {
                 </button>
                 {invoice.status === "Draft" && (
                   <button
-                    onClick={() => handleEditInvoice(invoice)}
-                    className="flex-1 text-xs px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                    onClick={() => handleEditDraftClick(invoice)}
+                    className="flex-1 text-xs px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center justify-center space-x-1"
                   >
-                    Edit
+                    <Edit className="w-3 h-3" />
+                    <span>Edit</span>
                   </button>
                 )}
                   {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && hasReturnableItems(invoice) && (
@@ -644,10 +650,6 @@ const getStatusBadge = (status: string) => {
     navigate(`/invoice/${invoice.id}`);
   };
 
-  const handleEditInvoice = (invoice: SalesInvoice) => {
-    setSelectedDraftInvoice(invoice);
-    setShowEditOptions(true);
-  };
 
     // Helper function to check if invoice has items that can still be returned
   const hasReturnableItems = (invoice: SalesInvoice) => {
@@ -705,6 +707,45 @@ const getStatusBadge = (status: string) => {
     setInvoiceToDelete(null);
   };
 
+  // Edit draft invoice handlers
+  const handleEditDraftClick = (invoice: SalesInvoice) => {
+    if (invoice.status !== "Draft") {
+      toast.error("Only draft invoices can be edited");
+      return;
+    }
+    setSelectedDraftInvoice(invoice);
+    setShowEditOptions(true);
+  };
+
+  const handleGoToCart = async (invoice: SalesInvoice) => {
+    try {
+      const success = await addDraftInvoiceToCart(invoice.id);
+      if (success) {
+        setShowEditOptions(false);
+        setSelectedDraftInvoice(null);
+        // Add a longer delay to ensure cart state is fully persisted before navigation
+        setTimeout(() => {
+          navigate('/pos'); // Navigate directly to POS page
+        }, 500);
+      }
+    } catch (error: any) {
+      console.error("Error going to cart:", error);
+      toast.error(error.message || "Failed to add items to cart");
+    }
+  };
+
+  const handleGoToPayment = () => {
+    // Navigate to payment page for this invoice
+    setShowEditOptions(false);
+    setSelectedDraftInvoice(null);
+    navigate(`/payment/${selectedDraftInvoice?.id}`);
+  };
+
+  const handleCloseEditOptions = () => {
+    setShowEditOptions(false);
+    setSelectedDraftInvoice(null);
+  };
+
   const handleRefund = (invoiceId: string) => {
     handleReturnClick(invoiceId);
     setShowInvoiceModal(false);
@@ -745,37 +786,6 @@ const getStatusBadge = (status: string) => {
       window.location.reload();
     };
 
-    // Draft Invoice Edit Option handlers
-  const handleGoToCart = () => {
-    navigate('/pos');
-    setShowEditOptions(false);
-    setSelectedDraftInvoice(null);
-  };
-
-  const handleGoToPayment = () => {
-    // Go back to the main POS cart page where they can use the normal payment flow
-    navigate('/pos');
-    setShowEditOptions(false);
-    setSelectedDraftInvoice(null);
-    toast.info('Navigate to the cart and use the Checkout button to process payment');
-  };
-
-  const handleSubmitInvoice = async () => {
-    if (selectedDraftInvoice) {
-      try {
-        toast.success(`Invoice ${selectedDraftInvoice.id} submitted successfully`);
-      } catch (error: any) {
-        toast.error(error.message || "Failed to submit invoice");
-      }
-    }
-    setShowEditOptions(false);
-    setSelectedDraftInvoice(null);
-  };
-
-  const handleCloseEditOptions = () => {
-    setShowEditOptions(false);
-    setSelectedDraftInvoice(null);
-  };
 
   const handleCustomerSelect = (customer: string) => {
     if (!customer) {
@@ -953,60 +963,6 @@ const getStatusBadge = (status: string) => {
           customers={customers}
         />
 
-        {/* Draft Invoice Edit Options Modal */}
-        {showEditOptions && selectedDraftInvoice && (
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-md relative">
-              {/* Click outside to close */}
-              <div
-                className="absolute inset-0 -z-10"
-                onClick={handleCloseEditOptions}
-              />
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Draft Invoice</h2>
-                  <button
-                    onClick={handleCloseEditOptions}
-                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                  >
-                    <XCircle className="w-5 h-5" />
-                  </button>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                  Invoice: {selectedDraftInvoice.id}
-                </p>
-              </div>
-              <div className="p-6">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-                  What would you like to do with this draft invoice?
-                </p>
-                <div className="space-y-3">
-                  <button
-                    onClick={handleGoToCart}
-                    className="w-full flex items-center justify-center space-x-3 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
-                  >
-                    <ShoppingCart className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    <span className="font-medium text-blue-900 dark:text-blue-100">Go to Cart</span>
-                  </button>
-                  <button
-                    onClick={handleGoToPayment}
-                    className="w-full flex items-center justify-center space-x-3 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
-                  >
-                    <CreditCard className="w-5 h-5 text-orange-600 dark:text-green-400" />
-                    <span className="font-medium text-green-900 dark:text-green-100">Payment</span>
-                  </button>
-                  <button
-                    onClick={handleSubmitInvoice}
-                    className="w-full flex items-center justify-center space-x-3 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
-                  >
-                    <Send className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                    <span className="font-medium text-orange-900 dark:text-orange-100">Submit Invoice</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Bottom Navigation */}
         <BottomNavigation />
@@ -1178,7 +1134,28 @@ const getStatusBadge = (status: string) => {
           customers={customers}
         />
 
-        {/* Draft Invoice Edit Options Modal */}
+
+        {/* Single Invoice Return Modal */}
+        <SingleInvoiceReturn
+          invoice={selectedInvoiceForReturn}
+          isOpen={showSingleReturn}
+          onClose={() => setShowSingleReturn(false)}
+          onSuccess={handleSingleReturnSuccess}
+        />
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmDialog
+          isOpen={showDeleteConfirm}
+          onClose={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+          title="Delete Draft Invoice"
+          message={`Are you sure you want to delete draft invoice ${invoiceToDelete?.id}? This action cannot be undone.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          confirmButtonClass="bg-red-600 hover:bg-red-700 text-white"
+        />
+
+        {/* Original Draft Invoice Edit Options Modal */}
         {showEditOptions && selectedDraftInvoice && (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
             <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-md relative">
@@ -1207,7 +1184,7 @@ const getStatusBadge = (status: string) => {
                 </p>
                 <div className="space-y-3">
                   <button
-                    onClick={handleGoToCart}
+                    onClick={() => handleGoToCart(selectedDraftInvoice)}
                     className="w-full flex items-center justify-center space-x-3 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
                   >
                     <ShoppingCart className="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -1215,43 +1192,16 @@ const getStatusBadge = (status: string) => {
                   </button>
                   <button
                     onClick={handleGoToPayment}
-                    className="w-full flex items-center justify-center space-x-3 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
+                    className="w-full flex items-center justify-center space-x-3 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-colors"
                   >
-                    <CreditCard className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                    <span className="font-medium text-green-900 dark:text-green-100">Payment</span>
-                  </button>
-                  <button
-                    onClick={handleSubmitInvoice}
-                    className="w-full flex items-center justify-center space-x-3 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
-                  >
-                    <Send className="w-5 h-5 text-orange-600 dark:text-purple-400" />
-                    <span className="font-medium text-purple-900 dark:text-purple-100">Submit Invoice</span>
+                    <FileText className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                    <span className="font-medium text-orange-900 dark:text-orange-100">Submit Payment</span>
                   </button>
                 </div>
               </div>
             </div>
           </div>
         )}
-
-        {/* Single Invoice Return Modal */}
-        <SingleInvoiceReturn
-          invoice={selectedInvoiceForReturn}
-          isOpen={showSingleReturn}
-          onClose={() => setShowSingleReturn(false)}
-          onSuccess={handleSingleReturnSuccess}
-        />
-
-        {/* Delete Confirmation Dialog */}
-        <ConfirmDialog
-          isOpen={showDeleteConfirm}
-          onClose={handleDeleteCancel}
-          onConfirm={handleDeleteConfirm}
-          title="Delete Draft Invoice"
-          message={`Are you sure you want to delete draft invoice ${invoiceToDelete?.id}? This action cannot be undone.`}
-          confirmText="Delete"
-          cancelText="Cancel"
-          confirmButtonClass="bg-red-600 hover:bg-red-700 text-white"
-        />
       </div>
     </div>
   );

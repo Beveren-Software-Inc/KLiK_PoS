@@ -20,6 +20,8 @@ interface CustomerData {
   vatNumber?: string;
   registrationScheme?: string;
   registrationNumber?: string;
+  customer_group?: string;
+  territory?: string;
 }
 
 export const useCustomerActions = () => {
@@ -81,8 +83,56 @@ export const useCustomerActions = () => {
     }
   };
 
+  const getCustomerGroups = async () => {
+    try {
+      const response = await fetch('/api/method/klik_pos.api.customer.get_customer_groups', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      });
+
+      const result = await response.json();
+
+      if (!result.message || !result.message.success) {
+        throw new Error(result.message?.error || "Failed to fetch customer groups");
+      }
+
+      return result.message.data;
+    } catch (error) {
+      console.error("❌ Error fetching customer groups:", error);
+      throw error;
+    }
+  };
+
+  const getTerritories = async () => {
+    try {
+      const response = await fetch('/api/method/klik_pos.api.customer.get_territories', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      });
+
+      const result = await response.json();
+
+      if (!result.message || !result.message.success) {
+        throw new Error(result.message?.error || "Failed to fetch territories");
+      }
+
+      return result.message.data;
+    } catch (error) {
+      console.error("❌ Error fetching territories:", error);
+      throw error;
+    }
+  };
+
   return {
     createCustomer,
-    updateCustomer
+    updateCustomer,
+    getCustomerGroups,
+    getTerritories
   };
 };

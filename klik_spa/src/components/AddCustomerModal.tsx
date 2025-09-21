@@ -68,6 +68,8 @@ export default function AddCustomerModal({
     registrationScheme: "",
     registrationNumber: "",
     preferredPaymentMethod: "Cash" as Customer["preferredPaymentMethod"],
+    customer_group: "All Customer Groups",
+    territory: "Saudi Arabia",
   });
 
   // Set customer type based on POS Profile business type when component mounts
@@ -90,6 +92,25 @@ export default function AddCustomerModal({
 
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [customerGroups, setCustomerGroups] = useState<Array<{name: string, customer_group_name: string}>>([]);
+  const [loadingGroups, setLoadingGroups] = useState(true);
+  const { getCustomerGroups } = useCustomerActions();
+
+  // Fetch customer groups
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const groupsData = await getCustomerGroups();
+        setCustomerGroups(groupsData);
+        setLoadingGroups(false);
+      } catch (error) {
+        console.error('Error fetching customer groups:', error);
+        setLoadingGroups(false);
+      }
+    };
+
+    fetchData();
+  }, [getCustomerGroups]);
 
   useEffect(() => {
     if (customer) {
@@ -113,6 +134,8 @@ export default function AddCustomerModal({
         registrationScheme: "",
         registrationNumber: "",
         preferredPaymentMethod: customer.preferredPaymentMethod || "Cash",
+        customer_group: customer.customer_group || "All Customer Groups",
+        territory: customer.territory || "Saudi Arabia",
       });
     } else if (prefilledData && Object.keys(prefilledData).length > 0) {
       setFormData((prev) => ({
@@ -292,11 +315,13 @@ export default function AddCustomerModal({
     try {
       const customerData = {
         name: formData.name,
-        customer_type: formData.customer_type,
+        customer_type: formData.customer_type === "individual" ? "Individual" : "Company",
         email: formData.email,
         phone: formData.phone,
         address: formData.address,
         preferredPaymentMethod: formData.preferredPaymentMethod,
+        customer_group: formData.customer_group,
+        territory: formData.territory,
         ...(formData.customer_type === "company" && {
           contactName: formData.contactName,
           vatNumber: formData.vatNumber || undefined,
@@ -619,6 +644,55 @@ export default function AddCustomerModal({
                     </datalist>
                   </div>
                 )}
+
+                {/* Customer Group */}
+                <div>
+                  <label
+                    htmlFor="customer_group"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                  >
+                    Customer Group
+                  </label>
+                  <select
+                    id="customer_group"
+                    value={formData.customer_group}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, customer_group: e.target.value }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white"
+                    disabled={loadingGroups}
+                  >
+                    {loadingGroups ? (
+                      <option>Loading...</option>
+                    ) : (
+                      customerGroups.map((group) => (
+                        <option key={group.name} value={group.name}>
+                          {group.customer_group_name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+
+                {/* Territory */}
+                <div>
+                  <label
+                    htmlFor="territory"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                  >
+                    Territory
+                  </label>
+                  <input
+                    type="text"
+                    id="territory"
+                    value={formData.territory}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, territory: e.target.value }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Enter territory"
+                  />
+                </div>
               </div>
             </div>
 

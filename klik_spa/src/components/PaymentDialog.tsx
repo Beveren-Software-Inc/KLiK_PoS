@@ -27,6 +27,7 @@ import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { DisplayPrintPreview, handlePrintInvoice } from "../utils/invoicePrint";
 import { sendEmails, sendWhatsAppMessage } from "../services/useSharing";
+import { clearDraftInvoiceCache } from "../utils/draftInvoiceCache";
 import {
   fetchWhatsAppTemplates,
   getDefaultWhatsAppTemplate,
@@ -614,6 +615,9 @@ export default function PaymentDialog({
         : "Payment completed successfully!";
       toast.success(successMessage);
 
+      // Clear draft invoice cache since payment is completed
+      clearDraftInvoiceCache();
+
       // Don't clear cart immediately - let modal stay open for invoice preview
       console.log("Invoice created successfully - modal stays open for preview");
     } catch (err) {
@@ -656,6 +660,10 @@ export default function PaymentDialog({
     try {
       await createDraftSalesInvoice(orderData);
       toast.success("Order held successfully!");
+
+      // Clear draft invoice cache since order is held
+      clearDraftInvoiceCache();
+
       onHoldOrder(orderData);
     } catch (err) {
       toast.error("Failed to hold order");

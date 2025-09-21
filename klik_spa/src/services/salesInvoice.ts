@@ -1,5 +1,4 @@
 
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function createDraftSalesInvoice(data: any) {
 const csrfToken = window.csrf_token;
@@ -142,4 +141,32 @@ export async function deleteDraftInvoice(invoiceId: string) {
   }
 
   return result.message;
+}
+
+export async function getDraftInvoiceItems(invoiceId: string) {
+  const response = await fetch(`/api/method/klik_pos.api.sales_invoice.get_invoice_details?invoice_id=${invoiceId}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include'
+  });
+
+  const result = await response.json();
+  console.log("Draft invoice items result:", result);
+
+  if (!response.ok || !result.message) {
+    const serverMsg = result._server_messages
+      ? JSON.parse(result._server_messages)[0]
+      : result.message?.error || 'Failed to fetch draft invoice items';
+    throw new Error(serverMsg);
+  }
+
+  // The backend returns { success: true, data: { ... } }
+  // We need to return the data part
+  if (result.message.success && result.message.data) {
+    return result.message.data;
+  } else {
+    throw new Error(result.message.error || 'Failed to fetch draft invoice items');
+  }
 }

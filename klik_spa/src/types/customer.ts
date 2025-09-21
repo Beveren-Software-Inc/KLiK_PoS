@@ -36,4 +36,6 @@ export interface Customer {
   // Additional fields for ERPNext integration
   defaultCurrency?: string
   companyCurrency?: string
+  customer_group?: string
+  territory?: string
 }

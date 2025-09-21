@@ -29,7 +29,8 @@ import { toast } from "react-toastify";
 import { createSalesReturn } from "../services/salesInvoice";
 import RetailSidebar from "../components/RetailSidebar";
 import { useCustomerDetails } from "../hooks/useCustomers";
-import { usePOSDetails } from "../hooks/usePOSProfile";
+import EditDraftInvoiceDialog from "../components/EditDraftInvoiceDialog";
+import { addDraftInvoiceToCart } from "../utils/draftInvoiceToCart";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { isToday, isThisWeek, isThisMonth, isThisYear } from "../utils/time";
 import AddCustomerModal from "../components/AddCustomerModal";
@@ -49,6 +50,10 @@ export default function CustomerDetailsPage() {
   // Customer edit modal state
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+
+  // Edit draft invoice dialog states
+  const [showEditDraftDialog, setShowEditDraftDialog] = useState(false);
+  const [draftInvoiceToEdit, setDraftInvoiceToEdit] = useState<SalesInvoice | null>(null);
 
   const { id: customerId } = useParams();
   const { customer, isLoadingC, errorC } = useCustomerDetails(customerId);
@@ -180,8 +185,38 @@ export default function CustomerDetailsPage() {
   };
 
   const handleEditInvoice = (invoice: SalesInvoice) => {
-    // Navigate to edit page or open edit modal
-    navigate(`/invoice/${invoice.id}/edit`);
+    if (invoice.status !== "Draft") {
+      toast.error("Only draft invoices can be edited");
+      return;
+    }
+    setDraftInvoiceToEdit(invoice);
+    setShowEditDraftDialog(true);
+  };
+
+  const handleGoToCart = async (invoice: SalesInvoice) => {
+    try {
+      const success = await addDraftInvoiceToCart(invoice.id);
+      if (success) {
+        setShowEditDraftDialog(false);
+        setDraftInvoiceToEdit(null);
+        navigate('/'); // Navigate to home screen
+      }
+    } catch (error: any) {
+      console.error("Error going to cart:", error);
+      toast.error(error.message || "Failed to add items to cart");
+    }
+  };
+
+  const handleSubmitPayment = (invoice: SalesInvoice) => {
+    // Navigate to payment page for this invoice
+    setShowEditDraftDialog(false);
+    setDraftInvoiceToEdit(null);
+    navigate(`/payment/${invoice.id}`);
+  };
+
+  const handleEditDraftCancel = () => {
+    setShowEditDraftDialog(false);
+    setDraftInvoiceToEdit(null);
   };
 
   const handleSingleReturnClick = (invoice: SalesInvoice) => {
@@ -657,6 +692,15 @@ export default function CustomerDetailsPage() {
             onSave={handleSaveCustomer}
           />
         )}
+
+        {/* Edit Draft Invoice Dialog */}
+        <EditDraftInvoiceDialog
+          isOpen={showEditDraftDialog}
+          onClose={handleEditDraftCancel}
+          invoice={draftInvoiceToEdit}
+          onGoToCart={handleGoToCart}
+          onSubmitPayment={handleSubmitPayment}
+        />
       </div>
     </div>
   );
