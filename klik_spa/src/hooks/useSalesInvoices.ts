@@ -49,7 +49,6 @@ export function useSalesInvoices(searchTerm: string = "") {
       }
 
       const resData = await response.json();
-      console.log('Sales invoices data:', resData);
 
       if (!resData.message || !resData.message.success) {
         throw new Error(resData.message?.error || resData.error || "Failed to fetch invoices");

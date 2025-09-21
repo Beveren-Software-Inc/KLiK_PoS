@@ -6,9 +6,9 @@ import {
   FileText,
   DollarSign,
   TrendingUp,
-  CreditCard,
+  
   Search,
-  Eye,
+
   User,
   Mail,
   Phone,
@@ -18,8 +18,7 @@ import {
   ArrowLeft,
   Clock,
   AlertCircle,
-  RefreshCw,
-  RotateCcw
+ 
 } from "lucide-react";
 
 import InvoiceViewModal from "../components/InvoiceViewModal";
@@ -373,11 +372,11 @@ export default function CustomerDetailsPage() {
                     <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
                       <div className="flex items-center space-x-1">
                         <Mail className="w-4 h-4" />
-                        <span>{customer.email_id || "No email provided"}</span>
+                        <span>{customer.email || "No email provided"}</span>
                       </div>
                       <div className="flex items-center space-x-1">
                         <Phone className="w-4 h-4" />
-                        <span>{customer.mobile_no || "No phone provided"}</span>
+                        <span>{customer.phone || "No phone provided"}</span>
                       </div>
                     </div>
                     <div className="flex items-center space-x-1 text-sm text-gray-600 dark:text-gray-400">
@@ -388,7 +387,7 @@ export default function CustomerDetailsPage() {
                       <span>Customer Group: {customer.customer_group}</span>
                     </div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">
-                      <span>Type: {customer.customer_type}</span>
+                      <span>Type: {customer.type}</span>
                     </div>
                   </div>
                 </div>

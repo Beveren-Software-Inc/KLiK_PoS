@@ -432,9 +432,19 @@ def create_and_submit_invoice(data):
         doc.save(ignore_permissions=True)
         doc.submit()
 
-        # Create payment entry for B2B (async if possible)
+        # Create payment entry for B2B or B2B & B2C with company customers
         payment_entry = None
-        if business_type == "B2B" and mode_of_payment and amount_paid > 0:
+        should_create_payment_entry = False
+
+        if business_type == "B2B":
+            should_create_payment_entry = True
+        elif business_type == "B2B & B2C":
+            # For B2B & B2C, only create payment entry for company customers
+            customer_doc = frappe.get_doc("Customer", customer)
+            if customer_doc.customer_type == "Company":
+                should_create_payment_entry = True
+
+        if should_create_payment_entry and mode_of_payment and amount_paid > 0:
             try:
                 payment_entry = create_payment_entry(doc, mode_of_payment, amount_paid)
             except Exception as pe_error:
@@ -535,7 +545,22 @@ def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,
     doc.company = pos_profile.company
     doc.currency = get_customer_billing_currency(customer)
     doc.conversion_rate = 1.0  # Set conversion rate to 1 for same currency
-    doc.is_pos = 1 if business_type == "B2C" else 0
+
+    # Determine if this should be a POS invoice based on business type and customer type
+    if business_type == "B2C":
+        doc.is_pos = 1
+    elif business_type == "B2B":
+        doc.is_pos = 0
+    elif business_type == "B2B & B2C":
+        # For B2B & B2C, check customer type to determine behavior
+        customer_doc = frappe.get_doc("Customer", customer)
+        if customer_doc.customer_type == "Individual":
+            doc.is_pos = 1  # B2C behavior for individual customers
+        else:
+            doc.is_pos = 0  # B2B behavior for company customers
+    else:
+        doc.is_pos = 0  # Default to B2B behavior
+
     doc.update_stock = 1
     doc.warehouse = pos_profile.warehouse
 
