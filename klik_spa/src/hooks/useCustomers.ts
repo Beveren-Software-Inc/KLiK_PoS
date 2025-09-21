@@ -130,7 +130,7 @@ export function useCustomerDetails(customerId: string | null) {
             city: "",
             state: "",
             zipCode: "",
-            country: ""
+            country: "Saudi Arabia" // Default country
           },
           dateOfBirth: "",
           gender: "other",
@@ -146,6 +146,8 @@ export function useCustomerDetails(customerId: string | null) {
           avatar: undefined,
           defaultCurrency: undefined,
           companyCurrency: undefined,
+          customer_group: apiCustomer.customer_group || "All Customer Groups",
+          territory: apiCustomer.territory || "Saudi Arabia",
           // Add missing fields that AddCustomerModal expects
           contactPerson: apiCustomer.customer_name || "", // Use customer_name as contact person for individual customers
           companyName: apiCustomer.customer_type === "Company" ? apiCustomer.customer_name : undefined,

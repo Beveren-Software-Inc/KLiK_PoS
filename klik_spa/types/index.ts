@@ -188,13 +188,15 @@ export interface Customer {
     state: string
     zipCode: string
     country: string
+    addressType?: 'Billing' | 'Shipping' | 'Other'
   }
   dateOfBirth?: string
   gender?: 'male' | 'female' | 'other'
   loyaltyPoints: number
+  type: 'individual' | 'company'
   totalSpent: number
   totalOrders: number
-  preferredPaymentMethod: 'cash' | 'card' | 'mobile' | 'loyalty'
+  preferredPaymentMethod: 'Cash' | 'Card' | 'Mobile' | 'Loyalty'
   notes?: string
   tags: string[]
   status: 'active' | 'inactive' | 'vip'

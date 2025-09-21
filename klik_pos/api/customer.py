@@ -351,7 +351,7 @@ def get_territories():
 def create_or_update_contact(customer, customer_name, email, phone):
     existing_contact = frappe.get_all(
         "Contact",
-        filters={"link_name": customer},
+        filters={"email_id": email, "link_name": customer},
         limit=1
     )
 
@@ -359,48 +359,20 @@ def create_or_update_contact(customer, customer_name, email, phone):
         # load existing document
         doc = frappe.get_doc("Contact", existing_contact[0].name)
         doc.first_name = customer_name
-
-        # Update email in child table
-        if email:
-            doc.email_ids = []
-            doc.append("email_ids", {
-                "email_id": email,
-                "is_primary": 1
-            })
-
-        # Update phone in child table
-        if phone:
-            doc.phone_nos = []
-            doc.append("phone_nos", {
-                "phone": phone,
-                "is_primary_mobile_no": 1,
-                "is_primary_phone": 1
-            })
+        doc.phone = phone
+        doc.email_id = email
     else:
         # create new document properly
         doc = frappe.get_doc({
             "doctype": "Contact",
             "first_name": customer_name,
+            "email_id": email,
+            "phone": phone,
             "links": [{
                 "link_doctype": "Customer",
                 "link_name": customer
             }]
         })
-
-        # Add email to child table
-        if email:
-            doc.append("email_ids", {
-                "email_id": email,
-                "is_primary": 1
-            })
-
-        # Add phone to child table
-        if phone:
-            doc.append("phone_nos", {
-                "phone": phone,
-                "is_primary_mobile_no": 1,
-                "is_primary_phone": 1
-            })
 
     doc.save(ignore_permissions=True)
     return doc
@@ -466,25 +438,23 @@ def update_customer(customer_id, customer_data):
             if key not in ["email", "phone"]:  # Skip email/phone as they go to Contact
                 setattr(customer, key, value)
 
-        # Also update email_id and mobile_no on Customer doctype for consistency
+        customer.ignore_version = True
+        customer.save()
+
+        # Update email_id and mobile_no directly on Customer doctype for consistency
         if email:
             customer.email_id = email
         if phone:
             customer.mobile_no = phone
 
-        customer.ignore_version = True
-        customer.save()
-
-        # Update the primary contact if email or phone changed
+        # Update the primary contact's child tables if email or phone changed
         if customer.customer_primary_contact and (email or phone):
             try:
                 contact_doc = frappe.get_doc("Contact", customer.customer_primary_contact)
 
                 # Update email in child table
                 if email:
-                    # Clear existing email entries
                     contact_doc.email_ids = []
-                    # Add new email entry
                     contact_doc.append("email_ids", {
                         "email_id": email,
                         "is_primary": 1
@@ -492,9 +462,7 @@ def update_customer(customer_id, customer_data):
 
                 # Update phone in child table
                 if phone:
-                    # Clear existing phone entries
                     contact_doc.phone_nos = []
-                    # Add new phone entry
                     contact_doc.append("phone_nos", {
                         "phone": phone,
                         "is_primary_mobile_no": 1,
