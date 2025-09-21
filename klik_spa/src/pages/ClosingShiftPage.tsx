@@ -138,9 +138,16 @@ export default function ClosingShiftPage() {
       const matchesPayment = paymentFilter === "all" || invoice.paymentMethod === paymentFilter;
       const matchesDate = filterInvoiceByDate(invoice.date);
 
-      return matchesSearch && matchesPayment && matchesStatus && matchesDate;
+      // Filter by POS profile - only show invoices for the current POS profile
+      const matchesPOSProfile = !posDetails?.name || invoice.posProfile === posDetails.name;
+
+      // Filter by POS opening entry - only show invoices for the current opening entry
+      const matchesOpeningEntry = !posDetails?.current_opening_entry ||
+        (invoice.custom_pos_opening_entry && invoice.custom_pos_opening_entry === posDetails.current_opening_entry);
+
+      return matchesSearch && matchesPayment && matchesStatus && matchesDate && matchesPOSProfile && matchesOpeningEntry;
     });
-  }, [invoices, searchQuery, statusFilter, dateFilter, paymentFilter, isLoading, error]);
+  }, [invoices, searchQuery, statusFilter, dateFilter, paymentFilter, isLoading, error, posDetails]);
 
   // Loading state
   if (isLoading) {

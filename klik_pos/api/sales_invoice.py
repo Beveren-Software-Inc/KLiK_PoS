@@ -166,6 +166,7 @@ def get_sales_invoices(limit=100, start=0):
             "discount_amount",
             "total_taxes_and_charges",
             "custom_pos_opening_entry",
+            "pos_profile",
             "currency"
         ]
 

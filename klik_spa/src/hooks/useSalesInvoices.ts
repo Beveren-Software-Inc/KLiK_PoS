@@ -80,6 +80,8 @@ const fetchInvoices = async () => {
           | "Not Cleared") || "Draft",
       currency: invoice.currency || "USD",
       notes: invoice.remarks || "",
+      posProfile: invoice.pos_profile || "",
+      custom_pos_opening_entry: invoice.custom_pos_opening_entry || "",
     }));
     // console.log("Transformed", transformed)
     setInvoices(transformed);
