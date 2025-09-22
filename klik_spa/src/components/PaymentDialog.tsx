@@ -518,16 +518,21 @@ export default function PaymentDialog({
       ? calculations.taxableAmount
       : calculations.taxableAmount + calculations.taxAmount;
 
-    // Change this line: use Math.floor instead of Math.round to always round DOWN
-    const rounded = Math.floor(totalBeforeRoundOff);
-
-    const difference = rounded - totalBeforeRoundOff;
-
-    setRoundOffAmount(difference);
-    setRoundOffInput(difference.toFixed(2));
-
-    // For B2C, update payment amount; for B2B, keep flexible
     if (isB2C) {
+      // For B2C: Round down to nearest 10 and calculate roundoff as negative difference
+      const rounded = Math.floor(totalBeforeRoundOff / 10) * 10; // Round down to nearest 10
+      const difference = rounded - totalBeforeRoundOff; // This will be negative (roundoff amount)
+
+      console.log('B2C Roundoff Debug:', {
+        totalBeforeRoundOff,
+        rounded,
+        difference
+      });
+
+      setRoundOffAmount(difference);
+      setRoundOffInput(difference.toFixed(2));
+
+      // Update payment amount to the rounded amount
       const defaultMode = modes.find((mode) => mode.default === 1);
       if (defaultMode) {
         setPaymentAmounts((prev) => ({
@@ -535,6 +540,13 @@ export default function PaymentDialog({
           [defaultMode.mode_of_payment]: rounded,
         }));
       }
+    } else {
+      // For B2B: Keep original logic (round down to nearest whole number)
+      const rounded = Math.floor(totalBeforeRoundOff);
+      const difference = rounded - totalBeforeRoundOff;
+
+      setRoundOffAmount(difference);
+      setRoundOffInput(difference.toFixed(2));
     }
   };
 
