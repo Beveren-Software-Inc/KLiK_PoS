@@ -500,7 +500,7 @@ export default function ClosingShiftPage() {
                             <Eye className="w-4 h-4" />
                             <span>View</span>
                           </button>
-                          {invoice.status === "Draft" && (
+                          {/* {invoice.status === "Draft" && (
                             <button
                               onClick={() => handleEditInvoice(invoice)}
                               className="text-blue-600 hover:text-blue-900 flex items-center space-x-1"
@@ -508,7 +508,7 @@ export default function ClosingShiftPage() {
                               <Edit className="w-4 h-4" />
                               <span>Edit</span>
                             </button>
-                          )}
+                          )} */}
                           {invoice.status === "Draft" && (
                             <button
                               onClick={() => handleDeleteClick(invoice)}
@@ -825,7 +825,7 @@ export default function ClosingShiftPage() {
                             <Eye className="w-4 h-4" />
                             <span>View</span>
                           </button>
-                          {invoice.status === "Draft" && (
+                          {/* {invoice.status === "Draft" && (
                             <button
                               onClick={() => handleEditInvoice(invoice)}
                               className="text-blue-600 hover:text-blue-900 flex items-center space-x-1"
@@ -833,7 +833,7 @@ export default function ClosingShiftPage() {
                               <Edit className="w-4 h-4" />
                               <span>Edit</span>
                             </button>
-                          )}
+                          )} */}
                           {invoice.status === "Draft" && (
                             <button
                               onClick={() => handleDeleteClick(invoice)}
