@@ -667,7 +667,7 @@ export default function PaymentDialog({
 
     try {
       await createDraftSalesInvoice(orderData);
-      toast.success("Order held successfully!");
+      // toast.success("Order held successfully!");
 
       // Clear draft invoice cache since order is held
       clearDraftInvoiceCache();

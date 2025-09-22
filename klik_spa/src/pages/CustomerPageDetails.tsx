@@ -6,7 +6,7 @@ import {
   FileText,
   DollarSign,
   TrendingUp,
-  
+
   Search,
 
   User,
@@ -18,7 +18,7 @@ import {
   ArrowLeft,
   Clock,
   AlertCircle,
- 
+
 } from "lucide-react";
 
 import InvoiceViewModal from "../components/InvoiceViewModal";
@@ -26,7 +26,7 @@ import SingleInvoiceReturn from "../components/SingleInvoiceReturn";
 import type { SalesInvoice } from "../../types";
 import { useCustomerInvoices } from "../hooks/useCustomerInvoices";
 import { toast } from "react-toastify";
-import { createSalesReturn } from "../services/salesInvoice";
+import { createSalesReturn, submitDraftInvoice } from "../services/salesInvoice";
 import RetailSidebar from "../components/RetailSidebar";
 import { useCustomerDetails } from "../hooks/useCustomers";
 import EditDraftInvoiceDialog from "../components/EditDraftInvoiceDialog";
@@ -212,6 +212,20 @@ export default function CustomerDetailsPage() {
     setShowEditDraftDialog(false);
     setDraftInvoiceToEdit(null);
     navigate(`/payment/${invoice.id}`);
+  };
+
+  const handleSubmitDirect = async (invoice: SalesInvoice) => {
+    try {
+      await submitDraftInvoice(invoice.id);
+      toast.success(`Draft invoice ${invoice.id} submitted successfully`);
+      setShowEditDraftDialog(false);
+      setDraftInvoiceToEdit(null);
+      // Refresh the invoices list
+      window.location.reload();
+    } catch (error: any) {
+      console.error("Error submitting draft invoice:", error);
+      toast.error(error.message || "Failed to submit draft invoice");
+    }
   };
 
   const handleEditDraftCancel = () => {
@@ -700,6 +714,7 @@ export default function CustomerDetailsPage() {
           invoice={draftInvoiceToEdit}
           onGoToCart={handleGoToCart}
           onSubmitPayment={handleSubmitPayment}
+          onSubmitDirect={handleSubmitDirect}
         />
       </div>
     </div>

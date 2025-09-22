@@ -18,10 +18,8 @@ import {
   Users,
   ShoppingCart,
   RotateCcw,
-
+  Check,
   FileMinus,
-
-
 } from "lucide-react";
 
 import InvoiceViewModal from "../components/InvoiceViewModal";
@@ -36,7 +34,7 @@ import { useCustomers } from "../hooks/useCustomers";
 import { useUserInfo } from "../hooks/useUserInfo";
 import { usePOSDetails } from "../hooks/usePOSProfile";
 import { toast } from "react-toastify";
-import { createSalesReturn, deleteDraftInvoice } from "../services/salesInvoice";
+import { createSalesReturn, deleteDraftInvoice, submitDraftInvoice } from "../services/salesInvoice";
 import { useAllPaymentModes } from "../hooks/usePaymentModes";
 import RetailSidebar from "../components/RetailSidebar";
 import { addDraftInvoiceToCart } from "../utils/draftInvoiceToCart";
@@ -741,6 +739,20 @@ const getStatusBadge = (status: string) => {
     navigate(`/payment/${selectedDraftInvoice?.id}`);
   };
 
+  const handleSubmitDirect = async (invoice: SalesInvoice) => {
+    try {
+      await submitDraftInvoice(invoice.id);
+      toast.success(`Draft invoice ${invoice.id} submitted successfully`);
+      setShowEditOptions(false);
+      setSelectedDraftInvoice(null);
+      // Refresh the invoices list
+      window.location.reload();
+    } catch (error: any) {
+      console.error("Error submitting draft invoice:", error);
+      toast.error(error.message || "Failed to submit draft invoice");
+    }
+  };
+
   const handleCloseEditOptions = () => {
     setShowEditOptions(false);
     setSelectedDraftInvoice(null);
@@ -1196,6 +1208,13 @@ const getStatusBadge = (status: string) => {
                   >
                     <FileText className="w-5 h-5 text-orange-600 dark:text-orange-400" />
                     <span className="font-medium text-orange-900 dark:text-orange-100">Submit Payment</span>
+                  </button>
+                  <button
+                    onClick={() => handleSubmitDirect(selectedDraftInvoice)}
+                    className="w-full flex items-center justify-center space-x-3 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
+                  >
+                    <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    <span className="font-medium text-green-900 dark:text-green-100">Submit</span>
                   </button>
                 </div>
               </div>

@@ -11,6 +11,7 @@ import MobilePOSLayout from "./MobilePOSLayout"
 import LoadingSpinner from "./LoadingSpinner"
 import type { MenuItem, CartItem, GiftCoupon } from "../../types"
 import { useMediaQuery } from "../hooks/useMediaQuery"
+import { toast } from "react-toastify"
 
 export default function RetailPOSLayout() {
   const { t } = useI18n()
@@ -45,7 +46,20 @@ export default function RetailPOSLayout() {
   // Separate function for adding items to cart (used by both click and barcode)
   const addItemToCart = (item: MenuItem) => {
     const existingItem = cartItems.find((cartItem) => cartItem.id === item.id)
+
+    // Check if item has available quantity
+    if (item.available <= 0) {
+      toast.error(`${item.name} is out of stock`)
+      return
+    }
+
     if (existingItem) {
+      // Check if adding one more would exceed available stock
+      if (existingItem.quantity >= item.available) {
+          toast.error(`Only ${item.available} ${item.uom || 'units'} of ${item.name} available`)
+        return
+      }
+
       setCartItems(
         cartItems.map((cartItem) =>
           cartItem.id === item.id ? { ...cartItem, quantity: cartItem.quantity + 1 } : cartItem,
@@ -61,6 +75,8 @@ export default function RetailPOSLayout() {
           price: item.price,
           image: item.image,
           quantity: 1,
+          available: item.available,
+          uom: item.uom,
         },
       ])
     }
@@ -75,6 +91,12 @@ export default function RetailPOSLayout() {
     if (quantity <= 0) {
       setCartItems(cartItems.filter((item) => item.id !== id))
     } else {
+      const item = cartItems.find((cartItem) => cartItem.id === id)
+      if (item && item.available !== undefined && quantity > item.available) {
+        toast.error(`Only ${item.available} ${item.uom || 'units'} of ${item.name} available`)
+        return
+      }
+
       setCartItems(cartItems.map((item) => (item.id === id ? { ...item, quantity } : item)))
     }
   }
