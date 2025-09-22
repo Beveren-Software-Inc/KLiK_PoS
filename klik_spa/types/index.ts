@@ -15,6 +15,8 @@ export interface CartItem {
   price: number
   image: string
   quantity: number
+  available?: number
+  uom?: string
 }
 
 export interface MenuItem {

@@ -79,7 +79,7 @@ export function useSalesInvoices(searchTerm: string = "") {
         giftCardCode: String(invoice.discount_code) || "",
         taxAmount: Number(invoice.total_taxes_and_charges) || 0,
         totalAmount: Number(invoice.base_grand_total) || 0,
-        paymentMethod: invoice.mode_of_payment || "Cash",
+        paymentMethod: invoice.mode_of_payment || "-",
         amountPaid: Number(invoice.base_rounded_total) || 0,
         changeGiven: Number(invoice.change_amount) || 0,
         status:

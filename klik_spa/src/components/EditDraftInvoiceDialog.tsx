@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, ShoppingCart, FileText } from 'lucide-react';
+import { X, ShoppingCart, FileText, Check } from 'lucide-react';
 import type { SalesInvoice } from '../../types';
 
 interface EditDraftInvoiceDialogProps {
@@ -8,6 +8,7 @@ interface EditDraftInvoiceDialogProps {
   invoice: SalesInvoice | null;
   onGoToCart: (invoice: SalesInvoice) => void;
   onSubmitPayment: (invoice: SalesInvoice) => void;
+  onSubmitDirect?: (invoice: SalesInvoice) => void;
 }
 
 export default function EditDraftInvoiceDialog({
@@ -15,7 +16,8 @@ export default function EditDraftInvoiceDialog({
   onClose,
   invoice,
   onGoToCart,
-  onSubmitPayment
+  onSubmitPayment,
+  onSubmitDirect
 }: EditDraftInvoiceDialogProps) {
   if (!isOpen || !invoice) return null;
 
@@ -60,13 +62,23 @@ export default function EditDraftInvoiceDialog({
             <span>Go to Cart</span>
           </button>
 
-          <button
+          {/* <button
             onClick={() => onSubmitPayment(invoice)}
             className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
           >
             <FileText size={20} />
             <span>Submit Payment</span>
-          </button>
+          </button> */}
+
+          {onSubmitDirect && (
+            <button
+              onClick={() => onSubmitDirect(invoice)}
+              className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <Check size={20} />
+              <span>Submit</span>
+            </button>
+          )}
         </div>
 
         {/* Cancel Button */}

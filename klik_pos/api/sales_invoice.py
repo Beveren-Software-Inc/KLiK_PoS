@@ -275,6 +275,22 @@ def get_sales_invoices(limit=100, start=0, search=""):
                 })
             inv["items"] = items
 
+            # Get payment method from payment child table
+            payment_method = "-"  # Default for unpaid invoices
+            if invoice_doc.status == "Paid" and invoice_doc.payments:
+                # Get the first payment method from the payment child table
+                payment_method = invoice_doc.payments[0].mode_of_payment
+            elif invoice_doc.status in ["Unpaid", "Overdue", "Partly Paid"]:
+                # Check if there are any payments in the child table
+                if invoice_doc.payments:
+                    payment_method = invoice_doc.payments[0].mode_of_payment
+                else:
+                    payment_method = "-"
+            elif invoice_doc.status == "Draft":
+                payment_method = "-"
+
+            inv["mode_of_payment"] = payment_method
+
         return {"success": True, "data": invoices, "total_count": total_count}
 
     except Exception as e:
@@ -1203,6 +1219,23 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None, s
 
             invoice.items = items
 
+            # Get payment method from payment child table
+            invoice_doc = frappe.get_doc("Sales Invoice", invoice.name)
+            payment_method = "-"  # Default for unpaid invoices
+            if invoice_doc.status == "Paid" and invoice_doc.payments:
+                # Get the first payment method from the payment child table
+                payment_method = invoice_doc.payments[0].mode_of_payment
+            elif invoice_doc.status in ["Unpaid", "Overdue", "Partly Paid"]:
+                # Check if there are any payments in the child table
+                if invoice_doc.payments:
+                    payment_method = invoice_doc.payments[0].mode_of_payment
+                else:
+                    payment_method = "-"
+            elif invoice_doc.status == "Draft":
+                payment_method = "-"
+
+            invoice.payment_method = payment_method
+
         return {
             "success": True,
             "data": invoices
@@ -1384,6 +1417,45 @@ def delete_draft_invoice(invoice_id):
         }
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), f"Error deleting draft invoice {invoice_id}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+@frappe.whitelist()
+def submit_draft_invoice(invoice_id):
+    """
+    Submit a draft sales invoice directly without payment dialog.
+    This converts a draft invoice to submitted status.
+    """
+    try:
+        # Get the invoice document
+        invoice_doc = frappe.get_doc("Sales Invoice", invoice_id)
+
+        if invoice_doc.status != "Draft":
+            return {
+                "success": False,
+                "error": f"Cannot submit invoice {invoice_id}. Only Draft invoices can be submitted. Current status: {invoice_doc.status}"
+            }
+
+        # Submit the invoice
+        invoice_doc.submit()
+
+        return {
+            "success": True,
+            "message": f"Draft invoice {invoice_id} submitted successfully",
+            "invoice_name": invoice_doc.name,
+            "invoice": invoice_doc
+        }
+
+    except frappe.DoesNotExistError:
+        return {
+            "success": False,
+            "error": f"Invoice {invoice_id} not found"
+        }
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), f"Error submitting draft invoice {invoice_id}")
         return {
             "success": False,
             "error": str(e)

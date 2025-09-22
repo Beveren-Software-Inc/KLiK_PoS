@@ -170,3 +170,29 @@ export async function getDraftInvoiceItems(invoiceId: string) {
     throw new Error(result.message.error || 'Failed to fetch draft invoice items');
   }
 }
+
+export async function submitDraftInvoice(invoiceId: string) {
+  const csrfToken = window.csrf_token;
+
+  const response = await fetch('/api/method/klik_pos.api.sales_invoice.submit_draft_invoice', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Frappe-CSRF-Token': csrfToken
+    },
+    body: JSON.stringify({ invoice_id: invoiceId }),
+    credentials: 'include'
+  });
+
+  const result = await response.json();
+  console.log("Submit draft invoice result:", result);
+
+  if (!response.ok || !result.message || result.message.success === false) {
+    const serverMsg = result._server_messages
+      ? JSON.parse(result._server_messages)[0]
+      : result.message?.error || 'Failed to submit draft invoice';
+    throw new Error(serverMsg);
+  }
+
+  return result.message;
+}

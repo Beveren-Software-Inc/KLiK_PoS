@@ -55,7 +55,7 @@ export default function ClosingShiftPage() {
   const { invoices, isLoading, isLoadingMore, error, hasMore, totalLoaded, loadMore } = useSalesInvoices();
   const { modes } = useAllPaymentModes()
   const { posDetails } = usePOSDetails();
-  
+
   const hideExpectedAmount = posDetails?.custom_hide_expected_amount || false;
 
   const filterInvoiceByDate = (invoiceDateStr: string) => {
@@ -150,7 +150,7 @@ export default function ClosingShiftPage() {
       console.log({matchesPOSProfile, matchesOpeningEntry, invoice, posDetails});
       return matchesSearch && matchesPayment && matchesStatus && matchesDate && matchesPOSProfile && matchesOpeningEntry;
     });
-    
+
   }, [invoices, searchQuery, statusFilter, dateFilter, paymentFilter, isLoading, error, posDetails]);
 
   // Payment Stats Calculation - Calculate from filtered invoices
@@ -159,12 +159,12 @@ export default function ClosingShiftPage() {
       acc[mode.name] = {
         name: mode.name,
         openingAmount: mode.openingAmount || 0,
-        amount: 0, 
-        transactions: 0 
+        amount: 0, // Will be calculated from filtered invoices
+        transactions: 0 // Will be calculated from filtered invoices
       };
       return acc;
     }, {});
-  
+
     // Calculate amounts and transactions from filtered invoices
     filteredInvoices.forEach(invoice => {
       if (invoice.paymentMethod && stats[invoice.paymentMethod]) {

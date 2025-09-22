@@ -59,6 +59,8 @@ export default function RetailPOSLayout() {
         category: item.category,
         price: item.price,
         image: item.image,
+        available: item.available,
+        uom: item.uom,
       })
     }
 

@@ -77,7 +77,7 @@ export function useCustomerInvoices(customerName: string) {
         customer: invoice.customer_name || invoice.customer || "Walk-in Customer",
         totalAmount: Number(invoice.base_grand_total) || 0,
         status: invoice.status || "Draft",
-        paymentMethod: invoice.payment_method || "Cash",
+        paymentMethod: invoice.payment_method || "-",
         discount: Number(invoice.discount_amount) || 0,
         tax: Number(invoice.total_taxes_and_charges) || 0,
         items: invoice.items || [],
