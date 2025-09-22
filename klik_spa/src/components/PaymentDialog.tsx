@@ -518,16 +518,21 @@ export default function PaymentDialog({
       ? calculations.taxableAmount
       : calculations.taxableAmount + calculations.taxAmount;
 
-    // Change this line: use Math.floor instead of Math.round to always round DOWN
-    const rounded = Math.floor(totalBeforeRoundOff);
-
-    const difference = rounded - totalBeforeRoundOff;
-
-    setRoundOffAmount(difference);
-    setRoundOffInput(difference.toFixed(2));
-
-    // For B2C, update payment amount; for B2B, keep flexible
     if (isB2C) {
+      // For B2C: Round down to nearest 10 and calculate roundoff as negative difference
+      const rounded = Math.floor(totalBeforeRoundOff / 10) * 10; // Round down to nearest 10
+      const difference = rounded - totalBeforeRoundOff; // This will be negative (roundoff amount)
+
+      console.log('B2C Roundoff Debug:', {
+        totalBeforeRoundOff,
+        rounded,
+        difference
+      });
+
+      setRoundOffAmount(difference);
+      setRoundOffInput(difference.toFixed(2));
+
+      // Update payment amount to the rounded amount
       const defaultMode = modes.find((mode) => mode.default === 1);
       if (defaultMode) {
         setPaymentAmounts((prev) => ({
@@ -535,6 +540,13 @@ export default function PaymentDialog({
           [defaultMode.mode_of_payment]: rounded,
         }));
       }
+    } else {
+      // For B2B: Keep original logic (round down to nearest whole number)
+      const rounded = Math.floor(totalBeforeRoundOff);
+      const difference = rounded - totalBeforeRoundOff;
+
+      setRoundOffAmount(difference);
+      setRoundOffInput(difference.toFixed(2));
     }
   };
 
@@ -592,12 +604,44 @@ export default function PaymentDialog({
     // For B2B, no payment validation required - can be partial or zero payment
     setIsProcessingPayment(true);
 
+    // Calculate net amount to send to backend (amount paid minus change for B2C)
+    const netAmountToSend = isB2B ? totalPaidAmount : calculations.grandTotal;
+
+    // For B2C, adjust payment method amounts to reflect net payment (after change)
+    const adjustedPaymentMethods = isB2B
+      ? Object.entries(paymentAmounts).filter(([, amount]) => amount > 0)
+      : (() => {
+          const validPayments = Object.entries(paymentAmounts).filter(([, amount]) => amount > 0);
+
+          if (validPayments.length === 0) return [];
+
+          // Calculate total of all payment methods
+          const totalPaymentAmount = validPayments.reduce((sum, [, amount]) => sum + amount, 0);
+
+          // If total exceeds grand total, adjust the last payment method
+          if (totalPaymentAmount > calculations.grandTotal) {
+            const excess = totalPaymentAmount - calculations.grandTotal;
+            const lastPaymentIndex = validPayments.length - 1;
+            const [lastMethod, lastAmount] = validPayments[lastPaymentIndex];
+
+            // Reduce the last payment method by the excess amount
+            const adjustedLastAmount = Math.max(0, lastAmount - excess);
+
+            return validPayments.map(([method, amount], index) => {
+              if (index === lastPaymentIndex) {
+                return [method, adjustedLastAmount];
+              }
+              return [method, amount];
+            });
+          }
+
+          return validPayments;
+        })();
+
     const paymentData = {
       items: cartItems,
       customer: selectedCustomer,
-      paymentMethods: Object.entries(paymentAmounts)
-        .filter(([, amount]) => amount > 0)
-        .map(([method, amount]) => ({ method, amount })),
+      paymentMethods: adjustedPaymentMethods.map(([method, amount]) => ({ method, amount })),
       subtotal: calculations.subtotal,
       SalesTaxCharges: selectedSalesTaxCharges,
       taxAmount: calculations.taxAmount,
@@ -605,7 +649,7 @@ export default function PaymentDialog({
       couponDiscount: calculations.couponDiscount,
       roundOffAmount,
       grandTotal: calculations.grandTotal,
-      amountPaid: totalPaidAmount,
+      amountPaid: netAmountToSend, // Send net amount (grand total for B2C, total paid for B2B)
       outstandingAmount: outstandingAmount,
       appliedCoupons,
       businessType: posDetails?.business_type,

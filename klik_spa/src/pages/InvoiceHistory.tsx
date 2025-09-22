@@ -1202,13 +1202,13 @@ const getStatusBadge = (status: string) => {
                     <ShoppingCart className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                     <span className="font-medium text-blue-900 dark:text-blue-100">Go to Cart</span>
                   </button>
-                  <button
+                  {/* <button
                     onClick={handleGoToPayment}
                     className="w-full flex items-center justify-center space-x-3 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-colors"
                   >
                     <FileText className="w-5 h-5 text-orange-600 dark:text-orange-400" />
                     <span className="font-medium text-orange-900 dark:text-orange-100">Submit Payment</span>
-                  </button>
+                  </button> */}
                   <button
                     onClick={() => handleSubmitDirect(selectedDraftInvoice)}
                     className="w-full flex items-center justify-center space-x-3 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
