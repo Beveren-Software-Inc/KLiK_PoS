@@ -51,6 +51,7 @@ export function getCachedDraftInvoiceItems(): DraftInvoiceCache | null {
 
 export function clearDraftInvoiceCache(): void {
   localStorage.removeItem(CACHE_KEY);
+  console.log('Draft invoice cache cleared');
 }
 
 export function loadCachedItemsToCart(): boolean {
