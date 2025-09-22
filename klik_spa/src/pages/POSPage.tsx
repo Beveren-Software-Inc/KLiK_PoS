@@ -83,8 +83,8 @@ useEffect(() => {
         if (hasCached) {
           console.log('Loading cached draft invoice items to cart');
           loadCachedItemsToCart();
-          // Clear the cache after loading to prevent reloading on refresh
-          clearDraftInvoiceCache();
+          // Don't clear cache here - let PaymentDialog handle it after invoice creation
+          // clearDraftInvoiceCache();
         }
 
         // Mark cache as loaded to prevent multiple executions

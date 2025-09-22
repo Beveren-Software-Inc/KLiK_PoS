@@ -27,7 +27,8 @@ import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { DisplayPrintPreview, handlePrintInvoice } from "../utils/invoicePrint";
 import { sendEmails, sendWhatsAppMessage } from "../services/useSharing";
-import { clearDraftInvoiceCache } from "../utils/draftInvoiceCache";
+import { clearDraftInvoiceCache, getOriginalDraftInvoiceId } from "../utils/draftInvoiceCache";
+import { deleteDraftInvoice } from "../services/salesInvoice";
 import {
   fetchWhatsAppTemplates,
   getDefaultWhatsAppTemplate,
@@ -666,6 +667,23 @@ export default function PaymentDialog({
         ? "Invoice submitted successfully!"
         : "Payment completed successfully!";
       toast.success(successMessage);
+
+      // Delete original draft invoice if it exists (from Edit → Go to Cart workflow)
+      const originalDraftInvoiceId = getOriginalDraftInvoiceId();
+      console.log("Checking for original draft invoice to delete:", originalDraftInvoiceId);
+
+      if (originalDraftInvoiceId) {
+        try {
+          console.log(`Attempting to delete original draft invoice: ${originalDraftInvoiceId}`);
+          const deleteResult = await deleteDraftInvoice(originalDraftInvoiceId);
+          console.log(`Original draft invoice ${originalDraftInvoiceId} deleted successfully:`, deleteResult);
+        } catch (deleteError) {
+          console.error("Failed to delete original draft invoice:", deleteError);
+          // Don't show error to user as the main invoice was created successfully
+        }
+      } else {
+        console.log("No original draft invoice found to delete");
+      }
 
       // Clear draft invoice cache since payment is completed
       clearDraftInvoiceCache();
