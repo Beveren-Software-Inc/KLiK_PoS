@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { CartItem, GiftCoupon, Customer } from '../../types'
 import { toast } from 'react-toastify'
+import { clearDraftInvoiceCache } from '../utils/draftInvoiceCache'
 
 interface CartState {
   cartItems: CartItem[]
@@ -79,11 +80,15 @@ export const useCartStore = create<CartState>()(
         cartItems: state.cartItems.filter((item) => item.id !== id)
       })),
 
-      clearCart: () => set(() => ({
-        cartItems: [],
-        appliedCoupons: [],
-        selectedCustomer: null
-      })),
+      clearCart: () => {
+        // Clear draft invoice cache when clearing cart
+        clearDraftInvoiceCache();
+        set(() => ({
+          cartItems: [],
+          appliedCoupons: [],
+          selectedCustomer: null
+        }));
+      },
 
       applyCoupon: (coupon) => set((state) => {
         if (!state.appliedCoupons.some((c) => c.code === coupon.code)) {

@@ -6,7 +6,7 @@ import { usePOSOpeningStatus } from '../hooks/usePOSOpeningEntry'
 import RetailPOSLayout from "../components/RetailPOSLayout"
 import POSOpeningModal from '../components/PosOpeningEntryDialog'
 import erpnextAPI from '../services/erpnext-api'
-import { loadCachedItemsToCart, hasCachedDraftInvoiceItems } from '../utils/draftInvoiceCache'
+import { loadCachedItemsToCart, hasCachedDraftInvoiceItems, clearDraftInvoiceCache } from '../utils/draftInvoiceCache'
 import { useCartStore } from '../stores/cartStore'
 
 export default function MainPOSScreen() {
@@ -81,7 +81,10 @@ useEffect(() => {
         const hasCached = hasCachedDraftInvoiceItems();
 
         if (hasCached) {
+          console.log('Loading cached draft invoice items to cart');
           loadCachedItemsToCart();
+          // Don't clear cache here - let PaymentDialog handle it after invoice creation
+          // clearDraftInvoiceCache();
         }
 
         // Mark cache as loaded to prevent multiple executions

@@ -6,6 +6,7 @@ interface DraftInvoiceCache {
   timestamp: number;
   invoiceId: string;
   customer: Customer | null;
+  originalDraftInvoiceId: string; // Track the original draft invoice to delete later
 }
 
 const CACHE_KEY = 'draft-invoice-cache';
@@ -16,31 +17,39 @@ export function cacheDraftInvoiceItems(invoiceId: string, items: CartItem[], cus
     items,
     timestamp: Date.now(),
     invoiceId,
-    customer
+    customer,
+    originalDraftInvoiceId: invoiceId // Store the original draft invoice ID
   };
 
+  console.log("cacheDraftInvoiceItems - storing cache:", cache);
   localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
 }
 
 export function getCachedDraftInvoiceItems(): DraftInvoiceCache | null {
   try {
     const cached = localStorage.getItem(CACHE_KEY);
+    console.log("getCachedDraftInvoiceItems - raw cached data:", cached);
 
     if (!cached) {
+      console.log("getCachedDraftInvoiceItems - no cached data found");
       return null;
     }
 
     const cache: DraftInvoiceCache = JSON.parse(cached);
+    console.log("getCachedDraftInvoiceItems - parsed cache:", cache);
 
     // Check if cache is expired
     const now = Date.now();
     const age = now - cache.timestamp;
+    console.log("getCachedDraftInvoiceItems - cache age:", age, "ms, max age:", CACHE_DURATION, "ms");
 
     if (age > CACHE_DURATION) {
+      console.log("getCachedDraftInvoiceItems - cache expired, clearing");
       clearDraftInvoiceCache();
       return null;
     }
 
+    console.log("getCachedDraftInvoiceItems - returning valid cache");
     return cache;
   } catch (error) {
     console.error('Error retrieving cached draft invoice items:', error);
@@ -51,6 +60,7 @@ export function getCachedDraftInvoiceItems(): DraftInvoiceCache | null {
 
 export function clearDraftInvoiceCache(): void {
   localStorage.removeItem(CACHE_KEY);
+  console.log('Draft invoice cache cleared');
 }
 
 export function loadCachedItemsToCart(): boolean {
@@ -104,4 +114,11 @@ export function hasCachedDraftInvoiceItems(): boolean {
     console.error('Error checking cache validity:', error);
     return false;
   }
+}
+
+export function getOriginalDraftInvoiceId(): string | null {
+  const cachedData = getCachedDraftInvoiceItems();
+  console.log("getOriginalDraftInvoiceId - cachedData:", cachedData);
+  console.log("getOriginalDraftInvoiceId - originalDraftInvoiceId:", cachedData?.originalDraftInvoiceId);
+  return cachedData?.originalDraftInvoiceId || null;
 }
