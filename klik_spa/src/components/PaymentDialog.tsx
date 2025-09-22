@@ -592,12 +592,44 @@ export default function PaymentDialog({
     // For B2B, no payment validation required - can be partial or zero payment
     setIsProcessingPayment(true);
 
+    // Calculate net amount to send to backend (amount paid minus change for B2C)
+    const netAmountToSend = isB2B ? totalPaidAmount : calculations.grandTotal;
+
+    // For B2C, adjust payment method amounts to reflect net payment (after change)
+    const adjustedPaymentMethods = isB2B
+      ? Object.entries(paymentAmounts).filter(([, amount]) => amount > 0)
+      : (() => {
+          const validPayments = Object.entries(paymentAmounts).filter(([, amount]) => amount > 0);
+
+          if (validPayments.length === 0) return [];
+
+          // Calculate total of all payment methods
+          const totalPaymentAmount = validPayments.reduce((sum, [, amount]) => sum + amount, 0);
+
+          // If total exceeds grand total, adjust the last payment method
+          if (totalPaymentAmount > calculations.grandTotal) {
+            const excess = totalPaymentAmount - calculations.grandTotal;
+            const lastPaymentIndex = validPayments.length - 1;
+            const [lastMethod, lastAmount] = validPayments[lastPaymentIndex];
+
+            // Reduce the last payment method by the excess amount
+            const adjustedLastAmount = Math.max(0, lastAmount - excess);
+
+            return validPayments.map(([method, amount], index) => {
+              if (index === lastPaymentIndex) {
+                return [method, adjustedLastAmount];
+              }
+              return [method, amount];
+            });
+          }
+
+          return validPayments;
+        })();
+
     const paymentData = {
       items: cartItems,
       customer: selectedCustomer,
-      paymentMethods: Object.entries(paymentAmounts)
-        .filter(([, amount]) => amount > 0)
-        .map(([method, amount]) => ({ method, amount })),
+      paymentMethods: adjustedPaymentMethods.map(([method, amount]) => ({ method, amount })),
       subtotal: calculations.subtotal,
       SalesTaxCharges: selectedSalesTaxCharges,
       taxAmount: calculations.taxAmount,
@@ -605,7 +637,7 @@ export default function PaymentDialog({
       couponDiscount: calculations.couponDiscount,
       roundOffAmount,
       grandTotal: calculations.grandTotal,
-      amountPaid: totalPaidAmount,
+      amountPaid: netAmountToSend, // Send net amount (grand total for B2C, total paid for B2B)
       outstandingAmount: outstandingAmount,
       appliedCoupons,
       businessType: posDetails?.business_type,
