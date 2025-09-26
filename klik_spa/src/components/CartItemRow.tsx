@@ -29,14 +29,14 @@ export default function CartItemRow({ item, onUpdateQty }: CartItemRowProps) {
       <div className="flex items-center space-x-2">
         <button
           onClick={() => onUpdateQty(item.itemCode, item.qty - 1)}
-          className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300"
+          className="w-6 h-6 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center hover:bg-gray-200"
         >
           −
         </button>
         <span className="w-8 text-center font-medium">{item.qty}</span>
         <button
           onClick={() => onUpdateQty(item.itemCode, item.qty + 1)}
-          className="w-6 h-6 rounded-full bg-green-600 text-white flex items-center justify-center hover:bg-green-700"
+          className="w-6 h-6 rounded-full bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center hover:bg-blue-100"
         >
           +
         </button>

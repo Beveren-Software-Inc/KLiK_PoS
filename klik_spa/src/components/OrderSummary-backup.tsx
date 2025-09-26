@@ -92,7 +92,7 @@ export default function OrderSummary({
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
-                    className={`${isMobile ? "w-8 h-8" : "w-6 h-6"} rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-600`}
+                    className={`${isMobile ? "w-8 h-8" : "w-6 h-6"} rounded-full bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors`}
                   >
                     <Minus size={isMobile ? 16 : 12} className="text-gray-600 dark:text-gray-400" />
                   </button>
@@ -103,9 +103,9 @@ export default function OrderSummary({
                   </span>
                   <button
                     onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-                    className={`${isMobile ? "w-8 h-8" : "w-6 h-6"} rounded-full bg-beveren-600 text-white flex items-center justify-center hover:bg-beveren-700`}
+                    className={`${isMobile ? "w-8 h-8" : "w-6 h-6"} rounded-full bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors`}
                   >
-                    <Plus size={isMobile ? 16 : 12} />
+                    <Plus size={isMobile ? 16 : 12} className="text-blue-600 dark:text-blue-400" />
                   </button>
                 </div>
                 <div className="text-right">
