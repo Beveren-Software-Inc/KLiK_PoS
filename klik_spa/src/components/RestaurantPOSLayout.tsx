@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useI18n } from "../hooks/useI18n"
 import { useProducts } from "../hooks/useProducts"
 import { usePOSDetails } from "../hooks/usePOSProfile"
-import RetailSidebar from "./RetailSidebar"
+
 import MenuGrid from "./MenuGrid"
 import OrderSummary from "./OrderSummary"
 import MobilePOSLayout from "./MobilePOSLayout"
@@ -197,11 +197,8 @@ export default function RetailPOSLayout() {
     <>
       {scannerOnlyIndicator}
       <div className="flex h-screen bg-gray-50 pb-8">
-      {/* Sidebar */}
-      <RetailSidebar />
-
       {/* Menu Section - Takes remaining space minus cart width */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden ml-20">
         <MenuGrid
           items={filteredItems}
           selectedCategory={selectedCategory}

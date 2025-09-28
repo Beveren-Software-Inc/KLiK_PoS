@@ -1,138 +1,135 @@
-### KLiK PoS
+<div align="center" markdown="1">
 
-KLiK PoS: A Modern Point of Sale for your Business
+<!-- <img src=".github/klik-logo.svg" alt="KLiK PoS logo" width="80"/> -->
+<h1>KLiK PoS</h1>
 
-### Installation
+**Modern Point of Sale for Retail Businesses**
 
-You can install this app using the [bench](https://github.com/frappe/bench) CLI:
+
+</div>
+
+<div align="center">
+	<img src="./docs/screenshots/PoS_Hero_Image.png" alt="Hero Image" width="100%" />
+</div>
+<br />
+<div align="center">
+	<a href="https://beverensoftware.com/">Website</a>
+	-
+	<a href="https://github.com/Beveren-Software-Inc/klik_pos">Documentation</a>
+</div>
+
+---
+
+## KLiK PoS
+KLiK PoS is a 100% open-source Point of Sale for ERPNext - simple, modern, responsive, and feature-rich system designed for retail businesses. 
+
+---
+
+### Motivation
+The default ERPNext PoS often fall short. They lack strong UX design, miss key compliance requirements (such as ZATCA tax regulations), and have limited social media integration—resulting in a subpar overall experience. Many of ERPNext’s older POS solutions are outdated, don’t support newer versions (v15 and above), and no longer meet today’s business needs.
+
+KLiK PoS was built to close this gap—offering a simple, modern, compliant, and feature-rich POS system designed specifically for ERPNext. Our goal is to deliver a seamless, enjoyable checkout experience—whether in-store or on the go—empowering sales teams to sell smarter, stay compliant, and serve customers with speed and confidence.
+
+---
+
+### Key Features
+
+- **ZATCA Compliance**: Built-in ZATCA compliance by default for Saudi Arabian tax regulations
+- **Flexible Sales Modes**: Supports B2C, B2B, or hybrid modes to suit different business needs
+- **Smart Invoice Sharing**: Native Email, WhatsApp, and SMS integration for seamless invoice delivery
+- **Barcode Scanner Mode**: Dedicated scanner-only mode for fast sales through barcode scanning
+- **Multi-Invoice Credit Notes**: Create credit notes for single or multiple invoices effortlessly
+- **Customer Management**: Create or edit individual or business customers directly from PoS
+- **Payment Processing**: Support for multiple payment methods with seamless round-off (write-off) handling
+
+<details>
+<summary>View Screenshots</summary>
+
+<div align="center">
+	<sub>
+		Checkout Screen
+	</sub>
+</div>
+
+![Checkout](.github/checkout.png)
+
+<div align="center">
+	<sub>
+		Mobile View
+	</sub>
+</div>
+
+![Mobile](.github/mobile.png)
+
+</details>
+
+---
+
+### Under the Hood
+
+- [**React 19**](https://react.dev/) + [**TypeScript**](https://www.typescriptlang.org/)
+- [**Vite**](https://vitejs.dev/) for lightning-fast builds
+- [**Tailwind CSS**](https://tailwindcss.com/) for styling
+- [**Zustand**](https://zustand-demo.pmnd.rs/) for state management
+- [**ERPNext API**](https://frappeframework.com/) integration
+
+---
+
+## Production Setup
+
+### Managed Hosting
+Try KLiK PoS on [Frappe Cloud](https://frappecloud.com) for a hassle-free, secure, and scalable deployment.
+
+### Self Hosting
+
+**Step 1:** Install the app using bench
 
 ```bash
 cd $PATH_TO_YOUR_BENCH
-bench get-app $URL_OF_THIS_REPO --branch develop
+bench get-app https://github.com/beverensoftware/klik_pos --branch develop
 bench install-app klik_pos
 ```
 
-### Contributing
-
-This app uses `pre-commit` for code formatting and linting. Please [install pre-commit](https://pre-commit.com/#installation) and enable it for this repository:
+**Step 2:** Start your bench
 
 ```bash
-cd apps/klik_pos
-pre-commit install
+bench start
 ```
 
-Pre-commit is configured to use the following tools for checking and formatting your code:
+**Step 3:** Access the POS at `http://your-site:8000/klik_pos`
 
-- ruff
-- eslint
-- prettier
-- pyupgrade
+---
 
-### License
+## Development Setup
 
-mit
+### Backend (Frappe App)
 
+1. [Install Frappe/ERPNext](https://frappeframework.com/docs/v15/user/en/installation)
+2. Install KLiK PoS as above
+3. Run `bench start`
 
-# KLiK PoS UI/SPA
+### Frontend (SPA)
 
-A modern, responsive Point of Sale System built with React, TypeScript, and Vite. Designed for retail businesses with both desktop and mobile interfaces.
-
-## Features
-
-- 🏪 **Complete POS System** - Full retail point of sale functionality
-- 📱 **Mobile-First Design** - Responsive UI that works on all devices
-- 👥 **Customer Management** - Add, edit, and manage customer information
-- 🛒 **Cart Management** - Intuitive cart with item management
-- 💳 **Payment Processing** - Multiple payment methods support
-- 📊 **Real-time Dashboard** - Sales analytics and reporting
-- 🌐 **Multi-language Support** - Built-in internationalization
-- 🌙 **Dark Mode** - Light and dark theme support
-- 💾 **Offline Capable** - Works offline with data synchronization
-
-## Tech Stack
-
-- **Frontend**: React 19 + TypeScript
-- **Build Tool**: Vite
-- **Styling**: Tailwind CSS
-- **State Management**: Zustand
-- **Routing**: React Router
-- **Icons**: Lucide React
-- **Backend Integration**: ERPNext API compatible
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+ 
-- npm or yarn
-
-### Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/your-org/klik_spa.git
-cd klik_spa
-```
-
+1. Clone the SPA repo:
+    ```bash
+    git clone https://github.com/beverensoftware/klik_spa.git
+    cd klik_spa
+    ```
 2. Install dependencies:
-```bash
-npm install
-# or
-yarn install
-```
-
-3. Start the development server:
-```bash
-npm run dev
-# or
-yarn dev
-```
-
+    ```bash
+    npm install
+    # or
+    yarn install
+    ```
+3. Start the dev server:
+    ```bash
+    npm run dev
+    # or
+    yarn dev
+    ```
 4. Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-## Available Scripts
-
-- `yarn dev` - Start development server
-- `yarn build` - Build for production
-- `yarn serve` - Preview production build
-- `yarn lint` - Run ESLint
-
-## Project Structure
-
-```
-src/
-├── components/     # Reusable UI components
-├── pages/         # Page components
-├── hooks/         # Custom React hooks
-├── stores/        # State management (Zustand)
-├── services/      # API services
-├── providers/     # Context providers
-└── types/         # TypeScript type definitions
-```
-
-## Configuration
-
-The application can be configured for different environments:
-
-1. **Development**: Uses mock data and development APIs
-   To fetch data currently:
-   Go to providers -> FrappeProviders -> Change to your local token
-   ```
-     <FrappeProvider
-        url="http://localhost:8000"
-        tokenParams={() => ({
-        useToken: true,
-        token: "api_key:secret_key", 
-        type: "token", 
-      })}
-    >
-      {children}
-    </FrappeProvider>
-   ```
-   Then for Item, Item Group, Sales Invoice, Contact- allow Guest to read.
-   This will change in a few once we move to production.
-3. **Production**: Connects to ERPNext backend
-4. **Offline Mode**: Local storage fallback
+---
 
 ## Contributing
 
@@ -142,11 +139,25 @@ The application can be configured for different environments:
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## License
+This app uses `pre-commit` for code formatting and linting.  
+Install and enable it:
 
-This project is proprietary software. All rights reserved.
+```bash
+cd apps/klik_pos
+pre-commit install
+```
+
+---
 
 ## Support
 
-For support and questions, please contact the development team (info@beverensoftware.com).
+For support and questions, please contact the development team at [info@beverensoftware.com](mailto:info@beverensoftware.com).
+
+---
+
+<div align="center">
+	<a href="https://beverensoftware.com" target="_blank">
+		<img src="./docs/screenshots/beveren-logo.png"" alt="Beveren Software" height="28"/>
+	</a>
+</div>
 

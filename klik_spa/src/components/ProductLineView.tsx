@@ -119,7 +119,7 @@ export default function ProductLineView({ items, onAddToCart, isMobile = false, 
                         e.stopPropagation()
                         onAddToCart(item)
                       }}
-                      className={`bg-beveren-600 hover:bg-beveren-700 text-white font-medium rounded-md transition-colors ${
+                      className={`bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-medium rounded-md transition-colors hover:bg-slate-200 dark:hover:bg-slate-600 hover:border-slate-400 dark:hover:border-slate-500 ${
                         isMobile ? "px-2 py-1 text-xs" : "px-3 py-1.5 text-sm"
                       }`}
                     >

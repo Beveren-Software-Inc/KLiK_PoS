@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useProducts } from "../hooks/useProducts"
 import { usePOSDetails } from "../hooks/usePOSProfile"
-import RetailSidebar from "./RetailSidebar"
+
 import MenuGrid from "./MenuGrid"
 import OrderSummary from "./OrderSummary"
 import MobilePOSLayout from "./MobilePOSLayout"
@@ -260,9 +260,6 @@ export default function RetailPOSLayout() {
     <>
       {scannerOnlyIndicator}
       <div className="flex h-screen bg-gray-50 dark:bg-gray-900 pb-8">
-        {/* Sidebar */}
-        <RetailSidebar />
-
         {/* Menu Section - Takes remaining space minus cart width */}
         <div className="flex-1 overflow-hidden ml-20">
           <MenuGrid

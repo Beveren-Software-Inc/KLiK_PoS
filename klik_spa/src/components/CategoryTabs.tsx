@@ -65,18 +65,17 @@ export default function CategoryTabs({
         <button
           key={category.id}
           onClick={() => onCategoryChange(category.id)}
-          className={`flex items-center space-x-2 px-3 py-2 rounded-xl whitespace-nowrap transition-all duration-200 flex-shrink-0 min-w-fit ${
+          className={`flex items-center justify-center px-3 py-2 rounded-xl whitespace-nowrap transition-all duration-200 flex-shrink-0 min-w-fit ${
             selectedCategory === category.id
-              ? "bg-beveren-600 text-white shadow-md"
-              : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+              ? "bg-beveren-50 dark:bg-beveren-900/20 text-beveren-700 dark:text-beveren-300 border border-beveren-200 dark:border-beveren-800 shadow-sm"
+              : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"
           }`}
         >
-          <span className={`${isMobile ? "text-sm" : "text-base"}`}>{category.icon}</span>
-          <div className="flex flex-col items-start">
-            <span className={`font-medium ${isMobile ? "text-xs" : "text-sm"}`}>
+          <div className="flex flex-col items-center">
+            <span className={`font-semibold ${isMobile ? "text-xs" : "text-sm"}`}>
               {category.name}
             </span>
-            <span className={`${isMobile ? "text-xs" : "text-xs"} opacity-75`}>
+            <span className={`${isMobile ? "text-xs" : "text-xs"} font-medium opacity-70`}>
               {category.count} Item{category.count !== 1 ? "s" : ""}
             </span>
           </div>
