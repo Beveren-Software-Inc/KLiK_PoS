@@ -13,9 +13,9 @@
 </div>
 <br />
 <div align="center">
-	<a href="https://klikpos.com">Website</a>
+	<a href="https://beverensoftware.com/">Website</a>
 	-
-	<a href="https://docs.klikpos.com">Documentation</a>
+	<a href="https://github.com/Beveren-Software-Inc/klik_pos">Documentation</a>
 </div>
 
 ---
@@ -131,39 +131,6 @@ bench start
 
 ---
 
-## Project Structure
-
-```
-src/
-├── components/     # Reusable UI components
-├── pages/          # Page components
-├── hooks/          # Custom React hooks
-├── stores/         # State management (Zustand)
-├── services/       # API services
-├── providers/      # Context providers
-└── types/          # TypeScript type definitions
-```
-
----
-
-## Configuration
-
-- **Development**: Uses mock data and dev APIs.  
-  Edit `FrappeProvider` in `providers/FrappeProviders` to set your local token and backend URL.
-- **Production**: Connects to ERPNext backend.
-- **Offline Mode**: Local storage fallback.
-
----
-
-## Compatibility Matrix
-
-| KLiK PoS Branch | Compatible Frappe Version |
-|-----------------|--------------------------|
-| main            | v15                      |
-| develop         | develop                  |
-
----
-
 ## Contributing
 
 1. Fork the repository
@@ -182,13 +149,6 @@ pre-commit install
 
 ---
 
-## License
-
-MIT for open-source components.  
-Contact info@beverensoftware.com for commercial licensing.
-
----
-
 ## Support
 
 For support and questions, please contact the development team at [info@beverensoftware.com](mailto:info@beverensoftware.com).
@@ -197,7 +157,7 @@ For support and questions, please contact the development team at [info@beverens
 
 <div align="center">
 	<a href="https://beverensoftware.com" target="_blank">
-		<img src="https://beverensoftware.com/logo.svg" alt="Beveren Software" height="28"/>
+		<img src="./docs/screenshots/beveren-logo.png"" alt="Beveren Software" height="28"/>
 	</a>
 </div>
 
