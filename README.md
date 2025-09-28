@@ -112,30 +112,19 @@ Defines how items are displayed on the POS screen:
         
     -   If the scanner fails, users can still click the scanner icon in the search bar to enter a barcode manually.
 <img width="2904" height="1646" alt="image (3)" src="https://github.com/user-attachments/assets/aba76c01-1cdc-48fd-9c5e-814fdfd51e36" />
-    
-<details>
-<summary>View Screenshots</summary>
-
-<div align="center">
-	<sub>
-		Checkout Screen
-	</sub>
-</div>
-
-![Checkout](.github/checkout.png)
-
-<div align="center">
-	<sub>
-		Mobile View
-	</sub>
-</div>
-
-![Mobile](.github/mobile.png)
-
-</details>
 
 ---
+### ZATCA Compliance
+KLiK PoS is fully compliant with ZATCA regulations for B2B and B2C invoices, as well as credit notes. The system has been validated and tested with the [Beveren ZATCA Integration App](https://github.com/Beveren-Software-Inc/zatca_integration). 
 
+Saudi retailers can install both applications together to achieve ZATCA Phase 2 compliance effortlessly. KLiK PoS has been successfully adopted by numerous retail businesses, including some of the largest Dates Distributor companies in the Kingdom. 
+
+<div align="center">
+	<img src="./docs/screenshots/ZATCA_Compliance.png" alt="Hero Image" width="100%" />
+</div>
+<br />
+
+---
 ### Under the Hood
 
 - [**React 19**](https://react.dev/) + [**TypeScript**](https://www.typescriptlang.org/)
