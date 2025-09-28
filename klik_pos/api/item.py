@@ -16,7 +16,7 @@ def fetch_item_balance(item_code: str, warehouse: str) -> float:
         return 0
 
 def fetch_item_price(item_code: str, price_list: str) -> dict:
-   
+
     """Get item price from Item Price doctype. If price_list is null, get latest price without price_list filter."""
     try:
         # If price_list is null or empty, get latest price without price_list filter
