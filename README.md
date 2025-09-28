@@ -47,6 +47,7 @@ After installing KLiK PoS, a few extra configurations are required inside **POS 
 ### POS Profile Settings
 
 Navigate to **POS Profile** in ERPNext and configure the following fields:
+<img width="1137" height="907" alt="image" src="https://github.com/user-attachments/assets/ce6446da-8646-4109-b1d9-bf065cbe4f4d" />
 
 -   **Business Type**  
     Defines the type of customer allowed in the POS:
@@ -72,7 +73,9 @@ Navigate to **POS Profile** in ERPNext and configure the following fields:
         
     -   Recommended: Define your own email template for a consistent branding experience.
         
--   **WhatsApp Template**  
+-   **WhatsApp Template**
+ <img width="1271" height="731" alt="Screenshot 2025-09-28 at 10 32 30" src="https://github.com/user-attachments/assets/619d9b53-e467-4c5e-bfb4-fa69cd32837e" />
+ 
     Used when sharing invoices via WhatsApp.
     
     -   Templates must be registered and approved in the **WhatsApp Template** doctype.
@@ -80,8 +83,9 @@ Navigate to **POS Profile** in ERPNext and configure the following fields:
     -   If left blank, a fallback default will be used.
         
 -   **Default View**  
-    Defines how items are displayed on the POS screen:
-    
+Defines how items are displayed on the POS screen:
+        <img width="2922" height="1660" alt="image (1)" src="https://github.com/user-attachments/assets/00f7fb5b-7a63-4060-892f-d20d02b04462" />
+
     -   **List View** → Compact list-style layout.
         
     -   **Grid View** → Grid-style product cards (recommended for retail).
@@ -107,7 +111,7 @@ Navigate to **POS Profile** in ERPNext and configure the following fields:
     -   Disables manual click-based item selection.
         
     -   If the scanner fails, users can still click the scanner icon in the search bar to enter a barcode manually.
-
+<img width="2904" height="1646" alt="image (3)" src="https://github.com/user-attachments/assets/aba76c01-1cdc-48fd-9c5e-814fdfd51e36" />
     
 <details>
 <summary>View Screenshots</summary>
