@@ -42,6 +42,73 @@ KLiK PoS was built to close this gap—offering a simple, modern, compliant, and
 - **Customer Management**: Create or edit individual or business customers directly from PoS
 - **Payment Processing**: Support for multiple payment methods with seamless round-off (write-off) handling
 
+After installing KLiK PoS, a few extra configurations are required inside **POS Profile** and **KLiK PoS Settings** to unlock the full functionality.
+
+### POS Profile Settings
+
+Navigate to **POS Profile** in ERPNext and configure the following fields:
+
+-   **Business Type**  
+    Defines the type of customer allowed in the POS:
+    
+    -   **B2C** → For walk-in individual customers. Payment is required immediately at checkout.
+        
+    -   **B2B** → For company customers. Sales can be completed on credit (Can make instant payment, partial payment or pay later).
+        
+    -   **B2C & B2B** → Both types allowed.  
+        This directly controls how customers are fetched (Individual vs. Company) and whether credit sales are permitted.
+        
+-   **POS Print Format**  
+    Select the print format to use when an invoice is submitted.
+    
+    -   Default: Thermal printer–friendly format.
+        
+    -   Custom formats: You may create your own print formats and select them here.
+        
+-   **Email Template**  
+    Used when sending invoices via email.
+    
+    -   If blank, a default template is used.
+        
+    -   Recommended: Define your own email template for a consistent branding experience.
+        
+-   **WhatsApp Template**  
+    Used when sharing invoices via WhatsApp.
+    
+    -   Templates must be registered and approved in the **WhatsApp Template** doctype.
+        
+    -   If left blank, a fallback default will be used.
+        
+-   **Default View**  
+    Defines how items are displayed on the POS screen:
+    
+    -   **List View** → Compact list-style layout.
+        
+    -   **Grid View** → Grid-style product cards (recommended for retail).
+        
+-   **Hide Expected Amount**  
+    Controls cashier visibility at POS closing shift:
+    
+    -   Enabled → Cashiers do not see the day’s expected sales amount; they must enter their counted cash manually.
+        
+    -   Disabled → Cashiers see the expected amount before submitting closing entry.  
+        _Admins and System Managers always have full visibility regardless of this setting._
+        
+-   **Enable WhatsApp / Enable SMS**
+    
+    -   Enable these only if WhatsApp or SMS gateways are properly configured.
+        
+    -   If not configured, leave unchecked to avoid errors during invoice sharing.
+        
+-   **Use Scanner Fully**
+    
+    -   When enabled, items can only be added via barcode scanner.
+        
+    -   Disables manual click-based item selection.
+        
+    -   If the scanner fails, users can still click the scanner icon in the search bar to enter a barcode manually.
+
+    
 <details>
 <summary>View Screenshots</summary>
 
