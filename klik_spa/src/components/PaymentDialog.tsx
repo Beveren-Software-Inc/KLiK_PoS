@@ -58,6 +58,8 @@ interface PaymentDialogProps {
   isFullPage?: boolean;
   initialSharingMode?: string | null;
   externalInvoiceData?: any; // For invoice sharing
+  itemDiscounts?: any; // Batch and discount information
+  totalItemDiscount?: number;
 }
 
 interface PaymentMethod {
@@ -114,6 +116,8 @@ export default function PaymentDialog({
   isFullPage = false,
   initialSharingMode = null,
   externalInvoiceData = null,
+  itemDiscounts = {},
+  totalItemDiscount = 0,
 }: PaymentDialogProps) {
   const [selectedSalesTaxCharges, setSelectedSalesTaxCharges] = useState("");
   const [paymentAmounts, setPaymentAmounts] = useState<PaymentAmount>({});
@@ -640,7 +644,11 @@ export default function PaymentDialog({
         })();
 
     const paymentData = {
-      items: cartItems,
+      items: cartItems.map(item => ({
+        ...item,
+        batchNumber: itemDiscounts[item.id]?.batchNumber || null,
+        serialNumber: itemDiscounts[item.id]?.serialNumber || null,
+      })),
       customer: selectedCustomer,
       paymentMethods: adjustedPaymentMethods.map(([method, amount]) => ({ method, amount })),
       subtotal: calculations.subtotal,
@@ -658,7 +666,6 @@ export default function PaymentDialog({
 
     try {
       const response = await createSalesInvoice(paymentData);
-      console.log("Data", paymentData);
       setInvoiceSubmitted(true);
       setSubmittedInvoice(response);
       setInvoiceData(response.invoice);
@@ -670,26 +677,23 @@ export default function PaymentDialog({
 
       // Delete original draft invoice if it exists (from Edit → Go to Cart workflow)
       const originalDraftInvoiceId = getOriginalDraftInvoiceId();
-      console.log("Checking for original draft invoice to delete:", originalDraftInvoiceId);
+      // console.log("Checking for original draft invoice to delete:", originalDraftInvoiceId);
 
       if (originalDraftInvoiceId) {
         try {
-          console.log(`Attempting to delete original draft invoice: ${originalDraftInvoiceId}`);
           const deleteResult = await deleteDraftInvoice(originalDraftInvoiceId);
-          console.log(`Original draft invoice ${originalDraftInvoiceId} deleted successfully:`, deleteResult);
         } catch (deleteError) {
           console.error("Failed to delete original draft invoice:", deleteError);
           // Don't show error to user as the main invoice was created successfully
         }
       } else {
-        console.log("No original draft invoice found to delete");
+        console.log();
       }
 
       // Clear draft invoice cache since payment is completed
       clearDraftInvoiceCache();
 
       // Don't clear cart immediately - let modal stay open for invoice preview
-      console.log("Invoice created successfully - modal stays open for preview");
     } catch (err) {
       const errorMessage = isB2B
         ? "Failed to submit invoice"

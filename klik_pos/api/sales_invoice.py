@@ -617,7 +617,12 @@ def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,
         if not expense_account:
             frappe.throw(f"Expense account not found for item {item.get('id')}. Please check item defaults or company settings.")
 
-        doc.append("items", {
+        # Check if item has batch tracking
+        item_doc = frappe.get_doc("Item", item.get("id"))
+        has_batch_no = item_doc.has_batch_no
+
+        # Prepare item data
+        item_data = {
             "item_code": item.get("id"),
             "qty": item.get("quantity"),
             "rate": item.get("price"),
@@ -625,7 +630,24 @@ def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,
             "expense_account": expense_account,
             "warehouse": pos_profile.warehouse,
             "cost_center": pos_profile.cost_center
-        })
+        }
+
+        # Handle batch information if item has batch tracking
+        if has_batch_no:
+            batch_number = item.get("batchNumber")
+            if batch_number:
+                # User selected a specific batch - use serial/batch fields
+                item_data["use_serial_batch_fields"] = 1
+                item_data["batch_no"] = batch_number
+            # If no batch selected, leave use_serial_batch_fields = 0 for FIFO
+
+        # Handle serial number if provided
+        serial_number = item.get("serialNumber")
+        if serial_number:
+            item_data["use_serial_batch_fields"] = 1
+            item_data["serial_no"] = serial_number
+
+        doc.append("items", item_data)
 
     # If taxes_and_charges is set, populate taxes manually
     if doc.taxes_and_charges:

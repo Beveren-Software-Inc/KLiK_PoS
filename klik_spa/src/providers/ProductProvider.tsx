@@ -12,6 +12,7 @@ interface ProductContextType {
   refreshStockOnly: () => Promise<void>;
   updateStockOnly: (itemCode: string, newStock: number) => void;
   updateStockForItems: (itemCodes: string[]) => Promise<void>;
+  updateBatchQuantitiesForItems: (itemCodes: string[]) => Promise<void>;
   count: number;
   lastUpdated: Date | null;
 }
@@ -99,7 +100,7 @@ export function ProductProvider({ children }: ProductProviderProps) {
   // Fetch only stock updates - with fallback to batch API
   const fetchStockUpdates = async (): Promise<Record<string, number>> => {
     try {
-      console.log("Fetching stock updates from API...");
+      // console.log("Fetching stock updates from API...");
       const response = await fetch('/api/method/klik_pos.api.item.get_stock_updates');
 
       if (!response.ok) {
@@ -255,6 +256,53 @@ export function ProductProvider({ children }: ProductProviderProps) {
     }
   }, []);
 
+  // Update batch quantities for specific items (for real-time batch updates)
+  const updateBatchQuantitiesForItems = useCallback(async (itemCodes: string[]) => {
+    if (itemCodes.length === 0) return;
+
+    try {
+      console.log(`Updating batch quantities for ${itemCodes.length} items:`, itemCodes);
+
+      // Update batch quantities for each item individually
+      const batchUpdatePromises = itemCodes.map(async (itemCode) => {
+        try {
+          const response = await fetch(
+            `/api/method/klik_pos.api.item.get_batch_nos_with_qty?item_code=${encodeURIComponent(itemCode)}`
+          );
+          const resData = await response.json();
+          console.log(`Batch API response for ${itemCode}:`, resData);
+
+          if (resData?.message && Array.isArray(resData.message)) {
+            console.log(`Valid batch data for ${itemCode}:`, resData.message);
+            return { itemCode, batches: resData.message };
+          }
+          console.log(`No valid batch data for ${itemCode}`);
+          return null;
+        } catch (error) {
+          console.error(`Failed to update batch quantities for ${itemCode}:`, error);
+          return null;
+        }
+      });
+
+      const batchResults = await Promise.all(batchUpdatePromises);
+      const validResults = batchResults.filter(result => result !== null);
+
+      if (validResults.length > 0) {
+        console.log(`Updated batch quantities for ${validResults.length} items`);
+        console.log('Dispatching batchQuantitiesUpdated event with data:', validResults);
+        // Trigger a custom event to notify components about batch updates
+        window.dispatchEvent(new CustomEvent('batchQuantitiesUpdated', {
+          detail: { updatedItems: validResults }
+        }));
+        console.log('batchQuantitiesUpdated event dispatched successfully');
+      } else {
+        console.log('No valid batch results to dispatch');
+      }
+    } catch (error) {
+      console.error('Failed to update batch quantities for items:', error);
+    }
+  }, []);
+
   const refetchProducts = async () => {
     console.log("Force refreshing products...");
     await fetchProducts(true);
@@ -322,6 +370,7 @@ export function ProductProvider({ children }: ProductProviderProps) {
     refreshStockOnly,
     updateStockOnly,
     updateStockForItems,
+    updateBatchQuantitiesForItems,
     count: products.length,
     lastUpdated,
   };

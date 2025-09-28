@@ -13,12 +13,13 @@ interface UseProductsReturn {
   refreshStockOnly: () => Promise<boolean>;
   updateStockOnly: (itemCode: string, newStock: number) => void;
   updateStockForItems: (itemCodes: string[]) => Promise<void>;
+  updateBatchQuantitiesForItems: (itemCodes: string[]) => Promise<void>;
   count: number;
   lastUpdated: Date | null;
 }
 
 type Batch = {
-  batch_no: string;
+  batch_id: string;
   qty: number;
 };
 
@@ -28,6 +29,7 @@ type UseBatchReturn = {
   error: string | null;
   refetch: () => void;
   count: number;
+  updateBatchQuantities: (itemCode: string) => Promise<void>;
 };
 
 // Re-export the context hook for backward compatibility
@@ -42,6 +44,7 @@ export function useProducts(): UseProductsReturn {
     refreshStockOnly: context.refreshStockOnly,
     updateStockOnly: context.updateStockOnly,
     updateStockForItems: context.updateStockForItems,
+    updateBatchQuantitiesForItems: context.updateBatchQuantitiesForItems,
     count: context.products.length,
     lastUpdated: context.lastUpdated,
   };
@@ -81,11 +84,31 @@ export function useBatchData(itemCode: string, warehouse: string): UseBatchRetur
     }
   }, [itemCode, warehouse]);
 
+  // Function to update batch quantities for a specific item
+  const updateBatchQuantities = async (targetItemCode: string): Promise<void> => {
+    if (targetItemCode !== itemCode) return; // Only update if it's the same item
+
+    try {
+      const response = await fetch(
+        `/api/method/klik_pos.api.item.get_batch_nos_with_qty?item_code=${encodeURIComponent(targetItemCode)}`
+      );
+      const resData = await response.json();
+
+      if (resData?.message && Array.isArray(resData.message)) {
+        setBatches(resData.message);
+        console.log(`Updated batch quantities for ${targetItemCode}:`, resData.message);
+      }
+    } catch (error: any) {
+      console.error("Error updating batch quantities:", error);
+    }
+  };
+
   return {
     batches,
     isLoading,
     error: errorMessage,
     refetch: fetchBatches,
     count: batches.length,
+    updateBatchQuantities,
   };
 }
