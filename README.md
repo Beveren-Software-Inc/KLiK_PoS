@@ -1,6 +1,6 @@
 <div align="center" markdown="1">
 
-<img src=".github/klik-logo.svg" alt="KLiK PoS logo" width="80"/>
+<!-- <img src=".github/klik-logo.svg" alt="KLiK PoS logo" width="80"/> -->
 <h1>KLiK PoS</h1>
 
 **Modern Point of Sale for Retail Businesses**
@@ -9,7 +9,7 @@
 </div>
 
 <div align="center">
-	<img src="./.github/hero.png" alt="Hero Image" width="100%" />
+	<img src="./docs/screenshots/PoS_Hero_Image.png" alt="Hero Image" width="100%" />
 </div>
 <br />
 <div align="center">
@@ -21,27 +21,26 @@
 ---
 
 ## KLiK PoS
-KLiK PoS is a modern, responsive, and feature-rich Point of Sale system designed for retail businesses. It offers a seamless experience for both desktop and mobile, with robust integrations to ERPNext.
+KLiK PoS is a 100% open-source Point of Sale for ERPNext - simple, modern, responsive, and feature-rich system designed for retail businesses. 
 
 ---
 
 ### Motivation
-Retailers need a fast, reliable, and beautiful POS that works everywhere. KLiK PoS was built to solve the pain points of legacy POS systems: clunky UI, poor offline support, and limited extensibility. Our goal is to deliver a delightful checkout experience for staff and customers alike.
+The default ERPNext PoS often fall short. They lack strong UX design, miss key compliance requirements (such as ZATCA tax regulations), and have limited social media integration—resulting in a subpar overall experience. Many of ERPNext’s older POS solutions are outdated, don’t support newer versions (v15 and above), and no longer meet today’s business needs.
+
+KLiK PoS was built to close this gap—offering a simple, modern, compliant, and feature-rich POS system designed specifically for ERPNext. Our goal is to deliver a seamless, enjoyable checkout experience—whether in-store or on the go—empowering sales teams to sell smarter, stay compliant, and serve customers with speed and confidence.
 
 ---
 
 ### Key Features
 
-- **Complete POS System**: Full retail point of sale functionality
-- **Mobile-First Design**: Responsive UI for all devices
-- **Customer Management**: Add, edit, and manage customers
-- **Cart Management**: Intuitive cart with item management
-- **Payment Processing**: Multiple payment methods
-- **Real-time Dashboard**: Sales analytics and reporting
-- **Multi-language Support**: Built-in internationalization
-- **Dark Mode**: Light and dark themes
-- **Offline Capable**: Works offline with data sync
-- **ERPNext Integration**: Seamless backend connectivity
+- **ZATCA Compliance**: Built-in ZATCA compliance by default for Saudi Arabian tax regulations
+- **Flexible Sales Modes**: Supports B2C, B2B, or hybrid modes to suit different business needs
+- **Smart Invoice Sharing**: Native Email, WhatsApp, and SMS integration for seamless invoice delivery
+- **Barcode Scanner Mode**: Dedicated scanner-only mode for fast sales through barcode scanning
+- **Multi-Invoice Credit Notes**: Create credit notes for single or multiple invoices effortlessly
+- **Customer Management**: Create or edit individual or business customers directly from PoS
+- **Payment Processing**: Support for multiple payment methods with seamless round-off (write-off) handling
 
 <details>
 <summary>View Screenshots</summary>
