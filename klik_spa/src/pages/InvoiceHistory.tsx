@@ -811,7 +811,7 @@ const getStatusBadge = (status: string) => {
   };
 
   const handleMultiReturnSuccess = (returnInvoices: string[]) => {
-    toast.success(`Created ${returnInvoices.length} return invoices successfully`);
+    // toast.success(`Created ${returnInvoices.length} return invoices successfully`);
     setShowMultiReturn(false);
     setSelectedCustomer("");
   };
