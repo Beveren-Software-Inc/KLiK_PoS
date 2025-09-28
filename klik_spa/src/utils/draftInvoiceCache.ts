@@ -78,7 +78,6 @@ export function loadCachedItemsToCart(): boolean {
 
   // Add cached items to cart
   for (const item of cachedData.items) {
-    // Convert CartItem to the format expected by addToCart
     const cartItem = {
       id: item.id,
       name: item.name,
