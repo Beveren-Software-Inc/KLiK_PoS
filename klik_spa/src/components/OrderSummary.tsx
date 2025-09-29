@@ -117,6 +117,8 @@ interface UOMSelectFieldProps {
 const UOMSelectField = ({ item, onUOMChange, isMobile }: UOMSelectFieldProps) => {
   const [availableUOMs, setAvailableUOMs] = useState<string[]>(['Nos']); // Start with Nos as default
   const [selectedUOM, setSelectedUOM] = useState<string>(item.uom || 'Nos'); // Local state for selected UOM
+  const [searchQuery, setSearchQuery] = useState<string>(''); // Search query for UOM filtering
+  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false); // Control dropdown visibility
 
   useEffect(() => {
     const loadUOMs = async () => {
@@ -158,74 +160,123 @@ const UOMSelectField = ({ item, onUOMChange, isMobile }: UOMSelectFieldProps) =>
     setSelectedUOM(item.uom || 'Nos');
   }, [item.uom]);
 
-  return (
-    <select
-      value={selectedUOM}
-      onChange={async (e) => {
-        const newUOM = e.target.value;
-        console.log(`🔄 UOM Change Started:`);
-        console.log(`  Item: ${item.name} (${item.id})`);
-        console.log(`  Current UOM: ${item.uom || 'Nos'}`);
-        console.log(`  New UOM: ${newUOM}`);
-        console.log(`  Current Price: $${item.price}`);
+  // Filter UOMs based on search query
+  const filteredUOMs = availableUOMs.filter(uom =>
+    uom.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-        // Update local state immediately for UI responsiveness
-        setSelectedUOM(newUOM);
+  const handleUOMSelect = async (newUOM: string) => {
+    console.log(`🔄 UOM Change Started:`);
+    console.log(`  Item: ${item.name} (${item.id})`);
+    console.log(`  Current UOM: ${item.uom || 'Nos'}`);
+    console.log(`  New UOM: ${newUOM}`);
+    console.log(`  Current Price: $${item.price}`);
 
-        // Update UOM and price using item UOMs and prices API
-        try {
-          // Use item_code if available, otherwise fallback to item.id
-          const itemCode = item.item_code || item.id;
-          if (itemCode) {
-            console.log(`📡 API Call: get_item_uoms_and_prices for ${itemCode}`);
-            const response = await fetch(`/api/method/klik_pos.api.item.get_item_uoms_and_prices?item_code=${itemCode}`, {
-              method: 'GET',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include'
-            });
+    // Update local state immediately for UI responsiveness
+    setSelectedUOM(newUOM);
+    setIsDropdownOpen(false);
+    setSearchQuery('');
 
-            if (response.ok) {
-              const data = await response.json();
-              console.log(`📦 API Response:`, data.message);
+    // Update UOM and price using item UOMs and prices API
+    try {
+      // Use item_code if available, otherwise fallback to item.id
+      const itemCode = item.item_code || item.id;
+      if (itemCode) {
+        console.log(`📡 API Call: get_item_uoms_and_prices for ${itemCode}`);
+        const response = await fetch(`/api/method/klik_pos.api.item.get_item_uoms_and_prices?item_code=${itemCode}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include'
+        });
 
-              if (data?.message?.uoms) {
-                const selectedUOMData = data.message.uoms.find((uom: any) => uom.uom === newUOM);
-                if (selectedUOMData) {
-                  // Update cart item with new UOM and price
-                  console.log(`✅ UOM Price Found:`);
-                  console.log(`  UOM: ${selectedUOMData.uom}`);
-                  console.log(`  Price: $${selectedUOMData.price}`);
-                  console.log(`  Conversion Factor: ${selectedUOMData.conversion_factor}`);
-                  console.log(`  Price Change: $${item.price} → $${selectedUOMData.price}`);
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`📦 API Response:`, data.message);
 
-                  onUOMChange(item.id, newUOM, selectedUOMData.price);
-                } else {
-                  console.log(`❌ No UOM data found for ${newUOM}`);
-                  console.log(`Available UOMs:`, data.message.uoms.map((u: any) => u.uom));
-                }
-              } else {
-                console.log(`❌ No UOMs data in API response`);
-              }
+          if (data?.message?.uoms) {
+            const selectedUOMData = data.message.uoms.find((uom: any) => uom.uom === newUOM);
+            if (selectedUOMData) {
+              // Update cart item with new UOM and price
+              console.log(`✅ UOM Price Found:`);
+              console.log(`  UOM: ${selectedUOMData.uom}`);
+              console.log(`  Price: $${selectedUOMData.price}`);
+              console.log(`  Conversion Factor: ${selectedUOMData.conversion_factor}`);
+              console.log(`  Price Change: $${item.price} → $${selectedUOMData.price}`);
+
+              onUOMChange(item.id, newUOM, selectedUOMData.price);
             } else {
-              console.log(`❌ API call failed:`, response.status, response.statusText);
+              console.log(`❌ No UOM data found for ${newUOM}`);
+              console.log(`Available UOMs:`, data.message.uoms.map((u: any) => u.uom));
             }
           } else {
-            console.log(`❌ No item_code or id found for item:`, item);
+            console.log(`❌ No UOMs data in API response`);
           }
-        } catch (error) {
-          console.error('❌ Error fetching UOM pricing:', error);
+        } else {
+          console.log(`❌ API call failed:`, response.status, response.statusText);
         }
-      }}
-      className={`w-full ${
-        isMobile ? "text-sm" : "text-sm"
-      } px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
-    >
-      {availableUOMs.map((uom) => (
-        <option key={uom} value={uom}>
-          {uom}
-        </option>
-      ))}
-    </select>
+      } else {
+        console.log(`❌ No item_code or id found for item:`, item);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching UOM pricing:', error);
+    }
+  };
+
+  return (
+    <div className="relative">
+      {/* UOM Display Button */}
+      <button
+        type="button"
+        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+        className={`w-full ${
+          isMobile ? "text-sm" : "text-sm"
+        } px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-left flex items-center justify-between`}
+      >
+        <span>{selectedUOM}</span>
+        <svg className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {/* Dropdown */}
+      {isDropdownOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-hidden">
+          {/* Search Input */}
+          <div className="p-2 border-b border-gray-200 dark:border-gray-600">
+            <input
+              type="text"
+              placeholder="Search UOM..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              autoFocus
+            />
+          </div>
+
+          {/* UOM List */}
+          <div className="max-h-48 overflow-y-auto">
+            {filteredUOMs.length > 0 ? (
+              filteredUOMs.map((uom) => (
+                <button
+                  key={uom}
+                  type="button"
+                  onClick={() => handleUOMSelect(uom)}
+                  className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                    uom === selectedUOM ? 'bg-beveren-50 dark:bg-beveren-900/20 text-beveren-600 dark:text-beveren-400' : 'text-gray-900 dark:text-white'
+                  }`}
+                >
+                  {uom}
+                </button>
+              ))
+            ) : (
+              <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+                No UOMs found
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
