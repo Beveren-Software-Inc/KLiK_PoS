@@ -1,7 +1,11 @@
 import frappe
 from frappe import _
+import random
+import string
 from erpnext.stock.utils import get_stock_balance
 from klik_pos.klik_pos.utils import get_current_pos_profile
+from erpnext.stock.doctype.batch.batch import get_batch_qty
+
 
 def pos_details():
     pos = get_current_pos_profile
@@ -386,6 +390,7 @@ def get_item_groups_for_pos():
         frappe.log_error(frappe.get_traceback(), "Get Item Groups for POS Error")
         frappe.throw(_("Something went wrong while fetching item group data."))
 
+ 
 @frappe.whitelist()
 def get_batch_nos_with_qty(item_code):
     """
@@ -397,30 +402,24 @@ def get_batch_nos_with_qty(item_code):
 
     if not item_code or not warehouse:
         return []
-    # frappe.throw(str(item_code))
-    # Query batches with quantity > 0 from tabBatch and tabBatch Stock (Bin-like)
-    batch_qty_data = frappe.db.sql("""
-        SELECT
-            b.batch_id AS batch_id,
-            bs.batch_qty AS qty
-        FROM
-            `tabBatch` b
-        INNER JOIN
-            `tabBatch` bs ON bs.batch_id = b.name
-        WHERE
-            b.item = %(item_code)s
-            AND bs.batch_qty > 0
-        ORDER BY
-            b.batch_id ASC
-    """, {
-        "item_code": item_code,
-        "warehouse": warehouse
-    }, as_dict=True)
+
+    # Get all batches for the item
+    batches = frappe.get_all("Batch",
+        filters={"item": item_code},
+        fields=["name", "batch_id", "expiry_date"]
+    )
+
+    batch_qty_data = []
+    for b in batches:
+        qty = get_batch_qty(batch_no=b.name, warehouse=warehouse)
+        if qty > 0:
+            batch_qty_data.append({
+                "batch_id": b.batch_id,
+                "qty": qty
+            })
+
     return batch_qty_data
 
-
-import random
-import string
 
 @frappe.whitelist()
 def create_random_items():
