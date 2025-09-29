@@ -433,17 +433,17 @@ def get_item_uoms_and_prices(item_code):
     try:
         # Get item document to check base UOM and conversion rates
         item_doc = frappe.get_doc("Item", item_code)
-        
+
         # Get all UOMs for this item from Item UOM child table
         uom_data = []
-        
+
         # Add base UOM
         uom_data.append({
             "uom": item_doc.stock_uom,
             "conversion_factor": 1.0,
             "price": 0.0
         })
-        
+
         # Add additional UOMs from Item UOM child table
         for uom_row in item_doc.get("uoms", []):
             uom_data.append({
@@ -451,7 +451,7 @@ def get_item_uoms_and_prices(item_code):
                 "conversion_factor": uom_row.conversion_factor,
                 "price": 0.0
             })
-        
+
         # Get prices for each UOM from Item Price doctype
         for uom_info in uom_data:
             price_list_rate = frappe.db.get_value(
@@ -463,7 +463,7 @@ def get_item_uoms_and_prices(item_code):
                 },
                 "price_list_rate"
             )
-            
+
             if price_list_rate:
                 uom_info["price"] = float(price_list_rate)
             else:
@@ -477,7 +477,7 @@ def get_item_uoms_and_prices(item_code):
                     },
                     "price_list_rate"
                 )
-                
+
                 if base_price:
                     # Convert price based on UOM conversion factor
                     converted_price = float(base_price) * uom_info["conversion_factor"]
@@ -487,38 +487,38 @@ def get_item_uoms_and_prices(item_code):
                     valuation_rate = frappe.db.get_value("Item", item_code, "valuation_rate") or 0
                     converted_price = float(valuation_rate) * uom_info["conversion_factor"]
                     uom_info["price"] = converted_price
-        
+
         return {
             "base_uom": item_doc.stock_uom,
             "uoms": uom_data
         }
-        
+
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), f"Get Item UOMs Error for {item_code}")
         return {"base_uom": "Nos", "uoms": [{"uom": "Nos", "conversion_factor": 1.0, "price": 0.0}]}
 
 
-@frappe.whitelist()
-def create_random_items():
-    created = 0
-    for i in range(500):
-        item_code = "ITM-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-        item_name = "Random Item " + str(i+1)
+# @frappe.whitelist()
+# def create_random_items():
+#     created = 0
+#     for i in range(500):
+#         item_code = "ITM-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+#         item_name = "Random Item " + str(i+1)
 
-        item = frappe.get_doc({
-            "doctype": "Item",
-            "item_code": item_code,
-            "item_name": item_name,
-            "item_group": "All Item Groups",
-            "stock_uom": "Nos",
-            "is_stock_item": 1,
-        })
+#         item = frappe.get_doc({
+#             "doctype": "Item",
+#             "item_code": item_code,
+#             "item_name": item_name,
+#             "item_group": "All Item Groups",
+#             "stock_uom": "Nos",
+#             "is_stock_item": 1,
+#         })
 
-        try:
-            item.insert(ignore_permissions=True)
-            created += 1
-        except Exception as e:
-            frappe.log_error(f"Error creating item {item_code}: {str(e)}")
+#         try:
+#             item.insert(ignore_permissions=True)
+#             created += 1
+#         except Exception as e:
+#             frappe.log_error(f"Error creating item {item_code}: {str(e)}")
 
-    frappe.db.commit()
-    return f"{created} random items created successfully!"
+#     frappe.db.commit()
+#     return f"{created} random items created successfully!"

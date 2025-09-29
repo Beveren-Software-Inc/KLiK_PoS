@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { getItemUOMsAndPrices } from '../services/uomService';
+import { getItemUOMsAndPrices, getAllUOMs } from '../services/uomService';
 
 interface UOMData {
   uom: string;
@@ -32,8 +32,18 @@ export function useUOMs() {
     }
   }, []);
 
+  const getAllAvailableUOMs = useCallback(async (): Promise<string[]> => {
+    try {
+      return await getAllUOMs();
+    } catch (error) {
+      console.error('Error fetching all UOMs:', error);
+      return ['Nos', 'Box', 'Kilogram', 'Liter', 'Meter', 'Dozen']; // Fallback
+    }
+  }, []);
+
   return {
     getUOMsAndPrices,
-    loadingUOMs
+    loadingUOMs,
+    getAllAvailableUOMs
   };
 }

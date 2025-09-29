@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Minus,
   Plus,
@@ -110,25 +110,97 @@ const QuantityInput = ({ item, onUpdateQuantity, isMobile }: QuantityInputProps)
 // Simple UOM Select Field Component
 interface UOMSelectFieldProps {
   item: CartItem;
+  onUOMChange: (itemId: string, selectedUOM: string, newPrice: number) => void;
   isMobile?: boolean;
 }
 
-const UOMSelectField = ({ item, isMobile }: UOMSelectFieldProps) => {
-  // For now, just show basic UOM options - we'll enhance this later
-  const basicUOMs = ['Nos', 'Box', 'Kilogram', 'Liter', 'Meter', 'Dozen'];
+const UOMSelectField = ({ item, onUOMChange, isMobile }: UOMSelectFieldProps) => {
+  const [availableUOMs, setAvailableUOMs] = useState<string[]>(['Nos']); // Start with Nos as default
+  const [selectedUOM, setSelectedUOM] = useState<string>(item.uom || 'Nos'); // Local state for selected UOM
+
+  useEffect(() => {
+    const loadUOMs = async () => {
+      try {
+        const response = await fetch(`/api/method/frappe.client.get_list`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            doctype: "UOM",
+            fields: ["name"],
+            filters: {},
+            limit_page_length: 500
+          })
+        });
+
+        if (!response.ok) throw new Error('Failed to fetch UOMs');
+
+        const data = await response.json();
+        if (data?.message) {
+          const uoms = data.message.map((uom: any) => uom.name).sort();
+          setAvailableUOMs(uoms);
+        } else {
+          // Fallback to basic UOMs
+          setAvailableUOMs(['Nos', 'Box', 'Kilogram', 'Liter', 'Meter', 'Dozen']);
+        }
+      } catch (error) {
+        console.error('Error loading UOMs:', error);
+        // Fallback to basic UOMs
+        setAvailableUOMs(['Nos', 'Box', 'Kilogram', 'Liter', 'Meter', 'Dozen']);
+      }
+    };
+
+    loadUOMs();
+  }, []);
+
+  // Sync local state with item UOM changes
+  useEffect(() => {
+    setSelectedUOM(item.uom || 'Nos');
+  }, [item.uom]);
 
   return (
     <select
-      value={item.uom || 'Nos'}
-      onChange={(e) => {
-        // For now, just log - we'll implement price update logic later
-        console.log(`UOM changed to: ${e.target.value}`);
+      value={selectedUOM}
+      onChange={async (e) => {
+        const newUOM = e.target.value;
+        console.log(`UOM changed to: ${newUOM}`);
+
+        // Update local state immediately for UI responsiveness
+        setSelectedUOM(newUOM);
+
+        // Update UOM and price using item UOMs and prices API
+        try {
+          if (item.item_code) {
+            const response = await fetch(`/api/method/klik_pos.api.item.get_item_uoms_and_prices?item_code=${item.item_code}`, {
+              method: 'GET',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include'
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              if (data?.message?.uoms) {
+                const selectedUOMData = data.message.uoms.find((uom: any) => uom.uom === newUOM);
+                if (selectedUOMData) {
+                  // Update cart item with new UOM and price
+                  console.log(`✅ UOM Price Found: ${newUOM} = $${selectedUOMData.price}`);
+                  console.log(`Selected UOM data:`, selectedUOMData);
+                  onUOMChange(item.id, newUOM, selectedUOMData.price);
+                } else {
+                  console.log(`❌ No UOM data found for ${newUOM}`);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching UOM pricing:', error);
+        }
       }}
       className={`w-full ${
         isMobile ? "text-sm" : "text-sm"
       } px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
     >
-      {basicUOMs.map((uom) => (
+      {availableUOMs.map((uom) => (
         <option key={uom} value={uom}>
           {uom}
         </option>
@@ -148,7 +220,7 @@ export default function OrderSummary({
   isMobile = false,
 }: OrderSummaryProps) {
   const [showCouponPopover, setShowCouponPopover] = useState(false);
-  const { selectedCustomer, setSelectedCustomer } = useCartStore();
+  const { selectedCustomer, setSelectedCustomer, updateUOM } = useCartStore();
 
   // Track if user has manually removed the default customer
   const [userRemovedDefaultCustomer, setUserRemovedDefaultCustomer] = useState(false);
@@ -178,6 +250,25 @@ export default function OrderSummary({
 
   const currency = posDetails?.currency;
   const currency_symbol = posDetails?.currency_symbol;
+
+  // UOM change handler
+  const handleUOMChange = useCallback((itemId: string, selectedUOM: string, newPrice: number) => {
+    console.log(`Changing UOM for item ${itemId} to ${selectedUOM} with price ${newPrice}`);
+
+    // Update the cart item with new UOM and price using the cart store
+    updateUOM(itemId, selectedUOM, newPrice);
+
+    // Debug: Check if the cart item was updated
+    setTimeout(() => {
+      const updatedItem = cartItems.find(item => item.id === itemId);
+      console.log(`🛒 Cart Updated - Item ${itemId}:`, {
+        name: updatedItem?.name,
+        uom: updatedItem?.uom,
+        price: updatedItem?.price,
+        quantity: updatedItem?.quantity
+      });
+    }, 100);
+  }, [updateUOM, cartItems]);
   // State for item-level discounts and details
   const [itemDiscounts, setItemDiscounts] = useState<
     Record<
@@ -1160,7 +1251,7 @@ export default function OrderSummary({
                             <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
                               UOM
                             </label>
-                            <UOMSelectField item={item} isMobile={isMobile} />
+                            <UOMSelectField item={item} onUOMChange={handleUOMChange} isMobile={isMobile} />
                           </div>
                         </div>
 

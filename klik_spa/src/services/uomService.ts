@@ -41,6 +41,41 @@ export async function getItemUOMsAndPrices(itemCode: string): Promise<UOMsAndPri
   }
 }
 
+export async function getAllUOMs(): Promise<string[]> {
+  try {
+    const response = await fetch(`/api/method/frappe.client.get_list`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        doctype: "UOM",
+        fields: ["name"],
+        filters: {},
+        limit_page_length: 500
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to fetch UOMs');
+    }
+
+    if (data?.message) {
+      return data.message.map((uom: any) => uom.name).sort();
+    }
+
+    // Fallback to common UOMs if API fails
+    return ['Nos', 'Box', 'Kilogram', 'Liter', 'Meter', 'Dozen', 'Pound', 'Gram', 'Piece', 'Set'];
+  } catch (error) {
+    console.error(`Error fetching UOMs:`, error);
+    // Return fallback list
+    return ['Nos', 'Box', 'Kilogram', 'Liter', 'Meter', 'Dozen', 'Pound', 'Gram', 'Piece', 'Set'];
+  }
+}
+
 export async function updateItemUOMAndPrice(
   itemId: string,
   selectedUOM: string,
