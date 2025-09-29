@@ -432,8 +432,8 @@ def create_random_items():
             "doctype": "Item",
             "item_code": item_code,
             "item_name": item_name,
-            "item_group": "All Item Groups",   # make sure exists
-            "stock_uom": "Nos",               # make sure exists
+            "item_group": "All Item Groups",
+            "stock_uom": "Nos",               
             "is_stock_item": 1,
         })
 

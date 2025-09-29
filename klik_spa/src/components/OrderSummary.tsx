@@ -47,6 +47,66 @@ interface OrderSummaryProps {
   isMobile?: boolean;
 }
 
+// Component to handle quantity input with local state
+interface QuantityInputProps {
+  item: CartItem;
+  onUpdateQuantity: (id: string, quantity: number) => void;
+  isMobile?: boolean;
+}
+
+const QuantityInput = ({ item, onUpdateQuantity, isMobile }: QuantityInputProps) => {
+  const [inputValue, setInputValue] = useState(item.quantity.toString());
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Update input value when item quantity changes externally
+  useEffect(() => {
+    if (!isEditing) {
+      setInputValue(item.quantity.toString());
+    }
+  }, [item.quantity, isEditing]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInputValue(value);
+  };
+
+  const handleBlur = () => {
+    setIsEditing(false);
+    const numValue = Number(inputValue);
+
+    if (isNaN(numValue) || numValue <= 0) {
+      // Invalid input - reset to original value
+      setInputValue(item.quantity.toString());
+      if (numValue <= 0) {
+        onUpdateQuantity(item.id, 0);
+      }
+    } else {
+      // Valid input - update quantity
+      setInputValue(numValue.toString());
+      onUpdateQuantity(item.id, numValue);
+    }
+  };
+
+  const handleFocus = () => {
+    setIsEditing(true);
+  };
+
+  return (
+    <input
+      type="number"
+      step="0.01"
+      min="0"
+      value={inputValue}
+      onChange={handleChange}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      className={`w-full ${
+        isMobile ? "text-sm" : "text-xs"
+      } px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+    />
+  );
+};
+
 export default function OrderSummary({
   cartItems,
   onUpdateQuantity,
@@ -1065,19 +1125,10 @@ export default function OrderSummary({
                             >
                               Quantity
                             </label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={item.quantity}
-                              onChange={(e) =>
-                                onUpdateQuantity(
-                                  item.id,
-                                  parseInt(e.target.value) || 0
-                                )
-                              }
-                              className={`w-full ${
-                                isMobile ? "text-sm" : "text-xs"
-                              } px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+                            <QuantityInput
+                              item={item}
+                              onUpdateQuantity={onUpdateQuantity}
+                              isMobile={isMobile}
                             />
                           </div>
 
