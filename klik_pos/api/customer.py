@@ -14,7 +14,7 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
 
     try:
         pos_profile = get_current_pos_profile()
-        business_type = getattr(pos_profile, 'custom_business_type', 'B2C')  # Default to B2C
+        business_type = getattr(pos_profile, 'custom_business_type', 'B2C') 
         company, company_currency = get_user_company_and_currency()
         result = []
         filters = {}
@@ -150,10 +150,8 @@ def get_currency_exchange_rate(from_currency: str, to_currency: str, transaction
 def get_customer_info(customer_name: str):
     """Fetch comprehensive customer document by customer name."""
     try:
-        # First try to find by customer_name (the actual name field)
         customers = frappe.get_all("Customer", filters={"customer_name": customer_name}, fields=["name"])
         if not customers:
-            # If not found by customer_name, try by document name
             customers = frappe.get_all("Customer", filters={"name": customer_name}, fields=["name"])
 
         if not customers:
