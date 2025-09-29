@@ -5,14 +5,13 @@ import {
   Minus,
   Plus,
   X,
-  Tag,
   Search,
   UserPlus,
   User,
   Building,
 } from "lucide-react";
 import type { CartItem, GiftCoupon } from "../../types";
-import GiftCouponPopover from "./GiftCouponPopover";
+// import GiftCouponPopover from "./GiftCouponPopover";
 import PaymentDialog from "./PaymentDialog";
 import { type Customer } from "../types/customer"
 import AddCustomerModal from "./AddCustomerModal";
@@ -20,7 +19,6 @@ import { createDraftSalesInvoice } from "../services/salesInvoice";
 import { useCustomers } from "../hooks/useCustomers";
 import { useProducts } from "../hooks/useProducts";
 import { toast } from "react-toastify";
-import { useBatchData } from "../hooks/useProducts";
 import { getBatches } from "../utils/batch";
 import { useNavigate } from "react-router-dom";
 import { usePOSDetails } from "../hooks/usePOSProfile";
@@ -116,9 +114,9 @@ interface UOMSelectFieldProps {
 
 const UOMSelectField = ({ item, onUOMChange, isMobile }: UOMSelectFieldProps) => {
   const [availableUOMs, setAvailableUOMs] = useState<string[]>(['Nos']); // Start with Nos as default
-  const [selectedUOM, setSelectedUOM] = useState<string>(item.uom || 'Nos'); // Local state for selected UOM
-  const [searchQuery, setSearchQuery] = useState<string>(''); // Search query for UOM filtering
-  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false); // Control dropdown visibility
+  const [selectedUOM, setSelectedUOM] = useState<string>(item.uom || 'Nos'); //Mania: Local state for selected UOM
+  const [searchQuery, setSearchQuery] = useState<string>(''); 
+  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false); 
 
   useEffect(() => {
     const loadUOMs = async () => {
@@ -166,11 +164,7 @@ const UOMSelectField = ({ item, onUOMChange, isMobile }: UOMSelectFieldProps) =>
   );
 
   const handleUOMSelect = async (newUOM: string) => {
-    console.log(`🔄 UOM Change Started:`);
-    console.log(`  Item: ${item.name} (${item.id})`);
-    console.log(`  Current UOM: ${item.uom || 'Nos'}`);
-    console.log(`  New UOM: ${newUOM}`);
-    console.log(`  Current Price: $${item.price}`);
+  
 
     // Update local state immediately for UI responsiveness
     setSelectedUOM(newUOM);
@@ -196,13 +190,7 @@ const UOMSelectField = ({ item, onUOMChange, isMobile }: UOMSelectFieldProps) =>
           if (data?.message?.uoms) {
             const selectedUOMData = data.message.uoms.find((uom: any) => uom.uom === newUOM);
             if (selectedUOMData) {
-              // Update cart item with new UOM and price
-              console.log(`✅ UOM Price Found:`);
-              console.log(`  UOM: ${selectedUOMData.uom}`);
-              console.log(`  Price: $${selectedUOMData.price}`);
-              console.log(`  Conversion Factor: ${selectedUOMData.conversion_factor}`);
-              console.log(`  Price Change: $${item.price} → $${selectedUOMData.price}`);
-
+            
               onUOMChange(item.id, newUOM, selectedUOMData.price);
             } else {
               console.log(`❌ No UOM data found for ${newUOM}`);
@@ -488,7 +476,6 @@ export default function OrderSummary({
       } else if (filteredCustomers.length === 1 && !userRemovedDefaultCustomer) {
         handleCustomerSelect(filteredCustomers[0]);
       }
-      // If multiple matches, do nothing (let user choose from dropdown)
     }
   };
 
