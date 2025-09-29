@@ -12,7 +12,7 @@ export default function RetailSidebar() {
      { icon: Users, path: "/customers", label: "Customers" },
     { icon: BarChart3, path: "/dashboard", label: "Dashboard" },
     { icon: MonitorX, path: "/closing_shift", label: "Closing Shift" },
-    
+
   ]
 
   const isActive = (path: string) => {
@@ -23,7 +23,7 @@ export default function RetailSidebar() {
   }
 
   return (
-<div className="fixed h-screen w-20 top-0 left-0 bg-white dark:bg-gray-800 shadow-lg flex flex-col border-r border-gray-200 dark:border-gray-700 z-50">
+<div className="hidden lg:flex fixed h-screen w-20 top-0 left-0 bg-white dark:bg-gray-800 shadow-lg flex-col border-r border-gray-200 dark:border-gray-700 z-50">
       {/* Logo Section - Fixed height to match other sections */}
       <div
           className="h-20 flex items-center justify-center border-gray-100 dark:border-gray-700 cursor-pointer active:scale-90 transition-transform duration-150"
@@ -42,7 +42,7 @@ export default function RetailSidebar() {
           <button
             key={index}
             onClick={() => navigate(item.path)}
-            className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors cursor-pointer active:scale-90 transition-transform duration-150 ${
+            className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all cursor-pointer active:scale-90 duration-150 ${
               isActive(item.path)
                 ? "bg-beveren-100 dark:bg-beveren-900/20 text-beveren-600 dark:text-beveren-400"
                 : "text-beveren-600 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
