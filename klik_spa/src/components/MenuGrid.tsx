@@ -4,7 +4,7 @@ import { useI18n } from "../hooks/useI18n"
 import { useAuth } from "../hooks/useAuth"
 import { useTheme } from "../hooks/useTheme"
 import { usePOSDetails } from "../hooks/usePOSProfile"
-import { Settings, LogOut, Moon, Sun, Mail, Grid3X3, List } from "lucide-react"
+import { Settings, LogOut, Moon, Sun, Mail, Grid3X3, List, Store } from "lucide-react"
 import CategoryTabs from "./CategoryTabs"
 import ProductGrid from "./ProductGrid"
 import SearchBar from "./SearchBar"
@@ -90,6 +90,7 @@ export default function MenuGrid({
   }
 
   const displayName = user?.full_name || user?.name || "Guest User"
+  const posProfileName = posDetails?.name || "POS Profile"
   const userRole = user?.role || "User"
   const initials = getInitials(displayName)
 
@@ -134,8 +135,8 @@ export default function MenuGrid({
           </div>
           <div className="flex items-center space-x-4 ml-6 relative" ref={dropdownRef}>
             <div className="text-right">
-              <div className="text-sm font-medium text-gray-900 dark:text-white">{displayName}</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">{user?.email || "No email"}</div>
+              <div className="text-sm font-medium text-gray-900 dark:text-white">{posProfileName}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">{displayName}</div>
             </div>
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
@@ -156,11 +157,11 @@ export default function MenuGrid({
                       <span className="text-white font-medium text-base">{initials}</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 dark:text-white truncate">{displayName}</p>
+                      <p className="font-medium text-gray-900 dark:text-white truncate">{posProfileName}</p>
                       <div className="flex items-center space-x-1 mt-1">
-                        <Mail size={14} className="text-gray-400 flex-shrink-0" />
+                        <Store size={14} className="text-gray-400 flex-shrink-0" />
                         <p className="text-sm text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-600 truncate">
-                          {user?.email || "No email"}
+                          {displayName}
                         </p>
                       </div>
                       <p className="text-xs text-beveren-600 dark:text-beveren-400 font-medium mt-1">{userRole}</p>

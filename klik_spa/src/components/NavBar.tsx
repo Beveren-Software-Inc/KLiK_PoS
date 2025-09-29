@@ -3,12 +3,14 @@ import { Link } from "react-router-dom"
 import { useI18n } from "../hooks/useI18n"
 import { useAuth } from "../hooks/useAuth"
 import { useTheme } from "../hooks/useTheme"
-import { Search, Settings, LogOut, User, Moon, Sun, Mail } from "lucide-react"
+import { usePOSDetails } from "../hooks/usePOSProfile"
+import { Search, Settings, LogOut, User, Moon, Sun, Mail, Store } from "lucide-react"
 
 export default function NavBar() {
   const { t, language, setLanguage } = useI18n()
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
+  const { posDetails } = usePOSDetails()
   const [showUserMenu, setShowUserMenu] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -54,7 +56,7 @@ export default function NavBar() {
   }
 
   const displayName = user?.full_name || user?.name || "Guest User"
-  const userEmail = user?.email || user?.name || "No email"
+  const posProfileName = posDetails?.name || "POS Profile"
   const userRole = user?.role || "User"
   const initials = getInitials(displayName)
 
@@ -77,8 +79,8 @@ export default function NavBar() {
           {/* Center - User Info */}
           <div className="flex items-center space-x-3">
             <div className="text-right">
-              <h3 className="font-semibold text-gray-800">{displayName}</h3>
-              <p className="text-sm text-gray-500">{userEmail}</p>
+              <h3 className="font-semibold text-gray-800">{posProfileName}</h3>
+              <p className="text-sm text-gray-500">{displayName}</p>
             </div>
             <div className="relative" ref={dropdownRef}>
               <button
@@ -103,11 +105,11 @@ export default function NavBar() {
                         <span className="text-white font-medium text-base">{initials}</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-900 truncate">{displayName}</p>
+                        <p className="font-medium text-gray-900 truncate">{posProfileName}</p>
                         <div className="flex items-center space-x-1 mt-1">
-                          <Mail size={14} className="text-gray-400 flex-shrink-0" />
+                          <Store size={14} className="text-gray-400 flex-shrink-0" />
                           <p className="text-sm text-gray-600 border border-gray-200 rounded px-2 py-1 bg-white truncate">
-                            {userEmail}
+                            {displayName}
                           </p>
                         </div>
                         <p className="text-xs text-beveren-600 font-medium mt-1">{userRole}</p>
