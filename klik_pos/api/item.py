@@ -390,7 +390,7 @@ def get_item_groups_for_pos():
         frappe.log_error(frappe.get_traceback(), "Get Item Groups for POS Error")
         frappe.throw(_("Something went wrong while fetching item group data."))
 
- 
+
 @frappe.whitelist()
 def get_batch_nos_with_qty(item_code):
     """
@@ -422,6 +422,83 @@ def get_batch_nos_with_qty(item_code):
 
 
 @frappe.whitelist()
+def get_item_uoms_and_prices(item_code):
+    """
+    Returns a list of UOMs and their prices for a given item code.
+    Returns UOMs from Item UOM table and prices from Item Price doctype.
+    """
+    if not item_code:
+        return {}
+
+    try:
+        # Get item document to check base UOM and conversion rates
+        item_doc = frappe.get_doc("Item", item_code)
+        
+        # Get all UOMs for this item from Item UOM child table
+        uom_data = []
+        
+        # Add base UOM
+        uom_data.append({
+            "uom": item_doc.stock_uom,
+            "conversion_factor": 1.0,
+            "price": 0.0
+        })
+        
+        # Add additional UOMs from Item UOM child table
+        for uom_row in item_doc.get("uoms", []):
+            uom_data.append({
+                "uom": uom_row.uom,
+                "conversion_factor": uom_row.conversion_factor,
+                "price": 0.0
+            })
+        
+        # Get prices for each UOM from Item Price doctype
+        for uom_info in uom_data:
+            price_list_rate = frappe.db.get_value(
+                "Item Price",
+                {
+                    "item_code": item_code,
+                    "uom": uom_info["uom"],
+                    "selling": 1
+                },
+                "price_list_rate"
+            )
+            
+            if price_list_rate:
+                uom_info["price"] = float(price_list_rate)
+            else:
+                # If no specific price found for this UOM, calculate from base price using conversion factor
+                base_price = frappe.db.get_value(
+                    "Item Price",
+                    {
+                        "item_code": item_code,
+                        "uom": item_doc.stock_uom,
+                        "selling": 1
+                    },
+                    "price_list_rate"
+                )
+                
+                if base_price:
+                    # Convert price based on UOM conversion factor
+                    converted_price = float(base_price) * uom_info["conversion_factor"]
+                    uom_info["price"] = converted_price
+                else:
+                    # Use valuation rate if no price list rate found
+                    valuation_rate = frappe.db.get_value("Item", item_code, "valuation_rate") or 0
+                    converted_price = float(valuation_rate) * uom_info["conversion_factor"]
+                    uom_info["price"] = converted_price
+        
+        return {
+            "base_uom": item_doc.stock_uom,
+            "uoms": uom_data
+        }
+        
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), f"Get Item UOMs Error for {item_code}")
+        return {"base_uom": "Nos", "uoms": [{"uom": "Nos", "conversion_factor": 1.0, "price": 0.0}]}
+
+
+@frappe.whitelist()
 def create_random_items():
     created = 0
     for i in range(500):
@@ -433,7 +510,7 @@ def create_random_items():
             "item_code": item_code,
             "item_name": item_name,
             "item_group": "All Item Groups",
-            "stock_uom": "Nos",               
+            "stock_uom": "Nos",
             "is_stock_item": 1,
         })
 

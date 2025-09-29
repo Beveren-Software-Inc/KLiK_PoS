@@ -101,9 +101,39 @@ const QuantityInput = ({ item, onUpdateQuantity, isMobile }: QuantityInputProps)
       onFocus={handleFocus}
       onBlur={handleBlur}
       className={`w-full ${
-        isMobile ? "text-sm" : "text-xs"
-      } px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+        isMobile ? "text-sm" : "text-sm"
+      } px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
     />
+  );
+};
+
+// Simple UOM Select Field Component
+interface UOMSelectFieldProps {
+  item: CartItem;
+  isMobile?: boolean;
+}
+
+const UOMSelectField = ({ item, isMobile }: UOMSelectFieldProps) => {
+  // For now, just show basic UOM options - we'll enhance this later
+  const basicUOMs = ['Nos', 'Box', 'Kilogram', 'Liter', 'Meter', 'Dozen'];
+
+  return (
+    <select
+      value={item.uom || 'Nos'}
+      onChange={(e) => {
+        // For now, just log - we'll implement price update logic later
+        console.log(`UOM changed to: ${e.target.value}`);
+      }}
+      className={`w-full ${
+        isMobile ? "text-sm" : "text-sm"
+      } px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+    >
+      {basicUOMs.map((uom) => (
+        <option key={uom} value={uom}>
+          {uom}
+        </option>
+      ))}
+    </select>
   );
 };
 
@@ -1113,16 +1143,11 @@ export default function OrderSummary({
                         isMobile ? "px-3 pb-3" : "px-6 py-3 ml-7"
                       } bg-gray-25 dark:bg-gray-750`}
                     >
-                      <div className="grid grid-cols-2 gap-4">
-                        {/* Left Column */}
-                        <div className="space-y-3">
-                          {/* Quantity Field */}
+                      <div className="w-full">
+                        {/* Row 1: Quantity | UOM */}
+                        <div className="grid grid-cols-2 gap-4 mb-4">
                           <div>
-                            <label
-                              className={`block text-gray-700 dark:text-gray-300 font-medium ${
-                                isMobile ? "text-xs" : "text-xs"
-                              } mb-1`}
-                            >
+                            <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
                               Quantity
                             </label>
                             <QuantityInput
@@ -1131,14 +1156,38 @@ export default function OrderSummary({
                               isMobile={isMobile}
                             />
                           </div>
-
-                          {/* Discount Percentage */}
                           <div>
-                            <label
-                              className={`block text-gray-700 dark:text-gray-300 font-medium ${
-                                isMobile ? "text-xs" : "text-xs"
-                              } mb-1`}
-                            >
+                            <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
+                              UOM
+                            </label>
+                            <UOMSelectField item={item} isMobile={isMobile} />
+                          </div>
+                        </div>
+
+                        {/* Row 2: Discount Amount | Discount (%) */}
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
+                              Discount Amount
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={itemDiscount.discountAmount || ""}
+                              onChange={(e) =>
+                                updateItemDiscount(
+                                  item.id,
+                                  "discountAmount",
+                                  parseFloat(e.target.value) || 0
+                                )
+                              }
+                              placeholder="0.00"
+                              className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+                            />
+                          </div>
+                          <div>
+                            <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
                               Discount (%)
                             </label>
                             <input
@@ -1155,19 +1204,15 @@ export default function OrderSummary({
                                 )
                               }
                               placeholder="0.0"
-                              className={`w-full ${
-                                isMobile ? "text-sm" : "text-xs"
-                              } px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+                              className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
                             />
                           </div>
+                        </div>
 
-                          {/* Batch Number */}
+                        {/* Row 3: Batch | Serial No */}
+                        <div className="grid grid-cols-2 gap-4 mb-4">
                           <div>
-                            <label
-                              className={`block text-gray-700 dark:text-gray-300 font-medium ${
-                                isMobile ? "text-xs" : "text-xs"
-                              } mb-1`}
-                            >
+                            <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
                               Batch
                             </label>
                             <select
@@ -1189,70 +1234,19 @@ export default function OrderSummary({
                                   selectedQty
                                 );
                               }}
-                              className={`w-full ${
-                                isMobile ? "text-sm" : "text-xs"
-                              } px-2 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent
-                                bg-white text-gray-900 appearance-none`} // Removed dark mode classes
-                              style={{
-                                backgroundColor: "white",
-                                color: "#111827", // Tailwind's gray-900
-                              }}
+                              className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white text-gray-900 appearance-none`}
                             >
-                              <option value="" disabled></option>
+                              <option value="">Select Batch</option>
                               {itemBatches[item.item_code || item.id]?.map((batch) => (
-                                <option
-                                  key={batch.batch_id}
-                                  value={batch.batch_id}
-                                  style={{
-                                    backgroundColor: "white",
-                                    color: "#111827",
-                                  }}
-                                >
+                                <option key={batch.batch_id} value={batch.batch_id}>
                                   {batch.batch_id} - {batch.qty}
                                 </option>
                               ))}
                             </select>
                           </div>
-                        </div>
-
-                        {/* Right Column */}
-                        <div className="space-y-3">
-                          {/* Discount Amount */}
                           <div>
-                            <label
-                              className={`block text-gray-700 dark:text-gray-300 font-medium ${
-                                isMobile ? "text-xs" : "text-xs"
-                              } mb-1`}
-                            >
-                              Discount Amount ($)
-                            </label>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={itemDiscount.discountAmount || ""}
-                              onChange={(e) =>
-                                updateItemDiscount(
-                                  item.id,
-                                  "discountAmount",
-                                  parseFloat(e.target.value) || 0
-                                )
-                              }
-                              placeholder="0.00"
-                              className={`w-full ${
-                                isMobile ? "text-sm" : "text-xs"
-                              } px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
-                            />
-                          </div>
-
-                          {/* Serial Number */}
-                          <div>
-                            <label
-                              className={`block text-gray-700 dark:text-gray-300 font-medium ${
-                                isMobile ? "text-xs" : "text-xs"
-                              } mb-1`}
-                            >
-                              Serial No.
+                            <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
+                              Serial No
                             </label>
                             <input
                               type="text"
@@ -1265,9 +1259,7 @@ export default function OrderSummary({
                                 )
                               }
                               placeholder="Enter serial number"
-                              className={`w-full ${
-                                isMobile ? "text-sm" : "text-xs"
-                              } px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+                              className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
                             />
                           </div>
                         </div>
