@@ -376,8 +376,12 @@ export default function PaymentDialog({
 
   // Calculate totals with memoization for performance
   const calculations = useMemo(() => {
+    // Use discounted price if available, otherwise use original price
     const subtotal = cartItems.reduce(
-      (sum, item) => sum + item.price * item.quantity,
+      (sum, item) => {
+        const itemPrice = (item as any).discountedPrice || item.price;
+        return sum + itemPrice * item.quantity;
+      },
       0
     );
     const couponDiscount = appliedCoupons.reduce(
