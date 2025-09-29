@@ -125,11 +125,12 @@ export default function RetailPOSLayout() {
     // Category filter
     const matchesCategory = selectedCategory === "all" || item.category === selectedCategory
 
-    // Search filter - search by name, category, or any text content
+    // Search filter - search by name, category, item_code, or any text content
     const matchesSearch =
       searchQuery === "" ||
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchQuery.toLowerCase())
+      item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.id.toLowerCase().includes(searchQuery.toLowerCase()) // item.id is the item_code
 
     return matchesCategory && matchesSearch
   })
