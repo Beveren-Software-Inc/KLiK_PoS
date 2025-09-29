@@ -3,7 +3,6 @@
 export async function sendEmails(data: any) {
   const csrfToken = window.csrf_token;
 
-console.log("data", data)
   const response = await fetch('/api/method/klik_pos.api.email.send_invoice_email', {
     method: 'POST',
     headers: {

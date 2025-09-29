@@ -11,7 +11,7 @@ import { clearDraftInvoiceCache } from "../utils/draftInvoiceCache"
 export default function MobilePaymentPage() {
   const navigate = useNavigate()
   const { cartItems, appliedCoupons, selectedCustomer, clearCart } = useCartStore()
-  const { refetch: refetchProducts, refreshStockOnly, updateStockForItems } = useProducts();
+  const { refetch: refetchProducts, refreshStockOnly, updateStockForItems, updateBatchQuantitiesForItems } = useProducts();
 
   const handleClose = async (paymentCompleted?: boolean) => {
     // Only clear cart if payment was completed
@@ -28,6 +28,14 @@ export default function MobilePaymentPage() {
     try {
       await refreshStockOnly();
       console.log("Stock refreshed after payment modal close");
+
+      // Also update batch quantities for items that were in the cart
+      const cartItemCodes = cartItems.map(item => item.item_code || item.id);
+      if (cartItemCodes.length > 0) {
+        console.log("MobilePaymentPage: Updating batch quantities for cart items:", cartItemCodes);
+        await updateBatchQuantitiesForItems(cartItemCodes);
+        console.log("MobilePaymentPage: Batch quantities updated successfully");
+      }
     } catch (error) {
       console.error("Failed to refresh stock:", error);
     }

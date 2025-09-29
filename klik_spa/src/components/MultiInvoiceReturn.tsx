@@ -277,7 +277,6 @@ export default function MultiInvoiceReturn({
     };
 
     setIsLoading(true);
-    console.log("Data", returnData)
     try {
       const result = await createMultiInvoiceReturn(returnData);
 

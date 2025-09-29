@@ -73,7 +73,7 @@ export default function OrderSummary({
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const couponButtonRef = useRef<HTMLButtonElement>(null);
   const { customers, isLoading, error, refetch: refetchCustomers } = useCustomers();
-  const { refetch: refetchProducts, refreshStockOnly, updateStockForItems } = useProducts();
+  const { refetch: refetchProducts, refreshStockOnly, updateStockForItems, updateBatchQuantitiesForItems } = useProducts();
   const navigate = useNavigate();
   const { posDetails, loading: posLoading } = usePOSDetails();
 
@@ -103,7 +103,7 @@ export default function OrderSummary({
   >({});
 
   const [itemBatches, setItemBatches] = useState<
-    Record<string, { batch_no: string; qty: number }[]>
+    Record<string, { batch_id: string; qty: number }[]>
   >({});
 
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -383,6 +383,18 @@ export default function OrderSummary({
         console.log("OrderSummary: No stock updates needed");
         toast.info("Stock is up to date");
       }
+
+      // Also update batch quantities for items that were in the cart
+      const cartItemCodes = cartItems.map(item => item.item_code || item.id);
+      if (cartItemCodes.length > 0) {
+        console.log("OrderSummary: Updating batch quantities for cart items:", cartItemCodes);
+        try {
+          await updateBatchQuantitiesForItems(cartItemCodes);
+          console.log("OrderSummary: Batch quantities updated successfully");
+        } catch (error) {
+          console.error("OrderSummary: Failed to update batch quantities:", error);
+        }
+      }
     } catch (error: any) {
       console.error("OrderSummary: Failed to refresh stock:", error);
       const errorMessage = error?.message || "Unknown error";
@@ -524,8 +536,8 @@ export default function OrderSummary({
       const newBatches = { ...itemBatches };
 
       for (const item of cartItems) {
-        const key = `${item.item_code}`;
-        if (!newBatches[key]) {
+        const key = item.item_code || item.id;
+        if (key && key !== 'undefined' && !newBatches[key]) {
           try {
             const batches = await getBatches(item.id);
             if (Array.isArray(batches)) {
@@ -534,6 +546,8 @@ export default function OrderSummary({
           } catch (err) {
             console.error("Error fetching batches", err);
           }
+        } else {
+          console.log(`OrderSummary: Skipping initial batch loading for key "${key}"`);
         }
       }
 
@@ -544,6 +558,37 @@ export default function OrderSummary({
       fetchAndSetBatches();
     }
   }, [cartItems]);
+
+  // Listen for batch quantity updates from ProductProvider
+  useEffect(() => {
+    const handleBatchUpdate = (event: CustomEvent) => {
+      const { updatedItems } = event.detail;
+
+      setItemBatches(prevBatches => {
+        const newBatches = { ...prevBatches };
+
+        updatedItems.forEach(({ itemCode, batches }: { itemCode: string; batches: any[] }) => {
+          if (itemCode && itemCode !== 'undefined') {
+            newBatches[itemCode] = batches;
+          } else {
+            console.log(`OrderSummary: Skipping invalid itemCode: "${itemCode}"`);
+          }
+        });
+
+        // Remove any undefined keys
+        delete newBatches['undefined'];
+        delete newBatches[undefined];
+
+        return newBatches;
+      });
+    };
+
+    window.addEventListener('batchQuantitiesUpdated', handleBatchUpdate as EventListener);
+
+    return () => {
+      window.removeEventListener('batchQuantitiesUpdated', handleBatchUpdate as EventListener);
+    };
+  }, []);
 
   return (
     <div
@@ -618,7 +663,7 @@ export default function OrderSummary({
             {selectedCustomer && (
               <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 {/* Debug: Log customer data */}
-                {console.log("Selected Customer Data (Mobile):", {
+                {/* {console.log("Selected Customer Data (Mobile):", {
                   name: selectedCustomer,
                   phone: selectedCustomer.phone,
                   phoneType: typeof selectedCustomer.phone,
@@ -628,7 +673,7 @@ export default function OrderSummary({
                   totalOrders: selectedCustomer.totalOrders,
                   realTimeOrders: customerStats?.total_orders,
                   loyaltyPoints: selectedCustomer.loyaltyPoints
-                })}
+                })} */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     {getCustomerTypeIcon(selectedCustomer)}
@@ -638,12 +683,12 @@ export default function OrderSummary({
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
                         {/* Debug phone rendering */}
-                        {console.log("Phone rendering check:", {
+                        {/* {console.log("Phone rendering check:", {
                           phone: selectedCustomer.phone,
                           phoneExists: !!selectedCustomer.phone,
                           phoneNotNA: selectedCustomer.phone !== "N/A",
                           shouldShowPhone: selectedCustomer.phone && selectedCustomer.phone !== "N/A"
-                        })}
+                        })} */}
                         {selectedCustomer.phone && selectedCustomer.phone !== "N/A" && selectedCustomer.phone.trim() !== "" && (
                           <span>{selectedCustomer.phone}</span>
                         )}
@@ -737,7 +782,7 @@ export default function OrderSummary({
           {selectedCustomer && (
             <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
               {/* Debug: Log customer data */}
-              {console.log("Selected Customer Data:", {
+              {/* {console.log("Selected Customer Data:", {
                 name: selectedCustomer.name,
                 phone: selectedCustomer.phone,
                 phoneType: typeof selectedCustomer.phone,
@@ -747,7 +792,7 @@ export default function OrderSummary({
                 totalOrders: selectedCustomer.totalOrders,
                 realTimeOrders: customerStats?.total_orders,
                 loyaltyPoints: selectedCustomer.loyaltyPoints
-              })}
+              })} */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   {getCustomerTypeIcon(selectedCustomer)}
@@ -757,12 +802,12 @@ export default function OrderSummary({
                     </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
                       {/* Debug phone rendering */}
-                      {console.log("Phone rendering check (Desktop):", {
+                      {/* {console.log("Phone rendering check (Desktop):", {
                         phone: selectedCustomer.phone,
                         phoneExists: !!selectedCustomer.phone,
                         phoneNotNA: selectedCustomer.phone !== "N/A",
                         shouldShowPhone: selectedCustomer.phone && selectedCustomer.phone !== "N/A"
-                      })}
+                      })} */}
                       {selectedCustomer.phone && selectedCustomer.phone !== "N/A" && selectedCustomer.phone.trim() !== "" && (
                         <span>{selectedCustomer.phone}</span>
                       )}
@@ -1079,8 +1124,8 @@ export default function OrderSummary({
                               onChange={(e) => {
                                 const selectedBatch = e.target.value;
                                 const selectedQty =
-                                  itemBatches[item.item_code]?.find(
-                                    (b) => b.batch_no === selectedBatch
+                                  itemBatches[item.item_code || item.id]?.find(
+                                    (b) => b.batch_id === selectedBatch
                                   )?.qty || 0;
                                 updateItemDiscount(
                                   item.id,
@@ -1103,10 +1148,10 @@ export default function OrderSummary({
                               }}
                             >
                               <option value="" disabled></option>
-                              {itemBatches[item.item_code]?.map((batch) => (
+                              {itemBatches[item.item_code || item.id]?.map((batch) => (
                                 <option
-                                  key={batch.batch_no}
-                                  value={batch.batch_no}
+                                  key={batch.batch_id}
+                                  value={batch.batch_id}
                                   style={{
                                     backgroundColor: "white",
                                     color: "#111827",

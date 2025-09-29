@@ -77,7 +77,7 @@ export default function PrintPreview({ invoice }: PrintPreviewProps) {
 
       setLoading(true);
       try {
-        console.log("Fetching print format for invoice:", printFormat);
+        // console.log("Fetching print format for invoice:", printFormat);
         const { html, style } = await getPrintFormatHTML(invoice, printFormat);
         setHtml(html);
         setStyle(style);

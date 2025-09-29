@@ -16,7 +16,7 @@ def fetch_item_balance(item_code: str, warehouse: str) -> float:
         return 0
 
 def fetch_item_price(item_code: str, price_list: str) -> dict:
-   
+
     """Get item price from Item Price doctype. If price_list is null, get latest price without price_list filter."""
     try:
         # If price_list is null or empty, get latest price without price_list filter
@@ -139,29 +139,69 @@ def get_item_by_barcode(barcode: str):
 @frappe.whitelist(allow_guest=True)
 def get_items_with_balance_and_price():
     """
-    Get items with balance and price - optimized version with caching support
+    Get items with balance and price - optimized with early filtering for unavailable items
     """
     pos_doc = get_current_pos_profile()
     warehouse = pos_doc.warehouse
     price_list = pos_doc.selling_price_list
-    try:
-        # If POS Profile has item groups → only use those
-        filters = {"disabled": 0, "is_stock_item": 1}
-        if pos_doc.item_groups:
-            item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
-            if item_group_names:
-                filters["item_group"] = ["in", item_group_names]
+    hide_unavailable = getattr(pos_doc, 'hide_unavailable_items', False)
 
-        items = frappe.get_all(
-            "Item",
-            filters=filters,
-            fields=["name", "item_name", "description", "item_group", "image", "stock_uom"],
-            order_by="modified desc"
-        )
+    try:
+        # Build base query with early stock filtering if hide_unavailable is enabled
+        if hide_unavailable:
+            # Use SQL join to filter out unavailable items early
+            base_query = """
+                SELECT DISTINCT i.name, i.item_name, i.description, i.item_group, i.image, i.stock_uom
+                FROM `tabItem` i
+                INNER JOIN `tabBin` b ON i.name = b.item_code
+                WHERE i.disabled = 0
+                AND i.is_stock_item = 1
+                AND b.warehouse = %(warehouse)s
+                AND b.actual_qty > 0
+            """
+
+            # Add item group filter if specified in POS profile
+            if pos_doc.item_groups:
+                item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
+                if item_group_names:
+                    placeholders = ', '.join(['%s'] * len(item_group_names))
+                    base_query += f" AND i.item_group IN ({placeholders})"
+
+            base_query += " ORDER BY i.modified DESC"
+
+            # Execute query with parameters
+            params = {'warehouse': warehouse}
+            if pos_doc.item_groups:
+                item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
+                if item_group_names:
+                    params.update({f'group_{i}': group for i, group in enumerate(item_group_names)})
+
+            items = frappe.db.sql(base_query, params, as_dict=True)
+        else:
+            # Original logic for when hide_unavailable is disabled
+            filters = {"disabled": 0, "is_stock_item": 1}
+            if pos_doc.item_groups:
+                item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
+                if item_group_names:
+                    filters["item_group"] = ["in", item_group_names]
+
+            items = frappe.get_all(
+                "Item",
+                filters=filters,
+                fields=["name", "item_name", "description", "item_group", "image", "stock_uom"],
+                order_by="modified desc"
+            )
 
         enriched_items = []
         for item in items:
+            # Get balance (already filtered if hide_unavailable is True)
             balance = fetch_item_balance(item["name"], warehouse)
+
+            # Skip items with no stock if hide_unavailable is enabled
+            if hide_unavailable and balance <= 0:
+                continue
+
+            # Get price info only for available items
             price_info = fetch_item_price(item["name"], price_list)
 
             enriched_items.append({
@@ -189,29 +229,60 @@ def get_items_with_balance_and_price():
 
 @frappe.whitelist(allow_guest=True)
 def get_stock_updates():
-    """Get only stock updates for all items - lightweight endpoint for real-time updates."""
+    """Get only stock updates for all items - lightweight endpoint with early filtering."""
     pos_doc = get_current_pos_profile()
     warehouse = pos_doc.warehouse
+    hide_unavailable = getattr(pos_doc, 'hide_unavailable_items', False)
 
     try:
-        # If POS Profile has item groups → only use those
-        filters = {"disabled": 0, "is_stock_item": 1}
-        if pos_doc.item_groups:
-            item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
-            if item_group_names:
-                filters["item_group"] = ["in", item_group_names]
+        if hide_unavailable:
+            # Use SQL to get only items with stock > 0
+            base_query = """
+                SELECT DISTINCT i.name
+                FROM `tabItem` i
+                INNER JOIN `tabBin` b ON i.name = b.item_code
+                WHERE i.disabled = 0
+                AND i.is_stock_item = 1
+                AND b.warehouse = %(warehouse)s
+                AND b.actual_qty > 0
+            """
 
-        # Get only item codes - much faster query
-        items = frappe.get_all(
-            "Item",
-            filters=filters,
-            fields=["name"],
-            order_by="modified desc"
-        )
+            # Add item group filter if specified in POS profile
+            if pos_doc.item_groups:
+                item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
+                if item_group_names:
+                    placeholders = ', '.join(['%s'] * len(item_group_names))
+                    base_query += f" AND i.item_group IN ({placeholders})"
+
+            base_query += " ORDER BY i.modified DESC"
+
+            # Execute query
+            params = {'warehouse': warehouse}
+            if pos_doc.item_groups:
+                item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
+                if item_group_names:
+                    params.update({f'group_{i}': group for i, group in enumerate(item_group_names)})
+
+            items = frappe.db.sql(base_query, params, as_dict=True)
+            item_codes = [item["name"] for item in items]
+        else:
+            # Original logic for when hide_unavailable is disabled
+            filters = {"disabled": 0, "is_stock_item": 1}
+            if pos_doc.item_groups:
+                item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
+                if item_group_names:
+                    filters["item_group"] = ["in", item_group_names]
+
+            items = frappe.get_all(
+                "Item",
+                filters=filters,
+                fields=["name"],
+                order_by="modified desc"
+            )
+            item_codes = [item["name"] for item in items]
 
         # Optimized: Use batch processing with smaller chunks
         stock_updates = {}
-        item_codes = [item["name"] for item in items]
 
         # Process in chunks of 100 to avoid memory issues
         chunk_size = 100
@@ -220,9 +291,12 @@ def get_stock_updates():
             for item_code in chunk:
                 try:
                     balance = get_stock_balance(item_code, warehouse) or 0
-                    stock_updates[item_code] = balance
+                    # Only include items with stock if hide_unavailable is enabled
+                    if not hide_unavailable or balance > 0:
+                        stock_updates[item_code] = balance
                 except Exception:
-                    stock_updates[item_code] = 0
+                    if not hide_unavailable:
+                        stock_updates[item_code] = 0
 
         return stock_updates
 
@@ -245,9 +319,10 @@ def get_item_stock(item_code: str):
 
 @frappe.whitelist(allow_guest=True)
 def get_items_stock_batch(item_codes: str):
-    """Get stock for multiple specific items - optimized batch update."""
+    """Get stock for multiple specific items - optimized batch update with early filtering."""
     pos_doc = get_current_pos_profile()
     warehouse = pos_doc.warehouse
+    hide_unavailable = getattr(pos_doc, 'hide_unavailable_items', False)
 
     try:
         # Parse the comma-separated item codes
@@ -256,7 +331,9 @@ def get_items_stock_batch(item_codes: str):
         stock_updates = {}
         for item_code in item_codes_list:
             balance = fetch_item_balance(item_code, warehouse)
-            stock_updates[item_code] = balance
+            # Only include items with stock if hide_unavailable is enabled
+            if not hide_unavailable or balance > 0:
+                stock_updates[item_code] = balance
 
         return stock_updates
     except Exception:
@@ -285,7 +362,7 @@ def get_item_groups_for_pos():
             item_groups = frappe.get_all(
                 "Item Group",
                 filters={"is_group": 0},
-                fields=["name", "item_group_name", "parent_item_group"],
+                fields=["name", "item_group_name"],
                 limit=100,
                 order_by="modified desc"
             )
