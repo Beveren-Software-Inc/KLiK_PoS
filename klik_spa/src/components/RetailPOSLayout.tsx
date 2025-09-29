@@ -61,6 +61,7 @@ export default function RetailPOSLayout() {
         image: item.image,
         available: item.available,
         uom: item.uom,
+        item_code: item.id, // item.id is the item_code from the API
       })
     }
 

@@ -632,6 +632,11 @@ def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,
             "cost_center": pos_profile.cost_center
         }
 
+        # Handle UOM if provided
+        selected_uom = item.get("uom")
+        if selected_uom and selected_uom != "Nos":
+            item_data["uom"] = selected_uom
+
         # Handle batch information if item has batch tracking
         if has_batch_no:
             batch_number = item.get("batchNumber")

@@ -648,6 +648,7 @@ export default function PaymentDialog({
         ...item,
         batchNumber: itemDiscounts[item.id]?.batchNumber || null,
         serialNumber: itemDiscounts[item.id]?.serialNumber || null,
+        uom: item.uom || 'Nos', // Include selected UOM
       })),
       customer: selectedCustomer,
       paymentMethods: adjustedPaymentMethods.map(([method, amount]) => ({ method, amount })),

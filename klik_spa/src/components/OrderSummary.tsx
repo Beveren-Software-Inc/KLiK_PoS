@@ -163,15 +163,22 @@ const UOMSelectField = ({ item, onUOMChange, isMobile }: UOMSelectFieldProps) =>
       value={selectedUOM}
       onChange={async (e) => {
         const newUOM = e.target.value;
-        console.log(`UOM changed to: ${newUOM}`);
+        console.log(`🔄 UOM Change Started:`);
+        console.log(`  Item: ${item.name} (${item.id})`);
+        console.log(`  Current UOM: ${item.uom || 'Nos'}`);
+        console.log(`  New UOM: ${newUOM}`);
+        console.log(`  Current Price: $${item.price}`);
 
         // Update local state immediately for UI responsiveness
         setSelectedUOM(newUOM);
 
         // Update UOM and price using item UOMs and prices API
         try {
-          if (item.item_code) {
-            const response = await fetch(`/api/method/klik_pos.api.item.get_item_uoms_and_prices?item_code=${item.item_code}`, {
+          // Use item_code if available, otherwise fallback to item.id
+          const itemCode = item.item_code || item.id;
+          if (itemCode) {
+            console.log(`📡 API Call: get_item_uoms_and_prices for ${itemCode}`);
+            const response = await fetch(`/api/method/klik_pos.api.item.get_item_uoms_and_prices?item_code=${itemCode}`, {
               method: 'GET',
               headers: { 'Content-Type': 'application/json' },
               credentials: 'include'
@@ -179,21 +186,34 @@ const UOMSelectField = ({ item, onUOMChange, isMobile }: UOMSelectFieldProps) =>
 
             if (response.ok) {
               const data = await response.json();
+              console.log(`📦 API Response:`, data.message);
+
               if (data?.message?.uoms) {
                 const selectedUOMData = data.message.uoms.find((uom: any) => uom.uom === newUOM);
                 if (selectedUOMData) {
                   // Update cart item with new UOM and price
-                  console.log(`✅ UOM Price Found: ${newUOM} = $${selectedUOMData.price}`);
-                  console.log(`Selected UOM data:`, selectedUOMData);
+                  console.log(`✅ UOM Price Found:`);
+                  console.log(`  UOM: ${selectedUOMData.uom}`);
+                  console.log(`  Price: $${selectedUOMData.price}`);
+                  console.log(`  Conversion Factor: ${selectedUOMData.conversion_factor}`);
+                  console.log(`  Price Change: $${item.price} → $${selectedUOMData.price}`);
+
                   onUOMChange(item.id, newUOM, selectedUOMData.price);
                 } else {
                   console.log(`❌ No UOM data found for ${newUOM}`);
+                  console.log(`Available UOMs:`, data.message.uoms.map((u: any) => u.uom));
                 }
+              } else {
+                console.log(`❌ No UOMs data in API response`);
               }
+            } else {
+              console.log(`❌ API call failed:`, response.status, response.statusText);
             }
+          } else {
+            console.log(`❌ No item_code or id found for item:`, item);
           }
         } catch (error) {
-          console.error('Error fetching UOM pricing:', error);
+          console.error('❌ Error fetching UOM pricing:', error);
         }
       }}
       className={`w-full ${
@@ -253,7 +273,21 @@ export default function OrderSummary({
 
   // UOM change handler
   const handleUOMChange = useCallback((itemId: string, selectedUOM: string, newPrice: number) => {
-    console.log(`Changing UOM for item ${itemId} to ${selectedUOM} with price ${newPrice}`);
+    console.log(`🛒 Cart Update Started:`);
+    console.log(`  Item ID: ${itemId}`);
+    console.log(`  New UOM: ${selectedUOM}`);
+    console.log(`  New Price: $${newPrice}`);
+
+    // Find the current item before update
+    const currentItem = cartItems.find(item => item.id === itemId);
+    if (currentItem) {
+      console.log(`  Before Update:`, {
+        name: currentItem.name,
+        uom: currentItem.uom,
+        price: currentItem.price,
+        quantity: currentItem.quantity
+      });
+    }
 
     // Update the cart item with new UOM and price using the cart store
     updateUOM(itemId, selectedUOM, newPrice);
@@ -261,12 +295,20 @@ export default function OrderSummary({
     // Debug: Check if the cart item was updated
     setTimeout(() => {
       const updatedItem = cartItems.find(item => item.id === itemId);
-      console.log(`🛒 Cart Updated - Item ${itemId}:`, {
+      console.log(`✅ Cart Update Complete:`);
+      console.log(`  After Update:`, {
         name: updatedItem?.name,
         uom: updatedItem?.uom,
         price: updatedItem?.price,
         quantity: updatedItem?.quantity
       });
+
+      if (currentItem && updatedItem) {
+        console.log(`📊 Price Comparison:`);
+        console.log(`  Old: ${currentItem.uom} = $${currentItem.price}`);
+        console.log(`  New: ${updatedItem.uom} = $${updatedItem.price}`);
+        console.log(`  Difference: $${(updatedItem.price - currentItem.price).toFixed(2)}`);
+      }
     }, 100);
   }, [updateUOM, cartItems]);
   // State for item-level discounts and details
