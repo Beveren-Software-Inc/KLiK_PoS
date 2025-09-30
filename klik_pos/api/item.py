@@ -227,69 +227,87 @@ def get_items_with_balance_and_price():
     """
     Get items with balance and price - optimized with early filtering for unavailable items
     """
-    pos_doc = get_current_pos_profile()
-    warehouse = pos_doc.warehouse
-    price_list = pos_doc.selling_price_list
+    # Get POS profile and apply safe fallbacks so the API never crashes in production
+    try:
+        pos_doc = get_current_pos_profile()
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "get_current_pos_profile failed")
+        pos_doc = frappe._dict({})
+
+    # Resolve warehouse with robust fallbacks
+    warehouse = getattr(pos_doc, 'warehouse', None)
+    if not warehouse:
+        # Try company defaults
+        try:
+            default_company = frappe.defaults.get_user_default("Company") or frappe.db.get_single_value("Global Defaults", "default_company")
+            warehouse = frappe.db.get_value("Company", default_company, "default_warehouse")
+        except Exception:
+            warehouse = None
+    if not warehouse:
+        # Last resort: pick any leaf warehouse
+        try:
+            any_wh = frappe.get_all("Warehouse", filters={"is_group": 0}, fields=["name"], limit=1)
+            warehouse = any_wh[0]["name"] if any_wh else None
+        except Exception:
+            warehouse = None
+
+    # Price list (scan-friendly). fetch_item_price already tolerates empty
+    price_list = getattr(pos_doc, 'selling_price_list', None)
     hide_unavailable = getattr(pos_doc, 'hide_unavailable_items', False)
 
     try:
         # Build base query with early stock filtering if hide_unavailable is enabled
         if hide_unavailable:
             # Use SQL join to filter out unavailable items early
-            base_query = """
-                SELECT DISTINCT i.name, i.item_name, i.description, i.item_group, i.image, i.stock_uom
-                FROM `tabItem` i
-                INNER JOIN `tabBin` b ON i.name = b.item_code
-                WHERE i.disabled = 0
-                AND i.is_stock_item = 1
-                AND b.warehouse = %(warehouse)s
-                AND b.actual_qty > 0
-            """
+            base_query = [
+                "SELECT DISTINCT i.name, i.item_name, i.description, i.item_group, i.image, i.stock_uom",
+                "FROM `tabItem` i",
+                "INNER JOIN `tabBin` b ON i.name = b.item_code",
+                "WHERE i.disabled = 0",
+                "AND i.is_stock_item = 1",
+                "AND b.actual_qty > 0",
+            ]
+            params_list: list[object] = []
+
+            if warehouse:
+                base_query.append("AND b.warehouse = %s")
+                params_list.append(warehouse)
 
             # Add item group filter if specified in POS profile
-            if pos_doc.item_groups:
+            if getattr(pos_doc, 'item_groups', None):
                 item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
                 if item_group_names:
                     placeholders = ', '.join(['%s'] * len(item_group_names))
-                    base_query += f" AND i.item_group IN ({placeholders})"
+                    base_query.append(f"AND i.item_group IN ({placeholders})")
+                    params_list.extend(item_group_names)
 
-            base_query += " ORDER BY i.modified DESC"
+            base_query.append("ORDER BY i.modified DESC")
 
-            # Execute query with parameters
-            params = {'warehouse': warehouse}
-            if pos_doc.item_groups:
-                item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
-                if item_group_names:
-                    params.update({f'group_{i}': group for i, group in enumerate(item_group_names)})
-
-            items = frappe.db.sql(base_query, params, as_dict=True)
+            sql = "\n".join(base_query)
+            items = frappe.db.sql(sql, tuple(params_list), as_dict=True)
         else:
             # Original logic for when hide_unavailable is disabled
             # Use SQL to get items with barcode information
-            base_query = """
-                SELECT DISTINCT i.name, i.item_name, i.description, i.item_group, i.image, i.stock_uom
-                FROM `tabItem` i
-                WHERE i.disabled = 0
-                AND i.is_stock_item = 1
-            """
+            base_query = [
+                "SELECT DISTINCT i.name, i.item_name, i.description, i.item_group, i.image, i.stock_uom",
+                "FROM `tabItem` i",
+                "WHERE i.disabled = 0",
+                "AND i.is_stock_item = 1",
+            ]
+            params_list: list[object] = []
 
             # Add item group filter if specified in POS profile
-            if pos_doc.item_groups:
+            if getattr(pos_doc, 'item_groups', None):
                 item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
                 if item_group_names:
                     placeholders = ', '.join(['%s'] * len(item_group_names))
-                    base_query += f" AND i.item_group IN ({placeholders})"
+                    base_query.append(f"AND i.item_group IN ({placeholders})")
+                    params_list.extend(item_group_names)
 
-            base_query += " ORDER BY i.modified DESC"
+            base_query.append("ORDER BY i.modified DESC")
 
-            # Execute query with parameters
-            params = {}
-            if pos_doc.item_groups:
-                item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
-                if item_group_names:
-                    params.update({f'group_{i}': group for i, group in enumerate(item_group_names)})
-
-            items = frappe.db.sql(base_query, params, as_dict=True)
+            sql = "\n".join(base_query)
+            items = frappe.db.sql(sql, tuple(params_list), as_dict=True)
 
         # Get barcodes for all items in a separate query (portable across DBs)
         item_codes = [item["name"] for item in items]

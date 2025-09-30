@@ -84,7 +84,7 @@ def get_opening_entry_payment_summary():
         user_roles = frappe.get_roles(frappe.session.user)
         is_admin_user = any(role in ["Administrator", "Sales Manager", "System Manager"] for role in user_roles)
 
-        # Step 4: Aggregate sales invoice payments
+        # Step 4: Aggregate sales invoice payments (including returns)
         if is_admin_user:
             # For admin users, aggregate all invoices for the day
             frappe.logger().info(f"Admin user {frappe.session.user} - aggregating all invoices for date: {opening_date}")
