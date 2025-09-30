@@ -49,6 +49,7 @@ fixtures = [
                     "POS Profile-custom_default_view",
                     "POS Profile-custom_enable_whatsapp",
                     "POS Profile-custom_enable_sms",
+                    "POS Profile-custom_scale_barcodes_start_with"
                 ),
             ]
         ],
