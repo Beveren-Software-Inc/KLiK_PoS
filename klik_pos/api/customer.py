@@ -63,6 +63,26 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
                 tuple([like_param, like_param, like_param, like_param] + cust_type_params + [limit_val, int(start) or 0]),
                 as_dict=True,
             )
+
+            # Total count for search
+            total_count_row = frappe.db.sql(
+                f"""
+                SELECT COUNT(DISTINCT c.name) as total
+                FROM `tabCustomer` c
+                LEFT JOIN `tabDynamic Link` dl ON dl.link_doctype='Customer' AND dl.link_name=c.name AND dl.parenttype='Contact'
+                LEFT JOIN `tabContact` ct ON ct.name = dl.parent
+                LEFT JOIN `tabContact Email` ce ON ce.parent = ct.name
+                LEFT JOIN `tabContact Phone` cp ON cp.parent = ct.name
+                WHERE (
+                    c.customer_name LIKE %s OR c.name LIKE %s OR
+                    ce.email_id LIKE %s OR cp.phone LIKE %s
+                )
+                {cust_type_filter}
+                """,
+                tuple([like_param, like_param, like_param, like_param] + cust_type_params),
+                as_dict=True,
+            )
+            total_count = (total_count_row[0].total if total_count_row else 0) or 0
         else:
             # Original logic for when no search term - keep capped limit for performance
             filters = {}
@@ -82,6 +102,8 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
                 limit=limit,
                 start=start,
             )
+
+            total_count = frappe.db.count("Customer", filters=filters)
         for cust in customer_names:
             doc = frappe.get_doc("Customer", cust.name)
 
@@ -119,7 +141,7 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
                 # "exchange_rate": get_currency_exchange_rate(company_currency, doc.default_currency)
             })
 
-        return {"success": True, "data": result}
+        return {"success": True, "data": result, "total_count": total_count, "start": start, "limit": limit}
 
     except Exception:
         frappe.log_error(frappe.get_traceback(), "Error fetching customers")
@@ -627,6 +649,24 @@ def get_customer_statistics(customer_id):
             "error": str(e)
         }
 
+
+@frappe.whitelist(allow_guest=True)
+def get_global_totals():
+    """Return global totals for customers and invoices for dashboard cards."""
+    try:
+        total_customers = frappe.db.count("Customer")
+        total_invoices = frappe.db.count(
+            "Sales Invoice",
+            filters={
+                "docstatus": 1,
+                "is_return": 0,
+                "status": ["!=", "Cancelled"],
+            },
+        )
+        return {"success": True, "total_customers": total_customers, "total_invoices": total_invoices}
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Global Customer Totals Error")
+        return {"success": False, "error": str(e), "total_customers": 0, "total_invoices": 0}
 
 @frappe.whitelist()
 def create_random_customers(count: int = 2000, name_prefix: str = "Test Customer "):
