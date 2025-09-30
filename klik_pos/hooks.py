@@ -105,6 +105,8 @@ override_doctype_class = {
 
 # include js in doctype views
 doctype_js = {"Sales Invoice" : "public/js/sales_invoice.js"}
+# Add a button to Company to create random customers (client-side will call the whitelisted method)
+doctype_js.update({"Company": "public/js/company.js"})
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}

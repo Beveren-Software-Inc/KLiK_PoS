@@ -900,7 +900,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-        <div className="flex-1 px-6 py-8 mt-16 ml-20">
+        <div className="flex-1 px-6 py-8 mt-16">
         {/* Enhanced Filters */}
         {showFilters && (
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-6 sm:mb-8">

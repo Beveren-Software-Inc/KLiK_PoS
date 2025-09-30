@@ -245,8 +245,8 @@ const getStatusBadge = (status: string) => {
     return invoices.filter(invoice => invoice.status === status).length;
   };
 
-  // Loading state
-  if (isLoading || userInfoLoading) {
+  // Loading state - only block if nothing loaded yet
+  if ((isLoading && invoices.length === 0) || userInfoLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
@@ -288,6 +288,11 @@ const getStatusBadge = (status: string) => {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
           />
+          {isLoading && invoices.length > 0 && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <div className="animate-spin h-4 w-4 border-2 border-b-transparent border-beveren-500 rounded-full"></div>
+            </div>
+          )}
         </div>
         <select
           value={dateFilter}
@@ -1013,7 +1018,7 @@ const getStatusBadge = (status: string) => {
           </div>
         </div>
 
-        <div className="flex-1 px-6 py-8 mt-16 ml-20 max-w-none">
+        <div className="flex-1 px-6 py-8 mt-16 max-w-none">
           {/* Status Tabs - Now full width like the table */}
           <div className="mb-8 w-full max-w-none">
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">

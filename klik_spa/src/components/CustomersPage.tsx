@@ -1,6 +1,6 @@
 
 
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import {
   Search,
@@ -26,35 +26,35 @@ export default function CustomersPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [prefilledData, setPrefilledData] = useState<{name?: string, email?: string, phone?: string}>({})
+  const [globalTotals, setGlobalTotals] = useState<{ total_customers: number; total_invoices: number } | null>(null)
 
-  // Use the customers hook without search (fetch all customers once)
-  const { customers, isLoading, error, addCustomer } = useCustomers()
+  // Use the customers hook with search to fetch from server when searching
+  const { customers, isLoading, error, addCustomer, hasMore, totalCount, loadMore } = useCustomers(searchQuery)
+
+  useEffect(() => {
+    // Fetch global totals for accurate cards
+    ;(async () => {
+      try {
+        const res = await fetch('/api/method/klik_pos.api.customer.get_global_totals')
+        const data = await res.json()
+        if (data?.message?.success) {
+          setGlobalTotals({ total_customers: data.message.total_customers, total_invoices: data.message.total_invoices })
+        }
+      } catch {}
+    })()
+  }, [])
 
   // Filter and search customers (client-side filtering for smooth experience)
   const filteredCustomers = useMemo(() => {
     if (isLoading) return []
     if (error) return []
 
-    let filtered = customers
-
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
-      filtered = customers.filter(customer => {
-        const name = customer.name.toLowerCase()
-        const email = customer.email?.toLowerCase() || ''
-        const phone = customer.phone || ''
-        const id = customer.id.toLowerCase()
-
-        return name.includes(query) ||
-               email.includes(query) ||
-               phone.includes(query) ||
-               id.includes(query)
-      })
-    }
+    // When searching, trust server-side results (already filtered by backend)
+    // Otherwise, apply light client-side filtering (none here) and just sort
+    const list = customers
 
     // Sort by creation date (most recent first)
-    return filtered.sort((a, b) => {
+    return list.sort((a, b) => {
       const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
       const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
       return dateB - dateA
@@ -71,8 +71,8 @@ export default function CustomersPage() {
     return { total, totalOrders }
   }, [customers, isLoading])
 
-  // Loading state
-  if (isLoading) {
+  // Loading state - only block UI if we have no data yet
+  if (isLoading && customers.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
@@ -217,7 +217,7 @@ export default function CustomersPage() {
                   <Users className="text-orange-500" size={24} />
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Customers</p>
-                    <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.total}</p>
+                    <p className="text-2xl font-semibold text-gray-900 dark:text-white">{customers.length} of {globalTotals?.total_customers ?? totalCount ?? customers.length}</p>
                   </div>
                 </div>
               </div>
@@ -228,8 +228,8 @@ export default function CustomersPage() {
                     <span className="text-white text-xs font-bold">📦</span>
                   </div>
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Orders</p>
-                    <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.totalOrders}</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Invoices</p>
+                    <p className="text-2xl font-semibold text-gray-900 dark:text-white">{globalTotals?.total_invoices ?? stats.totalOrders}</p>
                   </div>
                 </div>
               </div>
@@ -249,6 +249,11 @@ export default function CustomersPage() {
                     onKeyPress={handleSearchKeyPress}
                     className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 text-sm font-medium border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white"
                   />
+                  {isLoading && customers.length > 0 && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="animate-spin h-4 w-4 border-2 border-b-transparent border-beveren-500 rounded-full"></div>
+                    </div>
+                  )}
                 </div>
 
 
@@ -381,6 +386,16 @@ export default function CustomersPage() {
                   </p>
                 </div>
               )}
+              {(totalCount > customers.length) && (
+                <div className="p-4 text-center">
+                  <button
+                    onClick={loadMore}
+                    className="px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors text-sm"
+                  >
+                    Load More ({customers.length}/{totalCount})
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -448,15 +463,15 @@ export default function CustomersPage() {
         <div className="mx-auto w-full">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 mt-3">
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center">
-                <Users className="text-orange-500" size={24} />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Customers</p>
-                  <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.total}</p>
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                <div className="flex items-center">
+                  <Users className="text-orange-500" size={24} />
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Customers</p>
+                    <p className="text-2xl font-semibold text-gray-900 dark:text-white">{customers.length} of {totalCount || customers.length}</p>
+                  </div>
                 </div>
               </div>
-            </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
               <div className="flex items-center">

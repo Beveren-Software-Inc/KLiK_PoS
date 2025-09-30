@@ -34,11 +34,19 @@ export function useCustomers(searchQuery?: string) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
+  const [start, setStart] = useState<number>(0);
+  const [hasMore, setHasMore] = useState<boolean>(false);
+  const [totalCount, setTotalCount] = useState<number>(0);
 
-  const fetchCustomers = async (search?: string) => {
+  const fetchCustomers = async (search?: string, append = false) => {
     setIsLoading(true);
     try {
-      const searchParam = search ? `?search=${encodeURIComponent(search)}` : '';
+      const params = new URLSearchParams();
+      if (search) params.set('search', search);
+      // Default page size 100
+      params.set('limit', '100');
+      params.set('start', String(append ? start : 0));
+      const searchParam = `?${params.toString()}`;
       const response = await fetch(`/api/method/klik_pos.api.customer.get_customers${searchParam}`);
       const resData = await response.json();
 
@@ -78,7 +86,12 @@ export function useCustomers(searchQuery?: string) {
         };
       });
 
-      setCustomers(enhanced);
+      setCustomers(prev => append ? [...prev, ...enhanced] : enhanced);
+      const total = resData.message.total_count || 0;
+      setTotalCount(total);
+      const nextStart = (append ? start : 0) + enhanced.length;
+      setStart(nextStart);
+      setHasMore(nextStart < total);
     } catch (err) {
       setError(err as Error);
     } finally {
@@ -87,8 +100,21 @@ export function useCustomers(searchQuery?: string) {
   };
 
   useEffect(() => {
-    fetchCustomers(searchQuery);
+    // Reset paging on new search
+    setStart(0);
+    setHasMore(false);
+    setTotalCount(0);
+    const t = setTimeout(() => {
+      fetchCustomers(searchQuery, false);
+    }, searchQuery ? 300 : 0);
+    return () => clearTimeout(t);
   }, [searchQuery]);
+
+  const loadMore = async () => {
+    if (hasMore) {
+      await fetchCustomers(searchQuery, true);
+    }
+  };
 
   const addCustomer = (newCustomer: Customer) => {
     setCustomers(prev => [newCustomer, ...prev]);
@@ -99,7 +125,10 @@ export function useCustomers(searchQuery?: string) {
     isLoading,
     error,
     refetch: fetchCustomers,
-    addCustomer
+    addCustomer,
+    hasMore,
+    totalCount,
+    loadMore,
   };
 }
 
