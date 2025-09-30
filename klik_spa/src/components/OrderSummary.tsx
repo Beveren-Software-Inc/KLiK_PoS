@@ -421,7 +421,7 @@ export default function OrderSummary({
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const couponButtonRef = useRef<HTMLButtonElement>(null);
-  const { customers, isLoading, error, refetch: refetchCustomers } = useCustomers();
+  const { customers, isLoading, error, refetch: refetchCustomers } = useCustomers(customerSearchQuery);
   const { refetch: refetchProducts, refreshStockOnly, updateStockForItems, updateBatchQuantitiesForItems } = useProducts();
   const navigate = useNavigate();
   const { posDetails, loading: posLoading } = usePOSDetails();

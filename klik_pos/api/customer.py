@@ -3,6 +3,8 @@ from frappe import _
 import json
 from erpnext.setup.utils import get_exchange_rate
 from klik_pos.klik_pos.utils import get_current_pos_profile
+import random
+import string
 
 
 @frappe.whitelist(allow_guest=True)
@@ -14,35 +16,72 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
 
     try:
         pos_profile = get_current_pos_profile()
-        business_type = getattr(pos_profile, 'custom_business_type', 'B2C') 
+        business_type = getattr(pos_profile, 'custom_business_type', 'B2C')
         company, company_currency = get_user_company_and_currency()
         result = []
-        filters = {}
 
-        # Apply search filter if provided
+        # If there's a search term, broaden the query across name, customer_name, contact email/phone.
+        # Also increase limit for search results to surface older matches.
         if search:
-            filters["customer_name"] = ["like", f"%{search}%"]
+            # Sanitize search input for LIKE
+            like_param = f"%{search}%"
 
-        # Apply business type filtering
-        if business_type == "B2B":
-            filters["customer_type"] = "Company"
-        elif business_type == "B2C":
-            filters["customer_type"] = "Individual"
+            # Build optional customer_type filter
+            cust_type_filter = ""
+            cust_type_params = []
+            if business_type == "B2B":
+                cust_type_filter = "AND c.customer_type = %s"
+                cust_type_params.append("Company")
+            elif business_type == "B2C":
+                cust_type_filter = "AND c.customer_type = %s"
+                cust_type_params.append("Individual")
+
+            # Prefer higher cap when searching
+            try:
+                limit_val = int(limit) if limit else 100
+            except Exception:
+                limit_val = 100
+            # Boost limits for search to show more matches
+            limit_val = max(limit_val, 500)
+
+            customer_names = frappe.db.sql(
+                f"""
+                SELECT DISTINCT c.name, c.customer_name, c.customer_type, c.customer_group, c.territory, c.default_currency
+                FROM `tabCustomer` c
+                LEFT JOIN `tabDynamic Link` dl ON dl.link_doctype='Customer' AND dl.link_name=c.name AND dl.parenttype='Contact'
+                LEFT JOIN `tabContact` ct ON ct.name = dl.parent
+                LEFT JOIN `tabContact Email` ce ON ce.parent = ct.name
+                LEFT JOIN `tabContact Phone` cp ON cp.parent = ct.name
+                WHERE (
+                    c.customer_name LIKE %s OR c.name LIKE %s OR
+                    ce.email_id LIKE %s OR cp.phone LIKE %s
+                )
+                {cust_type_filter}
+                ORDER BY c.creation DESC
+                LIMIT %s OFFSET %s
+                """,
+                tuple([like_param, like_param, like_param, like_param] + cust_type_params + [limit_val, int(start) or 0]),
+                as_dict=True,
+            )
         else:
-            print(f"No customer type filter applied - showing all customers (business_type: {business_type})")
-        # For "B2B & B2C", no customer_type filter is applied (show all)
+            # Original logic for when no search term - keep capped limit for performance
+            filters = {}
+            if business_type == "B2B":
+                filters["customer_type"] = "Company"
+            elif business_type == "B2C":
+                filters["customer_type"] = "Individual"
 
-        customer_names = frappe.get_all(
-            "Customer",
-            filters=filters,
-            fields=[
-                "name", "customer_name", "customer_type",
-                "customer_group", "territory", "default_currency"
-            ],
-            order_by="creation desc",
-            limit=limit,
-            start=start,
-        )
+            customer_names = frappe.get_all(
+                "Customer",
+                filters=filters,
+                fields=[
+                    "name", "customer_name", "customer_type",
+                    "customer_group", "territory", "default_currency"
+                ],
+                order_by="creation desc",
+                limit=limit,
+                start=start,
+            )
         for cust in customer_names:
             doc = frappe.get_doc("Customer", cust.name)
 
@@ -226,6 +265,7 @@ def create_or_update_customer(customer_data):
         country = customer_data.get("address", {}).get("country", "Kenya")
         name_arabic = customer_data.get("name_arabic", "")
         address = customer_data.get("address", {})
+
 
         # If name is missing, fallback to phone → email
         if not customer_name:
@@ -586,3 +626,42 @@ def get_customer_statistics(customer_id):
             "success": False,
             "error": str(e)
         }
+
+
+@frappe.whitelist()
+def create_random_customers(count: int = 2000, name_prefix: str = "Test Customer "):
+    """Create a number of random Customers with only mandatory fields (customer_name).
+    - Default creates 2000 customers
+    - Names are prefixed with name_prefix and a random suffix to avoid duplicates
+    """
+    try:
+        created = 0
+        count = int(count) if count else 0
+        if count <= 0:
+            count = 2000
+
+        for _ in range(count):
+            # generate a unique-ish suffix
+            suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+            customer_name = f"{name_prefix}{suffix}"
+
+            doc = frappe.get_doc({
+                "doctype": "Customer",
+                "customer_name": customer_name,
+                "custom_country": "Saudi Arabia",
+                "customer_type": "Individual",
+                "status": "Active",
+            })
+            try:
+                doc.insert(ignore_permissions=True)
+                created += 1
+            except Exception:
+                # if duplicate or other error, skip and continue
+                frappe.log_error(frappe.get_traceback(), f"Random Customer Create Failed: {customer_name}")
+                continue
+
+        frappe.db.commit()
+        return {"success": True, "created": created}
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Bulk Random Customer Creation Error")
+        return {"success": False, "error": str(e)}

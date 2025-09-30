@@ -38,7 +38,7 @@ export function useCustomers(searchQuery?: string) {
   const fetchCustomers = async (search?: string) => {
     setIsLoading(true);
     try {
-      const searchParam = search ? `?search=${encodeURIComponent(search)}` : '';
+      const searchParam = search ? `?search=${encodeURIComponent(search)}&limit=1000` : '';
       const response = await fetch(`/api/method/klik_pos.api.customer.get_customers${searchParam}`);
       const resData = await response.json();
 
@@ -87,7 +87,11 @@ export function useCustomers(searchQuery?: string) {
   };
 
   useEffect(() => {
-    fetchCustomers(searchQuery);
+    // Debounce searching to avoid UI thrash
+    const t = setTimeout(() => {
+      fetchCustomers(searchQuery);
+    }, searchQuery ? 300 : 0);
+    return () => clearTimeout(t);
   }, [searchQuery]);
 
   const addCustomer = (newCustomer: Customer) => {

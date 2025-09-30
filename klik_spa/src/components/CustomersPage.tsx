@@ -27,34 +27,20 @@ export default function CustomersPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [prefilledData, setPrefilledData] = useState<{name?: string, email?: string, phone?: string}>({})
 
-  // Use the customers hook without search (fetch all customers once)
-  const { customers, isLoading, error, addCustomer } = useCustomers()
+  // Use the customers hook with search to fetch from server when searching
+  const { customers, isLoading, error, addCustomer } = useCustomers(searchQuery)
 
   // Filter and search customers (client-side filtering for smooth experience)
   const filteredCustomers = useMemo(() => {
     if (isLoading) return []
     if (error) return []
 
-    let filtered = customers
-
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
-      filtered = customers.filter(customer => {
-        const name = customer.name.toLowerCase()
-        const email = customer.email?.toLowerCase() || ''
-        const phone = customer.phone || ''
-        const id = customer.id.toLowerCase()
-
-        return name.includes(query) ||
-               email.includes(query) ||
-               phone.includes(query) ||
-               id.includes(query)
-      })
-    }
+    // When searching, trust server-side results (already filtered by backend)
+    // Otherwise, apply light client-side filtering (none here) and just sort
+    const list = customers
 
     // Sort by creation date (most recent first)
-    return filtered.sort((a, b) => {
+    return list.sort((a, b) => {
       const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
       const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
       return dateB - dateA
@@ -71,8 +57,8 @@ export default function CustomersPage() {
     return { total, totalOrders }
   }, [customers, isLoading])
 
-  // Loading state
-  if (isLoading) {
+  // Loading state - only block UI if we have no data yet
+  if (isLoading && customers.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
@@ -249,6 +235,11 @@ export default function CustomersPage() {
                     onKeyPress={handleSearchKeyPress}
                     className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 text-sm font-medium border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white"
                   />
+                  {isLoading && customers.length > 0 && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="animate-spin h-4 w-4 border-2 border-b-transparent border-beveren-500 rounded-full"></div>
+                    </div>
+                  )}
                 </div>
 
 
