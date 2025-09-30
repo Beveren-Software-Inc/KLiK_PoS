@@ -4,7 +4,7 @@ import { useI18n } from "../hooks/useI18n"
 import { useAuth } from "../hooks/useAuth"
 import { useTheme } from "../hooks/useTheme"
 import { usePOSDetails } from "../hooks/usePOSProfile"
-import { Settings, LogOut, Moon, Sun, Mail, Grid3X3, List, Store } from "lucide-react"
+import { Settings, LogOut, Moon, Sun, Grid3X3, List, Store } from "lucide-react"
 import CategoryTabs from "./CategoryTabs"
 import ProductGrid from "./ProductGrid"
 import SearchBar from "./SearchBar"
@@ -91,7 +91,7 @@ export default function MenuGrid({
 
   const displayName = user?.full_name || user?.name || "Guest User"
   const posProfileName = posDetails?.name || "POS Profile"
-  const userRole = user?.role || "User"
+  // const userRole = user?.role || "User"
   const initials = getInitials(displayName)
 
   return (
@@ -164,7 +164,7 @@ export default function MenuGrid({
                           {displayName}
                         </p>
                       </div>
-                      <p className="text-xs text-beveren-600 dark:text-beveren-400 font-medium mt-1">{userRole}</p>
+                      {/* <p className="text-xs text-beveren-600 dark:text-beveren-400 font-medium mt-1">{userRole}</p> */}
                     </div>
                   </div>
                 </div>

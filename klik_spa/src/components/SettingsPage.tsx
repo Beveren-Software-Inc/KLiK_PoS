@@ -5,11 +5,11 @@ import { useI18n } from "../hooks/useI18n"
 import { useNavigate } from "react-router-dom"
 import {
   User,
-  Mail,
+ 
   Shield,
   Palette,
   Globe,
-  Save,
+  
   Camera,
   Moon,
   Sun,
@@ -17,7 +17,7 @@ import {
   LogOut,
   ChevronRight,
   ArrowLeft,
-  Home
+ 
 } from "lucide-react"
 
 export default function SettingsPage() {
@@ -38,7 +38,7 @@ export default function SettingsPage() {
 
   const displayName = user?.full_name || user?.name || "Guest User"
   const userEmail = user?.email || user?.name || "No email"
-  const userRole = user?.role || "User"
+  // const userRole = user?.role || "User"
   const initials = getInitials(displayName)
 
   const handleLogout = async () => {
@@ -94,10 +94,10 @@ export default function SettingsPage() {
           <div className="flex-1">
             <h2 className="text-2xl font-bold">{displayName}</h2>
             <p className="text-beveren-100 text-lg">{userEmail}</p>
-            <div className="flex items-center space-x-2 mt-2">
+            {/* <div className="flex items-center space-x-2 mt-2">
               <Shield size={16} className="text-beveren-200" />
               <span className="text-beveren-100 font-medium">{userRole}</span>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>
@@ -125,12 +125,12 @@ export default function SettingsPage() {
                 {user?.name || "Not provided"}
               </div>
             </div>
-            <div>
+            {/* <div>
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Role</label>
               <div className="mt-1 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-gray-900 dark:text-white">
                 {userRole}
               </div>
-            </div>
+            </div> */}
             {user?.first_name && (
               <div>
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">First Name</label>
