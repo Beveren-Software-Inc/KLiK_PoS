@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useProducts } from "../hooks/useProducts"
 import { usePOSDetails } from "../hooks/usePOSProfile"
 
@@ -10,7 +10,7 @@ import MobilePOSLayout from "./MobilePOSLayout"
 import LoadingSpinner from "./LoadingSpinner"
 import BarcodeScannerModal from "./BarcodeScanner"
 import { useBarcodeScanner } from "../hooks/useBarcodeScanner"
-import type { MenuItem, CartItem, GiftCoupon } from "../../types"
+import type { MenuItem, GiftCoupon, POSProfile } from "../../types"
 import { useMediaQuery } from "../hooks/useMediaQuery"
 import { useCartStore } from "../stores/cartStore"
 
@@ -19,6 +19,7 @@ export default function RetailPOSLayout() {
   const [searchQuery, setSearchQuery] = useState("")
   const [appliedCoupons, setAppliedCoupons] = useState<GiftCoupon[]>([])
   const [showScanner, setShowScanner] = useState(false)
+  const [pinnedItemId, setPinnedItemId] = useState<string | null>(null)
 
   // Use cart store instead of local state
   const { cartItems, addToCart, updateQuantity, removeItem, clearCart } = useCartStore()
@@ -30,6 +31,13 @@ export default function RetailPOSLayout() {
   const { posDetails } = usePOSDetails()
   const useScannerOnly = posDetails?.custom_use_scanner_fully || false
   const hideUnavailableItems = posDetails?.hide_unavailable_items || false
+  type POSProfileWithCustom = POSProfile & { custom_scale_barcodes_start_with?: string }
+  const scalePrefix = (posDetails as POSProfileWithCustom)?.custom_scale_barcodes_start_with || ""
+
+  // Debug: show configured scale prefix once per mount/changes
+  useEffect(() => {
+    console.log('[ScaleDebug] scalePrefix:', scalePrefix)
+  }, [scalePrefix])
 
     // Use media query to detect mobile/tablet screens
   const isMobile = useMediaQuery("(max-width: 1024px)")
@@ -46,6 +54,59 @@ export default function RetailPOSLayout() {
 
     addItemToCart(item)
   }
+
+  // Helpers for scale barcodes like in posawesome
+  const parseScaleBarcode = useCallback((raw: string) => {
+    if (!scalePrefix || !raw.startsWith(scalePrefix)) return { isScale: false as const }
+
+    // First 7 chars represent the item code/barcode identifier (as per posawesome)
+    const base = raw.substring(0, 7)
+    // Accept 1-5 trailing digits while typing; DO NOT left-pad (match posawesome logic)
+    const qtyBlock = raw.substring(7)
+    if (!/^\d{1,5}$/.test(qtyBlock)) {
+      return { isScale: false as const }
+    }
+
+    // Convert qtyBlock to decimal mimicking posawesome rules
+    // 00089 -> 0.89, 00900 -> 0.900, 01234 -> 1.234, 12345 -> 12.345
+    let qtyStr = ""
+    if (qtyBlock.startsWith("0000")) {
+      qtyStr = "0.00" + qtyBlock.substring(4)
+    } else if (qtyBlock.startsWith("000")) {
+      qtyStr = "0.0" + qtyBlock.substring(3)
+    } else if (qtyBlock.startsWith("00")) {
+      qtyStr = "0." + qtyBlock.substring(2)
+    } else if (qtyBlock.startsWith("0")) {
+      qtyStr = qtyBlock.substring(1, 2) + "." + qtyBlock.substring(2)
+    } else {
+      qtyStr = qtyBlock.substring(0, 2) + "." + qtyBlock.substring(2)
+    }
+
+    const qty = parseFloat(qtyStr)
+    if (Number.isNaN(qty) || qty <= 0) return { isScale: false as const }
+
+    return { isScale: true as const, baseBarcode: base, quantity: qty }
+  }, [scalePrefix])
+
+  const addOrIncreaseWithQuantity = useCallback((item: MenuItem, quantity: number) => {
+    const existingItem = cartItems.find((cartItem) => cartItem.id === item.id)
+    if (existingItem) {
+      updateQuantity(item.id, existingItem.quantity + quantity)
+    } else {
+      // Add directly to cart with base quantity 0, then set exact quantity
+      addToCart({
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        price: item.price,
+        image: item.image,
+        available: item.available,
+        uom: item.uom,
+        item_code: item.id,
+      })
+      updateQuantity(item.id, quantity)
+    }
+  }, [cartItems, updateQuantity, addToCart])
 
   // Separate function for adding items to cart (used by both click and barcode)
   const addItemToCart = (item: MenuItem) => {
@@ -101,21 +162,40 @@ export default function RetailPOSLayout() {
   // Barcode scanning functionality - moved after handleAddToCart is defined
   const { scanBarcode } = useBarcodeScanner(addItemToCart)
 
-  const handleBarcodeDetected = async (barcode: string) => {
+  const handleBarcodeDetected = useCallback(async (barcode: string) => {
     const success = await scanBarcode(barcode)
     if (success) {
       setShowScanner(false)
     }
-  }
+  }, [scanBarcode])
 
   // Handle search input for both product search and barcode scanning
   const handleSearchInput = (query: string) => {
     setSearchQuery(query)
 
-    // If input looks like a barcode (numeric/alphanumeric, 8+ characters),
-    // it might be from a hardware scanner
-    if (query.length >= 8 && /^[0-9A-Za-z]+$/.test(query)) {
+    // If input looks like a barcode (numeric-only, 8+ digits),
+    // it might be from a hardware scanner (reduced false positives)
+    if (useScannerOnly && query.length >= 8 && /^[0-9]+$/.test(query)) {
       console.log('Potential barcode input detected:', query)
+    }
+
+    // Manage pinning behavior for scale barcodes while typing
+    const isScaleTyping = !!scalePrefix &&
+      query &&
+      /^[0-9]+$/.test(query) &&
+      query.startsWith(scalePrefix) &&
+      query.length >= 7
+
+    if (isScaleTyping) {
+      const base = query.substring(0, 7)
+      const matched = menuItems.find(mi => mi.id === base || (mi.barcode && mi.barcode === base))
+      setPinnedItemId(matched ? matched.id : null)
+      console.log('[ScaleDebug] typing:', { query, base, matchedId: matched?.id, pinnedItemId: matched ? matched.id : null })
+    } else {
+      if (pinnedItemId) {
+        console.log('[ScaleDebug] clearing pinned due to not scale typing:', { query })
+        setPinnedItemId(null)
+      }
     }
   }
 
@@ -124,30 +204,78 @@ export default function RetailPOSLayout() {
     if (e.key === 'Enter' && searchQuery.trim()) {
       e.preventDefault()
 
-      // Check if this looks like a barcode (numeric/alphanumeric, 8+ characters)
-      if (searchQuery.length >= 8 && /^[0-9A-Za-z]+$/.test(searchQuery)) {
+      // First: handle scale barcodes regardless of scanner-only setting
+      if (/^[0-9]+$/.test(searchQuery) && scalePrefix && searchQuery.startsWith(scalePrefix)) {
+        const parsed = parseScaleBarcode(searchQuery.trim())
+        if (parsed.isScale) {
+          const base = parsed.baseBarcode
+          const qty = parsed.quantity
+
+          const item = menuItems.find(mi => mi.id === base || (mi.barcode && mi.barcode === base))
+          if (item) {
+            console.log('[ScaleDebug] enter scale add:', { base, qty, itemId: item.id })
+            addOrIncreaseWithQuantity(item, qty)
+            setSearchQuery('')
+            setPinnedItemId(null)
+            return
+          }
+
+          // Fallback: process via barcode flow with base identifier
+          console.log('[ScaleDebug] enter scale fallback via handleBarcodeDetected:', { base, qty })
+          handleBarcodeDetected(base)
+          const fallbackItem = menuItems.find(mi => mi.id === base)
+          if (fallbackItem) {
+            console.log('[ScaleDebug] enter scale fallback update qty:', { fallbackId: fallbackItem.id, qty })
+            addOrIncreaseWithQuantity(fallbackItem, qty)
+          }
+          setSearchQuery('')
+          setPinnedItemId(null)
+          return
+        }
+      }
+
+      // Non-scale numeric barcode: only process automatically in scanner-only mode
+      if (useScannerOnly && /^[0-9]+$/.test(searchQuery)) {
         console.log('Processing as barcode:', searchQuery)
         handleBarcodeDetected(searchQuery.trim())
-        setSearchQuery('') // Clear after processing
-      } else {
-        // Regular search - just let it filter products
-        console.log('Processing as product search:', searchQuery)
+        setSearchQuery('')
+        setPinnedItemId(null)
+        return
       }
+
+      // Regular search - do not clear the input
+      console.log('Processing as product search:', searchQuery)
     }
   }
 
   // Auto-process barcode after a short delay (for hardware scanners)
   useEffect(() => {
+    if (!useScannerOnly) return
+
     const timer = setTimeout(() => {
-      if (searchQuery.length >= 8 && /^[0-9A-Za-z]+$/.test(searchQuery)) {
+      if (searchQuery.length >= 8 && /^[0-9]+$/.test(searchQuery)) {
+        const parsed = parseScaleBarcode(searchQuery.trim())
+        if (parsed.isScale) {
+          const base = parsed.baseBarcode
+          const qty = parsed.quantity
+          const item = menuItems.find(mi => mi.id === base || (mi.barcode && mi.barcode === base))
+          if (item) {
+            console.log('[ScaleDebug] auto scale add:', { base, qty, itemId: item.id })
+            addOrIncreaseWithQuantity(item, qty)
+            setSearchQuery('')
+            setPinnedItemId(null)
+            return
+          }
+        }
         console.log('Auto-processing potential barcode:', searchQuery)
         handleBarcodeDetected(searchQuery.trim())
         setSearchQuery('')
+        setPinnedItemId(null)
       }
     }, 500) // Wait 500ms after last input
 
     return () => clearTimeout(timer)
-  }, [searchQuery, handleBarcodeDetected])
+  }, [searchQuery, handleBarcodeDetected, useScannerOnly, menuItems, parseScaleBarcode, addOrIncreaseWithQuantity])
 
   const filteredItems = menuItems.filter((item) => {
     // Availability filter - hide items with 0 quantity if hide_unavailable_items is enabled
@@ -155,20 +283,44 @@ export default function RetailPOSLayout() {
       return false
     }
 
-    // Category filter
     const matchesCategory = selectedCategory === "all" || item.category === selectedCategory
 
-    // Search filter - search by name, category, item_code, or any text content
-    const matchesSearch =
-      searchQuery === "" ||
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.id.toLowerCase().includes(searchQuery.toLowerCase()) // item.id is the item_code
+    // Special handling for scale barcodes while typing: if a scale prefix is set and
+    // the search starts with that numeric prefix, use only the base part (first 7 chars)
+    // for filtering so that extra quantity digits do not hide the item
+    const isScaleTyping = !!scalePrefix &&
+      searchQuery &&
+      /^[0-9]+$/.test(searchQuery) &&
+      searchQuery.startsWith(scalePrefix) &&
+      searchQuery.length >= 7
 
-    return matchesCategory && matchesSearch
+    // If exactly one item is already matched and pinned, keep it visible regardless of extra digits
+    const queryForFilter = pinnedItemId && isScaleTyping ? searchQuery.substring(0, 7) : (isScaleTyping ? searchQuery.substring(0, 7) : searchQuery)
+    if (isScaleTyping) {
+      console.log('[ScaleDebug] filter using base:', { searchQuery, base: queryForFilter, pinnedItemId })
+    }
+
+    // Search filter - search by name, category, item_code, barcode, or any text content
+    const matchesSearch =
+      queryForFilter === "" ||
+      item.name.toLowerCase().includes(queryForFilter.toLowerCase()) ||
+      item.category.toLowerCase().includes(queryForFilter.toLowerCase()) ||
+      item.id.toLowerCase().includes(queryForFilter.toLowerCase()) ||
+      item.description?.toLowerCase().includes(queryForFilter.toLowerCase()) ||
+      (item.barcode && item.barcode.toLowerCase().includes(queryForFilter.toLowerCase()))
+
+    // If pinned, ensure the pinned item always passes
+    const passes = matchesCategory && matchesSearch
+    if (pinnedItemId && isScaleTyping) {
+      const keep = passes || item.id === pinnedItemId
+      if (!passes && keep) {
+        console.log('[ScaleDebug] keeping pinned in results:', { itemId: item.id, pinnedItemId })
+      }
+      return keep
+    }
+    return passes
   })
 
-  // Show loading state
   if (loading) {
     return <LoadingSpinner message="Loading products..." />
   }
@@ -263,7 +415,7 @@ export default function RetailPOSLayout() {
       {scannerOnlyIndicator}
       <div className="flex h-screen bg-gray-50 dark:bg-gray-900 pb-8">
         {/* Menu Section - Takes remaining space minus cart width */}
-        <div className="flex-1 overflow-hidden lg:ml-20">
+        <div className="flex-1 overflow-hidden ml-20">
           <MenuGrid
             items={filteredItems}
             selectedCategory={selectedCategory}

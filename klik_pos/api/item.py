@@ -183,18 +183,46 @@ def get_items_with_balance_and_price():
             items = frappe.db.sql(base_query, params, as_dict=True)
         else:
             # Original logic for when hide_unavailable is disabled
-            filters = {"disabled": 0, "is_stock_item": 1}
+            # Use SQL to get items with barcode information
+            base_query = """
+                SELECT DISTINCT i.name, i.item_name, i.description, i.item_group, i.image, i.stock_uom
+                FROM `tabItem` i
+                WHERE i.disabled = 0
+                AND i.is_stock_item = 1
+            """
+
+            # Add item group filter if specified in POS profile
             if pos_doc.item_groups:
                 item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
                 if item_group_names:
-                    filters["item_group"] = ["in", item_group_names]
+                    placeholders = ', '.join(['%s'] * len(item_group_names))
+                    base_query += f" AND i.item_group IN ({placeholders})"
 
-            items = frappe.get_all(
-                "Item",
-                filters=filters,
-                fields=["name", "item_name", "description", "item_group", "image", "stock_uom"],
-                order_by="modified desc"
-            )
+            base_query += " ORDER BY i.modified DESC"
+
+            # Execute query with parameters
+            params = {}
+            if pos_doc.item_groups:
+                item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
+                if item_group_names:
+                    params.update({f'group_{i}': group for i, group in enumerate(item_group_names)})
+
+            items = frappe.db.sql(base_query, params, as_dict=True)
+
+        # Get barcodes for all items in a separate query
+        item_codes = [item["name"] for item in items]
+        barcode_map = {}
+        if item_codes:
+            barcode_results = frappe.db.sql("""
+                SELECT parent, barcode
+                FROM `tabItem Barcode`
+                WHERE parent IN %s
+            """, (item_codes,), as_dict=True)
+
+            for barcode_row in barcode_results:
+                item_code = barcode_row["parent"]
+                if item_code not in barcode_map:
+                    barcode_map[item_code] = barcode_row["barcode"]  # Get first barcode
 
         enriched_items = []
         for item in items:
@@ -208,6 +236,9 @@ def get_items_with_balance_and_price():
             # Get price info only for available items
             price_info = fetch_item_price(item["name"], price_list)
 
+            # Get barcode from the map
+            primary_barcode = barcode_map.get(item["name"])
+
             enriched_items.append({
                 "id": item["name"],
                 "name": item.get("item_name") or item["name"],
@@ -220,9 +251,9 @@ def get_items_with_balance_and_price():
                 "image": item.get("image"),
                 "sold": 0,
                 "preparationTime": 10,
-                "uom": item.get("stock_uom", "Nos")
+                "uom": item.get("stock_uom", "Nos"),
+                "barcode": primary_barcode
             })
-
         return enriched_items
 
     except Exception:
