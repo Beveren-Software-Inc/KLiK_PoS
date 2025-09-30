@@ -24,7 +24,7 @@ export default function SearchBar({
     if (isMobile) {
       return "Search menu..."
     }
-    return "Search for products, categories, or ingredients..."
+    return "Search by product, category, item code, barcode, batch or serial..."
   }
 
   return (

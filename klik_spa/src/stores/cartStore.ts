@@ -12,6 +12,7 @@ interface CartState {
   // Actions
   addToCart: (item: Omit<CartItem, 'quantity'>) => void
   updateQuantity: (id: string, quantity: number) => void
+  updateUOM: (id: string, uom: string, price: number) => void
   removeItem: (id: string) => void
   clearCart: () => void
   applyCoupon: (coupon: GiftCoupon) => void
@@ -75,6 +76,24 @@ export const useCartStore = create<CartState>()(
           )
         }
       }),
+
+      updateUOM: (id, uom, price) => {
+        console.log(`🏪 Cart Store: Updating UOM for item ${id} to ${uom} with price ${price}`);
+        set((state) => {
+          const updatedItems = state.cartItems.map((item) => {
+            if (item.id === id) {
+              console.log(`🏪 Cart Store: Item ${id} updated:`, {
+                before: { uom: item.uom, price: item.price },
+                after: { uom, price }
+              });
+              return { ...item, uom, price };
+            }
+            return item;
+          });
+          console.log(`🏪 Cart Store: All items after update:`, updatedItems);
+          return { cartItems: updatedItems };
+        });
+      },
 
       removeItem: (id) => set((state) => ({
         cartItems: state.cartItems.filter((item) => item.id !== id)

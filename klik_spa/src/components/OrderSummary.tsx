@@ -1,18 +1,17 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Minus,
   Plus,
   X,
-  Tag,
   Search,
   UserPlus,
   User,
   Building,
 } from "lucide-react";
 import type { CartItem, GiftCoupon } from "../../types";
-import GiftCouponPopover from "./GiftCouponPopover";
+// import GiftCouponPopover from "./GiftCouponPopover";
 import PaymentDialog from "./PaymentDialog";
 import { type Customer } from "../types/customer"
 import AddCustomerModal from "./AddCustomerModal";
@@ -20,8 +19,8 @@ import { createDraftSalesInvoice } from "../services/salesInvoice";
 import { useCustomers } from "../hooks/useCustomers";
 import { useProducts } from "../hooks/useProducts";
 import { toast } from "react-toastify";
-import { useBatchData } from "../hooks/useProducts";
 import { getBatches } from "../utils/batch";
+import { getSerials } from "../utils/serial";
 import { useNavigate } from "react-router-dom";
 import { usePOSDetails } from "../hooks/usePOSProfile";
 import { useCustomerStatistics } from "../hooks/useCustomerStatistics";
@@ -47,6 +46,356 @@ interface OrderSummaryProps {
   isMobile?: boolean;
 }
 
+// Component to handle quantity input with local state
+interface QuantityInputProps {
+  item: CartItem;
+  onUpdateQuantity: (id: string, quantity: number) => void;
+  isMobile?: boolean;
+}
+
+const QuantityInput = ({ item, onUpdateQuantity, isMobile }: QuantityInputProps) => {
+  const [inputValue, setInputValue] = useState(item.quantity.toString());
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Update input value when item quantity changes externally
+  useEffect(() => {
+    if (!isEditing) {
+      setInputValue(item.quantity.toString());
+    }
+  }, [item.quantity, isEditing]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInputValue(value);
+  };
+
+  const handleBlur = () => {
+    setIsEditing(false);
+    const numValue = Number(inputValue);
+
+    if (isNaN(numValue) || numValue <= 0) {
+      // Invalid input - reset to original value
+      setInputValue(item.quantity.toString());
+      if (numValue <= 0) {
+        onUpdateQuantity(item.id, 0);
+      }
+    } else {
+      // Valid input - update quantity
+      setInputValue(numValue.toString());
+      onUpdateQuantity(item.id, numValue);
+    }
+  };
+
+  const handleFocus = () => {
+    setIsEditing(true);
+  };
+
+  return (
+    <input
+      type="number"
+      step="0.01"
+      min="0"
+      value={inputValue}
+      onChange={handleChange}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      className={`w-full ${
+        isMobile ? "text-sm" : "text-sm"
+      } px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+    />
+  );
+};
+
+// Simple UOM Select Field Component
+interface UOMSelectFieldProps {
+  item: CartItem;
+  onUOMChange: (itemId: string, selectedUOM: string, newPrice: number) => void;
+  isMobile?: boolean;
+}
+
+const UOMSelectField = ({ item, onUOMChange, isMobile }: UOMSelectFieldProps) => {
+  const [availableUOMs, setAvailableUOMs] = useState<string[]>(['Nos']); // Start with Nos as default
+  const [selectedUOM, setSelectedUOM] = useState<string>(item.uom || 'Nos'); //Mania: Local state for selected UOM
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    const loadUOMs = async () => {
+      try {
+        const response = await fetch(`/api/method/frappe.client.get_list`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            doctype: "UOM",
+            fields: ["name"],
+            filters: {},
+            limit_page_length: 500
+          })
+        });
+
+        if (!response.ok) throw new Error('Failed to fetch UOMs');
+
+        const data = await response.json();
+        if (data?.message) {
+          const uoms = data.message.map((uom: any) => uom.name).sort();
+          setAvailableUOMs(uoms);
+        } else {
+          // Fallback to basic UOMs
+          setAvailableUOMs(['Nos', 'Box', 'Kilogram', 'Liter', 'Meter', 'Dozen']);
+        }
+      } catch (error) {
+        console.error('Error loading UOMs:', error);
+        // Fallback to basic UOMs
+        setAvailableUOMs(['Nos', 'Box', 'Kilogram', 'Liter', 'Meter', 'Dozen']);
+      }
+    };
+
+    loadUOMs();
+  }, []);
+
+  // Sync local state with item UOM changes
+  useEffect(() => {
+    setSelectedUOM(item.uom || 'Nos');
+  }, [item.uom]);
+
+  // Filter UOMs based on search query
+  const filteredUOMs = availableUOMs.filter(uom =>
+    uom.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleUOMSelect = async (newUOM: string) => {
+
+
+    // Update local state immediately for UI responsiveness
+    setSelectedUOM(newUOM);
+    setIsDropdownOpen(false);
+    setSearchQuery('');
+
+    // Update UOM and price using item UOMs and prices API
+    try {
+      // Use item_code if available, otherwise fallback to item.id
+      const itemCode = item.item_code || item.id;
+      if (itemCode) {
+        console.log(`📡 API Call: get_item_uoms_and_prices for ${itemCode}`);
+        const response = await fetch(`/api/method/klik_pos.api.item.get_item_uoms_and_prices?item_code=${itemCode}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`📦 API Response:`, data.message);
+
+          if (data?.message?.uoms) {
+            const selectedUOMData = data.message.uoms.find((uom: any) => uom.uom === newUOM);
+            if (selectedUOMData) {
+
+              onUOMChange(item.id, newUOM, selectedUOMData.price);
+            } else {
+              console.log(`❌ No UOM data found for ${newUOM}`);
+              console.log(`Available UOMs:`, data.message.uoms.map((u: any) => u.uom));
+            }
+          } else {
+            console.log(`❌ No UOMs data in API response`);
+          }
+        } else {
+          console.log(`❌ API call failed:`, response.status, response.statusText);
+        }
+      } else {
+        console.log(`❌ No item_code or id found for item:`, item);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching UOM pricing:', error);
+    }
+  };
+
+  return (
+    <div className="relative">
+      {/* UOM Display Button */}
+      <button
+        type="button"
+        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+        className={`w-full ${
+          isMobile ? "text-sm" : "text-sm"
+        } px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-left flex items-center justify-between`}
+      >
+        <span>{selectedUOM}</span>
+        <svg className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {/* Dropdown */}
+      {isDropdownOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-hidden">
+          {/* Search Input */}
+          <div className="p-2 border-b border-gray-200 dark:border-gray-600">
+            <input
+              type="text"
+              placeholder="Search UOM..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              autoFocus
+            />
+          </div>
+
+          {/* UOM List */}
+          <div className="max-h-48 overflow-y-auto">
+            {filteredUOMs.length > 0 ? (
+              filteredUOMs.map((uom) => (
+                <button
+                  key={uom}
+                  type="button"
+                  onClick={() => handleUOMSelect(uom)}
+                  className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                    uom === selectedUOM ? 'bg-beveren-50 dark:bg-beveren-900/20 text-beveren-600 dark:text-beveren-400' : 'text-gray-900 dark:text-white'
+                  }`}
+                >
+                  {uom}
+                </button>
+              ))
+            ) : (
+              <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+                No UOMs found
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Compact searchable dropdown for Batch selection
+interface BatchSelectFieldProps {
+  itemId: string;
+  itemCode: string;
+  options: { batch_id: string; qty: number }[];
+  value: string;
+  onChange: (value: string, availableQty: number) => void;
+  isMobile?: boolean;
+}
+
+const BatchSelectField = ({ itemId, itemCode, options, value, onChange, isMobile }: BatchSelectFieldProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const filtered = options.filter(o => o.batch_id.toLowerCase().includes(query.toLowerCase()));
+
+  const handleSelect = (batchId: string) => {
+    const selectedQty = options.find(b => b.batch_id === batchId)?.qty || 0;
+    onChange(batchId, selectedQty);
+    setIsOpen(false);
+    setQuery("");
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full ${isMobile ? "text-xs" : "text-xs"} px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-left flex items-center justify-between`}
+      >
+        <span className="truncate">{value || "Select Batch"}</span>
+        <svg className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      </button>
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-44 overflow-hidden">
+          <div className="p-1 border-b border-gray-200 dark:border-gray-600">
+            <input
+              type="text"
+              placeholder="Filter batch..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              autoFocus
+            />
+          </div>
+          <div className="max-h-36 overflow-y-auto">
+            {filtered.length > 0 ? filtered.map((b) => (
+              <button
+                key={b.batch_id}
+                type="button"
+                onClick={() => handleSelect(b.batch_id)}
+                className={`w-full px-2 py-1 text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-700 ${value === b.batch_id ? 'bg-beveren-50 dark:bg-beveren-900/20 text-beveren-600 dark:text-beveren-400' : 'text-gray-900 dark:text-white'}`}
+              >
+                {b.batch_id} - {b.qty}
+              </button>
+            )) : (
+              <div className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">No matches</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Compact searchable dropdown for Serial selection
+interface SerialSelectFieldProps {
+  itemId: string;
+  itemCode: string;
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
+  isMobile?: boolean;
+}
+
+const SerialSelectField = ({ itemId, itemCode, options, value, onChange, isMobile }: SerialSelectFieldProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const filtered = options.filter(sn => sn.toLowerCase().includes(query.toLowerCase()));
+
+  const handleSelect = (sn: string) => {
+    onChange(sn);
+    setIsOpen(false);
+    setQuery("");
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full ${isMobile ? "text-xs" : "text-xs"} px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-left flex items-center justify-between`}
+      >
+        <span className="truncate">{value || "Select Serial"}</span>
+        <svg className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      </button>
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-44 overflow-hidden">
+          <div className="p-1 border-b border-gray-200 dark:border-gray-600">
+            <input
+              type="text"
+              placeholder="Filter serial..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              autoFocus
+            />
+          </div>
+          <div className="max-h-36 overflow-y-auto">
+            {filtered.length > 0 ? filtered.map((sn) => (
+              <button
+                key={sn}
+                type="button"
+                onClick={() => handleSelect(sn)}
+                className={`w-full px-2 py-1 text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-700 ${value === sn ? 'bg-beveren-50 dark:bg-beveren-900/20 text-beveren-600 dark:text-beveren-400' : 'text-gray-900 dark:text-white'}`}
+              >
+                {sn}
+              </button>
+            )) : (
+              <div className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">No matches</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function OrderSummary({
   cartItems,
   onUpdateQuantity,
@@ -58,7 +407,7 @@ export default function OrderSummary({
   isMobile = false,
 }: OrderSummaryProps) {
   const [showCouponPopover, setShowCouponPopover] = useState(false);
-  const { selectedCustomer, setSelectedCustomer } = useCartStore();
+  const { selectedCustomer, setSelectedCustomer, updateUOM } = useCartStore();
 
   // Track if user has manually removed the default customer
   const [userRemovedDefaultCustomer, setUserRemovedDefaultCustomer] = useState(false);
@@ -88,6 +437,47 @@ export default function OrderSummary({
 
   const currency = posDetails?.currency;
   const currency_symbol = posDetails?.currency_symbol;
+
+  // UOM change handler
+  const handleUOMChange = useCallback((itemId: string, selectedUOM: string, newPrice: number) => {
+    console.log(`🛒 Cart Update Started:`);
+    console.log(`  Item ID: ${itemId}`);
+    console.log(`  New UOM: ${selectedUOM}`);
+    console.log(`  New Price: $${newPrice}`);
+
+    // Find the current item before update
+    const currentItem = cartItems.find(item => item.id === itemId);
+    if (currentItem) {
+      console.log(`  Before Update:`, {
+        name: currentItem.name,
+        uom: currentItem.uom,
+        price: currentItem.price,
+        quantity: currentItem.quantity
+      });
+    }
+
+    // Update the cart item with new UOM and price using the cart store
+    updateUOM(itemId, selectedUOM, newPrice);
+
+    // Debug: Check if the cart item was updated
+    setTimeout(() => {
+      const updatedItem = cartItems.find(item => item.id === itemId);
+      console.log(`✅ Cart Update Complete:`);
+      console.log(`  After Update:`, {
+        name: updatedItem?.name,
+        uom: updatedItem?.uom,
+        price: updatedItem?.price,
+        quantity: updatedItem?.quantity
+      });
+
+      if (currentItem && updatedItem) {
+        console.log(`📊 Price Comparison:`);
+        console.log(`  Old: ${currentItem.uom} = $${currentItem.price}`);
+        console.log(`  New: ${updatedItem.uom} = $${updatedItem.price}`);
+        console.log(`  Difference: $${(updatedItem.price - currentItem.price).toFixed(2)}`);
+      }
+    }, 100);
+  }, [updateUOM, cartItems]);
   // State for item-level discounts and details
   const [itemDiscounts, setItemDiscounts] = useState<
     Record<
@@ -104,6 +494,15 @@ export default function OrderSummary({
 
   const [itemBatches, setItemBatches] = useState<
     Record<string, { batch_id: string; qty: number }[]>
+  >({});
+
+  const [itemSerials, setItemSerials] = useState<
+    Record<string, string[]>
+  >({});
+
+  // Pending pre-selections when item not yet in cart
+  const [pendingPreselect, setPendingPreselect] = useState<
+    Record<string, { batchId?: string; serialNo?: string }>
   >({});
 
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -214,7 +613,6 @@ export default function OrderSummary({
       } else if (filteredCustomers.length === 1 && !userRemovedDefaultCustomer) {
         handleCustomerSelect(filteredCustomers[0]);
       }
-      // If multiple matches, do nothing (let user choose from dropdown)
     }
   };
 
@@ -532,30 +930,40 @@ export default function OrderSummary({
   }, [posDetails, selectedCustomer, posLoading, userRemovedDefaultCustomer]);
 
   useEffect(() => {
-    const fetchAndSetBatches = async () => {
+    const fetchAndSetInfo = async () => {
       const newBatches = { ...itemBatches };
+      const newSerials = { ...itemSerials } as Record<string, string[]>;
 
       for (const item of cartItems) {
         const key = item.item_code || item.id;
-        if (key && key !== 'undefined' && !newBatches[key]) {
-          try {
-            const batches = await getBatches(item.id);
-            if (Array.isArray(batches)) {
-              newBatches[key] = batches;
+        if (key && key !== 'undefined') {
+          if (!newBatches[key]) {
+            try {
+              const batches = await getBatches(item.id);
+              if (Array.isArray(batches)) newBatches[key] = batches;
+            } catch (err) {
+              console.error("Error fetching batches", err);
             }
-          } catch (err) {
-            console.error("Error fetching batches", err);
+          }
+          if (!newSerials[key]) {
+            try {
+              const serials = await getSerials(key);
+              if (Array.isArray(serials)) newSerials[key] = serials;
+            } catch (err) {
+              console.error("Error fetching serials", err);
+            }
           }
         } else {
-          console.log(`OrderSummary: Skipping initial batch loading for key "${key}"`);
+          console.log(`OrderSummary: Skipping initial info loading for key "${key}"`);
         }
       }
 
       setItemBatches(newBatches);
+      setItemSerials(newSerials);
     };
 
     if (cartItems.length) {
-      fetchAndSetBatches();
+      fetchAndSetInfo();
     }
   }, [cartItems]);
 
@@ -585,10 +993,110 @@ export default function OrderSummary({
 
     window.addEventListener('batchQuantitiesUpdated', handleBatchUpdate as EventListener);
 
+    // Listen for preselection from search (batch/serial)
+    const handleSetBatch = (event: CustomEvent) => {
+      const { itemCode, batchId } = event.detail as { itemCode: string; batchId: string };
+      const item = cartItems.find(ci => (ci.item_code || ci.id) === itemCode)
+      if (item) {
+        const selectedQty = itemBatches[item.item_code || item.id]?.find(b => b.batch_id === batchId)?.qty || 0
+        setItemDiscounts(prev => ({
+          ...prev,
+          [item.id]: {
+            ...(prev[item.id] || { discountPercentage: 0, discountAmount: 0, batchNumber: '', serialNumber: '', availableQuantity: 0 }),
+            batchNumber: batchId,
+            availableQuantity: selectedQty,
+          }
+        }))
+      } else {
+        // Save pending, to be applied when item appears in cart
+        setPendingPreselect(prev => ({
+          ...prev,
+          [itemCode]: { ...(prev[itemCode] || {}), batchId }
+        }))
+      }
+    }
+
+    const handleSetSerial = (event: CustomEvent) => {
+      const { itemCode, serialNo } = event.detail as { itemCode: string; serialNo: string };
+      const item = cartItems.find(ci => (ci.item_code || ci.id) === itemCode)
+      if (item) {
+        setItemDiscounts(prev => ({
+          ...prev,
+          [item.id]: {
+            ...(prev[item.id] || { discountPercentage: 0, discountAmount: 0, batchNumber: '', serialNumber: '', availableQuantity: 0 }),
+            serialNumber: serialNo,
+          }
+        }))
+        // Ensure the serial exists in options for visibility; if not, inject it
+        setItemSerials(prev => {
+          const key = item.item_code || item.id
+          const existing = new Set(prev[key] || [])
+          if (!existing.has(serialNo)) {
+            return { ...prev, [key]: [...existing, serialNo] as string[] }
+          }
+          return prev
+        })
+      } else {
+        // Save pending, to be applied when item appears in cart
+        setPendingPreselect(prev => ({
+          ...prev,
+          [itemCode]: { ...(prev[itemCode] || {}), serialNo }
+        }))
+      }
+    }
+
+    window.addEventListener('cart:setBatchForItem', handleSetBatch as EventListener)
+    window.addEventListener('cart:setSerialForItem', handleSetSerial as EventListener)
+
     return () => {
       window.removeEventListener('batchQuantitiesUpdated', handleBatchUpdate as EventListener);
+      window.removeEventListener('cart:setBatchForItem', handleSetBatch as EventListener)
+      window.removeEventListener('cart:setSerialForItem', handleSetSerial as EventListener)
     };
-  }, []);
+  }, [cartItems, itemBatches]);
+
+  // Apply any pending pre-selections when cart items change
+  useEffect(() => {
+    if (!cartItems.length) return
+    const nextPending = { ...pendingPreselect }
+    cartItems.forEach(item => {
+      const key = item.item_code || item.id
+      const pending = nextPending[key]
+      if (pending) {
+        if (pending.batchId) {
+          const selectedQty = itemBatches[key]?.find(b => b.batch_id === pending.batchId)?.qty || 0
+          setItemDiscounts(prev => ({
+            ...prev,
+            [item.id]: {
+              ...(prev[item.id] || { discountPercentage: 0, discountAmount: 0, batchNumber: '', serialNumber: '', availableQuantity: 0 }),
+              batchNumber: pending.batchId,
+              availableQuantity: selectedQty,
+            }
+          }))
+        }
+        if (pending.serialNo) {
+          setItemDiscounts(prev => ({
+            ...prev,
+            [item.id]: {
+              ...(prev[item.id] || { discountPercentage: 0, discountAmount: 0, batchNumber: '', serialNumber: '', availableQuantity: 0 }),
+              serialNumber: pending.serialNo,
+            }
+          }))
+          setItemSerials(prev => {
+            const existing = new Set(prev[key] || [])
+            if (!existing.has(pending.serialNo!)) {
+              return { ...prev, [key]: [...existing, pending.serialNo!] as string[] }
+            }
+            return prev
+          })
+        }
+        delete nextPending[key]
+      }
+    })
+    if (Object.keys(nextPending).length !== Object.keys(pendingPreselect).length) {
+      setPendingPreselect(nextPending)
+    }
+  }, [cartItems, itemBatches, pendingPreselect])
 
   return (
     <div
@@ -1053,41 +1561,51 @@ export default function OrderSummary({
                         isMobile ? "px-3 pb-3" : "px-6 py-3 ml-7"
                       } bg-gray-25 dark:bg-gray-750`}
                     >
-                      <div className="grid grid-cols-2 gap-4">
-                        {/* Left Column */}
-                        <div className="space-y-3">
-                          {/* Quantity Field */}
+                      <div className="w-full">
+                        {/* Row 1: Quantity | UOM */}
+                        <div className="grid grid-cols-2 gap-4 mb-4">
                           <div>
-                            <label
-                              className={`block text-gray-700 dark:text-gray-300 font-medium ${
-                                isMobile ? "text-xs" : "text-xs"
-                              } mb-1`}
-                            >
+                            <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
                               Quantity
+                            </label>
+                            <QuantityInput
+                              item={item}
+                              onUpdateQuantity={onUpdateQuantity}
+                              isMobile={isMobile}
+                            />
+                          </div>
+                          <div>
+                            <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
+                              UOM
+                            </label>
+                            <UOMSelectField item={item} onUOMChange={handleUOMChange} isMobile={isMobile} />
+                          </div>
+                        </div>
+
+                        {/* Row 2: Discount Amount | Discount (%) */}
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
+                              Discount Amount
                             </label>
                             <input
                               type="number"
                               min="0"
-                              value={item.quantity}
+                              step="0.01"
+                              value={itemDiscount.discountAmount || ""}
                               onChange={(e) =>
-                                onUpdateQuantity(
+                                updateItemDiscount(
                                   item.id,
-                                  parseInt(e.target.value) || 0
+                                  "discountAmount",
+                                  parseFloat(e.target.value) || 0
                                 )
                               }
-                              className={`w-full ${
-                                isMobile ? "text-sm" : "text-xs"
-                              } px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+                              placeholder="0.00"
+                              className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
                             />
                           </div>
-
-                          {/* Discount Percentage */}
                           <div>
-                            <label
-                              className={`block text-gray-700 dark:text-gray-300 font-medium ${
-                                isMobile ? "text-xs" : "text-xs"
-                              } mb-1`}
-                            >
+                            <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
                               Discount (%)
                             </label>
                             <input
@@ -1104,119 +1622,40 @@ export default function OrderSummary({
                                 )
                               }
                               placeholder="0.0"
-                              className={`w-full ${
-                                isMobile ? "text-sm" : "text-xs"
-                              } px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+                              className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
                             />
-                          </div>
-
-                          {/* Batch Number */}
-                          <div>
-                            <label
-                              className={`block text-gray-700 dark:text-gray-300 font-medium ${
-                                isMobile ? "text-xs" : "text-xs"
-                              } mb-1`}
-                            >
-                              Batch
-                            </label>
-                            <select
-                              value={itemDiscount.batchNumber || ""}
-                              onChange={(e) => {
-                                const selectedBatch = e.target.value;
-                                const selectedQty =
-                                  itemBatches[item.item_code || item.id]?.find(
-                                    (b) => b.batch_id === selectedBatch
-                                  )?.qty || 0;
-                                updateItemDiscount(
-                                  item.id,
-                                  "batchNumber",
-                                  selectedBatch
-                                );
-                                updateItemDiscount(
-                                  item.id,
-                                  "availableQuantity",
-                                  selectedQty
-                                );
-                              }}
-                              className={`w-full ${
-                                isMobile ? "text-sm" : "text-xs"
-                              } px-2 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent
-                                bg-white text-gray-900 appearance-none`} // Removed dark mode classes
-                              style={{
-                                backgroundColor: "white",
-                                color: "#111827", // Tailwind's gray-900
-                              }}
-                            >
-                              <option value="" disabled></option>
-                              {itemBatches[item.item_code || item.id]?.map((batch) => (
-                                <option
-                                  key={batch.batch_id}
-                                  value={batch.batch_id}
-                                  style={{
-                                    backgroundColor: "white",
-                                    color: "#111827",
-                                  }}
-                                >
-                                  {batch.batch_id} - {batch.qty}
-                                </option>
-                              ))}
-                            </select>
                           </div>
                         </div>
 
-                        {/* Right Column */}
-                        <div className="space-y-3">
-                          {/* Discount Amount */}
+                        {/* Row 3: Batch | Serial No */}
+                        <div className="grid grid-cols-2 gap-4 mb-4">
                           <div>
-                            <label
-                              className={`block text-gray-700 dark:text-gray-300 font-medium ${
-                                isMobile ? "text-xs" : "text-xs"
-                              } mb-1`}
-                            >
-                              Discount Amount ($)
+                            <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
+                              Batch
                             </label>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={itemDiscount.discountAmount || ""}
-                              onChange={(e) =>
-                                updateItemDiscount(
-                                  item.id,
-                                  "discountAmount",
-                                  parseFloat(e.target.value) || 0
-                                )
-                              }
-                              placeholder="0.00"
-                              className={`w-full ${
-                                isMobile ? "text-sm" : "text-xs"
-                              } px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+                            <BatchSelectField
+                              itemId={item.id}
+                              itemCode={item.item_code || item.id}
+                              options={itemBatches[item.item_code || item.id] || []}
+                              value={itemDiscount.batchNumber || ""}
+                              onChange={(selectedBatch, selectedQty) => {
+                                updateItemDiscount(item.id, "batchNumber", selectedBatch)
+                                updateItemDiscount(item.id, "availableQuantity", selectedQty)
+                              }}
+                              isMobile={isMobile}
                             />
                           </div>
-
-                          {/* Serial Number */}
                           <div>
-                            <label
-                              className={`block text-gray-700 dark:text-gray-300 font-medium ${
-                                isMobile ? "text-xs" : "text-xs"
-                              } mb-1`}
-                            >
-                              Serial No.
+                            <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
+                              Serial No
                             </label>
-                            <input
-                              type="text"
+                            <SerialSelectField
+                              itemId={item.id}
+                              itemCode={item.item_code || item.id}
+                              options={itemSerials[item.item_code || item.id] || []}
                               value={itemDiscount.serialNumber || ""}
-                              onChange={(e) =>
-                                updateItemDiscount(
-                                  item.id,
-                                  "serialNumber",
-                                  e.target.value
-                                )
-                              }
-                              placeholder="Enter serial number"
-                              className={`w-full ${
-                                isMobile ? "text-sm" : "text-xs"
-                              } px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+                              onChange={(sn) => updateItemDiscount(item.id, "serialNumber", sn)}
+                              isMobile={isMobile}
                             />
                           </div>
                         </div>

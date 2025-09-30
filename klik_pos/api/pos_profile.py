@@ -83,6 +83,7 @@ def get_pos_details():
         "is_zatca_enabled": is_zatca_enabled(),
         "default_customer": default_customer,
         "current_opening_entry": current_opening_entry,
+        "custom_scale_barcodes_start_with": pos.custom_scale_barcodes_start_with or "",
     }
     return details
 

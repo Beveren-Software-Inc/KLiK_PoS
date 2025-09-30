@@ -15,7 +15,8 @@ import {
   MailPlus,
   MessageSquarePlus,
   Loader2,
-  Pencil
+  Pencil,
+  CheckCircle
 } from "lucide-react";
 import type { CartItem, GiftCoupon, Customer } from "../../types";
 import { usePaymentModes } from "../hooks/usePaymentModes";
@@ -376,8 +377,12 @@ export default function PaymentDialog({
 
   // Calculate totals with memoization for performance
   const calculations = useMemo(() => {
+    // Use discounted price if available, otherwise use original price
     const subtotal = cartItems.reduce(
-      (sum, item) => sum + item.price * item.quantity,
+      (sum, item) => {
+        const itemPrice = (item as any).discountedPrice || item.price;
+        return sum + itemPrice * item.quantity;
+      },
       0
     );
     const couponDiscount = appliedCoupons.reduce(
@@ -516,6 +521,86 @@ export default function PaymentDialog({
       [methodId]: numericAmount,
     }));
   };
+
+  // Auto-fill payment method with grand total and clear others
+  const handleAutoFillPayment = (methodId: string) => {
+    if (invoiceSubmitted || isProcessingPayment) return;
+
+    const grandTotal = calculations.grandTotal;
+    const newPaymentAmounts: PaymentAmount = {};
+
+    // Set all payment methods to 0 first
+    paymentMethods.forEach(method => {
+      newPaymentAmounts[method.id] = 0;
+    });
+
+    // Set the selected method to grand total
+    newPaymentAmounts[methodId] = grandTotal;
+
+    setPaymentAmounts(newPaymentAmounts);
+  };
+
+  // Auto-distribute remaining amount to other payment methods
+  const handleAutoDistribute = (methodId: string) => {
+    if (invoiceSubmitted || isProcessingPayment) return;
+
+    const grandTotal = calculations.grandTotal;
+    const currentAmount = paymentAmounts[methodId] || 0;
+    const remainingAmount = grandTotal - currentAmount;
+
+    if (remainingAmount <= 0) return;
+
+    // Find other payment methods that have 0 amount
+    const otherMethods = paymentMethods.filter(method =>
+      method.id !== methodId && (paymentAmounts[method.id] || 0) === 0
+    );
+
+    if (otherMethods.length > 0) {
+      // Distribute remaining amount to the first available method
+      const targetMethod = otherMethods[0];
+      setPaymentAmounts((prev) => ({
+        ...prev,
+        [targetMethod.id]: remainingAmount,
+      }));
+    }
+  };
+
+  // Handle manual amount adjustment
+  const handleManualAmountChange = (methodId: string, amount: string) => {
+    if (invoiceSubmitted || isProcessingPayment) return;
+
+    const numericAmount = parseFloat(amount) || 0;
+    const grandTotal = calculations.grandTotal;
+
+    // Calculate total of all other payment methods
+    const otherMethodsTotal = Object.entries(paymentAmounts)
+      .filter(([id]) => id !== methodId)
+      .reduce((sum, [, amount]) => sum + amount, 0);
+
+    // Calculate remaining amount for other methods
+    const remainingAmount = grandTotal - numericAmount;
+
+    // If remaining amount is positive, distribute it to other methods
+    if (remainingAmount > 0) {
+      const otherMethods = paymentMethods.filter(method => method.id !== methodId);
+      if (otherMethods.length > 0) {
+        // Distribute remaining amount to the first other method
+        const targetMethod = otherMethods[0];
+        setPaymentAmounts((prev) => ({
+          ...prev,
+          [methodId]: numericAmount,
+          [targetMethod.id]: remainingAmount,
+        }));
+        return;
+      }
+    }
+
+    // If no other methods or remaining amount is 0, just update the current method
+    setPaymentAmounts((prev) => ({
+      ...prev,
+      [methodId]: numericAmount,
+    }));
+  };
   const handleRoundOff = () => {
     if (invoiceSubmitted || isProcessingPayment) return;
 
@@ -648,6 +733,7 @@ export default function PaymentDialog({
         ...item,
         batchNumber: itemDiscounts[item.id]?.batchNumber || null,
         serialNumber: itemDiscounts[item.id]?.serialNumber || null,
+        uom: item.uom || 'Nos', // Include selected UOM
       })),
       customer: selectedCustomer,
       paymentMethods: adjustedPaymentMethods.map(([method, amount]) => ({ method, amount })),
@@ -946,7 +1032,11 @@ export default function PaymentDialog({
                       {paymentMethods.map((method) => (
                         <div
                           key={method.id}
-                          className={`min-w-[280px] max-w-[280px] flex-shrink-0 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-beveren-300 transition-colors ${
+                          className={`${
+                            paymentMethods.length <= 3
+                              ? "flex-1 min-w-0"
+                              : "min-w-[280px] max-w-[280px] flex-shrink-0"
+                          } border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-beveren-300 transition-colors ${
                             invoiceSubmitted || isProcessingPayment
                               ? "bg-gray-50 dark:bg-gray-800"
                               : ""
@@ -1660,7 +1750,11 @@ export default function PaymentDialog({
                     {paymentMethods.map((method) => (
                       <div
                         key={method.id}
-                        className={`min-w-[50%] sm:min-w-[300px] md:min-w-[350px] border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-beveren-300 transition-colors flex-shrink-0 ${
+                        className={`${
+                          paymentMethods.length <= 3
+                            ? "flex-1 min-w-0"
+                            : "min-w-[300px] flex-shrink-0"
+                        } border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-beveren-300 transition-colors ${
                           invoiceSubmitted || isProcessingPayment
                             ? "bg-gray-50 dark:bg-gray-800"
                             : ""
@@ -1668,7 +1762,7 @@ export default function PaymentDialog({
                       >
                         <div className="flex items-center space-x-3 mb-3">
                           <div
-                            className={`w-8 h-8 rounded-md ${method.color} text-white flex items-center justify-center`}
+                            className={`w-8 h-6 rounded-md ${method.color} text-white flex items-center justify-center`}
                           >
                             <div className="scale-75">{method.icon}</div>
                           </div>
@@ -1679,9 +1773,26 @@ export default function PaymentDialog({
                           </div>
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Amount
-                          </label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                              Amount
+                            </label>
+                            <div className="flex space-x-1">
+                              <button
+                                onClick={() => handleAutoFillPayment(method.id)}
+                                disabled={invoiceSubmitted || isProcessingPayment}
+                                className={`p-1 rounded text-xs ${
+                                  invoiceSubmitted || isProcessingPayment
+                                    ? "cursor-not-allowed opacity-50"
+                                    : "hover:bg-beveren-100 text-beveren-600"
+                                }`}
+                                title="Auto-fill with grand total"
+                              >
+                                <CheckCircle size={16} />
+                              </button>
+
+                            </div>
+                          </div>
                           <input
                             type="number"
                             step="0.01"
@@ -1690,7 +1801,7 @@ export default function PaymentDialog({
                               const inputValue = e.target.value;
                               const numValue =
                                 inputValue === "" ? 0 : parseFloat(inputValue);
-                              handlePaymentAmountChange(
+                              handleManualAmountChange(
                                 method.id,
                                 isNaN(numValue) ? "0" : numValue.toString()
                               );
@@ -1701,7 +1812,7 @@ export default function PaymentDialog({
                                 const formatted = parseFloat(
                                   numValue.toFixed(2)
                                 );
-                                handlePaymentAmountChange(method.id, formatted.toString());
+                                handleManualAmountChange(method.id, formatted.toString());
                               }
                             }}
                             placeholder="0.00"

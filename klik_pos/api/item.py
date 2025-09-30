@@ -1,7 +1,11 @@
 import frappe
 from frappe import _
+import random
+import string
 from erpnext.stock.utils import get_stock_balance
 from klik_pos.klik_pos.utils import get_current_pos_profile
+from erpnext.stock.doctype.batch.batch import get_batch_qty
+
 
 def pos_details():
     pos = get_current_pos_profile
@@ -136,6 +140,95 @@ def get_item_by_barcode(barcode: str):
         frappe.log_error(frappe.get_traceback(), f"Error fetching item by barcode: {barcode}")
         frappe.throw(_("Error fetching item by barcode: {0}").format(str(e)))
 
+
+@frappe.whitelist(allow_guest=True)
+def get_item_by_identifier(code: str):
+    """Resolve an item by barcode, batch number or serial number.
+    Returns same structure as get_item_by_barcode."""
+    try:
+        if not code:
+            frappe.throw(_("Identifier required"))
+
+        pos_doc = get_current_pos_profile()
+        warehouse = pos_doc.warehouse
+        price_list = pos_doc.selling_price_list
+
+        matched_type = None
+        matched_value = None
+
+        # 1) Try Item Barcode
+        item_row = frappe.db.sql(
+            """
+            SELECT parent as item_code
+            FROM `tabItem Barcode`
+            WHERE barcode = %s
+            """,
+            code,
+            as_dict=True,
+        )
+        if item_row:
+            matched_type = 'barcode'
+            matched_value = code
+
+        # 2) Try Batch by batch_id or name
+        if not item_row:
+            item_row = frappe.db.sql(
+                """
+                SELECT b.item as item_code
+                FROM `tabBatch` b
+                WHERE b.batch_id = %s OR b.name = %s
+                """,
+                (code, code),
+                as_dict=True,
+            )
+            if item_row:
+                matched_type = 'batch'
+                matched_value = code
+
+        # 3) Try Serial No
+        if not item_row:
+            # In ERPNext, the Serial No doctype has field name=serial_no; item_code links to Item
+            item_row = frappe.db.sql(
+                """
+                SELECT s.item_code as item_code
+                FROM `tabSerial No` s
+                WHERE s.name = %s OR s.serial_no = %s
+                """,
+                (code, code),
+                as_dict=True,
+            )
+            if item_row:
+                matched_type = 'serial'
+                matched_value = code
+
+        if not item_row:
+            frappe.throw(_("Item not found for identifier: {0}").format(code))
+
+        item_code = item_row[0].get("item_code")
+        if not item_code:
+            frappe.throw(_("Invalid identifier mapping for: {0}").format(code))
+
+        item_doc = frappe.get_doc("Item", item_code)
+        balance = fetch_item_balance(item_code, warehouse)
+        price_info = fetch_item_price(item_code, price_list)
+
+        return {
+            "item_code": item_code,
+            "item_name": item_doc.item_name or item_code,
+            "description": item_doc.description or "",
+            "item_group": item_doc.item_group or "General",
+            "price": price_info["price"],
+            "currency": price_info["currency"],
+            "currency_symbol": price_info["currency_symbol"],
+            "available": balance,
+            "image": item_doc.image,
+            "matched_type": matched_type,
+            "matched_value": matched_value,
+        }
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), f"Error fetching item by identifier: {code}")
+        frappe.throw(_("Error fetching item by identifier: {0}").format(str(e)))
+
 @frappe.whitelist(allow_guest=True)
 def get_items_with_balance_and_price():
     """
@@ -179,18 +272,46 @@ def get_items_with_balance_and_price():
             items = frappe.db.sql(base_query, params, as_dict=True)
         else:
             # Original logic for when hide_unavailable is disabled
-            filters = {"disabled": 0, "is_stock_item": 1}
+            # Use SQL to get items with barcode information
+            base_query = """
+                SELECT DISTINCT i.name, i.item_name, i.description, i.item_group, i.image, i.stock_uom
+                FROM `tabItem` i
+                WHERE i.disabled = 0
+                AND i.is_stock_item = 1
+            """
+
+            # Add item group filter if specified in POS profile
             if pos_doc.item_groups:
                 item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
                 if item_group_names:
-                    filters["item_group"] = ["in", item_group_names]
+                    placeholders = ', '.join(['%s'] * len(item_group_names))
+                    base_query += f" AND i.item_group IN ({placeholders})"
 
-            items = frappe.get_all(
-                "Item",
-                filters=filters,
-                fields=["name", "item_name", "description", "item_group", "image", "stock_uom"],
-                order_by="modified desc"
-            )
+            base_query += " ORDER BY i.modified DESC"
+
+            # Execute query with parameters
+            params = {}
+            if pos_doc.item_groups:
+                item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
+                if item_group_names:
+                    params.update({f'group_{i}': group for i, group in enumerate(item_group_names)})
+
+            items = frappe.db.sql(base_query, params, as_dict=True)
+
+        # Get barcodes for all items in a separate query
+        item_codes = [item["name"] for item in items]
+        barcode_map = {}
+        if item_codes:
+            barcode_results = frappe.db.sql("""
+                SELECT parent, barcode
+                FROM `tabItem Barcode`
+                WHERE parent IN %s
+            """, (item_codes,), as_dict=True)
+
+            for barcode_row in barcode_results:
+                item_code = barcode_row["parent"]
+                if item_code not in barcode_map:
+                    barcode_map[item_code] = barcode_row["barcode"]  # Get first barcode
 
         enriched_items = []
         for item in items:
@@ -204,6 +325,9 @@ def get_items_with_balance_and_price():
             # Get price info only for available items
             price_info = fetch_item_price(item["name"], price_list)
 
+            # Get barcode from the map
+            primary_barcode = barcode_map.get(item["name"])
+
             enriched_items.append({
                 "id": item["name"],
                 "name": item.get("item_name") or item["name"],
@@ -216,9 +340,9 @@ def get_items_with_balance_and_price():
                 "image": item.get("image"),
                 "sold": 0,
                 "preparationTime": 10,
-                "uom": item.get("stock_uom", "Nos")
+                "uom": item.get("stock_uom", "Nos"),
+                "barcode": primary_barcode
             })
-
         return enriched_items
 
     except Exception:
@@ -386,6 +510,7 @@ def get_item_groups_for_pos():
         frappe.log_error(frappe.get_traceback(), "Get Item Groups for POS Error")
         frappe.throw(_("Something went wrong while fetching item group data."))
 
+
 @frappe.whitelist()
 def get_batch_nos_with_qty(item_code):
     """
@@ -397,52 +522,162 @@ def get_batch_nos_with_qty(item_code):
 
     if not item_code or not warehouse:
         return []
-    # frappe.throw(str(item_code))
-    # Query batches with quantity > 0 from tabBatch and tabBatch Stock (Bin-like)
-    batch_qty_data = frappe.db.sql("""
-        SELECT
-            b.batch_id AS batch_id,
-            bs.batch_qty AS qty
-        FROM
-            `tabBatch` b
-        INNER JOIN
-            `tabBatch` bs ON bs.batch_id = b.name
-        WHERE
-            b.item = %(item_code)s
-            AND bs.batch_qty > 0
-        ORDER BY
-            b.batch_id ASC
-    """, {
-        "item_code": item_code,
-        "warehouse": warehouse
-    }, as_dict=True)
+
+    # Get all batches for the item
+    batches = frappe.get_all("Batch",
+        filters={"item": item_code},
+        fields=["name", "batch_id", "expiry_date"]
+    )
+
+    batch_qty_data = []
+    for b in batches:
+        qty = get_batch_qty(batch_no=b.name, warehouse=warehouse)
+        if qty > 0:
+            batch_qty_data.append({
+                "batch_id": b.batch_id,
+                "qty": qty
+            })
+
     return batch_qty_data
 
 
-import random
-import string
-
 @frappe.whitelist()
-def create_random_items():
-    created = 0
-    for i in range(500):
-        item_code = "ITM-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-        item_name = "Random Item " + str(i+1)
+def get_item_uoms_and_prices(item_code):
+    """
+    Returns a list of UOMs and their prices for a given item code.
+    Returns UOMs from Item UOM table and prices from Item Price doctype.
+    """
+    if not item_code:
+        return {}
 
-        item = frappe.get_doc({
-            "doctype": "Item",
-            "item_code": item_code,
-            "item_name": item_name,
-            "item_group": "All Item Groups",   # make sure exists
-            "stock_uom": "Nos",               # make sure exists
-            "is_stock_item": 1,
+    try:
+        # Get item document to check base UOM and conversion rates
+        item_doc = frappe.get_doc("Item", item_code)
+
+        # Get all UOMs for this item from Item UOM child table
+        uom_data = []
+
+        # Add base UOM
+        uom_data.append({
+            "uom": item_doc.stock_uom,
+            "conversion_factor": 1.0,
+            "price": 0.0
         })
 
-        try:
-            item.insert(ignore_permissions=True)
-            created += 1
-        except Exception as e:
-            frappe.log_error(f"Error creating item {item_code}: {str(e)}")
+        # Add additional UOMs from Item UOM child table
+        for uom_row in item_doc.get("uoms", []):
+            uom_data.append({
+                "uom": uom_row.uom,
+                "conversion_factor": uom_row.conversion_factor,
+                "price": 0.0
+            })
 
-    frappe.db.commit()
-    return f"{created} random items created successfully!"
+        # Get prices for each UOM from Item Price doctype
+        for uom_info in uom_data:
+            price_list_rate = frappe.db.get_value(
+                "Item Price",
+                {
+                    "item_code": item_code,
+                    "uom": uom_info["uom"],
+                    "selling": 1
+                },
+                "price_list_rate"
+            )
+
+            if price_list_rate:
+                uom_info["price"] = float(price_list_rate)
+            else:
+                # If no specific price found for this UOM, calculate from base price using conversion factor
+                base_price = frappe.db.get_value(
+                    "Item Price",
+                    {
+                        "item_code": item_code,
+                        "uom": item_doc.stock_uom,
+                        "selling": 1
+                    },
+                    "price_list_rate"
+                )
+
+                if base_price:
+                    # Convert price based on UOM conversion factor
+                    converted_price = float(base_price) * uom_info["conversion_factor"]
+                    uom_info["price"] = converted_price
+                else:
+                    # Use valuation rate if no price list rate found
+                    valuation_rate = frappe.db.get_value("Item", item_code, "valuation_rate") or 0
+                    converted_price = float(valuation_rate) * uom_info["conversion_factor"]
+                    uom_info["price"] = converted_price
+
+        return {
+            "base_uom": item_doc.stock_uom,
+            "uoms": uom_data
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), f"Get Item UOMs Error for {item_code}")
+        return {"base_uom": "Nos", "uoms": [{"uom": "Nos", "conversion_factor": 1.0, "price": 0.0}]}
+
+
+@frappe.whitelist(allow_guest=True)
+def get_serial_nos_for_item(item_code: str):
+    """
+    Returns a list of available Serial Nos for a given item (and POS warehouse if set).
+    """
+    if not item_code:
+        return []
+
+    try:
+        pos_doc = get_current_pos_profile()
+        warehouse = getattr(pos_doc, 'warehouse', None)
+
+        filters = {
+            'item_code': item_code,
+            'status': ['in', ['Active', 'Available']]
+        }
+        if warehouse:
+            filters['warehouse'] = warehouse
+
+        serials = frappe.get_all(
+            'Serial No',
+            filters=filters,
+            fields=['name', 'serial_no'],
+            limit=500,
+            order_by='modified desc'
+        )
+
+        # Normalize: prefer serial_no field if present; fallback to name
+        result = []
+        for s in serials:
+            serial_value = s.get('serial_no') or s.get('name')
+            if serial_value:
+                result.append({'serial_no': serial_value})
+
+        return result
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), f"Get Serial Nos Error for {item_code}")
+        return []
+
+# @frappe.whitelist()
+# def create_random_items():
+#     created = 0
+#     for i in range(500):
+#         item_code = "ITM-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+#         item_name = "Random Item " + str(i+1)
+
+#         item = frappe.get_doc({
+#             "doctype": "Item",
+#             "item_code": item_code,
+#             "item_name": item_name,
+#             "item_group": "All Item Groups",
+#             "stock_uom": "Nos",
+#             "is_stock_item": 1,
+#         })
+
+#         try:
+#             item.insert(ignore_permissions=True)
+#             created += 1
+#         except Exception as e:
+#             frappe.log_error(f"Error creating item {item_code}: {str(e)}")
+
+#     frappe.db.commit()
+#     return f"{created} random items created successfully!"

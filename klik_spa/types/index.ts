@@ -17,6 +17,9 @@ export interface CartItem {
   quantity: number
   available?: number
   uom?: string
+  item_code?: string
+  base_uom?: string
+  conversion_factor?: number
 }
 
 export interface MenuItem {
@@ -32,6 +35,7 @@ export interface MenuItem {
   description?: string
   uom?: string
   currency_symbol?: string
+  barcode?: string
 }
 
 export interface Category {

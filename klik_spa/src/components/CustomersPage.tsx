@@ -443,7 +443,7 @@ export default function CustomersPage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 px-6 py-8 mt-16 ml-20 max-w-none">
+      <div className="flex-1 px-6 py-8 mt-16 lg:ml-20 max-w-none">
 
         <div className="mx-auto w-full">
           {/* Stats Cards */}

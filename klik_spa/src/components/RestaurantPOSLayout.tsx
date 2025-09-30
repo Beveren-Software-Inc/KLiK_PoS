@@ -77,6 +77,7 @@ export default function RetailPOSLayout() {
           quantity: 1,
           available: item.available,
           uom: item.uom,
+          item_code: item.id, // item.id is the item_code from the API
         },
       ])
     }
@@ -124,11 +125,12 @@ export default function RetailPOSLayout() {
     // Category filter
     const matchesCategory = selectedCategory === "all" || item.category === selectedCategory
 
-    // Search filter - search by name, category, or any text content
+    // Search filter - search by name, category, item_code, or any text content
     const matchesSearch =
       searchQuery === "" ||
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchQuery.toLowerCase())
+      item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.id.toLowerCase().includes(searchQuery.toLowerCase()) // item.id is the item_code
 
     return matchesCategory && matchesSearch
   })
@@ -198,7 +200,7 @@ export default function RetailPOSLayout() {
       {scannerOnlyIndicator}
       <div className="flex h-screen bg-gray-50 pb-8">
       {/* Menu Section - Takes remaining space minus cart width */}
-      <div className="flex-1 overflow-hidden ml-20">
+      <div className="flex-1 overflow-hidden lg:ml-20">
         <MenuGrid
           items={filteredItems}
           selectedCategory={selectedCategory}
