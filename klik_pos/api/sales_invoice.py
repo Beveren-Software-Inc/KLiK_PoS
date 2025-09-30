@@ -288,6 +288,9 @@ def get_sales_invoices(limit=100, start=0, search=""):
                     payment_method = "-"
             elif invoice_doc.status == "Draft":
                 payment_method = "-"
+            elif invoice_doc.is_return and invoice_doc.payments:
+                # For return invoices, get payment method from the payment child table
+                payment_method = invoice_doc.payments[0].mode_of_payment
 
             inv["mode_of_payment"] = payment_method
 
