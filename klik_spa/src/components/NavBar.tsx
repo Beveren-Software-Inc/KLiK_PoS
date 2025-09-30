@@ -4,7 +4,7 @@ import { useI18n } from "../hooks/useI18n"
 import { useAuth } from "../hooks/useAuth"
 import { useTheme } from "../hooks/useTheme"
 import { usePOSDetails } from "../hooks/usePOSProfile"
-import { Search, Settings, LogOut, User, Moon, Sun, Mail, Store } from "lucide-react"
+import { Search, Settings, LogOut, Moon, Sun, Store } from "lucide-react"
 
 export default function NavBar() {
   const { t, language, setLanguage } = useI18n()
@@ -57,7 +57,7 @@ export default function NavBar() {
 
   const displayName = user?.full_name || user?.name || "Guest User"
   const posProfileName = posDetails?.name || "POS Profile"
-  const userRole = user?.role || "User"
+  // const userRole = user?.role || "User"
   const initials = getInitials(displayName)
 
   return (
@@ -112,7 +112,7 @@ export default function NavBar() {
                             {displayName}
                           </p>
                         </div>
-                        <p className="text-xs text-beveren-600 font-medium mt-1">{userRole}</p>
+                        {/* <p className="text-xs text-beveren-600 font-medium mt-1">{userRole}</p> */}
                       </div>
                     </div>
                   </div>
