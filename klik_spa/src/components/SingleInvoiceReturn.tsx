@@ -79,18 +79,18 @@ export default function SingleInvoiceReturn({
         // Handle different property names from different invoice sources
         const itemCode = item.item_code || item.id;
         const itemName = item.item_name || item.name;
-        const qty = item.qty || item.quantity;
-        const rate = item.rate || item.unitPrice;
-        const amount = item.amount || item.total;
+        const qty = Number(item.qty ?? item.quantity ?? 0);
+        const rate = Number(item.rate ?? item.unitPrice ?? 0);
+        const amount = Number(item.amount ?? item.total ?? (qty * rate));
 
         console.log('Extracted values:', { itemCode, itemName, qty, rate, amount, returnedQty });
 
         items.push({
           item_code: itemCode,
           item_name: itemName,
-          qty: qty,
-          rate: rate,
-          amount: amount,
+          qty,
+          rate,
+          amount,
           returned_qty: returnedQty,
           available_qty: qty - returnedQty,
           return_qty: qty - returnedQty // Set default return quantity to available quantity
