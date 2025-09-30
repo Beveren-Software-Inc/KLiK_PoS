@@ -1,15 +1,8 @@
 import frappe
 from frappe import _
-import random
-import string
 from erpnext.stock.utils import get_stock_balance
 from klik_pos.klik_pos.utils import get_current_pos_profile
 from erpnext.stock.doctype.batch.batch import get_batch_qty
-
-
-def pos_details():
-    pos = get_current_pos_profile
-    customer = pos.customer
 
 def fetch_item_balance(item_code: str, warehouse: str) -> float:
     """Get stock balance of an item from a warehouse."""
@@ -298,20 +291,24 @@ def get_items_with_balance_and_price():
 
             items = frappe.db.sql(base_query, params, as_dict=True)
 
-        # Get barcodes for all items in a separate query
+        # Get barcodes for all items in a separate query (portable across DBs)
         item_codes = [item["name"] for item in items]
         barcode_map = {}
         if item_codes:
-            barcode_results = frappe.db.sql("""
-                SELECT parent, barcode
-                FROM `tabItem Barcode`
-                WHERE parent IN %s
-            """, (item_codes,), as_dict=True)
+            try:
+                barcode_results = frappe.get_all(
+                    "Item Barcode",
+                    filters={"parent": ["in", item_codes]},
+                    fields=["parent", "barcode"],
+                    limit=0,
+                )
 
-            for barcode_row in barcode_results:
-                item_code = barcode_row["parent"]
-                if item_code not in barcode_map:
-                    barcode_map[item_code] = barcode_row["barcode"]  # Get first barcode
+                for barcode_row in barcode_results:
+                    item_code = barcode_row.get("parent")
+                    if item_code and item_code not in barcode_map:
+                        barcode_map[item_code] = barcode_row.get("barcode")  # First barcode
+            except Exception:
+                frappe.log_error(frappe.get_traceback(), "Error fetching item barcodes for POS")
 
         enriched_items = []
         for item in items:
@@ -656,28 +653,3 @@ def get_serial_nos_for_item(item_code: str):
     except Exception:
         frappe.log_error(frappe.get_traceback(), f"Get Serial Nos Error for {item_code}")
         return []
-
-# @frappe.whitelist()
-# def create_random_items():
-#     created = 0
-#     for i in range(500):
-#         item_code = "ITM-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-#         item_name = "Random Item " + str(i+1)
-
-#         item = frappe.get_doc({
-#             "doctype": "Item",
-#             "item_code": item_code,
-#             "item_name": item_name,
-#             "item_group": "All Item Groups",
-#             "stock_uom": "Nos",
-#             "is_stock_item": 1,
-#         })
-
-#         try:
-#             item.insert(ignore_permissions=True)
-#             created += 1
-#         except Exception as e:
-#             frappe.log_error(f"Error creating item {item_code}: {str(e)}")
-
-#     frappe.db.commit()
-#     return f"{created} random items created successfully!"

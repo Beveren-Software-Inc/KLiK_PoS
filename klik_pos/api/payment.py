@@ -41,6 +41,7 @@ def get_all_mode_of_payment():
         frappe.log_error(frappe.get_traceback(), "Fetch Mode of Payment Error")
         return {"success": False, "message": str(e)}
 
+
 @frappe.whitelist()
 def get_opening_entry_payment_summary():
     try:
@@ -55,7 +56,7 @@ def get_opening_entry_payment_summary():
             filters={
                 "pos_profile": pos_profile.name,
                 "user": frappe.session.user,
-                "docstatus": 1,  # submitted
+                "docstatus": 1,
                 "status": "Open"
             },
             fields=["name", "period_start_date"],
@@ -67,7 +68,7 @@ def get_opening_entry_payment_summary():
             return {"success": False, "error": "No open POS Opening Entry found."}
 
         opening_entry_name = opening_entry[0].name
-        opening_start = opening_entry[0].period_start_date  # full datetime
+        opening_start = opening_entry[0].period_start_date
 
         opening_date = opening_start.date()
         opening_time = opening_start.time()
@@ -79,7 +80,6 @@ def get_opening_entry_payment_summary():
             fields=["mode_of_payment", "opening_amount"]
         )
         opening_time = opening_start.time().strftime("%H:%M:%S")
-        print("Opening Modes:", opening_time)
         # Check if user has administrative privileges
         user_roles = frappe.get_roles(frappe.session.user)
         is_admin_user = any(role in ["Administrator", "Sales Manager", "System Manager"] for role in user_roles)
