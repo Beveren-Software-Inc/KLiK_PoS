@@ -645,7 +645,7 @@ export default function ClosingShiftPage() {
           </div>
         </div>
 
-        <div className="flex-1 px-6 py-8 mt-16 ml-20 space-y-6">
+        <div className="flex-1 px-6 py-8 mt-16 space-y-6">
           {/* Payment Summary - Only show if not hidden */}
           {!hideExpectedAmount && (
             <>

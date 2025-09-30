@@ -1018,7 +1018,7 @@ const getStatusBadge = (status: string) => {
           </div>
         </div>
 
-        <div className="flex-1 px-6 py-8 mt-16 ml-20 max-w-none">
+        <div className="flex-1 px-6 py-8 mt-16 max-w-none">
           {/* Status Tabs - Now full width like the table */}
           <div className="mb-8 w-full max-w-none">
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
