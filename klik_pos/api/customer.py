@@ -3,8 +3,6 @@ from frappe import _
 import json
 from erpnext.setup.utils import get_exchange_rate
 from klik_pos.klik_pos.utils import get_current_pos_profile
-import random
-import string
 
 
 @frappe.whitelist(allow_guest=True)
@@ -149,7 +147,6 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
 
 
 def get_user_company_and_currency():
-    user = frappe.session.user
 
     default_company = frappe.defaults.get_user_default("Company")
     if not default_company:
@@ -289,7 +286,6 @@ def create_or_update_customer(customer_data):
         address = customer_data.get("address", {})
 
 
-        # If name is missing, fallback to phone → email
         if not customer_name:
             customer_name = phone or email
         if not customer_name:
@@ -308,7 +304,6 @@ def create_or_update_customer(customer_data):
             # Create address for individual customers if address data is provided
             if address and any(address.get(field) for field in ['street', 'city', 'state', 'zipCode']):
                 addr_doc = create_or_update_address(customer_doc.name, customer_name, address, country)
-                # 🔗 Link Address to Customer
                 if addr_doc:
                     frappe.db.set_value("Customer", customer_doc.name, "customer_primary_address", addr_doc.name)
 
@@ -318,7 +313,6 @@ def create_or_update_customer(customer_data):
             contact_doc = create_or_update_contact(customer_doc.name, contact_name, email, phone)
             addr_doc = create_or_update_address(customer_doc.name, customer_name, address, country)
 
-            # 🔗 Link Address to Customer
             if addr_doc:
                 frappe.db.set_value("Customer", customer_doc.name, "customer_primary_address", addr_doc.name)
 
@@ -347,7 +341,6 @@ def get_or_create_customer(name, email, phone, country, name_arabic="", data=Non
 
         existing = frappe.get_all("Customer", filters={"customer_name": name}, fields=["name"])
         if existing:
-            # Update existing
             doc = frappe.get_doc("Customer", existing[0]["name"])
             doc.email_id = email
             doc.mobile_no = phone
@@ -397,7 +390,6 @@ def get_customer_groups():
 
         # Check if POS profile has customer groups configured
         if hasattr(pos_profile, 'customer_groups') and pos_profile.customer_groups:
-            # Get customer groups from POS profile configuration
             customer_group_names = [d.customer_group for d in pos_profile.customer_groups if d.customer_group]
 
             customer_groups = frappe.get_all(
@@ -407,7 +399,6 @@ def get_customer_groups():
                 order_by="customer_group_name asc"
             )
         else:
-            # Fallback: fetch all customer groups if none configured in POS profile
             customer_groups = frappe.get_all(
                 "Customer Group",
                 fields=["name", "customer_group_name"],
@@ -449,7 +440,6 @@ def create_or_update_contact(customer, customer_name, email, phone):
     )
 
     if existing_contact:
-        # load existing document
         doc = frappe.get_doc("Contact", existing_contact[0].name)
         doc.first_name = customer_name
         doc.phone = phone
@@ -531,7 +521,7 @@ def update_customer(customer_id, customer_data):
 
         # Update customer fields
         for key, value in customer_data.items():
-            if key not in ["email", "phone", "address"]:  # Skip email/phone/address as they go to Contact/Address
+            if key not in ["email", "phone", "address"]:
                 setattr(customer, key, value)
 
         customer.ignore_version = True
@@ -574,12 +564,10 @@ def update_customer(customer_id, customer_data):
         if address_data and any(address_data.get(field) for field in ['street', 'city', 'state', 'zipCode', 'buildingNumber']):
             try:
                 addr_doc = create_or_update_address(customer_id, customer_name, address_data, country)
-                # Link Address to Customer if it was created/updated
                 if addr_doc:
                     frappe.db.set_value("Customer", customer_id, "customer_primary_address", addr_doc.name)
             except Exception as address_error:
                 frappe.log_error(frappe.get_traceback(), f"Error updating address for customer {customer_id}")
-                # Don't fail the whole operation if address update fails
 
         return {
             "success": True,
@@ -667,41 +655,3 @@ def get_global_totals():
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Global Customer Totals Error")
         return {"success": False, "error": str(e), "total_customers": 0, "total_invoices": 0}
-
-@frappe.whitelist()
-def create_random_customers(count: int = 2000, name_prefix: str = "Test Customer "):
-    """Create a number of random Customers with only mandatory fields (customer_name).
-    - Default creates 2000 customers
-    - Names are prefixed with name_prefix and a random suffix to avoid duplicates
-    """
-    try:
-        created = 0
-        count = int(count) if count else 0
-        if count <= 0:
-            count = 2000
-
-        for _ in range(count):
-            # generate a unique-ish suffix
-            suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-            customer_name = f"{name_prefix}{suffix}"
-
-            doc = frappe.get_doc({
-                "doctype": "Customer",
-                "customer_name": customer_name,
-                "custom_country": "Saudi Arabia",
-                "customer_type": "Individual",
-                "status": "Active",
-            })
-            try:
-                doc.insert(ignore_permissions=True)
-                created += 1
-            except Exception:
-                # if duplicate or other error, skip and continue
-                frappe.log_error(frappe.get_traceback(), f"Random Customer Create Failed: {customer_name}")
-                continue
-
-        frappe.db.commit()
-        return {"success": True, "created": created}
-    except Exception as e:
-        frappe.log_error(frappe.get_traceback(), "Bulk Random Customer Creation Error")
-        return {"success": False, "error": str(e)}
