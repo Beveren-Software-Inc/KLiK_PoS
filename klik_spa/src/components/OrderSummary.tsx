@@ -20,6 +20,7 @@ import { useCustomers } from "../hooks/useCustomers";
 import { useProducts } from "../hooks/useProducts";
 import { toast } from "react-toastify";
 import { getBatches } from "../utils/batch";
+import { getSerials } from "../utils/serial";
 import { useNavigate } from "react-router-dom";
 import { usePOSDetails } from "../hooks/usePOSProfile";
 import { useCustomerStatistics } from "../hooks/useCustomerStatistics";
@@ -115,8 +116,8 @@ interface UOMSelectFieldProps {
 const UOMSelectField = ({ item, onUOMChange, isMobile }: UOMSelectFieldProps) => {
   const [availableUOMs, setAvailableUOMs] = useState<string[]>(['Nos']); // Start with Nos as default
   const [selectedUOM, setSelectedUOM] = useState<string>(item.uom || 'Nos'); //Mania: Local state for selected UOM
-  const [searchQuery, setSearchQuery] = useState<string>(''); 
-  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false); 
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
 
   useEffect(() => {
     const loadUOMs = async () => {
@@ -164,7 +165,7 @@ const UOMSelectField = ({ item, onUOMChange, isMobile }: UOMSelectFieldProps) =>
   );
 
   const handleUOMSelect = async (newUOM: string) => {
-  
+
 
     // Update local state immediately for UI responsiveness
     setSelectedUOM(newUOM);
@@ -190,7 +191,7 @@ const UOMSelectField = ({ item, onUOMChange, isMobile }: UOMSelectFieldProps) =>
           if (data?.message?.uoms) {
             const selectedUOMData = data.message.uoms.find((uom: any) => uom.uom === newUOM);
             if (selectedUOMData) {
-            
+
               onUOMChange(item.id, newUOM, selectedUOMData.price);
             } else {
               console.log(`❌ No UOM data found for ${newUOM}`);
@@ -260,6 +261,133 @@ const UOMSelectField = ({ item, onUOMChange, isMobile }: UOMSelectFieldProps) =>
               <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
                 No UOMs found
               </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Compact searchable dropdown for Batch selection
+interface BatchSelectFieldProps {
+  itemId: string;
+  itemCode: string;
+  options: { batch_id: string; qty: number }[];
+  value: string;
+  onChange: (value: string, availableQty: number) => void;
+  isMobile?: boolean;
+}
+
+const BatchSelectField = ({ itemId, itemCode, options, value, onChange, isMobile }: BatchSelectFieldProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const filtered = options.filter(o => o.batch_id.toLowerCase().includes(query.toLowerCase()));
+
+  const handleSelect = (batchId: string) => {
+    const selectedQty = options.find(b => b.batch_id === batchId)?.qty || 0;
+    onChange(batchId, selectedQty);
+    setIsOpen(false);
+    setQuery("");
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full ${isMobile ? "text-xs" : "text-xs"} px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-left flex items-center justify-between`}
+      >
+        <span className="truncate">{value || "Select Batch"}</span>
+        <svg className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      </button>
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-44 overflow-hidden">
+          <div className="p-1 border-b border-gray-200 dark:border-gray-600">
+            <input
+              type="text"
+              placeholder="Filter batch..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              autoFocus
+            />
+          </div>
+          <div className="max-h-36 overflow-y-auto">
+            {filtered.length > 0 ? filtered.map((b) => (
+              <button
+                key={b.batch_id}
+                type="button"
+                onClick={() => handleSelect(b.batch_id)}
+                className={`w-full px-2 py-1 text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-700 ${value === b.batch_id ? 'bg-beveren-50 dark:bg-beveren-900/20 text-beveren-600 dark:text-beveren-400' : 'text-gray-900 dark:text-white'}`}
+              >
+                {b.batch_id} - {b.qty}
+              </button>
+            )) : (
+              <div className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">No matches</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Compact searchable dropdown for Serial selection
+interface SerialSelectFieldProps {
+  itemId: string;
+  itemCode: string;
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
+  isMobile?: boolean;
+}
+
+const SerialSelectField = ({ itemId, itemCode, options, value, onChange, isMobile }: SerialSelectFieldProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const filtered = options.filter(sn => sn.toLowerCase().includes(query.toLowerCase()));
+
+  const handleSelect = (sn: string) => {
+    onChange(sn);
+    setIsOpen(false);
+    setQuery("");
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full ${isMobile ? "text-xs" : "text-xs"} px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-left flex items-center justify-between`}
+      >
+        <span className="truncate">{value || "Select Serial"}</span>
+        <svg className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      </button>
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-44 overflow-hidden">
+          <div className="p-1 border-b border-gray-200 dark:border-gray-600">
+            <input
+              type="text"
+              placeholder="Filter serial..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              autoFocus
+            />
+          </div>
+          <div className="max-h-36 overflow-y-auto">
+            {filtered.length > 0 ? filtered.map((sn) => (
+              <button
+                key={sn}
+                type="button"
+                onClick={() => handleSelect(sn)}
+                className={`w-full px-2 py-1 text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-700 ${value === sn ? 'bg-beveren-50 dark:bg-beveren-900/20 text-beveren-600 dark:text-beveren-400' : 'text-gray-900 dark:text-white'}`}
+              >
+                {sn}
+              </button>
+            )) : (
+              <div className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">No matches</div>
             )}
           </div>
         </div>
@@ -366,6 +494,15 @@ export default function OrderSummary({
 
   const [itemBatches, setItemBatches] = useState<
     Record<string, { batch_id: string; qty: number }[]>
+  >({});
+
+  const [itemSerials, setItemSerials] = useState<
+    Record<string, string[]>
+  >({});
+
+  // Pending pre-selections when item not yet in cart
+  const [pendingPreselect, setPendingPreselect] = useState<
+    Record<string, { batchId?: string; serialNo?: string }>
   >({});
 
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -793,30 +930,40 @@ export default function OrderSummary({
   }, [posDetails, selectedCustomer, posLoading, userRemovedDefaultCustomer]);
 
   useEffect(() => {
-    const fetchAndSetBatches = async () => {
+    const fetchAndSetInfo = async () => {
       const newBatches = { ...itemBatches };
+      const newSerials = { ...itemSerials } as Record<string, string[]>;
 
       for (const item of cartItems) {
         const key = item.item_code || item.id;
-        if (key && key !== 'undefined' && !newBatches[key]) {
-          try {
-            const batches = await getBatches(item.id);
-            if (Array.isArray(batches)) {
-              newBatches[key] = batches;
+        if (key && key !== 'undefined') {
+          if (!newBatches[key]) {
+            try {
+              const batches = await getBatches(item.id);
+              if (Array.isArray(batches)) newBatches[key] = batches;
+            } catch (err) {
+              console.error("Error fetching batches", err);
             }
-          } catch (err) {
-            console.error("Error fetching batches", err);
+          }
+          if (!newSerials[key]) {
+            try {
+              const serials = await getSerials(key);
+              if (Array.isArray(serials)) newSerials[key] = serials;
+            } catch (err) {
+              console.error("Error fetching serials", err);
+            }
           }
         } else {
-          console.log(`OrderSummary: Skipping initial batch loading for key "${key}"`);
+          console.log(`OrderSummary: Skipping initial info loading for key "${key}"`);
         }
       }
 
       setItemBatches(newBatches);
+      setItemSerials(newSerials);
     };
 
     if (cartItems.length) {
-      fetchAndSetBatches();
+      fetchAndSetInfo();
     }
   }, [cartItems]);
 
@@ -846,10 +993,110 @@ export default function OrderSummary({
 
     window.addEventListener('batchQuantitiesUpdated', handleBatchUpdate as EventListener);
 
+    // Listen for preselection from search (batch/serial)
+    const handleSetBatch = (event: CustomEvent) => {
+      const { itemCode, batchId } = event.detail as { itemCode: string; batchId: string };
+      const item = cartItems.find(ci => (ci.item_code || ci.id) === itemCode)
+      if (item) {
+        const selectedQty = itemBatches[item.item_code || item.id]?.find(b => b.batch_id === batchId)?.qty || 0
+        setItemDiscounts(prev => ({
+          ...prev,
+          [item.id]: {
+            ...(prev[item.id] || { discountPercentage: 0, discountAmount: 0, batchNumber: '', serialNumber: '', availableQuantity: 0 }),
+            batchNumber: batchId,
+            availableQuantity: selectedQty,
+          }
+        }))
+      } else {
+        // Save pending, to be applied when item appears in cart
+        setPendingPreselect(prev => ({
+          ...prev,
+          [itemCode]: { ...(prev[itemCode] || {}), batchId }
+        }))
+      }
+    }
+
+    const handleSetSerial = (event: CustomEvent) => {
+      const { itemCode, serialNo } = event.detail as { itemCode: string; serialNo: string };
+      const item = cartItems.find(ci => (ci.item_code || ci.id) === itemCode)
+      if (item) {
+        setItemDiscounts(prev => ({
+          ...prev,
+          [item.id]: {
+            ...(prev[item.id] || { discountPercentage: 0, discountAmount: 0, batchNumber: '', serialNumber: '', availableQuantity: 0 }),
+            serialNumber: serialNo,
+          }
+        }))
+        // Ensure the serial exists in options for visibility; if not, inject it
+        setItemSerials(prev => {
+          const key = item.item_code || item.id
+          const existing = new Set(prev[key] || [])
+          if (!existing.has(serialNo)) {
+            return { ...prev, [key]: [...existing, serialNo] as string[] }
+          }
+          return prev
+        })
+      } else {
+        // Save pending, to be applied when item appears in cart
+        setPendingPreselect(prev => ({
+          ...prev,
+          [itemCode]: { ...(prev[itemCode] || {}), serialNo }
+        }))
+      }
+    }
+
+    window.addEventListener('cart:setBatchForItem', handleSetBatch as EventListener)
+    window.addEventListener('cart:setSerialForItem', handleSetSerial as EventListener)
+
     return () => {
       window.removeEventListener('batchQuantitiesUpdated', handleBatchUpdate as EventListener);
+      window.removeEventListener('cart:setBatchForItem', handleSetBatch as EventListener)
+      window.removeEventListener('cart:setSerialForItem', handleSetSerial as EventListener)
     };
-  }, []);
+  }, [cartItems, itemBatches]);
+
+  // Apply any pending pre-selections when cart items change
+  useEffect(() => {
+    if (!cartItems.length) return
+    const nextPending = { ...pendingPreselect }
+    cartItems.forEach(item => {
+      const key = item.item_code || item.id
+      const pending = nextPending[key]
+      if (pending) {
+        if (pending.batchId) {
+          const selectedQty = itemBatches[key]?.find(b => b.batch_id === pending.batchId)?.qty || 0
+          setItemDiscounts(prev => ({
+            ...prev,
+            [item.id]: {
+              ...(prev[item.id] || { discountPercentage: 0, discountAmount: 0, batchNumber: '', serialNumber: '', availableQuantity: 0 }),
+              batchNumber: pending.batchId,
+              availableQuantity: selectedQty,
+            }
+          }))
+        }
+        if (pending.serialNo) {
+          setItemDiscounts(prev => ({
+            ...prev,
+            [item.id]: {
+              ...(prev[item.id] || { discountPercentage: 0, discountAmount: 0, batchNumber: '', serialNumber: '', availableQuantity: 0 }),
+              serialNumber: pending.serialNo,
+            }
+          }))
+          setItemSerials(prev => {
+            const existing = new Set(prev[key] || [])
+            if (!existing.has(pending.serialNo!)) {
+              return { ...prev, [key]: [...existing, pending.serialNo!] as string[] }
+            }
+            return prev
+          })
+        }
+        delete nextPending[key]
+      }
+    })
+    if (Object.keys(nextPending).length !== Object.keys(pendingPreselect).length) {
+      setPendingPreselect(nextPending)
+    }
+  }, [cartItems, itemBatches, pendingPreselect])
 
   return (
     <div
@@ -1386,51 +1633,29 @@ export default function OrderSummary({
                             <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
                               Batch
                             </label>
-                            <select
+                            <BatchSelectField
+                              itemId={item.id}
+                              itemCode={item.item_code || item.id}
+                              options={itemBatches[item.item_code || item.id] || []}
                               value={itemDiscount.batchNumber || ""}
-                              onChange={(e) => {
-                                const selectedBatch = e.target.value;
-                                const selectedQty =
-                                  itemBatches[item.item_code || item.id]?.find(
-                                    (b) => b.batch_id === selectedBatch
-                                  )?.qty || 0;
-                                updateItemDiscount(
-                                  item.id,
-                                  "batchNumber",
-                                  selectedBatch
-                                );
-                                updateItemDiscount(
-                                  item.id,
-                                  "availableQuantity",
-                                  selectedQty
-                                );
+                              onChange={(selectedBatch, selectedQty) => {
+                                updateItemDiscount(item.id, "batchNumber", selectedBatch)
+                                updateItemDiscount(item.id, "availableQuantity", selectedQty)
                               }}
-                              className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white text-gray-900 appearance-none`}
-                            >
-                              <option value="">Select Batch</option>
-                              {itemBatches[item.item_code || item.id]?.map((batch) => (
-                                <option key={batch.batch_id} value={batch.batch_id}>
-                                  {batch.batch_id} - {batch.qty}
-                                </option>
-                              ))}
-                            </select>
+                              isMobile={isMobile}
+                            />
                           </div>
                           <div>
                             <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
                               Serial No
                             </label>
-                            <input
-                              type="text"
+                            <SerialSelectField
+                              itemId={item.id}
+                              itemCode={item.item_code || item.id}
+                              options={itemSerials[item.item_code || item.id] || []}
                               value={itemDiscount.serialNumber || ""}
-                              onChange={(e) =>
-                                updateItemDiscount(
-                                  item.id,
-                                  "serialNumber",
-                                  e.target.value
-                                )
-                              }
-                              placeholder="Enter serial number"
-                              className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+                              onChange={(sn) => updateItemDiscount(item.id, "serialNumber", sn)}
+                              isMobile={isMobile}
                             />
                           </div>
                         </div>

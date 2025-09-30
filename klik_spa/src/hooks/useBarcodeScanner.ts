@@ -42,7 +42,8 @@ export function useBarcodeScanner(onAddToCart: (item: any) => void): UseBarcodeS
 
       // If not found in local products, try API call
       try {
-        const response = await fetch(`/api/method/klik_pos.api.item.get_item_by_barcode?barcode=${encodeURIComponent(barcode)}`)
+        // First try combined identifier endpoint (barcode/batch/serial)
+        const response = await fetch(`/api/method/klik_pos.api.item.get_item_by_identifier?code=${encodeURIComponent(barcode)}`)
         const data = await response.json()
 
         if (data.message && data.message.item_code) {

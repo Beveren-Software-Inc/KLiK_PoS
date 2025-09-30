@@ -20,6 +20,7 @@ export default function RetailPOSLayout() {
   const [appliedCoupons, setAppliedCoupons] = useState<GiftCoupon[]>([])
   const [showScanner, setShowScanner] = useState(false)
   const [pinnedItemId, setPinnedItemId] = useState<string | null>(null)
+  const [identifierItemId, setIdentifierItemId] = useState<string | null>(null)
 
   // Use cart store instead of local state
   const { cartItems, addToCart, updateQuantity, removeItem, clearCart } = useCartStore()
@@ -55,13 +56,13 @@ export default function RetailPOSLayout() {
     addItemToCart(item)
   }
 
-  // Helpers for scale barcodes like in posawesome
+  // Helpers for scale barcodes
   const parseScaleBarcode = useCallback((raw: string) => {
     if (!scalePrefix || !raw.startsWith(scalePrefix)) return { isScale: false as const }
 
-    // First 7 chars represent the item code/barcode identifier (as per posawesome)
+    //Mania: First 7 chars represent the item code/barcode identifier (as per posawesome): Note I din't like the approach because it looks hardcoded
     const base = raw.substring(0, 7)
-    // Accept 1-5 trailing digits while typing; DO NOT left-pad (match posawesome logic)
+    // Accept 1-5 trailing digits while typing;
     const qtyBlock = raw.substring(7)
     if (!/^\d{1,5}$/.test(qtyBlock)) {
       return { isScale: false as const }
@@ -197,6 +198,9 @@ export default function RetailPOSLayout() {
         setPinnedItemId(null)
       }
     }
+
+    // Reset identifier resolution when query changes; will re-resolve via effect
+    setIdentifierItemId(null)
   }
 
   // Handle Enter key for barcode processing
@@ -245,6 +249,38 @@ export default function RetailPOSLayout() {
 
       // Regular search - do not clear the input
       console.log('Processing as product search:', searchQuery)
+      // Additionally try resolving batch/serial on Enter for user convenience
+      ;(async () => {
+        try {
+          const res = await fetch(`/api/method/klik_pos.api.item.get_item_by_identifier?code=${encodeURIComponent(searchQuery.trim())}`)
+          const data = await res.json()
+          console.log('Batch/Serial lookup result:', data)
+          if (data?.message?.item_code) {
+            const item = {
+              id: data.message.item_code,
+              name: data.message.item_name || data.message.item_code,
+              category: data.message.item_group || 'General',
+              price: data.message.price || 0,
+              available: data.message.available || 0,
+              image: data.message.image,
+              sold: 0,
+            } as MenuItem
+            addOrIncreaseWithQuantity(item, 1)
+            // Pre-select batch or serial if matched
+            const matchedType = data.message.matched_type
+            const matchedValue = data.message.matched_value
+            if (matchedType === 'batch') {
+              window.dispatchEvent(new CustomEvent('cart:setBatchForItem', { detail: { itemCode: item.id, batchId: matchedValue } }))
+            } else if (matchedType === 'serial') {
+              window.dispatchEvent(new CustomEvent('cart:setSerialForItem', { detail: { itemCode: item.id, serialNo: matchedValue } }))
+            }
+            setSearchQuery('')
+            setPinnedItemId(null)
+          }
+        } catch {
+          // ignore
+        }
+      })()
     }
   }
 
@@ -276,6 +312,29 @@ export default function RetailPOSLayout() {
 
     return () => clearTimeout(timer)
   }, [searchQuery, handleBarcodeDetected, useScannerOnly, menuItems, parseScaleBarcode, addOrIncreaseWithQuantity])
+
+  // Resolve item by batch/serial/barcode while typing to show in results list (non-blocking)
+  useEffect(() => {
+    // Skip when empty or when scale typing (handled separately)
+    if (!searchQuery) return
+    const isScaleTyping = !!scalePrefix && /^[0-9]+$/.test(searchQuery) && searchQuery.startsWith(scalePrefix) && searchQuery.length >= 7
+    if (isScaleTyping) return
+
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/method/klik_pos.api.item.get_item_by_identifier?code=${encodeURIComponent(searchQuery.trim())}`)
+        const data = await res.json()
+        if (!cancelled && data?.message?.item_code) {
+          setIdentifierItemId(data.message.item_code)
+        }
+      } catch {
+        if (!cancelled) setIdentifierItemId(null)
+      }
+    }, 250)
+
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [searchQuery, scalePrefix])
 
   const filteredItems = menuItems.filter((item) => {
     // Availability filter - hide items with 0 quantity if hide_unavailable_items is enabled
@@ -309,7 +368,7 @@ export default function RetailPOSLayout() {
       item.description?.toLowerCase().includes(queryForFilter.toLowerCase()) ||
       (item.barcode && item.barcode.toLowerCase().includes(queryForFilter.toLowerCase()))
 
-    // If pinned, ensure the pinned item always passes
+    // If pinned or identifier resolved, ensure the item always passes
     const passes = matchesCategory && matchesSearch
     if (pinnedItemId && isScaleTyping) {
       const keep = passes || item.id === pinnedItemId
@@ -317,6 +376,9 @@ export default function RetailPOSLayout() {
         console.log('[ScaleDebug] keeping pinned in results:', { itemId: item.id, pinnedItemId })
       }
       return keep
+    }
+    if (identifierItemId) {
+      return passes || item.id === identifierItemId
     }
     return passes
   })

@@ -140,6 +140,95 @@ def get_item_by_barcode(barcode: str):
         frappe.log_error(frappe.get_traceback(), f"Error fetching item by barcode: {barcode}")
         frappe.throw(_("Error fetching item by barcode: {0}").format(str(e)))
 
+
+@frappe.whitelist(allow_guest=True)
+def get_item_by_identifier(code: str):
+    """Resolve an item by barcode, batch number or serial number.
+    Returns same structure as get_item_by_barcode."""
+    try:
+        if not code:
+            frappe.throw(_("Identifier required"))
+
+        pos_doc = get_current_pos_profile()
+        warehouse = pos_doc.warehouse
+        price_list = pos_doc.selling_price_list
+
+        matched_type = None
+        matched_value = None
+
+        # 1) Try Item Barcode
+        item_row = frappe.db.sql(
+            """
+            SELECT parent as item_code
+            FROM `tabItem Barcode`
+            WHERE barcode = %s
+            """,
+            code,
+            as_dict=True,
+        )
+        if item_row:
+            matched_type = 'barcode'
+            matched_value = code
+
+        # 2) Try Batch by batch_id or name
+        if not item_row:
+            item_row = frappe.db.sql(
+                """
+                SELECT b.item as item_code
+                FROM `tabBatch` b
+                WHERE b.batch_id = %s OR b.name = %s
+                """,
+                (code, code),
+                as_dict=True,
+            )
+            if item_row:
+                matched_type = 'batch'
+                matched_value = code
+
+        # 3) Try Serial No
+        if not item_row:
+            # In ERPNext, the Serial No doctype has field name=serial_no; item_code links to Item
+            item_row = frappe.db.sql(
+                """
+                SELECT s.item_code as item_code
+                FROM `tabSerial No` s
+                WHERE s.name = %s OR s.serial_no = %s
+                """,
+                (code, code),
+                as_dict=True,
+            )
+            if item_row:
+                matched_type = 'serial'
+                matched_value = code
+
+        if not item_row:
+            frappe.throw(_("Item not found for identifier: {0}").format(code))
+
+        item_code = item_row[0].get("item_code")
+        if not item_code:
+            frappe.throw(_("Invalid identifier mapping for: {0}").format(code))
+
+        item_doc = frappe.get_doc("Item", item_code)
+        balance = fetch_item_balance(item_code, warehouse)
+        price_info = fetch_item_price(item_code, price_list)
+
+        return {
+            "item_code": item_code,
+            "item_name": item_doc.item_name or item_code,
+            "description": item_doc.description or "",
+            "item_group": item_doc.item_group or "General",
+            "price": price_info["price"],
+            "currency": price_info["currency"],
+            "currency_symbol": price_info["currency_symbol"],
+            "available": balance,
+            "image": item_doc.image,
+            "matched_type": matched_type,
+            "matched_value": matched_value,
+        }
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), f"Error fetching item by identifier: {code}")
+        frappe.throw(_("Error fetching item by identifier: {0}").format(str(e)))
+
 @frappe.whitelist(allow_guest=True)
 def get_items_with_balance_and_price():
     """
@@ -528,6 +617,45 @@ def get_item_uoms_and_prices(item_code):
         frappe.log_error(frappe.get_traceback(), f"Get Item UOMs Error for {item_code}")
         return {"base_uom": "Nos", "uoms": [{"uom": "Nos", "conversion_factor": 1.0, "price": 0.0}]}
 
+
+@frappe.whitelist(allow_guest=True)
+def get_serial_nos_for_item(item_code: str):
+    """
+    Returns a list of available Serial Nos for a given item (and POS warehouse if set).
+    """
+    if not item_code:
+        return []
+
+    try:
+        pos_doc = get_current_pos_profile()
+        warehouse = getattr(pos_doc, 'warehouse', None)
+
+        filters = {
+            'item_code': item_code,
+            'status': ['in', ['Active', 'Available']]
+        }
+        if warehouse:
+            filters['warehouse'] = warehouse
+
+        serials = frappe.get_all(
+            'Serial No',
+            filters=filters,
+            fields=['name', 'serial_no'],
+            limit=500,
+            order_by='modified desc'
+        )
+
+        # Normalize: prefer serial_no field if present; fallback to name
+        result = []
+        for s in serials:
+            serial_value = s.get('serial_no') or s.get('name')
+            if serial_value:
+                result.append({'serial_no': serial_value})
+
+        return result
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), f"Get Serial Nos Error for {item_code}")
+        return []
 
 # @frappe.whitelist()
 # def create_random_items():
