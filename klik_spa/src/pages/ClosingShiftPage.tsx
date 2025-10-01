@@ -25,6 +25,7 @@ import { deleteDraftInvoice } from "../services/salesInvoice";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { formatCurrency } from "../utils/currency";
 import { isToday, isThisWeek, isThisMonth, isThisYear } from "../utils/time";
+import { clearCacheAndReload } from "../utils/clearCache";
 
 export default function ClosingShiftPage() {
   const navigate = useNavigate();
@@ -158,7 +159,7 @@ export default function ClosingShiftPage() {
       acc[mode.name] = {
         name: mode.name,
         openingAmount: mode.openingAmount || 0,
-        amount: 0, 
+        amount: 0,
         transactions: 0
       };
       return acc;
@@ -312,7 +313,10 @@ export default function ClosingShiftPage() {
     try {
       await createClosingEntry(closingAmounts);
       setShowCloseModal(false);
-      navigate(`/`);
+
+      // Clear all cache when closing shift for a fresh start
+      console.log("Closing shift - clearing all cache for fresh session");
+      clearCacheAndReload();
     } catch (err) {
       console.error("Error closing shift:", err);
     }

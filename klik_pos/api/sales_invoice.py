@@ -553,6 +553,7 @@ def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,
 
     # Set company and currency from POS Profile
     pos_profile = get_current_pos_profile()
+    doc.pos_profile = pos_profile.name  # Set the POS profile on the invoice
     doc.company = pos_profile.company
     doc.currency = get_customer_billing_currency(customer)
     doc.conversion_rate = 1.0  # Set conversion rate to 1 for same currency
