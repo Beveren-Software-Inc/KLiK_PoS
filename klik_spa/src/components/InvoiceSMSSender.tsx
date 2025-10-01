@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { sendInvoiceWhatsApp } from '../services/useSharing';
+import { sendInvoiceSMS } from '../services/useSharing';
 import { getUserFriendlyError } from '../utils/errorMessages';
 
-interface InvoiceWhatsAppSenderProps {
+interface InvoiceSMSSenderProps {
   customerName?: string;
   customerPhone?: string;
   invoiceNumber?: string;
@@ -10,8 +10,7 @@ interface InvoiceWhatsAppSenderProps {
   onError?: (error: string) => void;
 }
 
-//Just incase we want to implement it somewhere apart from sharing buttons: By Mania
-export const InvoiceWhatsAppSender: React.FC<InvoiceWhatsAppSenderProps> = ({
+export const InvoiceSMSSender: React.FC<InvoiceSMSSenderProps> = ({
   customerName = '',
   customerPhone = '',
   invoiceNumber = '',
@@ -21,7 +20,7 @@ export const InvoiceWhatsAppSender: React.FC<InvoiceWhatsAppSenderProps> = ({
   const [phoneNumber, setPhoneNumber] = useState(customerPhone);
   const [name, setName] = useState(customerName);
   const [invoiceNo, setInvoiceNo] = useState(invoiceNumber);
-  const [message, setMessage] = useState('Your invoice is ready! Please find the PDF attached.');
+  const [message, setMessage] = useState('Your invoice is ready!');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string>('');
@@ -39,7 +38,7 @@ export const InvoiceWhatsAppSender: React.FC<InvoiceWhatsAppSenderProps> = ({
     setResult(null);
 
     try {
-      const response = await sendInvoiceWhatsApp({
+      const response = await sendInvoiceSMS({
         mobile_no: phoneNumber,
         customer_name: name,
         invoice_data: invoiceNo,
@@ -48,36 +47,22 @@ export const InvoiceWhatsAppSender: React.FC<InvoiceWhatsAppSenderProps> = ({
 
       setResult(response);
       onSuccess?.(response);
-      console.log('Invoice WhatsApp sent successfully:', response);
+      console.log('Invoice SMS sent successfully:', response);
     } catch (err: any) {
-      const userFriendlyError = getUserFriendlyError(err.message || 'Failed to send invoice WhatsApp message', 'whatsapp');
+      const userFriendlyError = getUserFriendlyError(err.message || 'Failed to send invoice SMS message', 'sms');
       setError(userFriendlyError);
       onError?.(userFriendlyError);
-      console.error('Invoice WhatsApp error:', err);
+      console.error('Invoice SMS error:', err);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="invoice-whatsapp-sender p-4 border rounded-lg bg-white shadow-sm">
-      <h3 className="text-lg font-semibold mb-4">Send Invoice via WhatsApp</h3>
+    <div className="invoice-sms-sender p-4 border rounded-lg bg-white shadow-sm">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">Send Invoice via SMS</h3>
 
       <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Customer Phone Number *
-          </label>
-          <input
-            type="tel"
-            value={phoneNumber}
-            onChange={(e) => setPhoneNumber(e.target.value)}
-            placeholder="+254740743521"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            required
-          />
-        </div>
-
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Customer Name *
@@ -86,8 +71,22 @@ export const InvoiceWhatsAppSender: React.FC<InvoiceWhatsAppSenderProps> = ({
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="John Doe"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Enter customer name"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Phone Number *
+          </label>
+          <input
+            type="tel"
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="+1234567890"
             required
           />
         </div>
@@ -100,8 +99,8 @@ export const InvoiceWhatsAppSender: React.FC<InvoiceWhatsAppSenderProps> = ({
             type="text"
             value={invoiceNo}
             onChange={(e) => setInvoiceNo(e.target.value)}
-            placeholder="ACC-SINV-2025-001"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Enter invoice number"
             required
           />
         </div>
@@ -113,7 +112,7 @@ export const InvoiceWhatsAppSender: React.FC<InvoiceWhatsAppSenderProps> = ({
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="Your invoice is ready! Please find the PDF attached."
+            placeholder="Your invoice is ready!"
             rows={3}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
@@ -122,9 +121,9 @@ export const InvoiceWhatsAppSender: React.FC<InvoiceWhatsAppSenderProps> = ({
         <button
           onClick={handleSendInvoice}
           disabled={loading}
-          className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full px-4 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loading ? 'Sending Invoice...' : 'Send Invoice via WhatsApp'}
+          {loading ? 'Sending SMS...' : 'Send Invoice via SMS'}
         </button>
 
         {error && (
@@ -139,11 +138,10 @@ export const InvoiceWhatsAppSender: React.FC<InvoiceWhatsAppSenderProps> = ({
             <p><strong>Recipient:</strong> {result.recipient}</p>
             <p><strong>Invoice:</strong> {result.invoice}</p>
             <p><strong>Amount:</strong> {result.amount}</p>
-            <p><strong>Message ID:</strong> {result.message_id}</p>
+            <p><strong>Message:</strong> {result.message}</p>
           </div>
         )}
       </div>
     </div>
   );
 };
-

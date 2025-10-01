@@ -34,6 +34,7 @@ import { useCustomers } from "../hooks/useCustomers";
 import { useUserInfo } from "../hooks/useUserInfo";
 import { usePOSDetails } from "../hooks/usePOSProfile";
 import { toast } from "react-toastify";
+import { extractErrorFromException } from "../utils/errorExtraction";
 import { createSalesReturn, deleteDraftInvoice, submitDraftInvoice } from "../services/salesInvoice";
 import { useAllPaymentModes } from "../hooks/usePaymentModes";
 
@@ -665,11 +666,9 @@ const getStatusBadge = (status: string) => {
       const soldQty = item.qty || item.quantity || 0;
       const returnedQty = item.returned_qty || 0;
       const canReturn = returnedQty < soldQty;
-      console.log(`Item ${item.item_code}: sold=${soldQty}, returned=${returnedQty}, canReturn=${canReturn}`);
       return canReturn;
     });
 
-    console.log(`Invoice ${invoice.id} has returnable items: ${hasReturnable}`);
     return hasReturnable;
   };
 
@@ -754,7 +753,8 @@ const getStatusBadge = (status: string) => {
       window.location.reload();
     } catch (error: any) {
       console.error("Error submitting draft invoice:", error);
-      toast.error(error.message || "Failed to submit draft invoice");
+      const errorMessage = extractErrorFromException(error, "Failed to submit draft invoice");
+      toast.error(errorMessage);
     }
   };
 

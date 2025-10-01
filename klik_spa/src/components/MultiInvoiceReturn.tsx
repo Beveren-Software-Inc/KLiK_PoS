@@ -20,6 +20,7 @@ import {
   type ReturnItem,
   type ReturnData
 } from "../services/returnService";
+import { useCustomers } from "../hooks/useCustomers";
 
 interface MultiInvoiceReturnProps {
   customer?: string;
@@ -50,6 +51,9 @@ export default function MultiInvoiceReturn({
   const [selectedItems, setSelectedItems] = useState<{item_code: string, item_name: string}[]>([]);
   const [availableItems, setAvailableItems] = useState<{item_code: string, item_name: string}[]>([]);
   const [filteredAvailableItems, setFilteredAvailableItems] = useState<{item_code: string, item_name: string}[]>([]);
+
+  // Use the customers hook with search to fetch from server when searching
+  const { customers: searchableCustomers, isLoading: customersLoading } = useCustomers(customerSearchQuery);
 
   // Address filter states
   const [customerAddresses, setCustomerAddresses] = useState<Array<{name: string, address_line1: string, city: string}>>([]);
@@ -404,17 +408,17 @@ export default function MultiInvoiceReturn({
             {/* Customer List */}
             <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4 flex-1 flex flex-col">
               <div className="space-y-2 flex-1 overflow-y-auto max-h-60 sm:max-h-none">
-                {customers && customers.length > 0 ? (
-                  customers
-                    .filter(customer =>
-                      customer.customer_name?.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
-                      customer.name?.toLowerCase().includes(customerSearchQuery.toLowerCase())
-                    )
+                {customersLoading ? (
+                  <div className="text-center py-4">
+                    <div className="text-gray-500 dark:text-gray-400">Loading customers...</div>
+                  </div>
+                ) : searchableCustomers && searchableCustomers.length > 0 ? (
+                  searchableCustomers
                     .map((customer) => (
                       <button
-                        key={customer.name || customer.customer_name || Math.random()}
+                        key={customer.id || customer.name || Math.random()}
                         onClick={async () => {
-                          const customerName = customer.name || customer.customer_name || '';
+                          const customerName = customer.id || customer.name || '';
                           setSelectedCustomer(customerName);
                           setWorkflowStep('select-items');
 
@@ -468,10 +472,10 @@ export default function MultiInvoiceReturn({
                         className="w-full text-left p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                       >
                         <div className="font-medium text-gray-900 dark:text-white">
-                          {customer.customer_name || customer.name || 'Unknown Customer'}
+                          {customer.name || 'Unknown Customer'}
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {customer.name || customer.customer_name || 'No ID'}
+                          {customer.id || 'No ID'}
                         </div>
                       </button>
                     ))
@@ -487,15 +491,12 @@ export default function MultiInvoiceReturn({
               </div>
 
               {/* Results Counter */}
-              {customers && (
+              {searchableCustomers && (
                 <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                   <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
                     {customerSearchQuery.trim()
-                      ? `${customers.filter(customer =>
-                          customer.customer_name?.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
-                          customer.name?.toLowerCase().includes(customerSearchQuery.toLowerCase())
-                        ).length} of ${customers.length} customers`
-                      : `${customers.length} customers total`
+                      ? `${searchableCustomers.length} customers found`
+                      : `${searchableCustomers.length} customers total`
                     }
                   </div>
                 </div>

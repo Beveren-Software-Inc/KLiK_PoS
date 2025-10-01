@@ -6,7 +6,8 @@ import { useTheme } from "../hooks/useTheme"
 import { useCartStore } from "../stores/cartStore"
 import { formatCurrency } from "../utils/currency"
 import { usePOSDetails } from "../hooks/usePOSProfile"
-import { ShoppingCart, Menu, X, Search, Settings, LogOut, Moon, Sun, Mail, Scan, Grid3X3, List, Store } from "lucide-react"
+import { ShoppingCart, Menu, X, Search, Settings, LogOut, Moon, Sun, Mail, Scan, Grid3X3, List, Store, RefreshCw } from "lucide-react"
+import { clearCacheAndReload } from "../utils/clearCache"
 import CategoryTabs from "./CategoryTabs"
 import ProductGrid from "./ProductGrid"
 import BottomNavigation from "./BottomNavigation"
@@ -179,6 +180,18 @@ export default function MobilePOSLayout({
                       <Moon size={14} className="mr-3 text-gray-500 dark:text-gray-400" />
                     )}
                     <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      clearCacheAndReload()
+                      setShowUserMenu(false)
+                    }}
+                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    type="button"
+                  >
+                    <RefreshCw size={14} className="mr-3 text-gray-500 dark:text-gray-400" />
+                    <span>Clear Cache</span>
                   </button>
 
                   <div className="border-t border-gray-100 dark:border-gray-700 my-1"></div>

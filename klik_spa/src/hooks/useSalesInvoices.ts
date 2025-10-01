@@ -23,7 +23,7 @@ export function useSalesInvoices(searchTerm: string = "") {
 
     try {
       const start = page * LIMIT;
-      console.log(`Fetching sales invoices - page: ${page}, start: ${start}, limit: ${LIMIT}, search: ${searchTerm}`);
+      // console.log(`Fetching sales invoices - page: ${page}, start: ${start}, limit: ${LIMIT}, search: ${searchTerm}`);
 
       const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
       const response = await fetch(
@@ -38,11 +38,11 @@ export function useSalesInvoices(searchTerm: string = "") {
         }
       );
 
-      console.log('Sales invoices response:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok
-      });
+      // console.log('Sales invoices response:', {
+      //   status: response.status,
+      //   statusText: response.statusText,
+      //   ok: response.ok
+      // });
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);

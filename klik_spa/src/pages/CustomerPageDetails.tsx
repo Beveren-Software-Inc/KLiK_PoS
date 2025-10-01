@@ -26,6 +26,7 @@ import SingleInvoiceReturn from "../components/SingleInvoiceReturn";
 import type { SalesInvoice } from "../../types";
 import { useCustomerInvoices } from "../hooks/useCustomerInvoices";
 import { toast } from "react-toastify";
+import { extractErrorFromException } from "../utils/errorExtraction";
 import { createSalesReturn, submitDraftInvoice } from "../services/salesInvoice";
 
 import { useCustomerDetails } from "../hooks/useCustomers";
@@ -224,7 +225,8 @@ export default function CustomerDetailsPage() {
       window.location.reload();
     } catch (error: any) {
       console.error("Error submitting draft invoice:", error);
-      toast.error(error.message || "Failed to submit draft invoice");
+      const errorMessage = extractErrorFromException(error, "Failed to submit draft invoice");
+      toast.error(errorMessage);
     }
   };
 

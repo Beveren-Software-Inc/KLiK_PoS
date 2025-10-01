@@ -146,7 +146,7 @@ export default function ClosingShiftPage() {
       // Filter by POS opening entry - only show invoices for the current opening entry
       const matchesOpeningEntry = !posDetails?.current_opening_entry ||
         (invoice.custom_pos_opening_entry && invoice.custom_pos_opening_entry === posDetails.current_opening_entry);
-      console.log({matchesPOSProfile, matchesOpeningEntry, invoice, posDetails});
+      // console.log({matchesPOSProfile, matchesOpeningEntry, invoice, posDetails});
       return matchesSearch && matchesPayment && matchesStatus && matchesDate && matchesPOSProfile && matchesOpeningEntry;
     });
 
@@ -276,11 +276,9 @@ export default function ClosingShiftPage() {
       const soldQty = item.qty || item.quantity || 0;
       const returnedQty = item.returned_qty || 0;
       const canReturn = returnedQty < soldQty;
-      console.log(`Item ${item.item_code}: sold=${soldQty}, returned=${returnedQty}, canReturn=${canReturn}`);
       return canReturn;
     });
 
-    console.log(`Invoice ${invoice.id} has returnable items: ${hasReturnable}`);
     return hasReturnable;
   };
 
@@ -298,7 +296,7 @@ export default function ClosingShiftPage() {
   };
 
   const handleCancel = (invoiceId: string) => {
-    console.log("Cancelling invoice:", invoiceId);
+    // console.log("Cancelling invoice:", invoiceId);
     setShowInvoiceModal(false);
   };
 
@@ -310,7 +308,6 @@ export default function ClosingShiftPage() {
   };
 
   const handleFinalClose = async () => {
-    console.log("Closing shift with amounts:", closingAmounts);
 
     try {
       await createClosingEntry(closingAmounts);
@@ -411,6 +408,7 @@ export default function ClosingShiftPage() {
                 <option value="Paid">Paid</option>
                 <option value="Overdue">Overdue</option>
                 <option value="Return">Return</option>
+                <option value="Credit Note Issued">Credit Note Issued</option>
                 <option value="Cancelled">Cancelled</option>
               </select>
 
@@ -723,6 +721,8 @@ export default function ClosingShiftPage() {
                 <option value="Paid">Paid</option>
                 <option value="Overdue">Overdue</option>
                 <option value="Return">Return</option>
+                <option value="Credit Note Issued">Credit Note Issued</option>
+
                 <option value="Cancelled">Cancelled</option>
               </select>
 

@@ -16,7 +16,7 @@ export default function MobilePaymentPage() {
   const handleClose = async (paymentCompleted?: boolean) => {
     // Only clear cart if payment was completed
     if (paymentCompleted) {
-      console.log("MobilePaymentPage: Payment was completed - clearing cart for next order");
+      // console.log("MobilePaymentPage: Payment was completed - clearing cart for next order");
       clearCart();
       // Clear draft invoice cache since payment is completed
       clearDraftInvoiceCache();
