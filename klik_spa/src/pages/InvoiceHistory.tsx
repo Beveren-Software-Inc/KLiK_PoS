@@ -41,6 +41,7 @@ import { useAllPaymentModes } from "../hooks/usePaymentModes";
 import { addDraftInvoiceToCart } from "../utils/draftInvoiceToCart";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { isToday, isThisWeek, isThisMonth, isThisYear } from "../utils/time";
+import { exportInvoicesToCSV, getExportFilename, type ExportableInvoice } from "../utils/exportUtils";
 // import InvoiceViewPage from "./InvoiceViewPage";
 
 export default function InvoiceHistoryPage() {
@@ -826,6 +827,49 @@ const getStatusBadge = (status: string) => {
     setCustomerSearchQuery("");
   };
 
+  // Export functionality
+  const handleExportInvoices = () => {
+    try {
+      if (!filteredInvoices || filteredInvoices.length === 0) {
+        toast.error("No invoices to export");
+        return;
+      }
+
+      // Convert invoices to exportable format
+      const exportableInvoices: ExportableInvoice[] = filteredInvoices.map(invoice => {
+        // Calculate outstanding amount: grand total - amount paid
+        const grandTotal = invoice.totalAmount || 0;
+        const amountPaid = invoice.amountPaid || 0;
+        const outstandingAmount = Math.max(0, grandTotal - amountPaid);
+
+        return {
+          name: invoice.id || invoice.name || '',
+          customer: invoice.customer || '',
+          posting_date: invoice.date || invoice.posting_date || '',
+          due_date: '', // Due date is not available in the current data structure
+          grand_total: grandTotal,
+          outstanding_amount: outstandingAmount,
+          status: invoice.status || '',
+          mode_of_payment: invoice.paymentMethod || '',
+          currency: invoice.currency || 'SAR',
+          company: invoice.company || ''
+        };
+      });
+
+      // Generate filename based on current filters
+      const tabName = activeTab === "all" ? "all" : activeTab.toLowerCase();
+      const filename = getExportFilename(`invoices_${tabName}`, 'csv');
+
+      // Export to CSV
+      exportInvoicesToCSV(exportableInvoices, filename);
+
+      toast.success(`Exported ${exportableInvoices.length} invoices successfully`);
+    } catch (error: any) {
+      console.error('Export error:', error);
+      toast.error(`Failed to export invoices: ${error.message}`);
+    }
+  };
+
   // Mobile layout: full-width content and persistent bottom navigation
   if (isMobile) {
     return (
@@ -843,7 +887,10 @@ const getStatusBadge = (status: string) => {
                   <Users className="w-4 h-4" />
                   <span>Multi Return</span>
                 </button>
-                <button className="flex items-center space-x-2 px-3 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors text-sm">
+                <button
+                  onClick={handleExportInvoices}
+                  className="flex items-center space-x-2 px-3 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors text-sm"
+                >
                   <Download className="w-4 h-4" />
                   <span>Export</span>
                 </button>
@@ -1009,7 +1056,10 @@ const getStatusBadge = (status: string) => {
                   <FileMinus className="w-4 h-4" />
                   <span>Multi-Invoice Return</span>
                 </button>
-                <button className="flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors">
+                <button
+                  onClick={handleExportInvoices}
+                  className="flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors"
+                >
                   <Download className="w-4 h-4" />
                   <span>Export</span>
                 </button>
