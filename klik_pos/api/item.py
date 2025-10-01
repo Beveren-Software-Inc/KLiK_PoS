@@ -2,6 +2,7 @@ import frappe
 from frappe import _
 from erpnext.stock.utils import get_stock_balance
 from klik_pos.klik_pos.utils import get_current_pos_profile
+from klik_pos.api.sales_invoice import get_current_pos_opening_entry
 from erpnext.stock.doctype.batch.batch import get_batch_qty
 
 def fetch_item_balance(item_code: str, warehouse: str) -> float:
@@ -369,7 +370,19 @@ def get_items_with_balance_and_price():
 @frappe.whitelist(allow_guest=True)
 def get_stock_updates():
     """Get only stock updates for all items - lightweight endpoint with early filtering."""
-    pos_doc = get_current_pos_profile()
+    # Prefer POS Profile from the active opening entry to match the UI/session
+    pos_doc = None
+    try:
+        current_opening_entry = get_current_pos_opening_entry()
+        if current_opening_entry:
+            opening_doc = frappe.get_doc("POS Opening Entry", current_opening_entry)
+            pos_doc = frappe.get_doc("POS Profile", opening_doc.pos_profile)
+    except Exception:
+        pos_doc = None
+
+    if not pos_doc:
+        pos_doc = get_current_pos_profile()
+
     warehouse = pos_doc.warehouse
     hide_unavailable = getattr(pos_doc, 'hide_unavailable_items', False)
 

@@ -7,25 +7,27 @@ from frappe.utils import flt
 
 def get_current_pos_opening_entry():
     """
-    Get the current active POS Opening Entry for the current user and POS profile.
+    Get the latest active POS Opening Entry for the current user across ALL profiles.
     Returns the opening entry name or None if not found.
     """
     try:
         user = frappe.session.user
-        pos_profile = get_current_pos_profile()
+        # Find the most recent submitted POS Opening Entry with no linked closing entry for this user
+        opening_entries = frappe.get_all(
+            "POS Opening Entry",
+            filters={
+                "user": user,
+                "docstatus": 1,
+                "status": "Open"
+            },
+            fields=["name"],
+            order_by="creation desc",
+            limit_page_length=1
+        )
 
-        if not pos_profile:
-            return None
-
-        # Look for a submitted POS Opening Entry with no linked closing entry
-        open_entry = frappe.db.exists("POS Opening Entry", {
-            "pos_profile": pos_profile.name,
-            "user": user,
-            "docstatus": 1,  # Submitted
-            "pos_closing_entry": None
-        })
-
-        return open_entry
+        if opening_entries:
+            return opening_entries[0].name
+        return None
     except Exception as e:
         frappe.log_error(f"Error getting current POS opening entry: {str(e)}")
         return None
@@ -552,7 +554,22 @@ def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,
     doc.custom_delivery_date = frappe.utils.nowdate()
 
     # Set company and currency from POS Profile
-    pos_profile = get_current_pos_profile()
+    # Prefer the POS Profile from the current open POS Opening Entry (active session)
+    selected_pos_profile_name = None
+    try:
+        current_opening_entry = get_current_pos_opening_entry()
+        if current_opening_entry:
+            opening_doc = frappe.get_doc("POS Opening Entry", current_opening_entry)
+            selected_pos_profile_name = opening_doc.pos_profile
+    except Exception:
+        # Fallback handled below
+        pass
+
+    if selected_pos_profile_name:
+        pos_profile = frappe.get_doc("POS Profile", selected_pos_profile_name)
+    else:
+        pos_profile = get_current_pos_profile()
+
     doc.pos_profile = pos_profile.name  # Set the POS profile on the invoice
     doc.company = pos_profile.company
     doc.currency = get_customer_billing_currency(customer)
@@ -586,7 +603,7 @@ def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,
     if current_opening_entry:
         doc.custom_pos_opening_entry = current_opening_entry
 
-    pos_profile = get_current_pos_profile()
+    # Ensure we continue using the same resolved POS Profile throughout
 
     # Set round-off fields only if roundoff_amount is not zero
     if roundoff_amount != 0:

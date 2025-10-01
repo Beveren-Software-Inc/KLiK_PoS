@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 from klik_pos.klik_pos.utils import get_current_pos_profile
+from klik_pos.api.sales_invoice import get_current_pos_opening_entry
 
 
 @frappe.whitelist()
@@ -45,30 +46,15 @@ def get_all_mode_of_payment():
 @frappe.whitelist()
 def get_opening_entry_payment_summary():
     try:
-        # Step 1: Get current POS profile
-        pos_profile = get_current_pos_profile()
-        if not pos_profile:
-            return {"success": False, "error": "No POS Profile found for the current user."}
-
-        # Step 2: Get active POS Opening Entry
-        opening_entry = frappe.get_all(
-            "POS Opening Entry",
-            filters={
-                "pos_profile": pos_profile.name,
-                "user": frappe.session.user,
-                "docstatus": 1,
-                "status": "Open"
-            },
-            fields=["name", "period_start_date"],
-            order_by="creation desc",
-            limit_page_length=1
-        )
-
-        if not opening_entry:
+        # Step 1: Resolve the current open POS Opening Entry across profiles
+        current_opening_entry = get_current_pos_opening_entry()
+        if not current_opening_entry:
             return {"success": False, "error": "No open POS Opening Entry found."}
 
-        opening_entry_name = opening_entry[0].name
-        opening_start = opening_entry[0].period_start_date
+        opening_doc = frappe.get_doc("POS Opening Entry", current_opening_entry)
+        pos_profile_name = opening_doc.pos_profile
+        opening_entry_name = opening_doc.name
+        opening_start = opening_doc.period_start_date
 
         opening_date = opening_start.date()
         opening_time = opening_start.time()
@@ -98,7 +84,7 @@ def get_opening_entry_payment_summary():
                   AND si.docstatus = 1
                   AND si.posting_date = %s
                 GROUP BY sip.mode_of_payment
-            """, (pos_profile.name, opening_date), as_dict=True)
+            """, (pos_profile_name, opening_date), as_dict=True)
         else:
             # For regular users, aggregate only invoices for the current POS opening entry
             frappe.logger().info(f"Aggregating payments for POS opening entry: {opening_entry_name}")
@@ -111,7 +97,7 @@ def get_opening_entry_payment_summary():
                 WHERE si.custom_pos_opening_entry = %s
                   AND si.docstatus = 1
                 GROUP BY sip.mode_of_payment
-            """, (opening_entry_name), as_dict=True)
+            """, (opening_entry_name,), as_dict=True)
 
 
 
@@ -131,7 +117,7 @@ def get_opening_entry_payment_summary():
 
         return {
             "success": True,
-            "pos_profile": pos_profile.name,
+            "pos_profile": pos_profile_name,
             "opening_entry": opening_entry_name,
             "date": str(opening_date),
             "time": str(opening_time),

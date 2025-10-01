@@ -19,17 +19,13 @@ from frappe import _
 def open_pos():
     """Check if the current user has an open POS Opening Entry."""
     user = frappe.session.user
-    pos_profile = get_current_pos_profile().name
 
-    if not pos_profile:
-        return False
-
-    # Look for a submitted POS Opening Entry with no linked closing entry
+    # Look for any submitted POS Opening Entry with no linked closing entry for this user
     open_entry = frappe.db.exists("POS Opening Entry", {
-        "pos_profile": pos_profile,
         "user": user,
         "docstatus": 1,  # Submitted
-        "pos_closing_entry": None
+        "pos_closing_entry": None,
+        "status": "Open"
     })
 
     return True if open_entry else False
@@ -49,8 +45,13 @@ def create_opening_entry():
 
         user = frappe.session.user
 
-        # get pos profile
-        pos_profile = get_current_pos_profile().name if get_current_pos_profile() else None
+        # get pos profile - use selected profile from frontend if provided, otherwise use current
+        selected_pos_profile = data.get("pos_profile")
+        if selected_pos_profile:
+            pos_profile = selected_pos_profile
+        else:
+            pos_profile = get_current_pos_profile().name if get_current_pos_profile() else None
+
         company = frappe.defaults.get_user_default("Company")
 
         if not company:
@@ -70,7 +71,7 @@ def create_opening_entry():
             "pos_closing_entry": None
         })
         if existing:
-            frappe.throw(_("You already have an open POS Opening Entry."))
+            frappe.throw(_("You already have an open POS Opening Entry for profile '{0}'. Please close the existing entry before creating a new one.").format(pos_profile))
 
         # Create the POS Opening Entry
         doc = frappe.new_doc("POS Opening Entry")
@@ -153,7 +154,7 @@ def create_closing_entry():
         opening_start = opening_entry.period_start_date  # full datetime
         opening_date = opening_start.date()
         opening_time = opening_start.time().strftime("%H:%M:%S")
-        
+
         # Step 3: Fetch payment modes + opening balances
         opening_modes = frappe.get_all(
             "POS Opening Entry Detail",
@@ -166,13 +167,15 @@ def create_closing_entry():
         closing_balance = data.get("closing_balance", {})
         tax_data = data.get("taxes", [])
 
-        if not closing_balance:
-            frappe.throw(_("At least one closing balance entry is required."))
+        # Allow closing even with no amounts entered (all zeros)
+        # This handles cases where no transactions occurred during the shift
+        if closing_balance is None:
+            closing_balance = {}
 
         # Step 4: Aggregate sales invoice payments for that day, starting from opening time
         sales_data = frappe.db.sql("""
-            SELECT sip.mode_of_payment, 
-                   SUM(sip.amount) as total_amount, 
+            SELECT sip.mode_of_payment,
+                   SUM(sip.amount) as total_amount,
                    COUNT(DISTINCT si.name) as transactions
             FROM `tabSales Invoice` si
             JOIN `tabSales Invoice Payment` sip ON si.name = sip.parent
@@ -202,18 +205,34 @@ def create_closing_entry():
         doc.total_amount = data.get("total_amount")
 
         # Append to payment reconciliation
-        for mode, closing_amount in closing_balance.items():
-            opening_amount = opening_balance_map.get(mode, 0)
-            expected_amount = sales_map.get(mode, 0)  # from SQL aggregation
-            difference = float(closing_amount) - float(expected_amount)
+        # If no closing amounts provided, create entries for all opening payment modes with zero amounts
+        if not closing_balance:
+            # Use opening balance modes with zero closing amounts
+            for mode, opening_amount in opening_balance_map.items():
+                expected_amount = sales_map.get(mode, 0)  # from SQL aggregation
+                difference = 0 - float(expected_amount)  # closing amount is 0
 
-            doc.append("payment_reconciliation", {
-                "mode_of_payment": mode,
-                "opening_amount": opening_amount,
-                "expected_amount": expected_amount,
-                "closing_amount": closing_amount,
-                "difference": difference
-            })
+                doc.append("payment_reconciliation", {
+                    "mode_of_payment": mode,
+                    "opening_amount": opening_amount,
+                    "expected_amount": expected_amount,
+                    "closing_amount": 0,
+                    "difference": difference
+                })
+        else:
+            # Use provided closing amounts
+            for mode, closing_amount in closing_balance.items():
+                opening_amount = opening_balance_map.get(mode, 0)
+                expected_amount = sales_map.get(mode, 0)  # from SQL aggregation
+                difference = float(closing_amount) - float(expected_amount)
+
+                doc.append("payment_reconciliation", {
+                    "mode_of_payment": mode,
+                    "opening_amount": opening_amount,
+                    "expected_amount": expected_amount,
+                    "closing_amount": closing_amount,
+                    "difference": difference
+                })
 
         # Append taxes
         for tax in tax_data:

@@ -18,21 +18,26 @@ export function useCreatePOSOpeningEntry(): UseCreateOpeningReturn {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const createOpeningEntry = async (openingBalance: OpeningBalance[]) => {
+  const createOpeningEntry = async (openingBalance: OpeningBalance[], posProfile?: string) => {
     setIsCreating(true);
     setError(null);
     setSuccess(false);
     const csrfToken = window.csrf_token;
 
-    console.log("Opening", openingBalance)
+    console.log("Opening", openingBalance, "POS Profile:", posProfile)
     try {
+      const requestBody: any = { opening_balance: openingBalance };
+      if (posProfile) {
+        requestBody.pos_profile = posProfile;
+      }
+
       const res = await fetch("/api/method/klik_pos.api.pos_entry.create_opening_entry", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           'X-Frappe-CSRF-Token': csrfToken
         },
-        body: JSON.stringify({ opening_balance: openingBalance }),
+        body: JSON.stringify(requestBody),
         credentials: "include"
       });
 
