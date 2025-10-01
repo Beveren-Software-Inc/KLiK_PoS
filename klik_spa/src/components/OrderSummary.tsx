@@ -780,7 +780,6 @@ export default function OrderSummary({
         // toast.success("Stock updated - ready for next order!");
       } else {
         console.log("OrderSummary: No stock updates needed");
-        toast.info("Stock is up to date");
       }
 
       // Also update batch quantities for items that were in the cart

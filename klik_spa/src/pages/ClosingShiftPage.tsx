@@ -6,7 +6,8 @@ import {
   Eye,
   MonitorX,
   X,
-  RotateCcw
+  RotateCcw,
+  AlertCircle
 } from "lucide-react";
 
 import InvoiceViewModal from "../components/InvoiceViewModal";
@@ -25,6 +26,7 @@ import { deleteDraftInvoice } from "../services/salesInvoice";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { formatCurrency } from "../utils/currency";
 import { isToday, isThisWeek, isThisMonth, isThisYear } from "../utils/time";
+import { clearCacheAndReload } from "../utils/clearCache";
 
 export default function ClosingShiftPage() {
   const navigate = useNavigate();
@@ -52,8 +54,13 @@ export default function ClosingShiftPage() {
   const [invoiceToDelete, setInvoiceToDelete] = useState<SalesInvoice | null>(null);
 
   const { invoices, isLoading, isLoadingMore, error, hasMore, totalLoaded, loadMore } = useSalesInvoices();
-  const { modes } = useAllPaymentModes()
+  const { modes, isLoading: modesLoading, error: modesError } = useAllPaymentModes()
   const { posDetails } = usePOSDetails();
+
+  // Debug: Log payment modes
+  console.log("Payment modes:", modes);
+  console.log("Modes loading:", modesLoading);
+  console.log("Modes error:", modesError);
 
   const hideExpectedAmount = posDetails?.custom_hide_expected_amount || false;
 
@@ -146,7 +153,17 @@ export default function ClosingShiftPage() {
       // Filter by POS opening entry - only show invoices for the current opening entry
       const matchesOpeningEntry = !posDetails?.current_opening_entry ||
         (invoice.custom_pos_opening_entry && invoice.custom_pos_opening_entry === posDetails.current_opening_entry);
-      // console.log({matchesPOSProfile, matchesOpeningEntry, invoice, posDetails});
+
+      // Debug logging to understand filtering
+      console.log('Invoice filtering debug:', {
+        invoiceId: invoice.id,
+        invoiceOpeningEntry: invoice.custom_pos_opening_entry,
+        posDetailsOpeningEntry: posDetails?.current_opening_entry,
+        matchesPOSProfile,
+        matchesOpeningEntry,
+        posDetails: posDetails
+      });
+
       return matchesSearch && matchesPayment && matchesStatus && matchesDate && matchesPOSProfile && matchesOpeningEntry;
     });
 
@@ -154,11 +171,16 @@ export default function ClosingShiftPage() {
 
   // Payment Stats Calculation - Calculate from filtered invoices
   const paymentStats = useMemo(() => {
+    if (!modes || modes.length === 0) {
+      console.log("No payment modes available");
+      return {};
+    }
+
     const stats = modes.reduce((acc, mode) => {
       acc[mode.name] = {
         name: mode.name,
         openingAmount: mode.openingAmount || 0,
-        amount: 0, 
+        amount: 0,
         transactions: 0
       };
       return acc;
@@ -177,30 +199,35 @@ export default function ClosingShiftPage() {
       }
     });
 
+    // Add opening amounts to the total amounts for each payment method
+    Object.keys(stats).forEach(methodName => {
+      stats[methodName].amount += stats[methodName].openingAmount;
+    });
+
     return stats;
   }, [modes, filteredInvoices]);
 
   const total = Object.values(paymentStats).reduce((sum, stat) => sum + stat.amount, 0);
 
   // Loading state
-  if (isLoading) {
+  if (isLoading || modesLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-beveren-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-300">Loading invoices...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-300">Loading invoices and payment modes...</p>
         </div>
       </div>
     );
   }
 
-  // Error state
+  // Error state - but allow closing shift even without opening entry
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-lg max-w-md">
-          <h3 className="text-lg font-medium text-red-800 dark:text-red-200">Error loading invoices</h3>
-          <p className="mt-2 text-sm text-red-700 dark:text-red-300">{error.message}</p>
+          <h3 className="text-lg font-medium text-red-800 dark:text-red-200">Error loading data</h3>
+          <p className="mt-2 text-sm text-red-700 dark:text-red-300">Invoices: {error.message}</p>
           <button
             onClick={() => window.location.reload()}
             className="mt-4 px-4 py-2 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-800"
@@ -211,6 +238,9 @@ export default function ClosingShiftPage() {
       </div>
     );
   }
+
+  // Show warning if no opening entry but allow proceeding
+  const hasNoOpeningEntry = modesError && modesError.includes("No open POS Opening Entry found");
 
   const handleViewInvoice = (invoice: SalesInvoice) => {
     navigate(`/invoice/${invoice.id}`);
@@ -312,7 +342,12 @@ export default function ClosingShiftPage() {
     try {
       await createClosingEntry(closingAmounts);
       setShowCloseModal(false);
-      navigate(`/`);
+
+      // Clear all cache when closing shift for a fresh start
+      console.log("Closing shift - clearing all cache for fresh session");
+
+      // Navigate to POS home page after successful closing
+      navigate('/pos');
     } catch (err) {
       console.error("Error closing shift:", err);
     }
@@ -340,8 +375,27 @@ export default function ClosingShiftPage() {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto pb-20 w-[98%] mx-auto px-2 py-4">
+          {/* Warning if no opening entry */}
+          {hasNoOpeningEntry && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-6">
+              <div className="flex items-center">
+                <div className="text-yellow-600 dark:text-yellow-400 mr-3">
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                    No Opening Entry Found
+                  </h3>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                    You can still close the shift, but payment summary will not be available.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Payment Summary - Only show if not hidden */}
-          {!hideExpectedAmount && (
+          {!hideExpectedAmount && !hasNoOpeningEntry && (
             <div className="grid grid-cols-1 gap-4 mb-6">
               {Object.values(paymentStats).map((stat) => (
                 <div key={stat.name} className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
@@ -648,8 +702,27 @@ export default function ClosingShiftPage() {
         </div>
 
         <div className="flex-1 px-6 py-8 mt-16 space-y-6">
+          {/* Warning if no opening entry */}
+          {hasNoOpeningEntry && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+              <div className="flex items-center">
+                <div className="text-yellow-600 dark:text-yellow-400 mr-3">
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                    No Opening Entry Found
+                  </h3>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                    You can still close the shift, but payment summary will not be available.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Payment Summary - Only show if not hidden */}
-          {!hideExpectedAmount && (
+          {!hideExpectedAmount && !hasNoOpeningEntry && (
             <>
               {/* Payment Method Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

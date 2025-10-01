@@ -25,7 +25,7 @@ export function useCreatePOSClosingEntry(): UseCreateClosingReturn {
     const csrfToken = window.csrf_token;
 
     try {
-      console.log('Creating closing entry with:', closingBalance);
+      // console.log('Creating closing entry with:', closingBalance);
 
       const res = await fetch("/api/method/klik_pos.api.pos_entry.create_closing_entry", {
         method: "POST",

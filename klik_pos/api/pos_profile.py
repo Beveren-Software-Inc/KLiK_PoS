@@ -40,12 +40,16 @@ def get_pos_profiles_for_user():
 
 @frappe.whitelist()
 def get_pos_details():
-    pos = get_current_pos_profile()
+    # Determine active POS Profile: prefer the one from the current open entry if any
+    current_opening_entry = get_current_pos_opening_entry()
+    if current_opening_entry:
+        opening_doc = frappe.get_doc("POS Opening Entry", current_opening_entry)
+        pos = frappe.get_doc("POS Profile", opening_doc.pos_profile)
+    else:
+        pos = get_current_pos_profile()
+
     business_type = pos.custom_business_type
     print_format = pos.custom_pos_printformat
-
-    # Get current POS opening entry
-    current_opening_entry = get_current_pos_opening_entry()
 
     # Get default customer details if set
     default_customer = None

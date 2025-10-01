@@ -126,8 +126,8 @@ const POSOpeningModal: React.FC<POSOpeningModalProps> = ({
         mode_of_payment: method.mode_of_payment,
         opening_amount: method.opening_amount || 0
       }));
-      console.log("Opening balance data:", openingBalance);
-      await createOpeningEntry(openingBalance);
+      console.log("Opening balance data:", openingBalance, "Selected profile:", selectedProfile);
+      await createOpeningEntry(openingBalance, selectedProfile);
 
     } catch (err: any) {
       console.error('Error creating opening entry:', err);
