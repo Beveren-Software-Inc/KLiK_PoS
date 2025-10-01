@@ -6,7 +6,6 @@ import {
   Eye,
   MonitorX,
   X,
-  Edit,
   RotateCcw
 } from "lucide-react";
 
@@ -159,8 +158,8 @@ export default function ClosingShiftPage() {
       acc[mode.name] = {
         name: mode.name,
         openingAmount: mode.openingAmount || 0,
-        amount: 0, // Will be calculated from filtered invoices
-        transactions: 0 // Will be calculated from filtered invoices
+        amount: 0, 
+        transactions: 0
       };
       return acc;
     }, {});
@@ -168,7 +167,12 @@ export default function ClosingShiftPage() {
     // Calculate amounts and transactions from filtered invoices
     filteredInvoices.forEach(invoice => {
       if (invoice.paymentMethod && stats[invoice.paymentMethod]) {
-        stats[invoice.paymentMethod].amount += invoice.totalAmount || 0;
+        // For return invoices, ensure the amount is subtracted (negative)
+        // Check if this is a return invoice by looking at the status
+        const isReturn = invoice.status === "Return";
+        const amount = isReturn ? -Math.abs(invoice.totalAmount || 0) : (invoice.totalAmount || 0);
+
+        stats[invoice.paymentMethod].amount += amount;
         stats[invoice.paymentMethod].transactions += 1;
       }
     });

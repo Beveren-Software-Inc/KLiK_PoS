@@ -277,20 +277,12 @@ def get_sales_invoices(limit=100, start=0, search=""):
 
             # Get payment method from payment child table
             payment_method = "-"  # Default for unpaid invoices
-            if invoice_doc.status == "Paid" and invoice_doc.payments:
-                # Get the first payment method from the payment child table
+            if invoice_doc.payments:
+                # Always get payment method from the payment child table if it exists
+                # This ensures original invoices with returns still show their payment method
                 payment_method = invoice_doc.payments[0].mode_of_payment
-            elif invoice_doc.status in ["Unpaid", "Overdue", "Partly Paid"]:
-                # Check if there are any payments in the child table
-                if invoice_doc.payments:
-                    payment_method = invoice_doc.payments[0].mode_of_payment
-                else:
-                    payment_method = "-"
             elif invoice_doc.status == "Draft":
                 payment_method = "-"
-            elif invoice_doc.is_return and invoice_doc.payments:
-                # For return invoices, get payment method from the payment child table
-                payment_method = invoice_doc.payments[0].mode_of_payment
 
             inv["mode_of_payment"] = payment_method
 
@@ -1252,15 +1244,10 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None, s
             # Get payment method from payment child table
             invoice_doc = frappe.get_doc("Sales Invoice", invoice.name)
             payment_method = "-"  # Default for unpaid invoices
-            if invoice_doc.status == "Paid" and invoice_doc.payments:
-                # Get the first payment method from the payment child table
+            if invoice_doc.payments:
+                # Always get payment method from the payment child table if it exists
+                # This ensures original invoices with returns still show their payment method
                 payment_method = invoice_doc.payments[0].mode_of_payment
-            elif invoice_doc.status in ["Unpaid", "Overdue", "Partly Paid"]:
-                # Check if there are any payments in the child table
-                if invoice_doc.payments:
-                    payment_method = invoice_doc.payments[0].mode_of_payment
-                else:
-                    payment_method = "-"
             elif invoice_doc.status == "Draft":
                 payment_method = "-"
 
