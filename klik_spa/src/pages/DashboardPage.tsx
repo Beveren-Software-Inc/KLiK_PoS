@@ -891,10 +891,10 @@ export default function DashboardPage() {
                 <RefreshCw className="w-4 h-4" />
                 <span className="hidden sm:inline">Refresh</span>
               </button> */}
-              <button className="hidden sm:flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-orange-700 transition-colors">
+              {/* <button className="hidden sm:flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-orange-700 transition-colors">
                 <Download className="w-4 h-4" />
                 <span>Export</span>
-              </button>
+              </button> */}
             </div>
           </div>
         </div>

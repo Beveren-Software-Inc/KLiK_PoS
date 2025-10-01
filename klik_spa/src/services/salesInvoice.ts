@@ -1,4 +1,6 @@
 
+import { extractErrorMessage } from "../utils/errorExtraction";
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function createDraftSalesInvoice(data: any) {
 const csrfToken = window.csrf_token;
@@ -13,13 +15,11 @@ const csrfToken = window.csrf_token;
   });
 
   const result = await response.json();
-  console.log("Invoice create result:", result);
+  // console.log("Invoice create result:", result);
 
   if (!response.ok || !result.message || result.message.success === false) {
-    const serverMsg = result._server_messages
-      ? JSON.parse(result._server_messages)[0]
-      : 'Failed to create invoice';
-    throw new Error(serverMsg);
+    const errorMessage = extractErrorMessage(result, 'Failed to create invoice');
+    throw new Error(errorMessage);
   }
 
   return result.message;
@@ -31,7 +31,7 @@ export async function createSalesInvoice(data: any) {
 
   // Add performance timing
   const startTime = performance.now();
-  console.log('Starting invoice creation...');
+  // console.log('Starting invoice creation...');
 
   const response = await fetch('/api/method/klik_pos.api.sales_invoice.create_and_submit_invoice', {
     method: 'POST',
@@ -51,10 +51,8 @@ export async function createSalesInvoice(data: any) {
   console.log("Invoice create result:", result);
 
   if (!response.ok || !result.message || result.message.success === false) {
-    const serverMsg = result._server_messages
-      ? JSON.parse(result._server_messages)[0]
-      : 'Failed to create invoice';
-    throw new Error(serverMsg);
+    const errorMessage = extractErrorMessage(result, 'Failed to create invoice');
+    throw new Error(errorMessage);
   }
 
   return result.message;
@@ -88,7 +86,7 @@ export async function createSalesReturn(invoiceName: string) {
 
 export async function getInvoiceDetails(invoiceName: string) {
   try {
-    console.log('Fetching invoice details for:', invoiceName);
+    // console.log('Fetching invoice details for:', invoiceName);
     const response = await fetch(`/api/method/klik_pos.api.sales_invoice.get_invoice_details?invoice_id=${invoiceName}`, {
       method: 'GET',
       headers: {
@@ -98,7 +96,7 @@ export async function getInvoiceDetails(invoiceName: string) {
     });
 
     const data = await response.json();
-    console.log('Invoice details response:', data);
+    // console.log('Invoice details response:', data);
 
     if (!response.ok) {
       throw new Error(data.message || 'Failed to get invoice details');
@@ -131,7 +129,7 @@ export async function deleteDraftInvoice(invoiceId: string) {
   });
 
   const result = await response.json();
-  console.log("Delete invoice result:", result);
+  // console.log("Delete invoice result:", result);
 
   if (!response.ok || !result.message || result.message.success === false) {
     const serverMsg = result._server_messages
@@ -153,13 +151,11 @@ export async function getDraftInvoiceItems(invoiceId: string) {
   });
 
   const result = await response.json();
-  console.log("Draft invoice items result:", result);
+  // console.log("Draft invoice items result:", result);
 
   if (!response.ok || !result.message) {
-    const serverMsg = result._server_messages
-      ? JSON.parse(result._server_messages)[0]
-      : result.message?.error || 'Failed to fetch draft invoice items';
-    throw new Error(serverMsg);
+    const errorMessage = extractErrorMessage(result, result.message?.error || 'Failed to fetch draft invoice items');
+    throw new Error(errorMessage);
   }
 
   // The backend returns { success: true, data: { ... } }
@@ -188,10 +184,8 @@ export async function submitDraftInvoice(invoiceId: string) {
   console.log("Submit draft invoice result:", result);
 
   if (!response.ok || !result.message || result.message.success === false) {
-    const serverMsg = result._server_messages
-      ? JSON.parse(result._server_messages)[0]
-      : result.message?.error || 'Failed to submit draft invoice';
-    throw new Error(serverMsg);
+    const errorMessage = extractErrorMessage(result, result.message?.error || 'Failed to submit draft invoice');
+    throw new Error(errorMessage);
   }
 
   return result.message;

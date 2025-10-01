@@ -49,7 +49,7 @@ export function ProductProvider({ children }: ProductProviderProps) {
 
         if (now < expiryTime) {
           const products = JSON.parse(cachedData);
-          console.log(`Loaded ${products.length} products from cache`);
+          // console.log(`Loaded ${products.length} products from cache`);
           return products;
         } else {
           console.log('Product cache expired, clearing...');
@@ -121,7 +121,7 @@ export function ProductProvider({ children }: ProductProviderProps) {
       console.error('Error fetching stock updates:', error);
 
       // Fallback: Use batch API for all current products
-      console.log("Falling back to batch stock API...");
+      // console.log("Falling back to batch stock API...");
       try {
         const itemCodes = products.map(p => p.id).join(',');
         if (itemCodes) {
@@ -221,7 +221,7 @@ export function ProductProvider({ children }: ProductProviderProps) {
     if (itemCodes.length === 0) return;
 
     try {
-      console.log(`Updating stock for ${itemCodes.length} items:`, itemCodes);
+      // console.log(`Updating stock for ${itemCodes.length} items:`, itemCodes);
 
       // Create comma-separated string for the API
       const itemCodesString = itemCodes.join(',');
@@ -235,7 +235,7 @@ export function ProductProvider({ children }: ProductProviderProps) {
       }
 
       const resData = await response.json();
-      console.log('Batch stock update response:', resData);
+      // console.log('Batch stock update response:', resData);
 
       if (resData?.message && typeof resData.message === 'object') {
         const stockUpdates = resData.message;
@@ -247,7 +247,7 @@ export function ProductProvider({ children }: ProductProviderProps) {
           }))
         );
 
-        console.log(`Updated stock for ${Object.keys(stockUpdates).length} items`);
+        // console.log(`Updated stock for ${Object.keys(stockUpdates).length} items`);
       }
     } catch (error) {
       console.error('Failed to update stock for items:', error);
@@ -260,7 +260,7 @@ export function ProductProvider({ children }: ProductProviderProps) {
     if (itemCodes.length === 0) return;
 
     try {
-      console.log(`Updating batch quantities for ${itemCodes.length} items:`, itemCodes);
+      // console.log(`Updating batch quantities for ${itemCodes.length} items:`, itemCodes);
 
       // Update batch quantities for each item individually
       const batchUpdatePromises = itemCodes.map(async (itemCode) => {
@@ -269,10 +269,10 @@ export function ProductProvider({ children }: ProductProviderProps) {
             `/api/method/klik_pos.api.item.get_batch_nos_with_qty?item_code=${encodeURIComponent(itemCode)}`
           );
           const resData = await response.json();
-          console.log(`Batch API response for ${itemCode}:`, resData);
+          // console.log(`Batch API response for ${itemCode}:`, resData);
 
           if (resData?.message && Array.isArray(resData.message)) {
-            console.log(`Valid batch data for ${itemCode}:`, resData.message);
+            // console.log(`Valid batch data for ${itemCode}:`, resData.message);
             return { itemCode, batches: resData.message };
           }
           console.log(`No valid batch data for ${itemCode}`);
@@ -287,8 +287,8 @@ export function ProductProvider({ children }: ProductProviderProps) {
       const validResults = batchResults.filter(result => result !== null);
 
       if (validResults.length > 0) {
-        console.log(`Updated batch quantities for ${validResults.length} items`);
-        console.log('Dispatching batchQuantitiesUpdated event with data:', validResults);
+        // console.log(`Updated batch quantities for ${validResults.length} items`);
+        // console.log('Dispatching batchQuantitiesUpdated event with data:', validResults);
         // Trigger a custom event to notify components about batch updates
         window.dispatchEvent(new CustomEvent('batchQuantitiesUpdated', {
           detail: { updatedItems: validResults }
@@ -303,13 +303,13 @@ export function ProductProvider({ children }: ProductProviderProps) {
   }, []);
 
   const refetchProducts = async () => {
-    console.log("Force refreshing products...");
+    // console.log("Force refreshing products...");
     await fetchProducts(true);
   };
 
   // Lightweight stock-only refresh - much faster than full reload
   const refreshStockOnly = async () => {
-    console.log("Refreshing stock only (lightweight)...");
+    // console.log("Refreshing stock only (lightweight)...");
     setIsRefreshingStock(true);
     try {
       const stockUpdates = await fetchStockUpdates();
@@ -320,7 +320,7 @@ export function ProductProvider({ children }: ProductProviderProps) {
             available: stockUpdates[product.id] ?? product.available
           }))
         );
-        console.log(`✅ Stock refreshed for ${Object.keys(stockUpdates).length} items - cashier can see updated availability`);
+        // console.log(`✅ Stock refreshed for ${Object.keys(stockUpdates).length} items - cashier can see updated availability`);
         setLastUpdated(new Date());
         return true; // Success
       }

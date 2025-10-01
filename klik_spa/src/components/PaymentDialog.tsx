@@ -2,6 +2,16 @@
 
 import { useState, useEffect, useMemo } from "react";
 import {
+  addCurrency,
+  subtractCurrency,
+  calculateRemainingAmount,
+  calculateTotalPayments,
+  roundCurrency,
+  formatCurrencyAmount
+} from "../utils/currencyMath";
+import { getUserFriendlyError } from "../utils/errorMessages";
+import { extractErrorFromException } from "../utils/errorExtraction";
+import {
   X,
   CreditCard,
   Banknote,
@@ -27,7 +37,7 @@ import { createSalesInvoice } from "../services/salesInvoice";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { DisplayPrintPreview, handlePrintInvoice } from "../utils/invoicePrint";
-import { sendEmails, sendWhatsAppMessage } from "../services/useSharing";
+import { sendEmails, sendWhatsAppMessage, sendSMSMessage } from "../services/useSharing";
 import { clearDraftInvoiceCache, getOriginalDraftInvoiceId } from "../utils/draftInvoiceCache";
 import { deleteDraftInvoice } from "../services/salesInvoice";
 import {
@@ -429,16 +439,9 @@ export default function PaymentDialog({
     roundOffAmount,
   ]);
 
-  // Calculate total paid amount from all payment methods (only for B2C)
   // Calculate total paid amount from all payment methods (for both B2C and B2B)
-  const totalPaidAmount = Object.values(paymentAmounts).reduce(
-    (sum, amount) => sum + (amount || 0),
-    0
-  );
-  const outstandingAmount = Math.max(
-    0,
-    calculations.grandTotal - totalPaidAmount
-  );
+  const totalPaidAmount = calculateTotalPayments(Object.values(paymentAmounts));
+  const outstandingAmount = calculateRemainingAmount(calculations.grandTotal, Object.values(paymentAmounts));
 
   useEffect(() => {
     if (isOpen && defaultTax && !selectedSalesTaxCharges) {
@@ -460,12 +463,12 @@ export default function PaymentDialog({
     if (modes.length > 0 && Object.keys(paymentAmounts).length > 0) {
       const defaultMode = modes.find((mode) => mode.default === 1);
       if (defaultMode) {
-        const otherPaymentsTotal = Object.entries(paymentAmounts)
+        const otherPayments = Object.entries(paymentAmounts)
           .filter(([key]) => key !== defaultMode.mode_of_payment)
-          .reduce((sum, [, amount]) => sum + (amount || 0), 0);
+          .map(([, amount]) => amount || 0);
 
         const remainingAmount = isB2C
-          ? Math.max(0, calculations.grandTotal - otherPaymentsTotal)
+          ? calculateRemainingAmount(calculations.grandTotal, otherPayments)
           : 0;
 
         setPaymentAmounts((prev) => ({
@@ -515,7 +518,7 @@ export default function PaymentDialog({
   const handlePaymentAmountChange = (methodId: string, amount: string) => {
     if (invoiceSubmitted || isProcessingPayment) return;
 
-    const numericAmount = parseFloat(amount) || 0;
+    const numericAmount = roundCurrency(parseFloat(amount) || 0);
     setPaymentAmounts((prev) => ({
       ...prev,
       [methodId]: numericAmount,
@@ -546,7 +549,7 @@ export default function PaymentDialog({
 
     const grandTotal = calculations.grandTotal;
     const currentAmount = paymentAmounts[methodId] || 0;
-    const remainingAmount = grandTotal - currentAmount;
+    const remainingAmount = subtractCurrency(grandTotal, currentAmount);
 
     if (remainingAmount <= 0) return;
 
@@ -560,7 +563,7 @@ export default function PaymentDialog({
       const targetMethod = otherMethods[0];
       setPaymentAmounts((prev) => ({
         ...prev,
-        [targetMethod.id]: remainingAmount,
+        [targetMethod.id]: roundCurrency(remainingAmount),
       }));
     }
   };
@@ -569,16 +572,17 @@ export default function PaymentDialog({
   const handleManualAmountChange = (methodId: string, amount: string) => {
     if (invoiceSubmitted || isProcessingPayment) return;
 
-    const numericAmount = parseFloat(amount) || 0;
+    const numericAmount = roundCurrency(parseFloat(amount) || 0);
     const grandTotal = calculations.grandTotal;
 
     // Calculate total of all other payment methods
-    const otherMethodsTotal = Object.entries(paymentAmounts)
+    const otherPayments = Object.entries(paymentAmounts)
       .filter(([id]) => id !== methodId)
-      .reduce((sum, [, amount]) => sum + amount, 0);
+      .map(([, amount]) => amount || 0);
+    const otherMethodsTotal = calculateTotalPayments(otherPayments);
 
     // Calculate remaining amount for other methods
-    const remainingAmount = grandTotal - numericAmount;
+    const remainingAmount = subtractCurrency(grandTotal, numericAmount);
 
     // If remaining amount is positive, distribute it to other methods
     if (remainingAmount > 0) {
@@ -589,7 +593,7 @@ export default function PaymentDialog({
         setPaymentAmounts((prev) => ({
           ...prev,
           [methodId]: numericAmount,
-          [targetMethod.id]: remainingAmount,
+          [targetMethod.id]: roundCurrency(remainingAmount),
         }));
         return;
       }
@@ -646,9 +650,17 @@ export default function PaymentDialog({
   };
 
   const handleRoundOffChange = (value: string) => {
-    setRoundOffInput(value);
+    // Ensure the value always starts with - for manual entry
+    let processedValue = value;
 
-    const parsed = parseFloat(value);
+    // If user enters a positive number, make it negative
+    if (value && !value.startsWith('-') && !isNaN(parseFloat(value))) {
+      processedValue = '-' + value;
+    }
+
+    setRoundOffInput(processedValue);
+
+    const parsed = parseFloat(processedValue);
     if (!isNaN(parsed)) {
       setRoundOffAmount(parsed);
 
@@ -780,10 +792,12 @@ export default function PaymentDialog({
       clearDraftInvoiceCache();
 
       // Don't clear cart immediately - let modal stay open for invoice preview
-    } catch (err) {
-      const errorMessage = isB2B
+    } catch (err: any) {
+      const defaultMessage = isB2B
         ? "Failed to submit invoice"
         : "Failed to process payment";
+
+      const errorMessage = extractErrorFromException(err, defaultMessage);
       toast.error(errorMessage);
     } finally {
       setIsProcessingPayment(false);
@@ -825,8 +839,9 @@ export default function PaymentDialog({
       clearDraftInvoiceCache();
 
       onHoldOrder(orderData);
-    } catch (err) {
-      toast.error("Failed to hold order");
+    } catch (err: any) {
+      const errorMessage = extractErrorFromException(err, "Failed to hold order");
+      toast.error(errorMessage);
     } finally {
       setIsHoldingOrder(false);
     }
@@ -1097,6 +1112,7 @@ export default function PaymentDialog({
                           value={roundOffInput}
                           onChange={(e) => handleRoundOffChange(e.target.value)}
                           disabled={invoiceSubmitted || isProcessingPayment}
+                          placeholder="-0.00"
                           className={`flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
                             invoiceSubmitted || isProcessingPayment
                               ? "cursor-not-allowed opacity-50"
@@ -1201,7 +1217,7 @@ export default function PaymentDialog({
                           </span>
                           <span className="font-medium text-beveren-600 dark:text-beveren-400">
                             {formatCurrency(
-                              totalPaidAmount - calculations.grandTotal
+                              subtractCurrency(totalPaidAmount, calculations.grandTotal)
                             )}
                           </span>
                         </div>
@@ -1514,7 +1530,8 @@ export default function PaymentDialog({
                           toast.success("Email sent successfully!");
                           setSharingMode(null);
                         } catch (error: any) {
-                          toast.error("Failed to send email: " + error.message);
+                          const userFriendlyError = getUserFriendlyError(error.message, 'email');
+                          toast.error(userFriendlyError);
                         } finally {
                           setIsSendingEmail(false);
                         }
@@ -1647,9 +1664,8 @@ export default function PaymentDialog({
                           toast.success("Whatsap message sent successfully!");
                           setSharingMode(null);
                         } catch (error: any) {
-                          toast.error(
-                            "Failed to send whatsap message: " + error.message
-                          );
+                          const userFriendlyError = getUserFriendlyError(error.message, 'whatsapp');
+                          toast.error(userFriendlyError);
                         } finally {
                           setIsSendingWhatsapp(false);
                         }
@@ -1719,16 +1735,19 @@ export default function PaymentDialog({
                       </div>
                     </div>
                     <button
-                      onClick={() => {
-                        const msg = encodeURIComponent(
-                          `Hi ${
-                            sharingData.name || "Customer"
-                          }!\nThank you for your purchase at KLiK PoS.\nInvoice Total: ${formatCurrency(
-                            calculations.grandTotal
-                          )}\nThank you!`
-                        );
-                        window.open(`sms:${sharingData.phone}?body=${msg}`);
-                        setSharingMode(null);
+                      onClick={async () => {
+                        try {
+                          await sendSMSMessage({
+                            mobile_no: sharingData.phone,
+                            customer_name: sharingData.name,
+                            message: `Thank you for your purchase at KLiK PoS.\nInvoice Total: ${formatCurrency(calculations.grandTotal)}\nThank you!`
+                          });
+                          toast.success("SMS sent successfully!");
+                          setSharingMode(null);
+                        } catch (error: any) {
+                          const userFriendlyError = getUserFriendlyError(error.message, 'sms');
+                          toast.error(userFriendlyError);
+                        }
                       }}
                       disabled={!sharingData.phone}
                       className="w-full py-3 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
@@ -1895,6 +1914,7 @@ export default function PaymentDialog({
                               handleRoundOffChange(e.target.value)
                             }
                             disabled={invoiceSubmitted || isProcessingPayment}
+                            placeholder="-0.00"
                             className={`flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
                               invoiceSubmitted || isProcessingPayment
                                 ? "cursor-not-allowed opacity-50"
@@ -2003,7 +2023,7 @@ export default function PaymentDialog({
                               </span>
                               <span className="font-bold text-green-600 dark:text-green-400">
                                 {formatCurrency(
-                                  totalPaidAmount - calculations.grandTotal
+                                  subtractCurrency(totalPaidAmount, calculations.grandTotal)
                                 )}
                               </span>
                             </div>

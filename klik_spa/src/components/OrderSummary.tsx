@@ -19,6 +19,7 @@ import { createDraftSalesInvoice } from "../services/salesInvoice";
 import { useCustomers } from "../hooks/useCustomers";
 import { useProducts } from "../hooks/useProducts";
 import { toast } from "react-toastify";
+import { extractErrorFromException } from "../utils/errorExtraction";
 import { getBatches } from "../utils/batch";
 import { getSerials } from "../utils/serial";
 import { useNavigate } from "react-router-dom";
@@ -765,7 +766,7 @@ export default function OrderSummary({
 
     // Only clear cart if payment was completed
     if (paymentCompleted) {
-      console.log("OrderSummary: Payment was completed - clearing cart for next order");
+      // console.log("OrderSummary: Payment was completed - clearing cart for next order");
       handleClearCart();
     } else {
       console.log("OrderSummary: Payment was not completed - keeping cart items");
@@ -819,11 +820,10 @@ export default function OrderSummary({
       } else {
         toast.error("Failed to create draft invoice");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating draft invoice:", error);
-      toast.error(
-        "Failed to create draft invoice: " + (error as Error).message
-      );
+      const errorMessage = extractErrorFromException(error, "Failed to create draft invoice");
+      toast.error(errorMessage);
     }
   };
 
