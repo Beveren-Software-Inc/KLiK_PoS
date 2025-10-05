@@ -60,42 +60,59 @@ export default function RetailPOSLayout() {
   const parseScaleBarcode = useCallback((raw: string) => {
     if (!scalePrefix || !raw.startsWith(scalePrefix)) return { isScale: false as const }
 
-    //Mania: First 7 chars represent the item code/barcode identifier (as per posawesome): Note I din't like the approach because it looks hardcoded
-    const base = raw.substring(0, 7)
-    // Accept 1-5 trailing digits while typing;
-    const qtyBlock = raw.substring(7)
-    if (!/^\d{1,5}$/.test(qtyBlock)) {
+    // Expect EAN-13 style: [7 digits item][5 digits weight][1 digit check]
+    // Example: 9900001 00760 6
+    if (!/^\d{12,13}$/.test(raw)) {
       return { isScale: false as const }
     }
 
-    // Convert qtyBlock to decimal mimicking posawesome rules
-    // 00089 -> 0.89, 00900 -> 0.900, 01234 -> 1.234, 12345 -> 12.345
-    let qtyStr = ""
-    if (qtyBlock.startsWith("0000")) {
-      qtyStr = "0.00" + qtyBlock.substring(4)
-    } else if (qtyBlock.startsWith("000")) {
-      qtyStr = "0.0" + qtyBlock.substring(3)
-    } else if (qtyBlock.startsWith("00")) {
-      qtyStr = "0." + qtyBlock.substring(2)
-    } else if (qtyBlock.startsWith("0")) {
-      qtyStr = qtyBlock.substring(1, 2) + "." + qtyBlock.substring(2)
-    } else {
-      qtyStr = qtyBlock.substring(0, 2) + "." + qtyBlock.substring(2)
+    const base = raw.substring(0, 7)
+    // If 13 digits: last is check digit; if 12 while typing, skip validation
+    const hasCheck = raw.length >= 13
+    const body12 = raw.substring(0, 12)
+    const check = hasCheck ? raw.substring(12, 13) : null
+
+    // Extract 5-digit weight block (positions 7..11)
+    const qtyBlock = body12.substring(7, 12)
+    if (!/^\d{5}$/.test(qtyBlock)) {
+      return { isScale: false as const }
     }
 
-    const qty = parseFloat(qtyStr)
+    // Optional check-digit validation (EAN-13 mod10)
+    if (hasCheck) {
+      const computeEAN13 = (digits12: string): string => {
+        let sum = 0
+        for (let i = 0; i < 12; i++) {
+          const n = parseInt(digits12.charAt(i), 10)
+          sum += (i % 2 === 0) ? n : n * 3
+        }
+        const mod = sum % 10
+        return mod === 0 ? '0' : String(10 - mod)
+      }
+      const expected = computeEAN13(body12)
+      if (expected !== check) {
+        console.warn('[ScaleDebug] invalid check digit', { raw, expected, check })
+        // Continue parsing but flag could be added if needed
+      }
+    }
+
+    // Convert qtyBlock to decimal, e.g., 00760 -> 7.60 (two decimals)
+    // Fallback rule compatible with earlier behavior when not using explicit decimal places
+    // If you later add POS setting for decimals, apply it here.
+    const qtyNum = parseInt(qtyBlock, 10)
+    const qty = qtyNum / 100
     if (Number.isNaN(qty) || qty <= 0) return { isScale: false as const }
 
     return { isScale: true as const, baseBarcode: base, quantity: qty }
   }, [scalePrefix])
 
-  const addOrIncreaseWithQuantity = useCallback((item: MenuItem, quantity: number) => {
+  const addOrIncreaseWithQuantity = useCallback(async (item: MenuItem, quantity: number) => {
     const existingItem = cartItems.find((cartItem) => cartItem.id === item.id)
     if (existingItem) {
       updateQuantity(item.id, existingItem.quantity + quantity)
     } else {
-      // Add directly to cart with base quantity 0, then set exact quantity
-      addToCart({
+      // Add to cart first (async), then set exact quantity to avoid initial qty=1
+      await addToCart({
         id: item.id,
         name: item.name,
         category: item.category,
@@ -204,7 +221,7 @@ export default function RetailPOSLayout() {
   }
 
   // Handle Enter key for barcode processing
-  const handleSearchKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleSearchKeyPress = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && searchQuery.trim()) {
       e.preventDefault()
 
@@ -218,19 +235,32 @@ export default function RetailPOSLayout() {
           const item = menuItems.find(mi => mi.id === base || (mi.barcode && mi.barcode === base))
           if (item) {
             console.log('[ScaleDebug] enter scale add:', { base, qty, itemId: item.id })
-            addOrIncreaseWithQuantity(item, qty)
+            await addOrIncreaseWithQuantity(item, qty)
             setSearchQuery('')
             setPinnedItemId(null)
             return
           }
 
-          // Fallback: process via barcode flow with base identifier
-          console.log('[ScaleDebug] enter scale fallback via handleBarcodeDetected:', { base, qty })
-          handleBarcodeDetected(base)
-          const fallbackItem = menuItems.find(mi => mi.id === base)
-          if (fallbackItem) {
-            console.log('[ScaleDebug] enter scale fallback update qty:', { fallbackId: fallbackItem.id, qty })
-            addOrIncreaseWithQuantity(fallbackItem, qty)
+          // Fallback: resolve item by identifier via API, then add with correct qty
+          try {
+            const res = await fetch(`/api/method/klik_pos.api.item.get_item_by_identifier?code=${encodeURIComponent(base)}`)
+            const data = await res.json()
+            if (data?.message?.item_code) {
+              const fetched: MenuItem = {
+                id: data.message.item_code,
+                name: data.message.item_name || data.message.item_code,
+                category: data.message.item_group || 'General',
+                price: data.message.price || 0,
+                available: data.message.available || 0,
+                image: data.message.image,
+                sold: 0,
+                uom: data.message.stock_uom,
+              }
+              console.log('[ScaleDebug] enter scale API add:', { base, qty, itemId: fetched.id })
+              await addOrIncreaseWithQuantity(fetched, qty)
+            }
+          } catch {
+            // ignore
           }
           setSearchQuery('')
           setPinnedItemId(null)
