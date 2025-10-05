@@ -121,39 +121,46 @@ const UOMSelectField = ({ item, onUOMChange, isMobile }: UOMSelectFieldProps) =>
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
 
   useEffect(() => {
-    const loadUOMs = async () => {
+    const loadItemSpecificUOMs = async () => {
       try {
-        const response = await fetch(`/api/method/frappe.client.get_list`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            doctype: "UOM",
-            fields: ["name"],
-            filters: {},
-            limit_page_length: 500
-          })
-        });
+        // Use item_code if available, otherwise fallback to item.id
+        const itemCode = item.item_code || item.id;
+        if (itemCode) {
+          console.log(`📡 Loading UOMs for item: ${itemCode}`);
+          const response = await fetch(`/api/method/klik_pos.api.item.get_item_uoms_and_prices?item_code=${itemCode}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include'
+          });
 
-        if (!response.ok) throw new Error('Failed to fetch UOMs');
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`📦 UOM API Response:`, data.message);
 
-        const data = await response.json();
-        if (data?.message) {
-          const uoms = data.message.map((uom: any) => uom.name).sort();
-          setAvailableUOMs(uoms);
+            if (data?.message?.uoms) {
+              const uoms = data.message.uoms.map((uom: any) => uom.uom);
+              setAvailableUOMs(uoms);
+              console.log(`✅ Loaded ${uoms.length} UOMs for ${itemCode}:`, uoms);
+            } else {
+              console.log(`❌ No UOMs data in API response`);
+              setAvailableUOMs(['Nos']); // Fallback to base UOM
+            }
+          } else {
+            console.log(`❌ UOM API call failed:`, response.status, response.statusText);
+            setAvailableUOMs(['Nos']); // Fallback to base UOM
+          }
         } else {
-          // Fallback to basic UOMs
-          setAvailableUOMs(['Nos', 'Box', 'Kilogram', 'Liter', 'Meter', 'Dozen']);
+          console.log(`❌ No item_code or id found for item:`, item);
+          setAvailableUOMs(['Nos']); // Fallback to base UOM
         }
       } catch (error) {
-        console.error('Error loading UOMs:', error);
-        // Fallback to basic UOMs
-        setAvailableUOMs(['Nos', 'Box', 'Kilogram', 'Liter', 'Meter', 'Dozen']);
+        console.error('❌ Error loading item-specific UOMs:', error);
+        setAvailableUOMs(['Nos']); // Fallback to base UOM
       }
     };
 
-    loadUOMs();
-  }, []);
+    loadItemSpecificUOMs();
+  }, [item.id, item.item_code]);
 
   // Sync local state with item UOM changes
   useEffect(() => {

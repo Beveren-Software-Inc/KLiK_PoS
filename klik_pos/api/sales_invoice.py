@@ -157,7 +157,6 @@ def get_sales_invoices(limit=100, start=0, search=""):
             # For comprehensive search, we'll use SQL with OR conditions
             # This will be handled in the query below
 
-        # ✅ Dynamically check if field exists
         sales_invoice_meta = frappe.get_meta("Sales Invoice")
         has_zatca_status = any(df.fieldname == "custom_zatca_submit_status" for df in sales_invoice_meta.fields)
 

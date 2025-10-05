@@ -579,18 +579,9 @@ def get_item_uoms_and_prices(item_code):
         return {}
 
     try:
-        # Get item document to check base UOM and conversion rates
         item_doc = frappe.get_doc("Item", item_code)
 
-        # Get all UOMs for this item from Item UOM child table
         uom_data = []
-
-        # Add base UOM
-        uom_data.append({
-            "uom": item_doc.stock_uom,
-            "conversion_factor": 1.0,
-            "price": 0.0
-        })
 
         # Add additional UOMs from Item UOM child table
         for uom_row in item_doc.get("uoms", []):
@@ -627,15 +618,13 @@ def get_item_uoms_and_prices(item_code):
                 )
 
                 if base_price:
-                    # Convert price based on UOM conversion factor
                     converted_price = float(base_price) * uom_info["conversion_factor"]
                     uom_info["price"] = converted_price
                 else:
-                    # Use valuation rate if no price list rate found
                     valuation_rate = frappe.db.get_value("Item", item_code, "valuation_rate") or 0
                     converted_price = float(valuation_rate) * uom_info["conversion_factor"]
                     uom_info["price"] = converted_price
-
+        # print("UOM DARTA", uom_data)
         return {
             "base_uom": item_doc.stock_uom,
             "uoms": uom_data
