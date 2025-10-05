@@ -112,48 +112,57 @@ interface UOMSelectFieldProps {
   item: CartItem;
   onUOMChange: (itemId: string, selectedUOM: string, newPrice: number) => void;
   isMobile?: boolean;
+  selectedCustomer?: Customer | null;
 }
 
-const UOMSelectField = ({ item, onUOMChange, isMobile }: UOMSelectFieldProps) => {
+const UOMSelectField = ({ item, onUOMChange, isMobile, selectedCustomer }: UOMSelectFieldProps) => {
   const [availableUOMs, setAvailableUOMs] = useState<string[]>(['Nos']); // Start with Nos as default
   const [selectedUOM, setSelectedUOM] = useState<string>(item.uom || 'Nos'); //Mania: Local state for selected UOM
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
 
   useEffect(() => {
-    const loadUOMs = async () => {
+    const loadItemSpecificUOMs = async () => {
       try {
-        const response = await fetch(`/api/method/frappe.client.get_list`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            doctype: "UOM",
-            fields: ["name"],
-            filters: {},
-            limit_page_length: 500
-          })
-        });
+        // Use item_code if available, otherwise fallback to item.id
+        const itemCode = item.item_code || item.id;
+        if (itemCode) {
+          console.log(`📡 Loading UOMs for item: ${itemCode} with customer: ${selectedCustomer?.id || 'None'}`);
+          const customerParam = selectedCustomer?.id ? `&customer=${selectedCustomer.id}` : '';
+          const response = await fetch(`/api/method/klik_pos.api.item.get_item_uoms_and_prices?item_code=${itemCode}${customerParam}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include'
+          });
 
-        if (!response.ok) throw new Error('Failed to fetch UOMs');
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`📦 UOM API Response:`, data.message);
 
-        const data = await response.json();
-        if (data?.message) {
-          const uoms = data.message.map((uom: any) => uom.name).sort();
-          setAvailableUOMs(uoms);
+            if (data?.message?.uoms) {
+              const uoms = data.message.uoms.map((uom: any) => uom.uom);
+              setAvailableUOMs(uoms);
+              console.log(`✅ Loaded ${uoms.length} UOMs for ${itemCode}:`, uoms);
+            } else {
+              console.log(`❌ No UOMs data in API response`);
+              setAvailableUOMs(['Nos']); // Fallback to base UOM
+            }
+          } else {
+            console.log(`❌ UOM API call failed:`, response.status, response.statusText);
+            setAvailableUOMs(['Nos']); // Fallback to base UOM
+          }
         } else {
-          // Fallback to basic UOMs
-          setAvailableUOMs(['Nos', 'Box', 'Kilogram', 'Liter', 'Meter', 'Dozen']);
+          console.log(`❌ No item_code or id found for item:`, item);
+          setAvailableUOMs(['Nos']); // Fallback to base UOM
         }
       } catch (error) {
-        console.error('Error loading UOMs:', error);
-        // Fallback to basic UOMs
-        setAvailableUOMs(['Nos', 'Box', 'Kilogram', 'Liter', 'Meter', 'Dozen']);
+        console.error('❌ Error loading item-specific UOMs:', error);
+        setAvailableUOMs(['Nos']); // Fallback to base UOM
       }
     };
 
-    loadUOMs();
-  }, []);
+    loadItemSpecificUOMs();
+  }, [item.id, item.item_code, selectedCustomer?.id]);
 
   // Sync local state with item UOM changes
   useEffect(() => {
@@ -178,8 +187,9 @@ const UOMSelectField = ({ item, onUOMChange, isMobile }: UOMSelectFieldProps) =>
       // Use item_code if available, otherwise fallback to item.id
       const itemCode = item.item_code || item.id;
       if (itemCode) {
-        console.log(`📡 API Call: get_item_uoms_and_prices for ${itemCode}`);
-        const response = await fetch(`/api/method/klik_pos.api.item.get_item_uoms_and_prices?item_code=${itemCode}`, {
+        console.log(`📡 API Call: get_item_uoms_and_prices for ${itemCode} with customer: ${selectedCustomer?.id || 'None'}`);
+        const customerParam = selectedCustomer?.id ? `&customer=${selectedCustomer.id}` : '';
+        const response = await fetch(`/api/method/klik_pos.api.item.get_item_uoms_and_prices?item_code=${itemCode}${customerParam}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include'
@@ -408,15 +418,23 @@ export default function OrderSummary({
   isMobile = false,
 }: OrderSummaryProps) {
   const [showCouponPopover, setShowCouponPopover] = useState(false);
-  const { selectedCustomer, setSelectedCustomer, updateUOM } = useCartStore();
+  const { selectedCustomer, setSelectedCustomer, updateUOM, updatePricesForCustomer } = useCartStore();
 
   // Track if user has manually removed the default customer
   const [userRemovedDefaultCustomer, setUserRemovedDefaultCustomer] = useState(false);
 
   // Debug selectedCustomer changes
   useEffect(() => {
-
+    console.log("🔄 OrderSummary: selectedCustomer changed:", selectedCustomer);
   }, [selectedCustomer]);
+
+  // Update prices when customer changes
+  useEffect(() => {
+    if (selectedCustomer && cartItems.length > 0) {
+      console.log(`🔄 Customer changed to: ${selectedCustomer.name}, updating prices for ${cartItems.length} items`);
+      updatePricesForCustomer(selectedCustomer.id);
+    }
+  }, [selectedCustomer?.id, cartItems.length, updatePricesForCustomer]);
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
@@ -1577,7 +1595,7 @@ export default function OrderSummary({
                             <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
                               UOM
                             </label>
-                            <UOMSelectField item={item} onUOMChange={handleUOMChange} isMobile={isMobile} />
+                            <UOMSelectField item={item} onUOMChange={handleUOMChange} isMobile={isMobile} selectedCustomer={selectedCustomer} />
                           </div>
                         </div>
 

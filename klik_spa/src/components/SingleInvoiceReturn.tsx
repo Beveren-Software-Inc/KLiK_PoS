@@ -9,6 +9,9 @@ import {
   Plus
 } from "lucide-react";
 import { toast } from "react-toastify";
+import { formatCurrency, getCurrencySymbol } from "../utils/currency";
+import { usePOSDetails } from "../hooks/usePOSProfile";
+import { usePaymentModes } from "../hooks/usePaymentModes";
 import { createPartialReturn, getReturnedQty, type ReturnItem } from "../services/returnService";
 import { getInvoiceDetails } from "../services/salesInvoice";
 
@@ -29,11 +32,40 @@ export default function SingleInvoiceReturn({
   const [isLoading, setIsLoading] = useState(false);
   const [loadingReturnData, setLoadingReturnData] = useState(true);
 
+  // Currency from invoice or POS profile
+  const { posDetails } = usePOSDetails();
+  const currency = (invoice && (invoice.currency || invoice.company_currency)) || posDetails?.currency || 'USD';
+  const currencySymbol = getCurrencySymbol(currency);
+
+  // Payment modes from POS profile
+  const { modes: paymentModes, isLoading: paymentModesLoading } = usePaymentModes(posDetails?.name || 'Test POS Profile');
+
+  // Payment method states
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("Cash");
+  const [returnAmount, setReturnAmount] = useState<number>(0);
+
   useEffect(() => {
     if (isOpen && invoice) {
       initializeReturnItems();
     }
   }, [isOpen, invoice]);
+
+  // Update return amount when items change
+  useEffect(() => {
+    const total = returnItems.reduce((sum, item) => {
+      return sum + ((item.return_qty || 0) * item.rate);
+    }, 0);
+    setReturnAmount(total);
+  }, [returnItems]);
+
+  // Set default payment method when payment modes are loaded
+  useEffect(() => {
+    if (paymentModes.length > 0 && !selectedPaymentMethod) {
+      // Find default payment method or use first one
+      const defaultMode = paymentModes.find(mode => mode.default === 1);
+      setSelectedPaymentMethod(defaultMode?.name || paymentModes[0].name);
+    }
+  }, [paymentModes, selectedPaymentMethod]);
 
   const initializeReturnItems = async () => {
     setLoadingReturnData(true);
@@ -69,7 +101,7 @@ export default function SingleInvoiceReturn({
         // Get returned quantity for each item
         const returnedData = await getReturnedQty(
           invoiceWithItems.customer,
-          invoiceWithItems.name || invoiceWithItems.id, // Use id as fallback if name is not available
+          invoiceWithItems.name || invoiceWithItems.id,
           item.item_code || item.id
         );
 
@@ -93,7 +125,7 @@ export default function SingleInvoiceReturn({
           amount,
           returned_qty: returnedQty,
           available_qty: qty - returnedQty,
-          return_qty: qty - returnedQty // Set default return quantity to available quantity
+          return_qty: qty - returnedQty
         });
       }
 
@@ -120,7 +152,7 @@ export default function SingleInvoiceReturn({
   const handleReturnAllItems = () => {
     setReturnItems(prev => prev.map(item => ({
       ...item,
-      return_qty: item.available_qty // Set return quantity to available quantity
+      return_qty: item.available_qty 
     })));
   };
 
@@ -142,10 +174,18 @@ export default function SingleInvoiceReturn({
     setIsLoading(true);
     const invoiceName = invoice.id || invoice.name
     try {
-      const result = await createPartialReturn(invoiceName, itemsToReturn);
+      const returnData = {
+        items: itemsToReturn,
+        paymentMethod: selectedPaymentMethod,
+        returnAmount: returnAmount
+      };
+
+      console.log('Creating return with payment method:', selectedPaymentMethod, 'Amount:', returnAmount);
+
+      const result = await createPartialReturn(invoiceName, itemsToReturn, selectedPaymentMethod, returnAmount);
 
       if (result.success) {
-        toast.success('Return created successfully');
+        toast.success(`Return created successfully (${selectedPaymentMethod})`);
         onSuccess(result.returnInvoice!);
         onClose();
       } else {
@@ -226,7 +266,7 @@ export default function SingleInvoiceReturn({
                 <div className="text-right">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Return Amount</p>
                   <p className="text-xl font-bold text-black-600 dark:text-orange-400">
-                    ${totalReturnAmount.toFixed(2)}
+                    {formatCurrency(totalReturnAmount, currency)}
                   </p>
                 </div>
               </div>
@@ -332,10 +372,10 @@ export default function SingleInvoiceReturn({
                             </div>
                           </td>
                           <td className="px-4 py-4 text-right text-sm text-gray-900 dark:text-white">
-                            ${item.rate.toFixed(2)}
+                            {formatCurrency(item.rate, currency)}
                           </td>
                           <td className="px-4 py-4 text-right text-sm font-medium text-gray-900 dark:text-white">
-                            ${((item.return_qty || 0) * item.rate).toFixed(2)}
+                            {formatCurrency((item.return_qty || 0) * item.rate, currency)}
                           </td>
                         </tr>
                       ))}
@@ -356,6 +396,55 @@ export default function SingleInvoiceReturn({
                       <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
                         All items from this invoice have already been returned.
                       </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Payment Method Selection */}
+              {hasItemsToReturn && (
+                <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    Payment Method for Return
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Payment Method Selection */}
+                    <div>
+                      <select
+                        value={selectedPaymentMethod}
+                        onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-beveren-500 focus:border-beveren-500 transition-colors"
+                        disabled={paymentModesLoading}
+                      >
+                        {paymentModesLoading ? (
+                          <option>Loading payment methods...</option>
+                        ) : (
+                          paymentModes.map((mode) => (
+                            <option key={mode.name} value={mode.name}>
+                              {mode.mode_of_payment}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+
+                    {/* Return Amount Input with currency symbol */}
+                    <div>
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 dark:text-gray-400 text-sm">
+                          {currencySymbol}
+                        </span>
+                        <input
+                          type="number"
+                          value={returnAmount}
+                          onChange={(e) => setReturnAmount(parseFloat(e.target.value) || 0)}
+                          step="0.01"
+                          min="0"
+                          className="w-full pl-8 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-beveren-500 focus:border-beveren-500 transition-colors text-right text-lg font-semibold"
+                          placeholder="0.00"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>

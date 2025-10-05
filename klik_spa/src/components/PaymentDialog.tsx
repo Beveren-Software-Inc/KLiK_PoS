@@ -132,6 +132,7 @@ export default function PaymentDialog({
 }: PaymentDialogProps) {
   const [selectedSalesTaxCharges, setSelectedSalesTaxCharges] = useState("");
   const [paymentAmounts, setPaymentAmounts] = useState<PaymentAmount>({});
+  const [activeMethodId, setActiveMethodId] = useState<string | null>(null);
   const [roundOffAmount, setRoundOffAmount] = useState(0);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isHoldingOrder, setIsHoldingOrder] = useState(false);
@@ -515,6 +516,23 @@ export default function PaymentDialog({
     };
   });
 
+  // Determine which payment method should be adjusted by round-off when no field is active
+  const getRoundTargetMethodId = (): string | null => {
+    if (activeMethodId && (paymentAmounts[activeMethodId] || 0) >= 0) return activeMethodId;
+
+    // Collect non-zero methods
+    const nonZero = Object.entries(paymentAmounts).filter(([, amt]) => (amt || 0) > 0).map(([id]) => id);
+    if (nonZero.length === 1) return nonZero[0];
+
+    // Prefer a non-default method that has a value
+    const defaultId = modes.find((m) => m.default === 1)?.mode_of_payment || null;
+    const nonDefaultWithValue = nonZero.find((id) => id !== defaultId);
+    if (nonDefaultWithValue) return nonDefaultWithValue;
+
+    // Fallback to default method
+    return defaultId;
+  };
+
   const handlePaymentAmountChange = (methodId: string, amount: string) => {
     if (invoiceSubmitted || isProcessingPayment) return;
 
@@ -541,6 +559,7 @@ export default function PaymentDialog({
     newPaymentAmounts[methodId] = grandTotal;
 
     setPaymentAmounts(newPaymentAmounts);
+    setActiveMethodId(methodId);
   };
 
   // Auto-distribute remaining amount to other payment methods
@@ -626,12 +645,18 @@ export default function PaymentDialog({
       setRoundOffAmount(difference);
       setRoundOffInput(difference.toFixed(2));
 
-      // Update payment amount to the rounded amount
-      const defaultMode = modes.find((mode) => mode.default === 1);
-      if (defaultMode) {
+      // Adjust the currently active or most relevant payment method to reflect the rounded total
+      const targetId = getRoundTargetMethodId();
+      if (targetId) {
+        // Sum amounts of other methods
+        const sumOthers = Object.entries(paymentAmounts)
+          .filter(([id]) => id !== targetId)
+          .reduce((sum, [, amt]) => sum + (amt || 0), 0);
+
+        const newTargetAmount = Math.max(0, parseFloat((rounded - sumOthers).toFixed(2)));
         setPaymentAmounts((prev) => ({
           ...prev,
-          [defaultMode.mode_of_payment]: rounded,
+          [targetId]: newTargetAmount,
         }));
       }
     } else {
@@ -664,18 +689,22 @@ export default function PaymentDialog({
     if (!isNaN(parsed)) {
       setRoundOffAmount(parsed);
 
-      if (isB2C || isB2B) {
-        const defaultMode = modes.find((mode) => mode.default === 1);
-        if (defaultMode) {
-          const newGrandTotal =
-            (calculations.isInclusive
-              ? calculations.taxableAmount
-              : calculations.taxableAmount + calculations.taxAmount) + parsed;
-          setPaymentAmounts((prev) => ({
-            ...prev,
-            [defaultMode.mode_of_payment]: parseFloat(newGrandTotal.toFixed(2)),
-          }));
-        }
+      // Recompute new grand total after roundoff change
+      const newGrandTotal =
+        (calculations.isInclusive
+          ? calculations.taxableAmount
+          : calculations.taxableAmount + calculations.taxAmount) + parsed;
+
+      const targetId = getRoundTargetMethodId();
+      if (targetId) {
+        const sumOthers = Object.entries(paymentAmounts)
+          .filter(([id]) => id !== targetId)
+          .reduce((sum, [, amt]) => sum + (amt || 0), 0);
+        const newTargetAmount = Math.max(0, parseFloat((newGrandTotal - sumOthers).toFixed(2)));
+        setPaymentAmounts((prev) => ({
+          ...prev,
+          [targetId]: newTargetAmount,
+        }));
       }
     }
   };
@@ -743,9 +772,13 @@ export default function PaymentDialog({
     const paymentData = {
       items: cartItems.map(item => ({
         ...item,
+        price: (item as any).discountedPrice || item.price, // Use discounted price
         batchNumber: itemDiscounts[item.id]?.batchNumber || null,
         serialNumber: itemDiscounts[item.id]?.serialNumber || null,
         uom: item.uom || 'Nos', // Include selected UOM
+        // Include discount information for backend
+        discountPercentage: itemDiscounts[item.id]?.discountPercentage || 0,
+        discountAmount: itemDiscounts[item.id]?.discountAmount || 0,
       })),
       customer: selectedCustomer,
       paymentMethods: adjustedPaymentMethods.map(([method, amount]) => ({ method, amount })),
@@ -1817,6 +1850,7 @@ export default function PaymentDialog({
                             step="0.01"
                             value={method.amount || ""}
                             onChange={(e) => {
+                              setActiveMethodId(method.id);
                               const inputValue = e.target.value;
                               const numValue =
                                 inputValue === "" ? 0 : parseFloat(inputValue);
@@ -1826,6 +1860,7 @@ export default function PaymentDialog({
                               );
                             }}
                             onBlur={(e) => {
+                              setActiveMethodId(method.id);
                               const numValue = parseFloat(e.target.value);
                               if (!isNaN(numValue)) {
                                 const formatted = parseFloat(

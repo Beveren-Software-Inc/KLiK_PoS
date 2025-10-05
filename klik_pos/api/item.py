@@ -5,6 +5,33 @@ from klik_pos.klik_pos.utils import get_current_pos_profile
 from klik_pos.api.sales_invoice import get_current_pos_opening_entry
 from erpnext.stock.doctype.batch.batch import get_batch_qty
 
+def get_price_list_with_customer_priority(customer=None):
+    """
+    Get price list with customer-first priority:
+    1. Customer's default price list (if customer provided and has one)
+    2. POS Profile's selling price list
+    3. None (fallback to latest price)
+    """
+    try:
+        # First priority: Check customer's default price list
+        if customer:
+            customer_price_list = frappe.db.get_value("Customer", customer, "default_price_list")
+            if customer_price_list:
+                return customer_price_list
+
+        # Second priority: POS Profile's selling price list
+        pos_doc = get_current_pos_profile()
+        pos_price_list = getattr(pos_doc, 'selling_price_list', None)
+        if pos_price_list:
+            return pos_price_list
+
+        # Fallback: No specific price list
+        return None
+
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "Error getting price list with customer priority")
+        return None
+
 def fetch_item_balance(item_code: str, warehouse: str) -> float:
     """Get stock balance of an item from a warehouse."""
     try:
@@ -13,10 +40,16 @@ def fetch_item_balance(item_code: str, warehouse: str) -> float:
         frappe.log_error(frappe.get_traceback(), f"Error fetching balance for {item_code}")
         return 0
 
-def fetch_item_price(item_code: str, price_list: str) -> dict:
-
-    """Get item price from Item Price doctype. If price_list is null, get latest price without price_list filter."""
+def fetch_item_price(item_code: str, price_list: str = None, customer: str = None) -> dict:
+    """
+    Get item price from Item Price doctype with customer-first priority.
+    If price_list is provided, use it. Otherwise, determine price list using customer-first priority.
+    """
     try:
+        # Determine the price list to use
+        if not price_list:
+            price_list = get_price_list_with_customer_priority(customer)
+
         # If price_list is null or empty, get latest price without price_list filter
         if not price_list or price_list.strip() == "":
             price_doc = frappe.get_value(
@@ -85,6 +118,36 @@ def fetch_item_price(item_code: str, price_list: str) -> dict:
             "price": 0,
             "currency": "SAR",
             "currency_symbol": "SAR"
+        }
+
+@frappe.whitelist(allow_guest=True)
+def get_item_price_for_customer(item_code, customer=None):
+    """
+    Get item price for a specific customer using customer-first price list priority.
+    This is used when adding items to cart or when customer changes.
+    """
+    try:
+        if not item_code:
+            return {"price": 0, "currency": "SAR", "currency_symbol": "SAR"}
+
+        # Get price using customer-first priority
+        price_info = fetch_item_price(item_code, customer=customer)
+
+        return {
+            "success": True,
+            "price": price_info["price"],
+            "currency": price_info["currency"],
+            "currency_symbol": price_info["currency_symbol"]
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), f"Error getting item price for customer: {item_code}")
+        return {
+            "success": False,
+            "price": 0,
+            "currency": "SAR",
+            "currency_symbol": "SAR",
+            "error": str(e)
         }
 
 @frappe.whitelist(allow_guest=True)
@@ -570,27 +633,22 @@ def get_batch_nos_with_qty(item_code):
 
 
 @frappe.whitelist()
-def get_item_uoms_and_prices(item_code):
+def get_item_uoms_and_prices(item_code, customer=None):
     """
     Returns a list of UOMs and their prices for a given item code.
     Returns UOMs from Item UOM table and prices from Item Price doctype.
+    Uses customer-first price list priority.
     """
     if not item_code:
         return {}
 
     try:
-        # Get item document to check base UOM and conversion rates
+        # Get the price list with customer-first priority
+        price_list = get_price_list_with_customer_priority(customer)
+
         item_doc = frappe.get_doc("Item", item_code)
 
-        # Get all UOMs for this item from Item UOM child table
         uom_data = []
-
-        # Add base UOM
-        uom_data.append({
-            "uom": item_doc.stock_uom,
-            "conversion_factor": 1.0,
-            "price": 0.0
-        })
 
         # Add additional UOMs from Item UOM child table
         for uom_row in item_doc.get("uoms", []):
@@ -600,8 +658,25 @@ def get_item_uoms_and_prices(item_code):
                 "price": 0.0
             })
 
-        # Get prices for each UOM from Item Price doctype
+        # Get prices for each UOM using customer-first price list priority
         for uom_info in uom_data:
+            if price_list:
+                price_list_rate = frappe.db.get_value(
+                    "Item Price",
+                    {
+                        "item_code": item_code,
+                        "uom": uom_info["uom"],
+                        "price_list": price_list,
+                        "selling": 1
+                    },
+                    "price_list_rate"
+                )
+
+                if price_list_rate:
+                    uom_info["price"] = float(price_list_rate)
+                    continue
+
+            # Fallback: Get price without price list filter
             price_list_rate = frappe.db.get_value(
                 "Item Price",
                 {
@@ -627,18 +702,17 @@ def get_item_uoms_and_prices(item_code):
                 )
 
                 if base_price:
-                    # Convert price based on UOM conversion factor
                     converted_price = float(base_price) * uom_info["conversion_factor"]
                     uom_info["price"] = converted_price
                 else:
-                    # Use valuation rate if no price list rate found
                     valuation_rate = frappe.db.get_value("Item", item_code, "valuation_rate") or 0
                     converted_price = float(valuation_rate) * uom_info["conversion_factor"]
                     uom_info["price"] = converted_price
 
         return {
             "base_uom": item_doc.stock_uom,
-            "uoms": uom_data
+            "uoms": uom_data,
+            "price_list_used": price_list
         }
 
     except Exception as e:

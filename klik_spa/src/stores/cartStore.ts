@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { CartItem, GiftCoupon, Customer } from '../../types'
 import { toast } from 'react-toastify'
 import { clearDraftInvoiceCache } from '../utils/draftInvoiceCache'
+import { updateItemPricesForCustomer, getItemPriceForCustomer } from '../services/dynamicPricing'
 
 interface CartState {
   cartItems: CartItem[]
@@ -10,7 +11,7 @@ interface CartState {
   selectedCustomer: Customer | null
 
   // Actions
-  addToCart: (item: Omit<CartItem, 'quantity'>) => void
+  addToCart: (item: Omit<CartItem, 'quantity'>) => Promise<void>
   updateQuantity: (id: string, quantity: number) => void
   updateUOM: (id: string, uom: string, price: number) => void
   removeItem: (id: string) => void
@@ -18,6 +19,7 @@ interface CartState {
   applyCoupon: (coupon: GiftCoupon) => void
   removeCoupon: (couponCode: string) => void
   setSelectedCustomer: (customer: Customer | null) => void
+  updatePricesForCustomer: (customerId?: string) => Promise<void>
 }
 
 export const useCartStore = create<CartState>()(
@@ -27,35 +29,53 @@ export const useCartStore = create<CartState>()(
       appliedCoupons: [],
       selectedCustomer: null,
 
-      addToCart: (item) => set((state) => {
-        const existingItem = state.cartItems.find((cartItem) => cartItem.id === item.id)
+      addToCart: async (item) => {
+        const state = get();
+        const existingItem = state.cartItems.find((cartItem) => cartItem.id === item.id);
 
         // Check if item has available quantity
         if (item.available !== undefined && item.available <= 0) {
-          toast.error(`${item.name} is out of stock`)
-          return state
+          toast.error(`${item.name} is out of stock`);
+          return;
         }
 
         if (existingItem) {
           // Check if adding one more would exceed available stock
           if (item.available !== undefined && existingItem.quantity >= item.available) {
-            toast.error(`Only ${item.available} ${item.uom || 'units'} of ${item.name} available`)
-            return state
+            toast.error(`Only ${item.available} ${item.uom || 'units'} of ${item.name} available`);
+            return;
           }
 
-          return {
+          set((state) => ({
             cartItems: state.cartItems.map((cartItem) =>
               cartItem.id === item.id
                 ? { ...cartItem, quantity: cartItem.quantity + 1 }
                 : cartItem
             )
-          }
+          }));
         } else {
-          return {
-            cartItems: [...state.cartItems, { ...item, quantity: 1 }]
+          // New item - fetch correct price if customer is selected
+          let finalPrice = item.price;
+
+          if (state.selectedCustomer) {
+            try {
+              console.log(`🔄 Fetching correct price for ${item.name} with customer: ${state.selectedCustomer.name}`);
+              const priceInfo = await getItemPriceForCustomer(item.id, state.selectedCustomer.id);
+              if (priceInfo.success) {
+                finalPrice = priceInfo.price;
+                console.log(`💰 Updated price for ${item.name}: ${item.price} → ${finalPrice}`);
+              }
+            } catch (error) {
+              console.error('❌ Error fetching price for customer:', error);
+              // Continue with original price if API fails
+            }
           }
+
+          set((state) => ({
+            cartItems: [...state.cartItems, { ...item, price: finalPrice, quantity: 1 }]
+          }));
         }
-      }),
+      },
 
       updateQuantity: (id, quantity) => set((state) => {
         if (quantity <= 0) {
@@ -124,7 +144,35 @@ export const useCartStore = create<CartState>()(
 
       setSelectedCustomer: (customer) => set(() => ({
         selectedCustomer: customer
-      }))
+      })),
+
+      updatePricesForCustomer: async (customerId) => {
+        const state = get();
+        if (state.cartItems.length === 0) return;
+
+        try {
+          console.log(`🔄 Updating prices for ${state.cartItems.length} items with customer: ${customerId || 'None'}`);
+
+          // Get updated prices for all items
+          const priceUpdates = await updateItemPricesForCustomer(state.cartItems, customerId);
+
+          // Update cart items with new prices
+          set((state) => ({
+            cartItems: state.cartItems.map(item => {
+              const priceUpdate = priceUpdates[item.id];
+              if (priceUpdate && priceUpdate.success) {
+                console.log(`💰 Updated price for ${item.name}: ${item.price} → ${priceUpdate.price}`);
+                return { ...item, price: priceUpdate.price };
+              }
+              return item;
+            })
+          }));
+
+        } catch (error) {
+          console.error('❌ Error updating prices for customer:', error);
+          toast.error('Failed to update prices for customer');
+        }
+      }
     }),
     {
       name: 'beveren-cart-storage'

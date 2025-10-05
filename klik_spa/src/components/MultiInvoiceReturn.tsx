@@ -20,7 +20,10 @@ import {
   type ReturnItem,
   type ReturnData
 } from "../services/returnService";
+import { formatCurrency, getCurrencySymbol } from "../utils/currency";
 import { useCustomers } from "../hooks/useCustomers";
+import { usePOSDetails } from "../hooks/usePOSProfile";
+import { usePaymentModes } from "../hooks/usePaymentModes";
 
 interface MultiInvoiceReturnProps {
   customer?: string;
@@ -43,6 +46,7 @@ export default function MultiInvoiceReturn({
   const [daysBack, setDaysBack] = useState<number>(90);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
+  const [invoicePayments, setInvoicePayments] = useState<Record<string, { method: string; amount: number }>>({});
 
   // New workflow states
   const [workflowStep, setWorkflowStep] = useState<'select-customer' | 'select-items' | 'filter-invoices' | 'select-invoices'>('select-customer');
@@ -54,6 +58,10 @@ export default function MultiInvoiceReturn({
 
   // Use the customers hook with search to fetch from server when searching
   const { customers: searchableCustomers, isLoading: customersLoading } = useCustomers(customerSearchQuery);
+  const { posDetails } = usePOSDetails();
+  const { modes: paymentModes } = usePaymentModes(posDetails?.name || 'Test POS Profile');
+  const currency = posDetails?.currency || 'USD';
+  const currencySymbol = getCurrencySymbol(currency);
 
   // Address filter states
   const [customerAddresses, setCustomerAddresses] = useState<Array<{name: string, address_line1: string, city: string}>>([]);
@@ -61,7 +69,6 @@ export default function MultiInvoiceReturn({
 
   useEffect(() => {
     if (isOpen) {
-      // Reset workflow when opening
       if (customer) {
         setWorkflowStep('select-items');
         setSelectedCustomer(customer);
@@ -76,7 +83,6 @@ export default function MultiInvoiceReturn({
       setCustomerSearchQuery('');
       setSelectedAddress('');
 
-      // Automatically load available items and addresses when modal opens if customer is provided
       if (customer) {
         loadAvailableItems();
         loadCustomerAddresses();
@@ -171,6 +177,20 @@ export default function MultiInvoiceReturn({
         }));
 
         setInvoices(filteredInvoices);
+        // Initialize per-invoice payment defaults for selected invoices
+        setInvoicePayments((prev) => {
+          const next = { ...prev } as Record<string, { method: string; amount: number }>;
+          for (const inv of filteredInvoices) {
+            if (selectedInvoices.has(inv.name)) {
+              const amount = inv.items.reduce((sum, item) => sum + (item.return_qty || 0) * item.rate, 0);
+              const defaultMode = paymentModes.find((m) => m.default === 1)?.mode_of_payment || paymentModes[0]?.mode_of_payment || 'Cash';
+              // @ts-expect-error backend may provide payments array
+              const inferred = inv.payments?.[0]?.mode_of_payment || defaultMode;
+              next[inv.name] = next[inv.name] || { method: inferred, amount };
+            }
+          }
+          return next;
+        });
         setWorkflowStep('select-invoices');
       } else {
         toast.error(result.error || 'Failed to load customer invoices');
@@ -222,8 +242,26 @@ export default function MultiInvoiceReturn({
           }
           return invoice;
         }));
+        // Remove payment config for this invoice
+        setInvoicePayments((prev) => {
+          const next = { ...prev };
+          delete next[invoiceName];
+          return next;
+        });
       } else {
         newSet.add(invoiceName);
+        // Initialize payment config when selecting
+        const inv = invoices.find(i => i.name === invoiceName);
+        if (inv) {
+          const amount = inv.items.reduce((sum, item) => sum + (item.return_qty || 0) * item.rate, 0);
+          const defaultMode = paymentModes.find((m) => m.default === 1)?.mode_of_payment || paymentModes[0]?.mode_of_payment || 'Cash';
+          // @ts-expect-error backend may provide payments array
+          const inferred = inv.payments?.[0]?.mode_of_payment || defaultMode;
+          setInvoicePayments((prev) => ({
+            ...prev,
+            [invoiceName]: prev[invoiceName] || { method: inferred, amount },
+          }));
+        }
       }
       return newSet;
     });
@@ -263,10 +301,15 @@ export default function MultiInvoiceReturn({
 
   const handleSubmitReturn = async () => {
     const invoiceReturns = invoices
-      .filter(invoice => selectedInvoices.has(invoice.name)) // Only include selected invoices
+      .filter(invoice => selectedInvoices.has(invoice.name)) 
       .map(invoice => ({
         invoice_name: invoice.name,
-        return_items: invoice.items.filter(item => (item.return_qty || 0) > 0)
+        return_items: invoice.items.filter(item => (item.return_qty || 0) > 0),
+        // Attach payment info for this invoice
+        // These fields are expected by backend to process per-invoice return payments
+        // If backend ignores them, it's backward-compatible
+        payment_method: invoicePayments[invoice.name]?.method,
+        return_amount: invoicePayments[invoice.name]?.amount ?? invoice.items.reduce((sum, it) => sum + (it.return_qty || 0) * it.rate, 0),
       }))
       .filter(invoiceReturn => invoiceReturn.return_items.length > 0);
 
@@ -794,7 +837,7 @@ export default function MultiInvoiceReturn({
                 <div className="text-right">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Return Amount</p>
                   <p className="text-xl font-bold text-beveren-600 dark:text-beveren-400">
-                    ${totalReturnAmount.toFixed(2)}
+                    {formatCurrency(totalReturnAmount, currency)}
                   </p>
                 </div>
               </div>
@@ -859,7 +902,7 @@ export default function MultiInvoiceReturn({
                           </h4>
                           <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
                             <span>{invoice.posting_date}</span>
-                            <span>${invoice.grand_total.toFixed(2)}</span>
+                            <span>{formatCurrency(invoice.grand_total, currency)}</span>
                             <span className="capitalize">{invoice.status}</span>
                           </div>
                         </div>
@@ -969,13 +1012,67 @@ export default function MultiInvoiceReturn({
                               </div>
                             </td>
                             <td className="px-4 py-3 text-right text-sm font-medium text-gray-900 dark:text-white">
-                              ${((item.return_qty || 0) * item.rate).toFixed(2)}
+                              {formatCurrency(((item.return_qty || 0) * item.rate), currency)}
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
+                  {/* Per-invoice Payment Controls - only when invoice is selected */}
+                  {selectedInvoices.has(invoice.name) && (
+                    <div className="px-4 py-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-600">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="md:col-span-2">
+                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Mode of Payment</label>
+                          <select
+                            value={invoicePayments[invoice.name]?.method || (paymentModes.find(m=>m.default===1)?.mode_of_payment || paymentModes[0]?.mode_of_payment || 'Cash')}
+                            onChange={(e) => {
+                              const method = e.target.value;
+                              setInvoicePayments(prev => ({
+                                ...prev,
+                                [invoice.name]: {
+                                  method,
+                                  amount: prev[invoice.name]?.amount ?? invoice.items.reduce((sum, it) => sum + (it.return_qty || 0) * it.rate, 0)
+                                }
+                              }));
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-beveren-500"
+                          >
+                            {paymentModes.map((mode) => (
+                              <option key={mode.name} value={mode.mode_of_payment}>{mode.mode_of_payment}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
+                          <div className="relative">
+                            <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 dark:text-gray-400 text-sm">
+                              {currencySymbol}
+                            </span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={invoicePayments[invoice.name]?.amount ?? invoice.items.reduce((sum, it) => sum + (it.return_qty || 0) * it.rate, 0)}
+                              onChange={(e) => {
+                                const value = parseFloat(e.target.value) || 0;
+                                setInvoicePayments(prev => ({
+                                  ...prev,
+                                  [invoice.name]: {
+                                    method: prev[invoice.name]?.method || (paymentModes.find(m=>m.default===1)?.mode_of_payment || paymentModes[0]?.mode_of_payment || 'Cash'),
+                                    amount: value
+                                  }
+                                }));
+                              }}
+                              className="w-full pl-8 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-beveren-500 text-right"
+                              placeholder="0.00"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
                               ))}
               </div>
