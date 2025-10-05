@@ -112,9 +112,10 @@ interface UOMSelectFieldProps {
   item: CartItem;
   onUOMChange: (itemId: string, selectedUOM: string, newPrice: number) => void;
   isMobile?: boolean;
+  selectedCustomer?: Customer | null;
 }
 
-const UOMSelectField = ({ item, onUOMChange, isMobile }: UOMSelectFieldProps) => {
+const UOMSelectField = ({ item, onUOMChange, isMobile, selectedCustomer }: UOMSelectFieldProps) => {
   const [availableUOMs, setAvailableUOMs] = useState<string[]>(['Nos']); // Start with Nos as default
   const [selectedUOM, setSelectedUOM] = useState<string>(item.uom || 'Nos'); //Mania: Local state for selected UOM
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -126,8 +127,9 @@ const UOMSelectField = ({ item, onUOMChange, isMobile }: UOMSelectFieldProps) =>
         // Use item_code if available, otherwise fallback to item.id
         const itemCode = item.item_code || item.id;
         if (itemCode) {
-          console.log(`📡 Loading UOMs for item: ${itemCode}`);
-          const response = await fetch(`/api/method/klik_pos.api.item.get_item_uoms_and_prices?item_code=${itemCode}`, {
+          console.log(`📡 Loading UOMs for item: ${itemCode} with customer: ${selectedCustomer?.id || 'None'}`);
+          const customerParam = selectedCustomer?.id ? `&customer=${selectedCustomer.id}` : '';
+          const response = await fetch(`/api/method/klik_pos.api.item.get_item_uoms_and_prices?item_code=${itemCode}${customerParam}`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include'
@@ -160,7 +162,7 @@ const UOMSelectField = ({ item, onUOMChange, isMobile }: UOMSelectFieldProps) =>
     };
 
     loadItemSpecificUOMs();
-  }, [item.id, item.item_code]);
+  }, [item.id, item.item_code, selectedCustomer?.id]);
 
   // Sync local state with item UOM changes
   useEffect(() => {
@@ -185,8 +187,9 @@ const UOMSelectField = ({ item, onUOMChange, isMobile }: UOMSelectFieldProps) =>
       // Use item_code if available, otherwise fallback to item.id
       const itemCode = item.item_code || item.id;
       if (itemCode) {
-        console.log(`📡 API Call: get_item_uoms_and_prices for ${itemCode}`);
-        const response = await fetch(`/api/method/klik_pos.api.item.get_item_uoms_and_prices?item_code=${itemCode}`, {
+        console.log(`📡 API Call: get_item_uoms_and_prices for ${itemCode} with customer: ${selectedCustomer?.id || 'None'}`);
+        const customerParam = selectedCustomer?.id ? `&customer=${selectedCustomer.id}` : '';
+        const response = await fetch(`/api/method/klik_pos.api.item.get_item_uoms_and_prices?item_code=${itemCode}${customerParam}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include'
@@ -415,15 +418,23 @@ export default function OrderSummary({
   isMobile = false,
 }: OrderSummaryProps) {
   const [showCouponPopover, setShowCouponPopover] = useState(false);
-  const { selectedCustomer, setSelectedCustomer, updateUOM } = useCartStore();
+  const { selectedCustomer, setSelectedCustomer, updateUOM, updatePricesForCustomer } = useCartStore();
 
   // Track if user has manually removed the default customer
   const [userRemovedDefaultCustomer, setUserRemovedDefaultCustomer] = useState(false);
 
   // Debug selectedCustomer changes
   useEffect(() => {
-
+    console.log("🔄 OrderSummary: selectedCustomer changed:", selectedCustomer);
   }, [selectedCustomer]);
+
+  // Update prices when customer changes
+  useEffect(() => {
+    if (selectedCustomer && cartItems.length > 0) {
+      console.log(`🔄 Customer changed to: ${selectedCustomer.name}, updating prices for ${cartItems.length} items`);
+      updatePricesForCustomer(selectedCustomer.id);
+    }
+  }, [selectedCustomer?.id, cartItems.length, updatePricesForCustomer]);
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
@@ -1584,7 +1595,7 @@ export default function OrderSummary({
                             <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
                               UOM
                             </label>
-                            <UOMSelectField item={item} onUOMChange={handleUOMChange} isMobile={isMobile} />
+                            <UOMSelectField item={item} onUOMChange={handleUOMChange} isMobile={isMobile} selectedCustomer={selectedCustomer} />
                           </div>
                         </div>
 
