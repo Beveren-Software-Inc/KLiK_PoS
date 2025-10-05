@@ -101,7 +101,7 @@ export default function SingleInvoiceReturn({
         // Get returned quantity for each item
         const returnedData = await getReturnedQty(
           invoiceWithItems.customer,
-          invoiceWithItems.name || invoiceWithItems.id, // Use id as fallback if name is not available
+          invoiceWithItems.name || invoiceWithItems.id,
           item.item_code || item.id
         );
 
@@ -125,7 +125,7 @@ export default function SingleInvoiceReturn({
           amount,
           returned_qty: returnedQty,
           available_qty: qty - returnedQty,
-          return_qty: qty - returnedQty // Set default return quantity to available quantity
+          return_qty: qty - returnedQty
         });
       }
 
@@ -152,7 +152,7 @@ export default function SingleInvoiceReturn({
   const handleReturnAllItems = () => {
     setReturnItems(prev => prev.map(item => ({
       ...item,
-      return_qty: item.available_qty // Set return quantity to available quantity
+      return_qty: item.available_qty 
     })));
   };
 
@@ -174,7 +174,6 @@ export default function SingleInvoiceReturn({
     setIsLoading(true);
     const invoiceName = invoice.id || invoice.name
     try {
-      // Include payment method in the return data
       const returnData = {
         items: itemsToReturn,
         paymentMethod: selectedPaymentMethod,
