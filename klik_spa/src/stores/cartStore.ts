@@ -168,7 +168,6 @@ export const useCartStore = create<CartState>()(
             })
           }));
 
-          console.log(`✅ Price update completed for customer: ${customerId || 'None'}`);
         } catch (error) {
           console.error('❌ Error updating prices for customer:', error);
           toast.error('Failed to update prices for customer');

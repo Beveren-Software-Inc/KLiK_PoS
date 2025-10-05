@@ -1284,8 +1284,8 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None, s
 
 
 @frappe.whitelist()
-def create_partial_return(invoice_name, return_items):
-    """Create a partial return for selected items from an invoice"""
+def create_partial_return(invoice_name, return_items, payment_method=None, return_amount=None):
+    """Create a partial return for selected items from an invoice with custom payment method"""
     try:
         # Handle parameter formats
         if isinstance(return_items, str):
@@ -1341,26 +1341,30 @@ def create_partial_return(invoice_name, return_items):
         # Replace items with only the selected ones
         return_doc.items = filtered_items
 
-        # Clear existing payments and recalculate based on returned items
+        # Clear existing payments and add custom payment method
         return_doc.payments = []
 
-        # Calculate total returned amount (should be positive for calculation)
+        # Calculate total returned amount
         total_returned_amount = sum(abs(item.qty * item.rate) for item in return_doc.items)
-        total_original_amount = sum(abs(item.qty * item.rate) for item in original_invoice.items)
 
-        if total_original_amount > 0 and total_returned_amount > 0:
-            proportion = total_returned_amount / total_original_amount
-            for payment in original_invoice.payments:
-                # Ensure the amount is negative for returns
-                payment_amount = -abs(payment.amount * proportion)
-                return_doc.append("payments", {
-                    "mode_of_payment": payment.mode_of_payment,
-                    "amount": payment_amount,
-                    "account": payment.account,
-                })
-        else:
-            # If no items to return, don't add any payments
-            pass
+        # Use provided return amount or calculate from items
+        final_return_amount = return_amount if return_amount is not None else total_returned_amount
+
+        # Use provided payment method or default to Cash
+        final_payment_method = payment_method if payment_method else "Cash"
+
+        # Add payment entry with the specified payment method
+        if final_return_amount > 0:
+            # Get the payment account for the specified payment method
+            # payment_account = frappe.db.get_value("Mode of Payment", final_payment_method, "default_account")
+            # if not payment_account:
+            #     payment_account = frappe.db.get_value("Company", return_doc.company, "default_cash_account")
+
+            return_doc.append("payments", {
+                "mode_of_payment": final_payment_method,
+                "amount": -abs(final_return_amount),  # Negative amount for returns
+                # "account": payment_account,
+            })
 
         return_doc.save()
         return_doc.submit()
@@ -1368,7 +1372,7 @@ def create_partial_return(invoice_name, return_items):
         return {
             "success": True,
             "return_invoice": return_doc.name,
-            "message": f"Return created successfully: {return_doc.name}"
+            "message": f"Return created successfully: {return_doc.name} (Payment: {final_payment_method})"
         }
 
     except Exception as e:
