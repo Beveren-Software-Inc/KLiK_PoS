@@ -13,6 +13,7 @@ import { useBarcodeScanner } from "../hooks/useBarcodeScanner"
 import type { MenuItem, GiftCoupon, POSProfile } from "../../types"
 import { useMediaQuery } from "../hooks/useMediaQuery"
 import { useCartStore } from "../stores/cartStore"
+import { toast } from "react-toastify"
 
 export default function RetailPOSLayout() {
   const [selectedCategory, setSelectedCategory] = useState("all")
@@ -227,7 +228,33 @@ export default function RetailPOSLayout() {
 
       // First: handle scale barcodes regardless of scanner-only setting
       if (/^[0-9]+$/.test(searchQuery) && scalePrefix && searchQuery.startsWith(scalePrefix)) {
-        const parsed = parseScaleBarcode(searchQuery.trim())
+        const raw = searchQuery.trim()
+
+        // Enforce presence of single check digit (total 13 digits) for scale barcodes
+        if (raw.length !== 13) {
+          toast.error('Scale barcode must be 13 digits including check digit')
+          return
+        }
+
+        // Validate EAN-13 check digit strictly before proceeding
+        const body12 = raw.substring(0, 12)
+        const providedCheck = raw.substring(12, 13)
+        const computeEAN13 = (digits12: string): string => {
+          let sum = 0
+          for (let i = 0; i < 12; i++) {
+            const n = parseInt(digits12.charAt(i), 10)
+            sum += (i % 2 === 0) ? n : n * 3
+          }
+          const mod = sum % 10
+          return mod === 0 ? '0' : String(10 - mod)
+        }
+        const expectedCheck = computeEAN13(body12)
+        if (expectedCheck !== providedCheck) {
+          toast.error('Invalid scale barcode check digit')
+          return
+        }
+
+        const parsed = parseScaleBarcode(raw)
         if (parsed.isScale) {
           const base = parsed.baseBarcode
           const qty = parsed.quantity
