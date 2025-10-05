@@ -583,7 +583,6 @@ def get_item_uoms_and_prices(item_code):
 
         uom_data = []
 
-        # Add additional UOMs from Item UOM child table
         for uom_row in item_doc.get("uoms", []):
             uom_data.append({
                 "uom": uom_row.uom,
@@ -591,7 +590,6 @@ def get_item_uoms_and_prices(item_code):
                 "price": 0.0
             })
 
-        # Get prices for each UOM from Item Price doctype
         for uom_info in uom_data:
             price_list_rate = frappe.db.get_value(
                 "Item Price",
@@ -624,7 +622,6 @@ def get_item_uoms_and_prices(item_code):
                     valuation_rate = frappe.db.get_value("Item", item_code, "valuation_rate") or 0
                     converted_price = float(valuation_rate) * uom_info["conversion_factor"]
                     uom_info["price"] = converted_price
-        # print("UOM DARTA", uom_data)
         return {
             "base_uom": item_doc.stock_uom,
             "uoms": uom_data
