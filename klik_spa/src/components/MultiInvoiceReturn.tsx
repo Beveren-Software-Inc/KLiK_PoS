@@ -69,7 +69,6 @@ export default function MultiInvoiceReturn({
 
   useEffect(() => {
     if (isOpen) {
-      // Reset workflow when opening
       if (customer) {
         setWorkflowStep('select-items');
         setSelectedCustomer(customer);
@@ -84,7 +83,6 @@ export default function MultiInvoiceReturn({
       setCustomerSearchQuery('');
       setSelectedAddress('');
 
-      // Automatically load available items and addresses when modal opens if customer is provided
       if (customer) {
         loadAvailableItems();
         loadCustomerAddresses();
@@ -303,16 +301,14 @@ export default function MultiInvoiceReturn({
 
   const handleSubmitReturn = async () => {
     const invoiceReturns = invoices
-      .filter(invoice => selectedInvoices.has(invoice.name)) // Only include selected invoices
+      .filter(invoice => selectedInvoices.has(invoice.name)) 
       .map(invoice => ({
         invoice_name: invoice.name,
         return_items: invoice.items.filter(item => (item.return_qty || 0) > 0),
         // Attach payment info for this invoice
         // These fields are expected by backend to process per-invoice return payments
         // If backend ignores them, it's backward-compatible
-        // @ts-expect-error extend payload for backend support
         payment_method: invoicePayments[invoice.name]?.method,
-        // @ts-expect-error extend payload for backend support
         return_amount: invoicePayments[invoice.name]?.amount ?? invoice.items.reduce((sum, it) => sum + (it.return_qty || 0) * it.rate, 0),
       }))
       .filter(invoiceReturn => invoiceReturn.return_items.length > 0);
