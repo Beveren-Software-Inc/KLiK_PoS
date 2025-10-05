@@ -743,9 +743,13 @@ export default function PaymentDialog({
     const paymentData = {
       items: cartItems.map(item => ({
         ...item,
+        price: (item as any).discountedPrice || item.price, // Use discounted price
         batchNumber: itemDiscounts[item.id]?.batchNumber || null,
         serialNumber: itemDiscounts[item.id]?.serialNumber || null,
         uom: item.uom || 'Nos', // Include selected UOM
+        // Include discount information for backend
+        discountPercentage: itemDiscounts[item.id]?.discountPercentage || 0,
+        discountAmount: itemDiscounts[item.id]?.discountAmount || 0,
       })),
       customer: selectedCustomer,
       paymentMethods: adjustedPaymentMethods.map(([method, amount]) => ({ method, amount })),

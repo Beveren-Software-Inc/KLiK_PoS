@@ -638,7 +638,7 @@ def build_sales_invoice_doc(customer, items, amount_paid, sales_and_tax_charges,
         item_data = {
             "item_code": item.get("id"),
             "qty": item.get("quantity"),
-            "rate": item.get("price"),
+            "rate": item.get("price"),  # This is the discounted price from frontend
             "income_account": income_account,
             "expense_account": expense_account,
             "warehouse": pos_profile.warehouse,
