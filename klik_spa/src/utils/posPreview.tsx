@@ -14,7 +14,7 @@
 //   const [style, setStyle] = useState("")
 //   const [loading, setLoading] = useState(true)
 //    const { posDetails, loading: posLoading } = usePOSDetails();
-  
+
 //   const printFormat = posDetails?.print_format ?? "Sales Invoice"
 
 

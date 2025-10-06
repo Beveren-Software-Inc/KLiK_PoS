@@ -21,7 +21,7 @@
 ---
 
 ## KLiK PoS
-KLiK PoS is a 100% open-source Point of Sale for ERPNext - simple, modern, responsive, and feature-rich system designed for retail businesses. 
+KLiK PoS is a 100% open-source Point of Sale for ERPNext - simple, modern, responsive, and feature-rich system designed for retail businesses.
 
 ---
 
@@ -49,75 +49,75 @@ After installing KLiK PoS, a few extra configurations are required inside **POS 
 Navigate to **POS Profile** in ERPNext and configure the following fields:
 <img width="1137" height="907" alt="image" src="https://github.com/user-attachments/assets/ce6446da-8646-4109-b1d9-bf065cbe4f4d" />
 
--   **Business Type**  
+-   **Business Type**
     Defines the type of customer allowed in the POS:
-    
+
     -   **B2C** → For walk-in individual customers. Payment is required immediately at checkout.
-        
+
     -   **B2B** → For company customers. Sales can be completed on credit (Can make instant payment, partial payment or pay later).
-        
-    -   **B2C & B2B** → Both types allowed.  
+
+    -   **B2C & B2B** → Both types allowed.
         This directly controls how customers are fetched (Individual vs. Company) and whether credit sales are permitted.
-        
--   **POS Print Format**  
+
+-   **POS Print Format**
     Select the print format to use when an invoice is submitted.
-    
+
     -   Default: Thermal printer–friendly format.
-        
+
     -   Custom formats: You may create your own print formats and select them here.
-        
--   **Email Template**  
+
+-   **Email Template**
     Used when sending invoices via email.
-    
+
     -   If blank, a default template is used.
-        
+
     -   Recommended: Define your own email template for a consistent branding experience.
-        
+
 -   **WhatsApp Template**
  <img width="1271" height="731" alt="Screenshot 2025-09-28 at 10 32 30" src="https://github.com/user-attachments/assets/619d9b53-e467-4c5e-bfb4-fa69cd32837e" />
- 
+
     Used when sharing invoices via WhatsApp.
-    
+
     -   Templates must be registered and approved in the **WhatsApp Template** doctype.
-        
+
     -   If left blank, a fallback default will be used.
-        
--   **Default View**  
+
+-   **Default View**
 Defines how items are displayed on the POS screen:
         <img width="2922" height="1660" alt="image (1)" src="https://github.com/user-attachments/assets/00f7fb5b-7a63-4060-892f-d20d02b04462" />
 
     -   **List View** → Compact list-style layout.
-        
+
     -   **Grid View** → Grid-style product cards (recommended for retail).
-        
--   **Hide Expected Amount**  
+
+-   **Hide Expected Amount**
     Controls cashier visibility at POS closing shift:
-    
+
     -   Enabled → Cashiers do not see the day’s expected sales amount; they must enter their counted cash manually.
-        
-    -   Disabled → Cashiers see the expected amount before submitting closing entry.  
+
+    -   Disabled → Cashiers see the expected amount before submitting closing entry.
         _Admins and System Managers always have full visibility regardless of this setting._
-        
+
 -   **Enable WhatsApp / Enable SMS**
-    
+
     -   Enable these only if WhatsApp or SMS gateways are properly configured.
-        
+
     -   If not configured, leave unchecked to avoid errors during invoice sharing.
-        
+
 -   **Use Scanner Fully**
-    
+
     -   When enabled, items can only be added via barcode scanner.
-        
+
     -   Disables manual click-based item selection.
-        
+
     -   If the scanner fails, users can still click the scanner icon in the search bar to enter a barcode manually.
 <img width="2904" height="1646" alt="image (3)" src="https://github.com/user-attachments/assets/aba76c01-1cdc-48fd-9c5e-814fdfd51e36" />
 
 ---
 ### ZATCA Compliance
-KLiK PoS is fully compliant with ZATCA regulations for B2B and B2C invoices, as well as credit notes. The system has been validated and tested with the [Beveren ZATCA Integration App](https://github.com/Beveren-Software-Inc/zatca_integration). 
+KLiK PoS is fully compliant with ZATCA regulations for B2B and B2C invoices, as well as credit notes. The system has been validated and tested with the [Beveren ZATCA Integration App](https://github.com/Beveren-Software-Inc/zatca_integration).
 
-Saudi retailers can install both applications together to achieve ZATCA Phase 2 compliance effortlessly. KLiK PoS has been successfully adopted by numerous retail businesses, including some of the largest Dates Distributor companies in the Kingdom. 
+Saudi retailers can install both applications together to achieve ZATCA Phase 2 compliance effortlessly. KLiK PoS has been successfully adopted by numerous retail businesses, including some of the largest Dates Distributor companies in the Kingdom.
 
 <div align="center">
 	<img src="./docs/screenshots/ZATCA_Compliance.png" alt="Hero Image" width="100%" />
@@ -199,7 +199,7 @@ bench start
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-This app uses `pre-commit` for code formatting and linting.  
+This app uses `pre-commit` for code formatting and linting.
 Install and enable it:
 
 ```bash
@@ -220,4 +220,3 @@ For support and questions, please contact the development team at [info@beverens
 		<img src="./docs/screenshots/beveren-logo.png"" alt="Beveren Software" height="28"/>
 	</a>
 </div>
-

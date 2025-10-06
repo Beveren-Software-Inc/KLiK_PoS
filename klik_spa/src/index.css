@@ -41,7 +41,7 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  
+
   /* Beveren brand colors */
   --color-beveren-50: #f0f6fb;
   --color-beveren-100: #e0ecf6;

@@ -11,5 +11,3 @@ export async function getSerials(itemCode: string): Promise<string[]> {
     return []
   }
 }
-
-

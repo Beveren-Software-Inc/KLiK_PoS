@@ -11,7 +11,7 @@ export default function BottomNavigation() {
      { icon: Users, path: "/customers", label: "Customers" },
     { icon: BarChart3, path: "/dashboard", label: "Dashboard" },
     { icon: FileText, path: "/closing_shift", label: "Closing" },
-    
+
   ]
 
   const isActive = (path: string) => {
@@ -34,15 +34,15 @@ export default function BottomNavigation() {
                 : "text-gray-400 dark:text-gray-500"
             }`}
           >
-            <item.icon 
-              size={20} 
+            <item.icon
+              size={20}
               className={`mb-1 ${
                 isActive(item.path)
                   ? "text-beveren-600 dark:text-beveren-400"
                   : "text-gray-400 dark:text-gray-500"
               }`}
             />
-            <span 
+            <span
               className={`text-xs font-medium truncate ${
                 isActive(item.path)
                   ? "text-beveren-600 dark:text-beveren-400"

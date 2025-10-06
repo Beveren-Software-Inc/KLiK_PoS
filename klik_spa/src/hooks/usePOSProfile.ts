@@ -143,4 +143,3 @@ export function usePOSDetails() {
 
   return { posDetails, loading, error }
 }
-
