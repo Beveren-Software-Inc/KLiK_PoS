@@ -97,11 +97,11 @@ export default function RetailPOSLayout() {
       }
     }
 
-    // Convert qtyBlock to decimal, e.g., 00760 -> 7.60 (two decimals)
-    // Fallback rule compatible with earlier behavior when not using explicit decimal places
-    // If you later add POS setting for decimals, apply it here.
+    // Convert qtyBlock to decimal weight.
+    // For scale labels using grams in 5 digits (e.g., 00760 = 760g),
+    // convert to kilograms with two decimals: 00760 -> 0.76 (divide by 1000)
     const qtyNum = parseInt(qtyBlock, 10)
-    const qty = qtyNum / 100
+    const qty = qtyNum / 1000
     if (Number.isNaN(qty) || qty <= 0) return { isScale: false as const }
 
     return { isScale: true as const, baseBarcode: base, quantity: qty }
