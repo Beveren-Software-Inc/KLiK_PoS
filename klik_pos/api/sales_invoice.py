@@ -689,9 +689,9 @@ def get_income_accounts(item_code):
 		return company_doc.default_income_account
 	except Exception as e:
 		frappe.log_error(
-    f"Error fetching income account for {item_code}: {e!s}",
-    "Income Account Error",
-)
+			f"Error fetching income account for {item_code}: {e!s}",
+			"Income Account Error",
+		)
 
 		return None
 
@@ -1254,7 +1254,7 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None, s
 		return {"success": True, "data": invoices}
 
 	except Exception as e:
-		frappe.log_error(frappe.get_traceback(), f"Error fetching customer invoices for return")
+		frappe.log_error(frappe.get_traceback(), "Error fetching customer invoices for return")
 		return {"success": False, "error": str(e)}
 
 
@@ -1363,12 +1363,12 @@ def create_multi_invoice_return(return_data):
 		if isinstance(return_data, str):
 			return_data = json.loads(return_data)
 
-		customer = return_data.get("customer")
+		# customer = return_data.get("customer")
 		invoice_returns = return_data.get("invoice_returns", [])
 
 		created_returns = []
 
-		for i, invoice_return in enumerate(invoice_returns):
+		for _i, invoice_return in enumerate(invoice_returns):
 			invoice_name = invoice_return.get("invoice_name")
 			return_items = invoice_return.get("return_items", [])
 

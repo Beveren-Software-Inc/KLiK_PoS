@@ -106,7 +106,7 @@ class WhatsAppMessageTemplates(Document):
 			self.id = response["id"]
 			self.status = response["status"]
 			self.db_update()
-		except Exception as e:
+		except Exception:
 			res = frappe.flags.integration_request.json()["error"]
 			error_message = res.get("error_user_msg", res.get("message"))
 			frappe.throw(
@@ -183,11 +183,11 @@ class WhatsAppMessageTemplates(Document):
 				samples = self.sample.split(", ")
 				header.update({"example": {"header_text": samples}})
 		else:
-			pdf_link = ""
+			# pdf_link = ""
 			if not self.sample:
 				key = frappe.get_doc(self.doctype, self.name).get_document_share_key()
 				link = get_pdf_link(self.doctype, self.name)
-				pdf_link = f"{frappe.utils.get_url()}{link}&key={key}"
+				# pdf_link = f"{frappe.utils.get_url()}{link}&key={key}"
 			header.update({"example": {"header_handle": [self._media_id]}})
 
 		return header
@@ -256,7 +256,7 @@ def fetch():
 				doc.db_insert()
 			frappe.db.commit()
 
-	except Exception as e:
+	except Exception:
 		res = frappe.flags.integration_request.json()["error"]
 		error_message = res.get("error_user_msg", res.get("message"))
 		frappe.throw(

@@ -295,7 +295,7 @@ def send_whatsapp_for_specific_invoice(notification_name, invoice_name, mobile_n
 		return result
 
 	except Exception as e:
-		frappe.log_error(f"Error sending WhatsApp for invoice: {str(e)}", "WhatsApp Invoice Send")
+		frappe.log_error(f"Error sending WhatsApp for invoice: {e!s}", "WhatsApp Invoice Send")
 		return {"success": False, "error": str(e)}
 
 
@@ -330,7 +330,7 @@ def get_recent_invoices(limit=10):
 		return invoices
 
 	except Exception as e:
-		frappe.log_error(f"Error getting recent invoices: {str(e)}", "WhatsApp Invoice List")
+		frappe.log_error(f"Error getting recent invoices: {e!s}", "WhatsApp Invoice List")
 		return []
 
 
@@ -361,5 +361,5 @@ def get_invoice_details(invoice_name):
 		}
 
 	except Exception as e:
-		frappe.log_error(f"Error getting invoice details: {str(e)}", "WhatsApp Invoice Details")
+		frappe.log_error(f"Error getting invoice details: {e!s}", "WhatsApp Invoice Details")
 		return None
