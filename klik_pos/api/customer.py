@@ -642,7 +642,6 @@ def update_customer(customer_id, customer_data):
 					frappe.get_traceback(),
 					f"Error updating contact for customer {customer_id}",
 				)
-				# Don't fail the whole operation if contact update fails
 
 		# Update address if address data is provided
 		if address_data and any(

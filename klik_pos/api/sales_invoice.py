@@ -7,6 +7,8 @@ from frappe.utils import flt
 
 from klik_pos.klik_pos.utils import get_current_pos_profile, get_user_default_company
 
+from erpnext.accounts.doctype.sales_invoice.sales_invoice import SalesInvoice
+
 
 def get_current_pos_opening_entry():
 	"""
@@ -60,9 +62,7 @@ def get_sales_invoices(limit=100, start=0, search=""):
 		# Add search filter if provided
 		if search and search.strip():
 			search_term = search.strip()
-			# For comprehensive search, we'll use SQL with OR conditions
-			# This will be handled in the query below
-
+	
 		sales_invoice_meta = frappe.get_meta("Sales Invoice")
 		has_zatca_status = any(
 			df.fieldname == "custom_zatca_submit_status" for df in sales_invoice_meta.fields
@@ -96,7 +96,7 @@ def get_sales_invoices(limit=100, start=0, search=""):
 
 			# Add role-based filtering
 			if is_admin_user:
-				pass  # No additional filters for admin
+				pass  
 			elif current_opening_entry:
 				base_conditions.append(f"custom_pos_opening_entry = '{current_opening_entry}'")
 
@@ -189,10 +189,9 @@ def get_sales_invoices(limit=100, start=0, search=""):
 			inv["items"] = items
 
 			# Get payment method from payment child table
-			payment_method = "-"  # Default for unpaid invoices
+			payment_method = "-"  
 			if invoice_doc.payments:
-				# Always get payment method from the payment child table if it exists
-				# This ensures original invoices with returns still show their payment method
+
 				payment_method = invoice_doc.payments[0].mode_of_payment
 			elif invoice_doc.status == "Draft":
 				payment_method = "-"
@@ -266,7 +265,6 @@ def get_invoice_details(invoice_id):
 				seconds = total_seconds % 60
 				invoice_data["posting_time"] = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 			else:
-				# It's already a string, keep as is
 				invoice_data["posting_time"] = str(invoice_data["posting_time"])
 
 		# Get cashier full name from document owner
@@ -373,7 +371,6 @@ def create_and_submit_invoice(data):
 		doc.save(ignore_permissions=True)
 		doc.submit()
 
-		# Create payment entry for B2B or B2B & B2C with company customers
 		payment_entry = None
 		should_create_payment_entry = False
 
@@ -402,7 +399,7 @@ def create_and_submit_invoice(data):
 			"success": True,
 			"invoice_name": doc.name,
 			"invoice_id": doc.name,
-			"invoice": doc,  # Full invoice object for print preview
+			"invoice": doc, 
 			"payment_entry": payment_entry.name if payment_entry else None,
 			"processing_time": round(processing_time, 2),
 		}
@@ -529,14 +526,13 @@ def build_sales_invoice_doc(
 	elif business_type == "B2B":
 		doc.is_pos = 0
 	elif business_type == "B2B & B2C":
-		# For B2B & B2C, check customer type to determine behavior
 		customer_doc = frappe.get_doc("Customer", customer)
 		if customer_doc.customer_type == "Individual":
-			doc.is_pos = 1  # B2C behavior for individual customers
+			doc.is_pos = 1  
 		else:
-			doc.is_pos = 0  # B2B behavior for company customers
+			doc.is_pos = 0 
 	else:
-		doc.is_pos = 0  # Default to B2B behavior
+		doc.is_pos = 0 
 
 	doc.update_stock = 1
 	doc.warehouse = pos_profile.warehouse
@@ -551,13 +547,10 @@ def build_sales_invoice_doc(
 	if current_opening_entry:
 		doc.custom_pos_opening_entry = current_opening_entry
 
-	# Ensure we continue using the same resolved POS Profile throughout
-
 	# Set round-off fields only if roundoff_amount is not zero
 	if roundoff_amount != 0:
 		doc.custom_roundoff_amount = flt(abs(roundoff_amount))
 		doc.custom_roundoff_account = get_writeoff_account()
-		# Set base round-off amount (conversion_rate defaults to 1 if not set)
 		conversion_rate = doc.conversion_rate or 1
 		doc.custom_base_roundoff_amount = flt(abs(roundoff_amount) * conversion_rate)
 
@@ -590,7 +583,7 @@ def build_sales_invoice_doc(
 		item_data = {
 			"item_code": item.get("id"),
 			"qty": item.get("quantity"),
-			"rate": item.get("price"),  # This is the discounted price from frontend
+			"rate": item.get("price"),
 			"income_account": income_account,
 			"expense_account": expense_account,
 			"warehouse": pos_profile.warehouse,
@@ -884,12 +877,6 @@ def get_writeoff_account():
 		return pos_profile.write_off_account
 
 
-# Copyright (c) 2025, Beveren Software Inc and contributors
-# For license information, please see license.txt
-
-from erpnext.accounts.doctype.sales_invoice.sales_invoice import SalesInvoice
-
-
 class CustomSalesInvoice(SalesInvoice):
 	def get_gl_entries(self, warehouse_account=None):
 		from erpnext.accounts.general_ledger import merge_similar_entries
@@ -1052,39 +1039,6 @@ def get_customer_receivable_account(customer, company):
 		return frappe.db.get_value("Company", company, "default_receivable_account")
 
 
-# @frappe.whitelist()
-# def returned_qty(customer, sales_invoice, item):
-#     """Get total returned quantity for a specific item from a specific invoice for a customer"""
-#     values = {
-#         'customer': customer,
-#         'sales_invoice': sales_invoice,
-#         'item': item
-#     }
-
-#     total_returned = frappe.db.sql("""
-#         SELECT
-#             `tabCredit Details`.sales_invoice,
-#             `tabSales Invoice`.customer,
-#             SUM(`tabCredit Details`.qtr) AS total_returned_qty
-#         FROM
-#             `tabSales Invoice`
-#         JOIN
-#             `tabCredit Details` ON `tabSales Invoice`.name = `tabCredit Details`.parent
-#         WHERE
-#             `tabSales Invoice`.customer = %(customer)s
-#             AND `tabCredit Details`.sales_invoice = %(sales_invoice)s
-#             AND `tabCredit Details`.item = %(item)s
-#             AND `tabSales Invoice`.docstatus = 1
-#             AND `tabSales Invoice`.status != 'Cancelled'
-#         GROUP BY
-#             `tabCredit Details`.sales_invoice, `tabSales Invoice`.customer
-#     """, values=values, as_dict=True)
-
-#     if not total_returned:
-#         return {'total_returned_qty': 0}
-
-
-#     return total_returned[0]
 @frappe.whitelist()
 def returned_qty(customer, sales_invoice, item):
 	"""
@@ -1311,7 +1265,6 @@ def create_partial_return(invoice_name, return_items, payment_method=None, retur
 						filtered_items.append(item)
 						break
 
-		# Replace items with only the selected ones
 		return_doc.items = filtered_items
 
 		# Clear existing payments and add custom payment method
@@ -1320,24 +1273,17 @@ def create_partial_return(invoice_name, return_items, payment_method=None, retur
 		# Calculate total returned amount
 		total_returned_amount = sum(abs(item.qty * item.rate) for item in return_doc.items)
 
-		# Use provided return amount or calculate from items
 		final_return_amount = return_amount if return_amount is not None else total_returned_amount
 
-		# Use provided payment method or default to Cash
 		final_payment_method = payment_method if payment_method else "Cash"
 
-		# Add payment entry with the specified payment method
 		if final_return_amount > 0:
-			# Get the payment account for the specified payment method
-			# payment_account = frappe.db.get_value("Mode of Payment", final_payment_method, "default_account")
-			# if not payment_account:
-			#     payment_account = frappe.db.get_value("Company", return_doc.company, "default_cash_account")
-
+		
 			return_doc.append(
 				"payments",
 				{
 					"mode_of_payment": final_payment_method,
-					"amount": -abs(final_return_amount),  # Negative amount for returns
+					"amount": -abs(final_return_amount), 
 					# "account": payment_account,
 				},
 			)
@@ -1379,7 +1325,6 @@ def create_multi_invoice_return(return_data):
 					created_returns.append(result.get("return_invoice"))
 				else:
 					frappe.log_error(f"Failed to create return for {invoice_name}: {result.get('message')}")
-					# Continue with other invoices even if one fails
 
 		return {
 			"success": True,

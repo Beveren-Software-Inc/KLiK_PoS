@@ -11,7 +11,6 @@ from frappe.utils import get_site_name
 # Store active connections
 active_connections = set()
 
-
 @frappe.whitelist(allow_guest=True)
 def stock_updates():
 	"""WebSocket endpoint for real-time stock updates"""
@@ -71,39 +70,12 @@ def broadcast_stock_update(item_code: str, available: float):
 	for websocket in active_connections:
 		try:
 			task = asyncio.create_task(websocket.send(json.dumps(message)))
-			task.add_done_callback(lambda t: t.exception())  # prevents 'task was destroyed' warning
+			task.add_done_callback(lambda t: t.exception())
 		except Exception:
 			disconnected.add(websocket)
 
 	for websocket in disconnected:
 		active_connections.discard(websocket)
-
-
-# def broadcast_stock_update(item_code: str, available: float):
-# 	"""Broadcast stock update to all connected clients"""
-# 	if not active_connections:
-# 		return
-
-# 	message = {
-# 		"type": "stock_update",
-# 		"data": {
-# 			"item_code": item_code,
-# 			"available": available,
-# 			"timestamp": int(time.time() * 1000),
-# 		},
-# 	}
-
-# 	# Send to all connected clients
-# 	disconnected = set()
-# 	for websocket in active_connections:
-# 		try:
-# 			_task = asyncio.create_task(websocket.send(json.dumps(message)))
-# 		except Exception:
-# 			disconnected.add(websocket)
-
-# 	# Remove disconnected clients
-# 	for websocket in disconnected:
-# 		active_connections.discard(websocket)
 
 
 def start_websocket_server():
@@ -116,7 +88,7 @@ def start_websocket_server():
 		start_server = websockets.serve(
 			handle_client,
 			"localhost",
-			8765,  # WebSocket port
+			8765,  
 			ping_interval=30,
 			ping_timeout=10,
 		)
@@ -130,7 +102,6 @@ def start_websocket_server():
 	print("WebSocket server started on port 8765")
 
 
-# Start WebSocket server when module is imported
 try:
 	start_websocket_server()
 except Exception as e:

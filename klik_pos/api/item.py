@@ -354,7 +354,6 @@ def get_items_with_balance_and_price():
 	try:
 		# Build base query with early stock filtering if hide_unavailable is enabled
 		if hide_unavailable:
-			# Use SQL join to filter out unavailable items early
 			base_query = [
 				"SELECT DISTINCT i.name, i.item_name, i.description, i.item_group, i.image, i.stock_uom",
 				"FROM `tabItem` i",
@@ -420,7 +419,7 @@ def get_items_with_balance_and_price():
 				for barcode_row in barcode_results:
 					item_code = barcode_row.get("parent")
 					if item_code and item_code not in barcode_map:
-						barcode_map[item_code] = barcode_row.get("barcode")  # First barcode
+						barcode_map[item_code] = barcode_row.get("barcode")
 			except Exception:
 				frappe.log_error(frappe.get_traceback(), "Error fetching item barcodes for POS")
 
@@ -429,14 +428,12 @@ def get_items_with_balance_and_price():
 			# Get balance (already filtered if hide_unavailable is True)
 			balance = fetch_item_balance(item["name"], warehouse)
 
-			# Skip items with no stock if hide_unavailable is enabled
 			if hide_unavailable and balance <= 0:
 				continue
 
 			# Get price info only for available items
 			price_info = fetch_item_price(item["name"], price_list)
 
-			# Get barcode from the map
 			primary_barcode = barcode_map.get(item["name"])
 
 			enriched_items.append(
@@ -466,7 +463,6 @@ def get_items_with_balance_and_price():
 @frappe.whitelist(allow_guest=True)
 def get_stock_updates():
 	"""Get only stock updates for all items - lightweight endpoint with early filtering."""
-	# Prefer POS Profile from the active opening entry to match the UI/session
 	pos_doc = None
 	try:
 		current_opening_entry = get_current_pos_opening_entry()
@@ -527,7 +523,6 @@ def get_stock_updates():
 		# Optimized: Use batch processing with smaller chunks
 		stock_updates = {}
 
-		# Process in chunks of 100 to avoid memory issues
 		chunk_size = 100
 		for i in range(0, len(item_codes), chunk_size):
 			chunk = item_codes[i : i + chunk_size]
