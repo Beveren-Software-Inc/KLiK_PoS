@@ -67,17 +67,43 @@ def broadcast_stock_update(item_code: str, available: float):
 		},
 	}
 
-	# Send to all connected clients
 	disconnected = set()
 	for websocket in active_connections:
 		try:
-			_task = asyncio.create_task(websocket.send(json.dumps(message)))
+			task = asyncio.create_task(websocket.send(json.dumps(message)))
+			task.add_done_callback(lambda t: t.exception())  # prevents 'task was destroyed' warning
 		except Exception:
 			disconnected.add(websocket)
 
-	# Remove disconnected clients
 	for websocket in disconnected:
 		active_connections.discard(websocket)
+
+
+# def broadcast_stock_update(item_code: str, available: float):
+# 	"""Broadcast stock update to all connected clients"""
+# 	if not active_connections:
+# 		return
+
+# 	message = {
+# 		"type": "stock_update",
+# 		"data": {
+# 			"item_code": item_code,
+# 			"available": available,
+# 			"timestamp": int(time.time() * 1000),
+# 		},
+# 	}
+
+# 	# Send to all connected clients
+# 	disconnected = set()
+# 	for websocket in active_connections:
+# 		try:
+# 			_task = asyncio.create_task(websocket.send(json.dumps(message)))
+# 		except Exception:
+# 			disconnected.add(websocket)
+
+# 	# Remove disconnected clients
+# 	for websocket in disconnected:
+# 		active_connections.discard(websocket)
 
 
 def start_websocket_server():

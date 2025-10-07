@@ -88,8 +88,8 @@ def send_whatsapp_message(
 			}
 
 	except Exception as e:
-		frappe.log_error(f"WhatsApp Message Error: {str(e)}", "WhatsApp Messaging")
-		return {"success": False, "error": str(e)}
+		frappe.log_error(f"WhatsApp Message Error: {e!s}", "WhatsApp Messaging")
+		return {"success": False, "error": "f{e!s}"}
 
 
 def send_text_message(
@@ -169,12 +169,12 @@ def send_template_message(
 		if isinstance(template_parameters, str):
 			try:
 				template_parameters = json.loads(template_parameters)
-			except:
+			except Exception:
 				template_parameters = [template_parameters]
 
 		# Validate each parameter
 		validated_parameters = []
-		for i, param in enumerate(template_parameters):
+		for _i, param in enumerate(template_parameters):
 			if param is not None:
 				validated_parameters.append(str(param).strip())
 			else:
@@ -347,7 +347,7 @@ def make_whatsapp_api_call(
 					error_message = error_response["error"].get(
 						"message", error_response["error"].get("Error", error_message)
 					)
-			except:
+			except Exception:
 				pass
 
 		# Log detailed error information
@@ -420,7 +420,7 @@ def get_document_attachment_url(doctype, docname):
 
 		return f"{site_url}{link}&key={key}"
 	except Exception as e:
-		frappe.log_error(f"Error getting document attachment URL: {str(e)}", "WhatsApp Messaging")
+		frappe.log_error(f"Error getting document attachment URL: {e!s}", "WhatsApp Messaging")
 		return None
 
 
@@ -513,7 +513,7 @@ def test_whatsapp_connection():
 			try:
 				error_response = frappe.flags.integration_request.json()
 				error_message = error_response.get("error", {}).get("message", error_message)
-			except:
+			except Exception:
 				pass
 
 		return {"success": False, "error": f"Connection test failed: {error_message}"}
@@ -668,7 +668,7 @@ def validate_phone_number_format(phone_number):
 		}
 
 	except Exception as e:
-		return {"valid": False, "error": f"Validation error: {str(e)}"}
+		return {"valid": False, "error": f"Validation error: {e!s}"}
 
 
 @frappe.whitelist()
@@ -700,7 +700,7 @@ def get_whatsapp_template_status(template_name):
 
 	except Exception as e:
 		return {
-			"error": f"Template not found or error: {str(e)}",
+			"error": f"Template not found or error:{e!s}",
 			"template_name": template_name,
 		}
 
@@ -845,7 +845,7 @@ def test_invoice_with_pdf(phone_number, invoice_no, message="Your invoice is rea
 					error_message = error_response["error"].get(
 						"message", error_response["error"].get("Error", error_message)
 					)
-			except:
+			except Exception:
 				pass
 
 		return {
@@ -925,7 +925,7 @@ def test_simple_text_message(phone_number, message="Test message"):
 					error_message = error_response["error"].get(
 						"message", error_response["error"].get("Error", error_message)
 					)
-			except:
+			except Exception:
 				pass
 
 		return {
@@ -973,7 +973,7 @@ def test_template_with_parameters(template_name, phone_number, parameters=None):
 			if isinstance(parameters, str):
 				try:
 					parameters = json.loads(parameters)
-				except:
+				except Exception:
 					parameters = [parameters]
 
 			# Validate and clean parameters
@@ -1040,7 +1040,7 @@ def test_template_with_parameters(template_name, phone_number, parameters=None):
 					error_message = error_response["error"].get(
 						"message", error_response["error"].get("Error", error_message)
 					)
-			except:
+			except Exception:
 				pass
 
 		return {
@@ -1089,6 +1089,6 @@ def generate_and_attach_invoice_pdf(invoice_name, print_format="Standard", lang=
 		# Return full URL to the file
 		return get_url(filedoc.file_url)
 
-	except Exception as e:
+	except Exception:
 		frappe.log_error(frappe.get_traceback(), "generate_and_attach_invoice_pdf Failed")
 		raise

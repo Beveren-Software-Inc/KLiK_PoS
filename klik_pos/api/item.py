@@ -628,7 +628,7 @@ def get_item_groups_for_pos():
 		return {"groups": formatted_groups, "total_items": total_item_count}
 
 	except Exception as e:
-		frappe.log_error(frappe.get_traceback(), f"Get Item Groups for POS Error {str(e)}")
+		frappe.log_error(frappe.get_traceback(), f"Get Item Groups for POS Error {e!s}")
 		frappe.throw(_("Something went wrong while fetching item group data."))
 
 

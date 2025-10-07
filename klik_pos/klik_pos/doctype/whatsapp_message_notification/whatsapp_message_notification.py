@@ -90,100 +90,208 @@ class WhatsAppMessageNotification(Document):
 		default_template=None,
 		ignore_condition=False,
 	):
-		"""Send template message for document events"""
 		if self.disabled:
 			return
 
 		doc_data = doc.as_dict()
+
+		# Evaluate condition if provided
 		if self.condition and not ignore_condition:
-			# check if condition satisfies
 			if not frappe.safe_eval(self.condition, get_safe_globals(), dict(doc=doc_data)):
 				return
 
+		# Get template details
 		template = default_template or frappe.db.get_value(
 			"WhatsApp Message Templates", self.template, fieldname="*"
 		)
 
-		if template:
-			if self.field_name:
-				phone_number = phone_no or doc_data[self.field_name]
-			else:
-				phone_number = phone_no
+		if not template:
+			return
 
-			# Prepare template parameters
-			template_parameters = []
-			if self.fields:
-				for field in self.fields:
-					if isinstance(doc, Document):
-						# get field with prettier value
-						value = doc.get_formatted(field.field_name)
-					else:
-						value = doc_data[field.field_name]
-						if isinstance(
-							doc_data[field.field_name],
-							(datetime.date, datetime.datetime),
-						):
-							value = str(doc_data[field.field_name])
+		# Determine recipient phone number
+		if self.field_name:
+			phone_number = phone_no or doc_data[self.field_name]
+		else:
+			phone_number = phone_no
 
-					template_parameters.append(value)
-
-			# Handle attachments
-			attach_document = self.attach_document_print
-			custom_attachment = None
-			file_name = None
-
-			if self.custom_attachment:
-				if self.attach_from_field:
-					custom_attachment = doc_data[self.attach_from_field]
-					if not custom_attachment.startswith("http"):
-						# get share key so that private files can be sent
-						key = doc.get_document_share_key()
-						custom_attachment = f"{frappe.utils.get_url()}{custom_attachment}&key={key}"
+		# Prepare template parameters
+		template_parameters = []
+		if self.fields:
+			for field in self.fields:
+				if isinstance(doc, Document):
+					value = doc.get_formatted(field.field_name)
 				else:
-					custom_attachment = self.attach
-					if not custom_attachment.startswith("http"):
-						custom_attachment = f"{frappe.utils.get_url()}{custom_attachment}"
+					value = doc_data[field.field_name]
+					if isinstance(
+						doc_data[field.field_name],
+						datetime.date | datetime.datetime,
+					):
+						value = str(doc_data[field.field_name])
+				template_parameters.append(value)
 
-				file_name = self.file_name
+		# Handle attachments
+		attach_document = self.attach_document_print
+		custom_attachment = None
+		file_name = None
 
-			# Send the message
-			result = send_whatsapp_message(
-				to_number=phone_number,
-				message_type="template",
-				template_name=template.name,
-				template_parameters=template_parameters,
-				reference_doctype=doc_data.get("doctype"),
-				reference_name=doc_data.get("name"),
-				attach_document=attach_document,
-				custom_attachment=custom_attachment,
-				file_name=file_name,
+		if self.custom_attachment:
+			if self.attach_from_field:
+				custom_attachment = doc_data[self.attach_from_field]
+				if not custom_attachment.startswith("http"):
+					key = doc.get_document_share_key()
+					custom_attachment = f"{frappe.utils.get_url()}{custom_attachment}&key={key}"
+			else:
+				custom_attachment = self.attach
+				if not custom_attachment.startswith("http"):
+					custom_attachment = f"{frappe.utils.get_url()}{custom_attachment}"
+
+			file_name = self.file_name
+
+		# Send the WhatsApp message
+		result = send_whatsapp_message(
+			to_number=phone_number,
+			message_type="template",
+			template_name=template.name,
+			template_parameters=template_parameters,
+			reference_doctype=doc_data.get("doctype"),
+			reference_name=doc_data.get("name"),
+			attach_document=attach_document,
+			custom_attachment=custom_attachment,
+			file_name=file_name,
+		)
+
+		# Handle success or failure
+		if result.get("success"):
+			if (
+				doc_data
+				and self.set_property_after_alert
+				and self.property_value
+				and doc_data.get("doctype")
+				and doc_data.get("name")
+			):
+				fieldname = self.set_property_after_alert
+				value = self.property_value
+				meta = frappe.get_meta(doc_data.get("doctype"))
+				df = meta.get_field(fieldname)
+				if df:
+					if df.fieldtype in frappe.model.numeric_fieldtypes:
+						value = frappe.utils.cint(value)
+					frappe.db.set_value(
+						doc_data.get("doctype"),
+						doc_data.get("name"),
+						fieldname,
+						value,
+					)
+
+			frappe.msgprint("WhatsApp Message Triggered", indicator="green", alert=True)
+		else:
+			frappe.msgprint(
+				f"Failed to trigger WhatsApp message: {result.get('error')}",
+				indicator="red",
+				alert=True,
 			)
 
-			if result.get("success"):
-				# Set property after alert if configured
-				if doc_data and self.set_property_after_alert and self.property_value:
-					if doc_data.doctype and doc_data.name:
-						fieldname = self.set_property_after_alert
-						value = self.property_value
-						meta = frappe.get_meta(doc_data.get("doctype"))
-						df = meta.get_field(fieldname)
-						if df:
-							if df.fieldtype in frappe.model.numeric_fieldtypes:
-								value = frappe.utils.cint(value)
-							frappe.db.set_value(
-								doc_data.get("doctype"),
-								doc_data.get("name"),
-								fieldname,
-								value,
-							)
+	# def send_template_message(
+	# 	self,
+	# 	doc: Document,
+	# 	phone_no=None,
+	# 	default_template=None,
+	# 	ignore_condition=False,
+	# ):
+	# 	"""Send template message for document events"""
+	# 	if self.disabled:
+	# 		return
 
-				frappe.msgprint("WhatsApp Message Triggered", indicator="green", alert=True)
-			else:
-				frappe.msgprint(
-					f"Failed to trigger WhatsApp message: {result.get('error')}",
-					indicator="red",
-					alert=True,
-				)
+	# 	doc_data = doc.as_dict()
+	# 	if self.condition and not ignore_condition:
+	# 		# check if condition satisfies
+	# 		if not frappe.safe_eval(self.condition, get_safe_globals(), dict(doc=doc_data)):
+	# 			return
+
+	# 	template = default_template or frappe.db.get_value(
+	# 		"WhatsApp Message Templates", self.template, fieldname="*"
+	# 	)
+
+	# 	if template:
+	# 		if self.field_name:
+	# 			phone_number = phone_no or doc_data[self.field_name]
+	# 		else:
+	# 			phone_number = phone_no
+
+	# 		# Prepare template parameters
+	# 		template_parameters = []
+	# 		if self.fields:
+	# 			for field in self.fields:
+	# 				if isinstance(doc, Document):
+	# 					# get field with prettier value
+	# 					value = doc.get_formatted(field.field_name)
+	# 				else:
+	# 					value = doc_data[field.field_name]
+	# 					if isinstance(
+	# 						doc_data[field.field_name],
+	# 						(datetime.date, datetime.datetime),
+	# 					):
+	# 						value = str(doc_data[field.field_name])
+
+	# 				template_parameters.append(value)
+
+	# 		# Handle attachments
+	# 		attach_document = self.attach_document_print
+	# 		custom_attachment = None
+	# 		file_name = None
+
+	# 		if self.custom_attachment:
+	# 			if self.attach_from_field:
+	# 				custom_attachment = doc_data[self.attach_from_field]
+	# 				if not custom_attachment.startswith("http"):
+	# 					# get share key so that private files can be sent
+	# 					key = doc.get_document_share_key()
+	# 					custom_attachment = f"{frappe.utils.get_url()}{custom_attachment}&key={key}"
+	# 			else:
+	# 				custom_attachment = self.attach
+	# 				if not custom_attachment.startswith("http"):
+	# 					custom_attachment = f"{frappe.utils.get_url()}{custom_attachment}"
+
+	# 			file_name = self.file_name
+
+	# 		# Send the message
+	# 		result = send_whatsapp_message(
+	# 			to_number=phone_number,
+	# 			message_type="template",
+	# 			template_name=template.name,
+	# 			template_parameters=template_parameters,
+	# 			reference_doctype=doc_data.get("doctype"),
+	# 			reference_name=doc_data.get("name"),
+	# 			attach_document=attach_document,
+	# 			custom_attachment=custom_attachment,
+	# 			file_name=file_name,
+	# 		)
+
+	# 		if result.get("success"):
+	# 			# Set property after alert if configured
+	# 			if doc_data and self.set_property_after_alert and self.property_value:
+	# 				if doc_data.doctype and doc_data.name:
+	# 					fieldname = self.set_property_after_alert
+	# 					value = self.property_value
+	# 					meta = frappe.get_meta(doc_data.get("doctype"))
+	# 					df = meta.get_field(fieldname)
+	# 					if df:
+	# 						if df.fieldtype in frappe.model.numeric_fieldtypes:
+	# 							value = frappe.utils.cint(value)
+	# 						frappe.db.set_value(
+	# 							doc_data.get("doctype"),
+	# 							doc_data.get("name"),
+	# 							fieldname,
+	# 							value,
+	# 						)
+
+	# 			frappe.msgprint("WhatsApp Message Triggered", indicator="green", alert=True)
+	# 		else:
+	# 			frappe.msgprint(
+	# 				f"Failed to trigger WhatsApp message: {result.get('error')}",
+	# 				indicator="red",
+	# 				alert=True,
+	# 			)
 
 	def on_trash(self):
 		"""On delete remove from schedule"""
@@ -197,7 +305,7 @@ class WhatsAppMessageNotification(Document):
 
 	def get_documents_for_today(self):
 		"""Get list of documents that will be triggered today"""
-		docs = []
+		# docs = []
 
 		diff_days = self.days_in_advance
 		if self.doctype_event == "Days After":
@@ -256,13 +364,13 @@ def send_whatsapp_for_specific_invoice(notification_name, invoice_name, mobile_n
 	Send WhatsApp message for a specific invoice
 
 	Args:
-	    notification_name (str): Name of the WhatsApp Message Notification
-	    invoice_name (str): Sales Invoice name
-	    mobile_number (str): Mobile number with country code
-	    customer_name (str): Customer name
+	        notification_name (str): Name of the WhatsApp Message Notification
+	        invoice_name (str): Sales Invoice name
+	        mobile_number (str): Mobile number with country code
+	        customer_name (str): Customer name
 
 	Returns:
-	    dict: Response with success status
+	        dict: Response with success status
 	"""
 	try:
 		# Get the notification configuration
@@ -305,10 +413,10 @@ def get_recent_invoices(limit=10):
 	Get recent submitted invoices for quick selection
 
 	Args:
-	    limit (int): Number of invoices to return
+	        limit (int): Number of invoices to return
 
 	Returns:
-	    list: List of recent invoices
+	        list: List of recent invoices
 	"""
 	try:
 		invoices = frappe.get_all(
@@ -340,10 +448,10 @@ def get_invoice_details(invoice_name):
 	Get detailed invoice information
 
 	Args:
-	    invoice_name (str): Sales Invoice name
+	        invoice_name (str): Sales Invoice name
 
 	Returns:
-	    dict: Invoice details
+	        dict: Invoice details
 	"""
 	try:
 		invoice = frappe.get_doc("Sales Invoice", invoice_name)
