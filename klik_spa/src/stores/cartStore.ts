@@ -12,6 +12,7 @@ interface CartState {
 
   // Actions
   addToCart: (item: Omit<CartItem, 'quantity'>) => Promise<void>
+  addToCartWithQuantity: (item: Omit<CartItem, 'quantity'>, quantity: number) => Promise<void>
   updateQuantity: (id: string, quantity: number) => void
   updateUOM: (id: string, uom: string, price: number) => void
   removeItem: (id: string) => void
@@ -73,6 +74,54 @@ export const useCartStore = create<CartState>()(
 
           set((state) => ({
             cartItems: [...state.cartItems, { ...item, price: finalPrice, quantity: 1 }]
+          }));
+        }
+      },
+
+      addToCartWithQuantity: async (item, quantity) => {
+        const state = get();
+        const existingItem = state.cartItems.find((cartItem) => cartItem.id === item.id);
+
+        // Check if item has available quantity
+        if (item.available !== undefined && item.available < quantity) {
+          toast.error(`Only ${item.available} ${item.uom || 'units'} of ${item.name} available`);
+          return;
+        }
+
+        if (existingItem) {
+          // Check if adding the quantity would exceed available stock
+          if (item.available !== undefined && (existingItem.quantity + quantity) > item.available) {
+            toast.error(`Only ${item.available} ${item.uom || 'units'} of ${item.name} available`);
+            return;
+          }
+
+          set((state) => ({
+            cartItems: state.cartItems.map((cartItem) =>
+              cartItem.id === item.id
+                ? { ...cartItem, quantity: cartItem.quantity + quantity }
+                : cartItem
+            )
+          }));
+        } else {
+          // New item - fetch correct price if customer is selected
+          let finalPrice = item.price;
+
+          if (state.selectedCustomer) {
+            try {
+              console.log(`🔄 Fetching correct price for ${item.name} with customer: ${state.selectedCustomer.name}`);
+              const priceInfo = await getItemPriceForCustomer(item.id, state.selectedCustomer.id);
+              if (priceInfo.success) {
+                finalPrice = priceInfo.price;
+                console.log(`💰 Updated price for ${item.name}: ${item.price} → ${finalPrice}`);
+              }
+            } catch (error) {
+              console.error('❌ Error fetching price for customer:', error);
+              // Continue with original price if API fails
+            }
+          }
+
+          set((state) => ({
+            cartItems: [...state.cartItems, { ...item, price: finalPrice, quantity }]
           }));
         }
       },
