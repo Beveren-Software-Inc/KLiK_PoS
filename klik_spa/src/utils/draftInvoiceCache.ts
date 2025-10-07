@@ -60,20 +60,20 @@ export function clearDraftInvoiceCache(): void {
   localStorage.removeItem(CACHE_KEY);
 }
 
-export function loadCachedItemsToCart(): boolean {
+export async function loadCachedItemsToCart(): Promise<boolean> {
   const cachedData = getCachedDraftInvoiceItems();
   if (!cachedData || cachedData.items.length === 0) {
     return false;
   }
 
-  const { addToCart, updateQuantity, setSelectedCustomer } = useCartStore.getState();
+  const { setSelectedCustomer, addToCartWithQuantity } = useCartStore.getState();
 
   // Set customer if available
   if (cachedData.customer) {
     setSelectedCustomer(cachedData.customer);
   }
 
-  // Add cached items to cart
+  // Add cached items to cart with correct quantities
   for (const item of cachedData.items) {
     const cartItem = {
       id: item.id,
@@ -81,15 +81,13 @@ export function loadCachedItemsToCart(): boolean {
       category: item.category,
       price: item.price,
       image: item.image,
+      available: item.available,
+      uom: item.uom,
+      item_code: item.id,
     };
 
-    // Add item to cart (addToCart adds quantity: 1 by default)
-    addToCart(cartItem);
-
-    // Update quantity if needed
-    if (item.quantity > 1) {
-      updateQuantity(item.id, item.quantity);
-    }
+    // Use the new method to add items with specific quantities
+    await addToCartWithQuantity(cartItem, item.quantity);
   }
 
   return true;

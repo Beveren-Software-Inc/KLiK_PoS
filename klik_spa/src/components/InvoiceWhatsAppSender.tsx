@@ -146,4 +146,3 @@ export const InvoiceWhatsAppSender: React.FC<InvoiceWhatsAppSenderProps> = ({
     </div>
   );
 };
-

@@ -37,4 +37,3 @@ export function usePOSOpeningStatus() {
     refetch: fetchStatus,
   };
 }
-

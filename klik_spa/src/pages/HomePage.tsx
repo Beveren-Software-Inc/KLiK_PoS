@@ -7,7 +7,7 @@ export default function HomePage() {
   const { isAuthenticated, loading } = useAuth()
 
   useEffect(() => {
-    
+
     if (!loading) {
       if (isAuthenticated) {
         navigate('/pos', { replace: true })

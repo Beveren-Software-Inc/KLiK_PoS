@@ -152,7 +152,7 @@ export default function SingleInvoiceReturn({
   const handleReturnAllItems = () => {
     setReturnItems(prev => prev.map(item => ({
       ...item,
-      return_qty: item.available_qty 
+      return_qty: item.available_qty
     })));
   };
 

@@ -1349,5 +1349,3 @@ export default function AddCustomerModal({
     </div>
   );
 }
-
-

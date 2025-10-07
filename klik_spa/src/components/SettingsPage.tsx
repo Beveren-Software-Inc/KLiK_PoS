@@ -5,11 +5,11 @@ import { useI18n } from "../hooks/useI18n"
 import { useNavigate } from "react-router-dom"
 import {
   User,
- 
+
   Shield,
   Palette,
   Globe,
-  
+
   Camera,
   Moon,
   Sun,
@@ -17,7 +17,7 @@ import {
   LogOut,
   ChevronRight,
   ArrowLeft,
- 
+
 } from "lucide-react"
 
 export default function SettingsPage() {

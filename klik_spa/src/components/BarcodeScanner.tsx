@@ -147,7 +147,7 @@ export default function BarcodeScannerModal({ onBarcodeDetected, onClose, isOpen
             }
           }
         }
-      }, 200) 
+      }, 200)
 
     } catch (err) {
       console.error('BarcodeDetector error:', err)

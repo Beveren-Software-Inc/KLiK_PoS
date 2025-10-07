@@ -28,7 +28,7 @@ A modern, responsive Point of Sale System built with React, TypeScript, and Vite
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - npm or yarn
 
 ### Installation

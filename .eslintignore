@@ -1,0 +1,7 @@
+klik_spa/public/
+klik_pos/public/
+**/node_modules/
+**/dist/
+**/assets/
+**/*.min.js
+**/*.bundle.js

@@ -301,7 +301,7 @@ export default function MultiInvoiceReturn({
 
   const handleSubmitReturn = async () => {
     const invoiceReturns = invoices
-      .filter(invoice => selectedInvoices.has(invoice.name)) 
+      .filter(invoice => selectedInvoices.has(invoice.name))
       .map(invoice => ({
         invoice_name: invoice.name,
         return_items: invoice.items.filter(item => (item.return_qty || 0) > 0),

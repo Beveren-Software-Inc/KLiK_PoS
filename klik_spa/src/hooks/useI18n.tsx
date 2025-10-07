@@ -118,7 +118,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!mounted) return
-    
+
     const savedLang = localStorage.getItem("language") || "en"
     setLanguage(savedLang)
 
@@ -129,7 +129,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   const handleSetLanguage = (lang: string) => {
     if (!mounted) return
-    
+
     setLanguage(lang)
     localStorage.setItem("language", lang)
     document.documentElement.dir = lang === "ar" ? "rtl" : "ltr"

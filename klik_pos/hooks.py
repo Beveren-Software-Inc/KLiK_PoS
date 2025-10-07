@@ -23,61 +23,60 @@ app_license = "mit"
 
 
 fixtures = [
-    {
-        "doctype": "Custom Field",
-        "filters": [
-            [
-                "name",
-                "in",
-                (
-                    "POS Profile-custom_klik_pos_settings",
-                    "POS Profile-custom_business_type",
-                    "POS Profile-custom_pos_printformat",
-                    "POS Profile-custom_column_break_7pdsa",
-                    "Sales Invoice-custom_roundoff_account",
-                    "Sales Invoice-custom_base_roundoff_amount",
-                    "Sales Invoice-custom_column_break_vtq6c",
-                    "Sales Invoice-custom_roundoff_amount",
-                    "Sales Invoice-custom_roundoff",
-                    "POS Profile-custom_allow_credit_sales",
-                    "POS Profile-custom_hide_expected_amount",
-                    "POS Profile-custom_allow_return",
-                    "POS Profile-custom_use_scanner_fully",
-                    "POS Profile-custom_whatsapp_template",
-                    "Sales Invoice-custom_pos_opening_entry",
-                    "POS Profile-custom_email_template",
-                    "POS Profile-custom_default_view",
-                    "POS Profile-custom_enable_whatsapp",
-                    "POS Profile-custom_enable_sms",
-                    "POS Profile-custom_scale_barcodes_start_with"
-                ),
-            ]
-        ],
-    }
+	{
+		"doctype": "Custom Field",
+		"filters": [
+			[
+				"name",
+				"in",
+				(
+					"POS Profile-custom_klik_pos_settings",
+					"POS Profile-custom_business_type",
+					"POS Profile-custom_pos_printformat",
+					"POS Profile-custom_column_break_7pdsa",
+					"Sales Invoice-custom_roundoff_account",
+					"Sales Invoice-custom_base_roundoff_amount",
+					"Sales Invoice-custom_column_break_vtq6c",
+					"Sales Invoice-custom_roundoff_amount",
+					"Sales Invoice-custom_roundoff",
+					"POS Profile-custom_allow_credit_sales",
+					"POS Profile-custom_hide_expected_amount",
+					"POS Profile-custom_allow_return",
+					"POS Profile-custom_use_scanner_fully",
+					"POS Profile-custom_whatsapp_template",
+					"Sales Invoice-custom_pos_opening_entry",
+					"POS Profile-custom_email_template",
+					"POS Profile-custom_default_view",
+					"POS Profile-custom_enable_whatsapp",
+					"POS Profile-custom_enable_sms",
+					"POS Profile-custom_scale_barcodes_start_with",
+				),
+			]
+		],
+	}
 ]
 
 add_to_apps_screen = [
 	{
 		"name": "klik_pos",
- 		"logo": "/assets/klik_pos/logo.png",
- 		"title": "KLiK PoS",
- 		"route": "/klik_pos",
+		"logo": "/assets/klik_pos/logo.png",
+		"title": "KLiK PoS",
+		"route": "/klik_pos",
 	}
 ]
 
 doc_events = {
 	"Sales Invoice": {
-        "validate": [
-            "klik_pos.api.sales_invoice.set_base_roundoff_amount",
-            "klik_pos.api.sales_invoice.set_grand_total_with_roundoff",
-
-        ],
-    },
- "POS Opening Entry": {
-        "validate": [
-            "klik_pos.api.pos_entry.validate_opening_entry",
-        ],
-}
+		"validate": [
+			"klik_pos.api.sales_invoice.set_base_roundoff_amount",
+			"klik_pos.api.sales_invoice.set_grand_total_with_roundoff",
+		],
+	},
+	"POS Opening Entry": {
+		"validate": [
+			"klik_pos.api.pos_entry.validate_opening_entry",
+		],
+	},
 }
 
 override_doctype_class = {
@@ -105,7 +104,7 @@ override_doctype_class = {
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-doctype_js = {"Sales Invoice" : "public/js/sales_invoice.js"}
+doctype_js = {"Sales Invoice": "public/js/sales_invoice.js"}
 # Add a button to Company to create random customers (client-side will call the whitelisted method)
 doctype_js.update({"Company": "public/js/company.js"})
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -307,4 +306,7 @@ doctype_js.update({"Company": "public/js/company.js"})
 # }
 
 
-website_route_rules = [{'from_route': '/klik_pos/<path:app_path>', 'to_route': 'klik_spa'}, {'from_route': '/klik_pos', 'to_route': 'klik_spa'}]
+website_route_rules = [
+	{"from_route": "/klik_pos/<path:app_path>", "to_route": "klik_spa"},
+	{"from_route": "/klik_pos", "to_route": "klik_spa"},
+]

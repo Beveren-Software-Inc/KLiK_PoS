@@ -77,12 +77,12 @@ useEffect(() => {
   useEffect(() => {
     if (posReady && !cacheLoaded) {
       // Add a small delay to ensure everything is loaded
-      setTimeout(() => {
+      setTimeout(async () => {
         const hasCached = hasCachedDraftInvoiceItems();
 
         if (hasCached) {
           console.log('Loading cached draft invoice items to cart');
-          loadCachedItemsToCart();
+          await loadCachedItemsToCart();
           // Don't clear cache here - let PaymentDialog handle it after invoice creation
           // clearDraftInvoiceCache();
         }

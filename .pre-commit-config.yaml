@@ -1,21 +1,58 @@
-exclude: 'node_modules|.git'
-default_stages: [pre-commit]
-fail_fast: false
-
-
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        files: "klik_pos.*"
-        exclude: ".*json$|.*txt$|.*csv|.*md|.*svg"
+        exclude: |
+          (?x)(
+            ^node_modules/|
+            /node_modules/|
+            ^klik_spa/node_modules/|
+            ^klik_spa/public/|
+            ^klik_pos/public/|
+            ^public/|
+            ^docs/screenshots/|
+            ^.*\.(png|jpg|jpeg|gif|svg|webp|ico|pdf|mp4|mov|zip|tar|gz|lock)$
+          )
+      - id: end-of-file-fixer
+        exclude: |
+          (?x)(
+            ^node_modules/|
+            /node_modules/|
+            ^klik_spa/node_modules/|
+            ^klik_spa/public/|
+            ^klik_pos/public/|
+            ^public/|
+            ^docs/screenshots/|
+            ^.*\.(png|jpg|jpeg|gif|svg|webp|ico|pdf|mp4|mov|zip|tar|gz|lock)$
+          )
+      - id: check-yaml
       - id: check-merge-conflict
+      - id: check-added-large-files
       - id: check-ast
       - id: check-json
+        exclude: |
+          (?x)(
+            ^klik_spa/tsconfig.*\.json$|
+            ^klik_spa/.*\.tsconfig\.json$|
+            ^.*\.tsconfig\.json$
+          )
       - id: check-toml
-      - id: check-yaml
       - id: debug-statements
+
+  # Black replaced by ruff-format for consistency
+  # - repo: https://github.com/psf/black
+  #   rev: 24.8.0
+  #   hooks:
+  #     - id: black
+  #       language_version: python3
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ["--profile=black"]
+        additional_dependencies: ["tomli"]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.8.1
@@ -23,10 +60,8 @@ repos:
       - id: ruff
         name: "Run ruff import sorter"
         args: ["--select=I", "--fix"]
-
       - id: ruff
         name: "Run ruff linter"
-
       - id: ruff-format
         name: "Run ruff formatter"
 
@@ -35,35 +70,36 @@ repos:
     hooks:
       - id: prettier
         types_or: [javascript, vue, scss]
-        # Ignore any files that might contain jinja / bundles
         exclude: |
-            (?x)^(
-                klik_pos/public/dist/.*|
-                .*node_modules.*|
-                .*boilerplate.*|
-                klik_pos/templates/includes/.*|
-                klik_pos/public/js/lib/.*
-            )$
-
+          (?x)(
+            ^klik_spa/public/|
+            ^klik_pos/public/|
+            ^node_modules/|
+            /node_modules/|
+            ^dist/|
+            ^.*\.(html|jinja|min\.js)$
+          )
 
   - repo: https://github.com/pre-commit/mirrors-eslint
     rev: v8.44.0
     hooks:
       - id: eslint
-        types_or: [javascript]
+        name: eslint (klik_spa/src)
+        files: ^klik_spa/src/.*\.(ts|tsx|js|jsx)$
         args: ['--quiet']
-        # Ignore any files that might contain jinja / bundles
         exclude: |
-            (?x)^(
-                klik_pos/public/dist/.*|
-                cypress/.*|
-                .*node_modules.*|
-                .*boilerplate.*|
-                klik_pos/templates/includes/.*|
-                klik_pos/public/js/lib/.*
-            )$
+          (?x)(
+            ^klik_spa/public/|
+            ^klik_pos/public/|
+            ^node_modules/|
+            /node_modules/|
+            ^dist/|
+            ^assets/
+          )
 
 ci:
-    autoupdate_schedule: weekly
-    skip: []
-    submodules: false
+  autofix_prs: true
+  autoupdate_schedule: weekly
+exclude: 'node_modules|.git'
+default_stages: [pre-commit]
+fail_fast: false

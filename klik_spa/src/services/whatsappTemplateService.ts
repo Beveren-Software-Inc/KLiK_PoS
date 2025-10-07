@@ -34,7 +34,7 @@ export async function fetchWhatsAppTemplates(): Promise<WhatsAppTemplate[]> {
     });
 
     const result = await response.json();
-    
+
     if (!response.ok || !result.message) {
       throw new Error('Failed to fetch WhatsApp templates');
     }
@@ -63,7 +63,7 @@ export async function getDefaultWhatsAppTemplate(): Promise<string | null> {
     });
 
     const result = await response.json();
-    
+
     if (!response.ok || !result.message) {
       throw new Error('Failed to fetch POS profile details');
     }
@@ -93,7 +93,7 @@ export async function getWhatsAppTemplate(templateName: string): Promise<WhatsAp
     });
 
     const result = await response.json();
-    
+
     if (!response.ok || !result.message) {
       return null;
     }
@@ -110,7 +110,7 @@ export async function getWhatsAppTemplate(templateName: string): Promise<WhatsAp
  */
 export function processTemplate(template: string, parameters: Record<string, any> = {}): string {
   let processedTemplate = template;
-  
+
   // Replace common placeholders
   const commonReplacements = {
     '{{customer_name}}': parameters.customer_name || 'there',

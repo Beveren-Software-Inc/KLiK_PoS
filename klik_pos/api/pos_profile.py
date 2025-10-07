@@ -1,102 +1,99 @@
-
-
 import frappe
 from frappe import _
-from klik_pos.klik_pos.utils import get_current_pos_profile
+
 from klik_pos.api.sales_invoice import get_current_pos_opening_entry
+from klik_pos.klik_pos.utils import get_current_pos_profile
 
 
 @frappe.whitelist()
 def get_pos_profiles_for_user():
-    """
-    Return a list of POS Profiles assigned to the current user via User Permissions or directly.
-    """
-    user = frappe.session.user
+	"""
+	Return a list of POS Profiles assigned to the current user via User Permissions or directly.
+	"""
+	user = frappe.session.user
 
-    # Get POS Profiles assigned to the user via User Permissions
-    user_permissions = frappe.get_all("User Permission",
-        filters={
-            "user": user,
-            "allow": "POS Profile"
-        },
-        fields=["for_value"]
-    )
+	# Get POS Profiles assigned to the user via User Permissions
+	user_permissions = frappe.get_all(
+		"User Permission",
+		filters={"user": user, "allow": "POS Profile"},
+		fields=["for_value"],
+	)
 
-    pos_profiles = [p["for_value"] for p in user_permissions]
+	pos_profiles = [p["for_value"] for p in user_permissions]
 
-    # Fallback: if no user permissions exist, return all POS Profiles where user is in the 'users' table
-    if not pos_profiles:
-        profiles = frappe.get_all("POS Profile", filters={}, fields=["name", "disabled"])
-        for p in profiles:
-            if not p.disabled:
-                user_list = frappe.get_all("POS Profile User",
-                    filters={"parent": p.name, "user": user},
-                    fields=["user"]
-                )
-                if user_list:
-                    pos_profiles.append(p.name)
+	# Fallback: if no user permissions exist, return all POS Profiles where user is in the 'users' table
+	if not pos_profiles:
+		profiles = frappe.get_all("POS Profile", filters={}, fields=["name", "disabled"])
+		for p in profiles:
+			if not p.disabled:
+				user_list = frappe.get_all(
+					"POS Profile User",
+					filters={"parent": p.name, "user": user},
+					fields=["user"],
+				)
+				if user_list:
+					pos_profiles.append(p.name)
 
-    return pos_profiles
+	return pos_profiles
+
 
 @frappe.whitelist()
 def get_pos_details():
-    # Determine active POS Profile: prefer the one from the current open entry if any
-    current_opening_entry = get_current_pos_opening_entry()
-    if current_opening_entry:
-        opening_doc = frappe.get_doc("POS Opening Entry", current_opening_entry)
-        pos = frappe.get_doc("POS Profile", opening_doc.pos_profile)
-    else:
-        pos = get_current_pos_profile()
+	# Determine active POS Profile: prefer the one from the current open entry if any
+	current_opening_entry = get_current_pos_opening_entry()
+	if current_opening_entry:
+		opening_doc = frappe.get_doc("POS Opening Entry", current_opening_entry)
+		pos = frappe.get_doc("POS Profile", opening_doc.pos_profile)
+	else:
+		pos = get_current_pos_profile()
 
-    business_type = pos.custom_business_type
-    print_format = pos.custom_pos_printformat
+	business_type = pos.custom_business_type
+	print_format = pos.custom_pos_printformat
 
-    # Get default customer details if set
-    default_customer = None
-    if pos.customer:
-        customer_doc = frappe.get_doc("Customer", pos.customer)
-        default_customer = {
-            "id": customer_doc.name,
-            "name": customer_doc.customer_name,
-            "email": customer_doc.email_id or "",
-            "phone": customer_doc.mobile_no or "",
-            "customer_type": customer_doc.customer_type,
-            "territory": customer_doc.territory,
-            "customer_group": customer_doc.customer_group,
-            "default_currency": customer_doc.default_currency
-        }
+	# Get default customer details if set
+	default_customer = None
+	if pos.customer:
+		customer_doc = frappe.get_doc("Customer", pos.customer)
+		default_customer = {
+			"id": customer_doc.name,
+			"name": customer_doc.customer_name,
+			"email": customer_doc.email_id or "",
+			"phone": customer_doc.mobile_no or "",
+			"customer_type": customer_doc.customer_type,
+			"territory": customer_doc.territory,
+			"customer_group": customer_doc.customer_group,
+			"default_currency": customer_doc.default_currency,
+		}
 
-    details = {
-        "name": pos.name,
-        "business_type": business_type,
-        "print_format": print_format,
-        "currency":pos.currency,
-        "currency_symbol":frappe.db.get_value("Currency", pos.currency, "symbol") or pos.currency,
-        "print_receipt_on_order_complete":pos.print_receipt_on_order_complete,
-        "print_format":pos.custom_pos_printformat,
-        "custom_use_scanner_fully":pos.custom_use_scanner_fully,
-        "custom_allow_credit_sales":pos.custom_allow_credit_sales,
-        "custom_allow_return":pos.custom_allow_return,
-        "custom_hide_expected_amount":pos.custom_hide_expected_amount,
-        "hide_unavailable_items":pos.hide_unavailable_items,
-        "custom_default_view": getattr(pos, 'custom_default_view', 'Grid View'),
-        "custom_whatsap_template": getattr(pos, 'custom_whatsap_template', None),
-        "custom_email_template": getattr(pos, 'custom_email_template', None),
-        "custom_enable_whatsapp": getattr(pos, 'custom_enable_whatsapp', 0),
-        "custom_enable_sms": getattr(pos, 'custom_enable_sms', 0),
-        "is_zatca_enabled": is_zatca_enabled(),
-        "default_customer": default_customer,
-        "current_opening_entry": current_opening_entry,
-        "custom_scale_barcodes_start_with": pos.custom_scale_barcodes_start_with or "",
-    }
-    return details
+	details = {
+		"name": pos.name,
+		"business_type": business_type,
+		"print_format": print_format,
+		"currency": pos.currency,
+		"currency_symbol": frappe.db.get_value("Currency", pos.currency, "symbol") or pos.currency,
+		"print_receipt_on_order_complete": pos.print_receipt_on_order_complete,
+		"custom_use_scanner_fully": pos.custom_use_scanner_fully,
+		"custom_allow_credit_sales": pos.custom_allow_credit_sales,
+		"custom_allow_return": pos.custom_allow_return,
+		"custom_hide_expected_amount": pos.custom_hide_expected_amount,
+		"hide_unavailable_items": pos.hide_unavailable_items,
+		"custom_default_view": getattr(pos, "custom_default_view", "Grid View"),
+		"custom_whatsap_template": getattr(pos, "custom_whatsap_template", None),
+		"custom_email_template": getattr(pos, "custom_email_template", None),
+		"custom_enable_whatsapp": getattr(pos, "custom_enable_whatsapp", 0),
+		"custom_enable_sms": getattr(pos, "custom_enable_sms", 0),
+		"is_zatca_enabled": is_zatca_enabled(),
+		"default_customer": default_customer,
+		"current_opening_entry": current_opening_entry,
+		"custom_scale_barcodes_start_with": pos.custom_scale_barcodes_start_with or "",
+	}
+	return details
 
 
 def is_zatca_enabled():
-    pos_profile = get_current_pos_profile()
-    company = pos_profile.company
-    meta = frappe.get_meta("Company")
-    if frappe.db.has_column("Company", "custom_enable_zatca_e_invoicing"):
-        return frappe.db.get_value("Company", company, "custom_enable_zatca_e_invoicing") == 1
-    return False
-
+	pos_profile = get_current_pos_profile()
+	company = pos_profile.company
+	# meta = frappe.get_meta("Company")  # unused
+	if frappe.db.has_column("Company", "custom_enable_zatca_e_invoicing"):
+		return frappe.db.get_value("Company", company, "custom_enable_zatca_e_invoicing") == 1
+	return False

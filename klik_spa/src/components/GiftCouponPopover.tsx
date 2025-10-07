@@ -15,12 +15,12 @@ interface GiftCouponPopoverProps {
   buttonRef: React.RefObject<HTMLButtonElement | null>
 }
 
-export default function GiftCouponPopover({ 
-  onApplyCoupon, 
-  appliedCoupons, 
-  isOpen, 
-  onClose, 
-  buttonRef 
+export default function GiftCouponPopover({
+  onApplyCoupon,
+  appliedCoupons,
+  isOpen,
+  onClose,
+  buttonRef
 }: GiftCouponPopoverProps) {
   const [couponCode, setCouponCode] = useState("")
   const [giftCardCode, setGiftCardCode] = useState("")
@@ -34,7 +34,7 @@ const currency_symbol = posDetails?.currency_symbol
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
-        popoverRef.current && 
+        popoverRef.current &&
         !popoverRef.current.contains(event.target as Node) &&
         buttonRef.current &&
         !buttonRef.current.contains(event.target as Node)
@@ -57,7 +57,7 @@ const currency_symbol = posDetails?.currency_symbol
 
     // Find coupon in available coupons
     let coupon = availableCoupons.find((c) => c.code.toLowerCase() === code.toLowerCase())
-    
+
     // If not found and it's a gift card, create a custom coupon
     if (!coupon && type === 'giftcard') {
       // Simulate gift card validation - in real app, this would call API
@@ -90,16 +90,16 @@ const currency_symbol = posDetails?.currency_symbol
 
   const validateAndShowAmount = (code: string, type: 'coupon' | 'giftcard') => {
     if (!code.trim()) return null
-    
+
     let coupon = availableCoupons.find((c) => c.code.toLowerCase() === code.toLowerCase())
-    
+
     if (!coupon && type === 'giftcard') {
       const giftCardValue = parseFloat(code.replace(/[^0-9.]/g, '')) || 0
       if (giftCardValue > 0) {
         return giftCardValue
       }
     }
-    
+
     return coupon ? coupon.value : null
   }
 

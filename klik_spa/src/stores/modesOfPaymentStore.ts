@@ -23,8 +23,8 @@ interface UseModeOfPaymentReturn {
 
 export function useModeOfPayment(posProfileName: string): UseModeOfPaymentReturn {
   // Get payment methods linked to POS Profile
-  const { 
-    paymentModes: posPaymentMethods, 
+  const {
+    paymentModes: posPaymentMethods,
     isLoading: profileLoading,
     error: profileError,
     refetch: refetchProfile
@@ -42,12 +42,12 @@ export function useModeOfPayment(posProfileName: string): UseModeOfPaymentReturn
   });
 
   // Filter to only include modes enabled in POS Profile
-  const enabledModes = allPaymentModes?.filter(mode => 
+  const enabledModes = allPaymentModes?.filter(mode =>
     posPaymentMethods.some(pm => pm.mode_of_payment === mode.name)
   ) || [];
 
   // Find default mode
-  const defaultMode = enabledModes.find(mode => mode.default === 1)?.name || 
+  const defaultMode = enabledModes.find(mode => mode.default === 1)?.name ||
                      posPaymentMethods.find(pm => pm.default === 1)?.mode_of_payment;
 
   return {
