@@ -176,6 +176,7 @@ export default function PaymentDialog({
   // Determine if this is B2B business type
   const isB2B = posDetails?.business_type === "B2B";
   const isB2C = posDetails?.business_type === "B2C";
+  const isCombined = posDetails?.business_type === "B2B & B2C";
   const print_receipt_on_order_complete =
     posDetails?.print_receipt_on_order_complete;
   const currencySymbol = posDetails?.currency_symbol;
@@ -468,7 +469,7 @@ export default function PaymentDialog({
           .filter(([key]) => key !== defaultMode.mode_of_payment)
           .map(([, amount]) => amount || 0);
 
-        const remainingAmount = isB2C
+        const remainingAmount = (isB2C || isCombined)
           ? calculateRemainingAmount(calculations.grandTotal, otherPayments)
           : 0;
 
@@ -478,7 +479,7 @@ export default function PaymentDialog({
         }));
       }
     }
-  }, [calculations.grandTotal, modes, isB2C, isB2B]);
+  }, [calculations.grandTotal, modes, isB2C, isB2B, isCombined]);
 
   // Auto-print when invoice is submitted and auto-print is enabled
   useEffect(() => {
@@ -521,10 +522,13 @@ export default function PaymentDialog({
     console.log('getRoundTargetMethodId Debug:', {
       activeMethodId,
       paymentAmounts,
-      modes: modes.map(m => ({ id: m.mode_of_payment, default: m.default }))
+      modes: modes.map(m => ({ id: m.mode_of_payment, default: m.default })),
+      modesLength: modes.length,
+      paymentMethodsLength: paymentMethods.length
     });
 
-    if (activeMethodId && (paymentAmounts[activeMethodId] || 0) >= 0) {
+    // If there's an active method and it exists in payment amounts, use it
+    if (activeMethodId && paymentAmounts.hasOwnProperty(activeMethodId)) {
       console.log('Using active method:', activeMethodId);
       return activeMethodId;
     }
@@ -651,108 +655,104 @@ export default function PaymentDialog({
       ? calculations.taxableAmount
       : calculations.taxableAmount + calculations.taxAmount;
 
-    if (isB2C) {
-      // For B2C: Round down to nearest 10 and calculate roundoff as negative difference
-      const rounded = Math.floor(totalBeforeRoundOff / 10) * 10; // Round down to nearest 10
-      const difference = rounded - totalBeforeRoundOff; // This will be negative (roundoff amount)
+    console.log('🔍 Detailed Roundoff Debug:', {
+      calculations,
+      totalBeforeRoundOff,
+      isB2C,
+      isB2B,
+      businessType: posDetails?.business_type,
+      isCombinedBusinessType: posDetails?.business_type === "B2B & B2C",
+      posDetails,
+      isInclusive: calculations.isInclusive,
+      taxableAmount: calculations.taxableAmount,
+      taxAmount: calculations.taxAmount,
+      grandTotal: calculations.grandTotal,
+      roundOffAmount,
+      cartItems: cartItems.map(item => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        discountedPrice: (item as any).discountedPrice
+      })),
+      appliedCoupons,
+      selectedSalesTaxCharges
+    });
 
-      console.log('B2C Roundoff Debug:', {
-        totalBeforeRoundOff,
-        rounded,
-        difference,
-        paymentAmounts,
-        activeMethodId
-      });
+    // Universal roundoff logic: Always round down to nearest 10 regardless of business type
+    // This provides consistent rounding behavior for all business types
+    const rounded = Math.floor(totalBeforeRoundOff / 10) * 10; // Round down to nearest 10
+    const difference = rounded - totalBeforeRoundOff; // This will be negative (roundoff amount)
 
-      setRoundOffAmount(difference);
-      setRoundOffInput(difference.toFixed(2));
+    console.log('Universal Roundoff Debug:', {
+      totalBeforeRoundOff,
+      rounded,
+      difference,
+      paymentAmounts,
+      activeMethodId,
+      isB2C,
+      isB2B,
+      businessType: posDetails?.business_type,
+      isCombinedBusinessType: posDetails?.business_type === "B2B & B2C"
+    });
+
+    setRoundOffAmount(difference);
+    setRoundOffInput(difference.toFixed(2));
+
+    // Different behavior based on business type:
+    // B2B: Don't auto-fill payment amounts (let user manually enter)
+    // B2C & B2B & B2C: Auto-fill payment amounts (push checkout total to payment method)
+    if (isB2B && !isB2C) {
+      // Pure B2B: Don't auto-fill payment amounts
+      console.log('B2B Business Type: Not auto-filling payment amounts - user must manually enter');
+      // Just set the roundoff amount, don't modify payment amounts
+    } else {
+      // B2C or B2B & B2C: Auto-fill payment amounts
+      console.log('B2C or B2B & B2C Business Type: Auto-filling payment amounts');
 
       // Adjust the currently active or most relevant payment method to reflect the rounded total
       const targetId = getRoundTargetMethodId();
       console.log('Roundoff Target Method ID:', targetId);
+      console.log('Available Payment Methods:', paymentMethods.map(m => ({ id: m.id, name: m.name })));
 
-      if (targetId) {
+      // Always ensure we have a valid target method
+      let finalTargetId = targetId;
+
+      if (!finalTargetId && paymentMethods.length > 0) {
+        // Use first available method as fallback
+        finalTargetId = paymentMethods[0].id;
+        console.log('Using first available method as fallback:', finalTargetId);
+      }
+
+      // Additional fallback: use default mode from modes if paymentMethods array is empty or unresolved
+      if (!finalTargetId) {
+        const fallbackDefaultFromModes = modes.find((m) => m.default === 1)?.mode_of_payment
+          || modes[0]?.mode_of_payment;
+        if (fallbackDefaultFromModes) {
+          finalTargetId = fallbackDefaultFromModes;
+          console.log('Using fallback default from modes as target:', finalTargetId);
+        }
+      }
+
+      if (finalTargetId) {
         // For roundoff, we want to set the target method to the rounded total
         // and clear other methods to avoid confusion
         const newPaymentAmounts: PaymentAmount = {};
 
         // Set the target method to the rounded amount
-        newPaymentAmounts[targetId] = rounded;
+        newPaymentAmounts[finalTargetId] = rounded;
 
         console.log('Roundoff Payment Calculation:', {
-          targetId,
+          targetId: finalTargetId,
           rounded,
           previousAmounts: paymentAmounts,
-          newAmounts: newPaymentAmounts
+          newAmounts: newPaymentAmounts,
+          paymentMethodsCount: paymentMethods.length
         });
 
         setPaymentAmounts(newPaymentAmounts);
       } else {
-        console.warn('No target method found for roundoff adjustment, using first available method');
-        // Fallback: use the first payment method if no target is found
-        if (paymentMethods.length > 0) {
-          const fallbackId = paymentMethods[0].id;
-          const newPaymentAmounts: PaymentAmount = {};
-          newPaymentAmounts[fallbackId] = rounded;
-
-          console.log('Using fallback method for roundoff:', {
-            fallbackId,
-            rounded,
-            previousAmounts: paymentAmounts,
-            newAmounts: newPaymentAmounts
-          });
-
-          setPaymentAmounts(newPaymentAmounts);
-        }
-      }
-    } else {
-      // For B2B: Keep original logic (round down to nearest whole number)
-      const rounded = Math.floor(totalBeforeRoundOff);
-      const difference = rounded - totalBeforeRoundOff;
-
-      console.log('B2B Roundoff Debug:', {
-        totalBeforeRoundOff,
-        rounded,
-        difference,
-        paymentAmounts,
-        activeMethodId
-      });
-
-      setRoundOffAmount(difference);
-      setRoundOffInput(difference.toFixed(2));
-
-      // Apply same logic as B2C for consistency
-      const targetId = getRoundTargetMethodId();
-      console.log('B2B Roundoff Target Method ID:', targetId);
-
-      if (targetId) {
-        const newPaymentAmounts: PaymentAmount = {};
-        newPaymentAmounts[targetId] = rounded;
-
-        console.log('B2B Roundoff Payment Calculation:', {
-          targetId,
-          rounded,
-          previousAmounts: paymentAmounts,
-          newAmounts: newPaymentAmounts
-        });
-
-        setPaymentAmounts(newPaymentAmounts);
-      } else {
-        console.warn('No target method found for B2B roundoff adjustment, using first available method');
-        if (paymentMethods.length > 0) {
-          const fallbackId = paymentMethods[0].id;
-          const newPaymentAmounts: PaymentAmount = {};
-          newPaymentAmounts[fallbackId] = rounded;
-
-          console.log('Using fallback method for B2B roundoff:', {
-            fallbackId,
-            rounded,
-            previousAmounts: paymentAmounts,
-            newAmounts: newPaymentAmounts
-          });
-
-          setPaymentAmounts(newPaymentAmounts);
-        }
+        console.error('No payment methods available for roundoff!');
       }
     }
   };
