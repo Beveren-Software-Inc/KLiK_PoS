@@ -194,7 +194,7 @@ def update_status(data):
 def update_template_status(data):
 	"""Update template status."""
 	frappe.db.sql(
-		"""UPDATE `tabWhatsApp Templates`
+		"""UPDATE `tabWhatsApp Message Templates`
 		SET status = %(event)s
 		WHERE id = %(message_template_id)s""",
 		data,
