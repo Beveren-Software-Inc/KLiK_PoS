@@ -200,7 +200,8 @@ def update_template_status(data):
 		data,
 	)
 
-#UPdate
+
+# UPdate
 def update_message_status(data):
 	"""Update message status."""
 	id = data["statuses"][0]["id"]

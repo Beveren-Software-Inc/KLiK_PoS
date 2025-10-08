@@ -258,7 +258,7 @@ def fetch():
 
 	except Exception:
 		res = frappe.flags.integration_request.json()["error"]
-		error_message = res.get("error_user_msg", res.get("message"))
+		error_message = res.get("error_user_msg_", res.get("message"))
 		frappe.throw(
 			msg=error_message,
 			title=res.get("error_user_title", "Error"),
