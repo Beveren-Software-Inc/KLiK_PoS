@@ -25,6 +25,7 @@ import { getSerials } from "../utils/serial";
 import { useNavigate } from "react-router-dom";
 import { usePOSDetails } from "../hooks/usePOSProfile";
 import { useCustomerStatistics } from "../hooks/useCustomerStatistics";
+import { useCustomerPermission } from "../hooks/useCustomerPermission";
 import { useCartStore } from "../stores/cartStore";
 
 // Extended CartItem interface to include discount properties
@@ -444,6 +445,7 @@ export default function OrderSummary({
   const { refetch: refetchProducts, refreshStockOnly, updateStockForItems, updateBatchQuantitiesForItems } = useProducts();
   const navigate = useNavigate();
   const { posDetails, loading: posLoading } = usePOSDetails();
+  const { checkCustomerPermission } = useCustomerPermission();
 
   // Get customer statistics for the selected customer
   const { statistics: customerStats, isLoading: statsLoading } = useCustomerStatistics(selectedCustomer?.id || null);
@@ -912,50 +914,52 @@ export default function OrderSummary({
     // 2. There's a default customer configured
     // 3. No customer is currently selected
     // 4. User hasn't manually removed the default customer
-    // 5. User has permission to access the default customer (it's in the customers list)
-    if (posDetails?.default_customer && !selectedCustomer && !posLoading && !userRemovedDefaultCustomer && !isLoading) {
+    if (posDetails?.default_customer && !selectedCustomer && !posLoading && !userRemovedDefaultCustomer) {
       const defaultCustomer = posDetails.default_customer;
 
-      // Check if the default customer is in the list of customers the user has permission to access
-      const hasPermissionToDefaultCustomer = customers.some(customer => customer.id === defaultCustomer.id);
+      // Use the new API to check if user has permission to access the default customer
+      checkCustomerPermission(defaultCustomer.id).then((result) => {
+        if (result.success && result.has_permission) {
+          console.log("Default customer permission check passed:", defaultCustomer.id);
+          // Transform the default customer data to match the Customer interface
+          const transformedCustomer: Customer = {
+            id: defaultCustomer.id,
+            name: defaultCustomer.name,
+            email: defaultCustomer.email,
+            phone: defaultCustomer.phone,
+            customer_type: defaultCustomer.customer_type === "Company" ? "company" : "individual",
+            address: {
+              street: "",
+              city: "",
+              state: "",
+              zipCode: "",
+              country: "Saudi Arabia",
+            },
+            loyaltyPoints: 0,
+            totalSpent: 0,
+            totalOrders: 0,
+            preferredPaymentMethod: "Cash",
+            notes: "",
+            tags: [],
+            status: "active",
+            createdAt: new Date().toISOString(),
+            defaultCurrency: defaultCustomer.default_currency,
+          };
 
-      if (hasPermissionToDefaultCustomer) {
-        console.log("Default customer details:", defaultCustomer);
-        // Transform the default customer data to match the Customer interface
-        const transformedCustomer: Customer = {
-          id: defaultCustomer.id,
-          name: defaultCustomer.name,
-          email: defaultCustomer.email,
-          phone: defaultCustomer.phone,
-          customer_type: defaultCustomer.customer_type === "Company" ? "company" : "individual",
-          address: {
-            street: "",
-            city: "",
-            state: "",
-            zipCode: "",
-            country: "Saudi Arabia",
-          },
-          loyaltyPoints: 0,
-          totalSpent: 0,
-          totalOrders: 0,
-          preferredPaymentMethod: "Cash",
-          notes: "",
-          tags: [],
-          status: "active",
-          createdAt: new Date().toISOString(),
-          defaultCurrency: defaultCustomer.default_currency,
-        };
-
-        setSelectedCustomer(transformedCustomer);
-        setCustomerSearchQuery(transformedCustomer.name);
-        setShowCustomerDropdown(false);
-      } else {
-        console.log("User does not have permission to access default customer:", defaultCustomer.id);
-        // Don't set the default customer if user doesn't have permission
-        // The single customer auto-selection logic below will handle selecting the first available customer
-      }
+          setSelectedCustomer(transformedCustomer);
+          setCustomerSearchQuery(transformedCustomer.name);
+          setShowCustomerDropdown(false);
+        } else {
+          console.log("User does not have permission to access default customer:", defaultCustomer.id, result);
+          // Don't set the default customer if user doesn't have permission
+          // The single customer auto-selection logic below will handle selecting the first available customer
+        }
+      }).catch((error) => {
+        console.error("Error checking default customer permission:", error);
+        // Don't set the default customer if there's an error checking permissions
+      });
     }
-  }, [posDetails, selectedCustomer, posLoading, userRemovedDefaultCustomer, customers, isLoading]);
+  }, [posDetails, selectedCustomer, posLoading, userRemovedDefaultCustomer, checkCustomerPermission]);
 
   useEffect(() => {
     const fetchAndSetInfo = async () => {

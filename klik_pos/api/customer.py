@@ -810,3 +810,70 @@ def get_global_totals():
 			"total_customers": 0,
 			"total_invoices": 0,
 		}
+
+
+@frappe.whitelist(allow_guest=False)
+def check_customer_permission(customer_name):
+	"""Check if user has permission to access a specific customer"""
+	try:
+		# Get POS profile details
+		pos_profile = get_current_pos_profile()
+		business_type = getattr(pos_profile, "custom_business_type", "B2C")
+
+		# Get customer groups from POS profile if configured
+		customer_group_names = []
+		if hasattr(pos_profile, "customer_groups") and pos_profile.customer_groups:
+			customer_group_names = [d.customer_group for d in pos_profile.customer_groups if d.customer_group]
+
+		# Get user permissions for Customer doctype
+		user_permitted = frappe.permissions.get_user_permissions(frappe.session.user)
+		permitted_customer_names = []
+		has_customer_permissions = False
+		if user_permitted and "Customer" in user_permitted:
+			permitted_customer_names = [perm.get("doc") for perm in user_permitted["Customer"]]
+			has_customer_permissions = True
+
+		# Check if user has permission to access this specific customer
+		has_permission = True
+
+		# Check user permissions first
+		if has_customer_permissions:
+			if customer_name not in permitted_customer_names:
+				has_permission = False
+				frappe.logger().info(f"User does not have permission to access customer: {customer_name}")
+
+		# If user has permission, check business type and customer groups
+		if has_permission:
+			# Get customer details
+			customer = frappe.get_doc("Customer", customer_name)
+
+			# Check business type
+			if business_type == "B2C" and customer.customer_type == "Company":
+				has_permission = False
+				frappe.logger().info(f"B2C business type: Customer {customer_name} is Company type")
+			elif business_type == "B2B" and customer.customer_type == "Individual":
+				has_permission = False
+				frappe.logger().info(f"B2B business type: Customer {customer_name} is Individual type")
+
+			# Check customer groups if configured
+			if has_permission and customer_group_names:
+				if customer.customer_group not in customer_group_names:
+					has_permission = False
+					frappe.logger().info(f"Customer {customer_name} not in allowed groups: {customer_group_names}")
+
+		return {
+			"success": True,
+			"has_permission": has_permission,
+			"customer_name": customer_name,
+			"business_type": business_type,
+			"customer_groups": customer_group_names,
+			"user_permissions": len(permitted_customer_names) if has_customer_permissions else 0
+		}
+
+	except Exception as e:
+		frappe.logger().error(f"Error checking customer permission: {str(e)}")
+		return {
+			"success": False,
+			"error": str(e),
+			"has_permission": False
+		}
