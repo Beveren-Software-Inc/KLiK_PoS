@@ -2,7 +2,7 @@
 
 <!-- <img src=".github/klik-logo.svg" alt="KLiK PoS logo" width="80"/> -->
 <h1>KLiK PoS</h1>
-
+[![CI](https://github.com/Beveren-Software-Inc/KLiK_PoS/actions/workflows/ci.yaml/badge.svg)](https://github.com/Beveren-Software-Inc/KLiK_PoS/actions/workflows/ci.yaml)<br><br>
 **Modern Point of Sale for Retail Businesses**
 
 
