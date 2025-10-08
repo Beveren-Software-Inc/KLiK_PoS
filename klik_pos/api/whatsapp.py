@@ -98,7 +98,7 @@ def send_invoice_whatsapp(**kwargs):
 		# Send WhatsApp message with document attachment using the utility function
 		result = send_whatsapp_message(
 			to_number=mobile,
-			message_type="text",  
+			message_type="text",
 			message_content=message_text,
 			reference_doctype="Sales Invoice",
 			reference_name=invoice_no,

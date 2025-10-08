@@ -28,7 +28,6 @@
   "section_break_11",
   "condition",
   "column_break_12",
-  "fields",
   "property_section",
   "set_property_after_alert",
   "property_value",
@@ -173,13 +172,6 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Enter fields in the right sequence as per the template parameters.",
-   "fieldname": "fields",
-   "fieldtype": "Table",
-   "label": "Fields",
-   "options": "WhatsApp Message Fields"
-  },
-  {
    "fieldname": "property_section",
    "fieldtype": "Section Break",
    "label": "Set Property After Alert"
@@ -213,9 +205,9 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-09-04 10:40:23.411795",
+ "modified": "2025-10-08 21:46:52.633736",
  "modified_by": "Administrator",
- "module": "KLiK PoS",
+ "module": "KLIK POS",
  "name": "WhatsApp Message Notification",
  "naming_rule": "By fieldname",
  "owner": "Administrator",
