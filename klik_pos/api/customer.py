@@ -20,6 +20,30 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
 		company, company_currency = get_user_company_and_currency()
 		result = []
 
+		# Get customer groups from POS profile if configured
+		customer_group_names = []
+		if hasattr(pos_profile, "customer_groups") and pos_profile.customer_groups:
+			customer_group_names = [d.customer_group for d in pos_profile.customer_groups if d.customer_group]
+
+		# Get user permissions for Customer doctype
+		user_permitted = frappe.permissions.get_user_permissions(frappe.session.user)
+		permitted_customer_names = []
+		has_customer_permissions = False
+		if user_permitted and "Customer" in user_permitted:
+			permitted_customer_names = [perm.get("doc") for perm in user_permitted["Customer"]]
+			has_customer_permissions = True
+
+		# Debug logging for customer filtering
+		frappe.logger().info(f"Customer API Debug - Business Type: {business_type}, Customer Groups: {customer_group_names}, User Permitted Customers: {len(permitted_customer_names)}, Search: '{search}'")
+
+		# If user has customer permissions configured but no customers are permitted, return empty result
+		if has_customer_permissions and not permitted_customer_names:
+			return {
+				"success": True,
+				"data": [],
+				"total_count": 0,
+			}
+
 		# If there's a search term, broaden the query across name, customer_name, contact email/phone.
 		# Also increase limit for search results to surface older matches.
 		if search:
@@ -35,6 +59,22 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
 			elif business_type == "B2C":
 				cust_type_filter = "AND c.customer_type = %s"
 				cust_type_params.append("Individual")
+
+			# Build optional customer_group filter
+			cust_group_filter = ""
+			cust_group_params = []
+			if customer_group_names:
+				placeholders = ",".join(["%s"] * len(customer_group_names))
+				cust_group_filter = f"AND c.customer_group IN ({placeholders})"
+				cust_group_params.extend(customer_group_names)
+
+			# Build optional user permission filter
+			user_perm_filter = ""
+			user_perm_params = []
+			if permitted_customer_names:
+				placeholders = ",".join(["%s"] * len(permitted_customer_names))
+				user_perm_filter = f"AND c.name IN ({placeholders})"
+				user_perm_params.extend(permitted_customer_names)
 
 			# Prefer higher cap when searching
 			try:
@@ -57,6 +97,8 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
                     ce.email_id LIKE %s OR cp.phone LIKE %s
                 )
                 {cust_type_filter}
+                {cust_group_filter}
+                {user_perm_filter}
                 ORDER BY c.creation DESC
                 LIMIT %s OFFSET %s
                 """,
@@ -67,6 +109,8 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
 						like_param,
 						like_param,
 						*cust_type_params,
+						*cust_group_params,
+						*user_perm_params,
 						limit_val,
 						int(start) or 0,
 					]
@@ -88,8 +132,10 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
                     ce.email_id LIKE %s OR cp.phone LIKE %s
                 )
                 {cust_type_filter}
+                {cust_group_filter}
+                {user_perm_filter}
                 """,
-				tuple([like_param, like_param, like_param, like_param, *cust_type_params]),
+				tuple([like_param, like_param, like_param, like_param, *cust_type_params, *cust_group_params, *user_perm_params]),
 				as_dict=True,
 			)
 			total_count = (total_count_row[0].total if total_count_row else 0) or 0
@@ -100,6 +146,14 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
 				filters["customer_type"] = "Company"
 			elif business_type == "B2C":
 				filters["customer_type"] = "Individual"
+
+			# Add customer group filtering if configured
+			if customer_group_names:
+				filters["customer_group"] = ["in", customer_group_names]
+
+			# Add user permission filtering if configured
+			if permitted_customer_names:
+				filters["name"] = ["in", permitted_customer_names]
 
 			customer_names = frappe.get_all(
 				"Customer",

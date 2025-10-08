@@ -912,39 +912,50 @@ export default function OrderSummary({
     // 2. There's a default customer configured
     // 3. No customer is currently selected
     // 4. User hasn't manually removed the default customer
-    if (posDetails?.default_customer && !selectedCustomer && !posLoading && !userRemovedDefaultCustomer) {
+    // 5. User has permission to access the default customer (it's in the customers list)
+    if (posDetails?.default_customer && !selectedCustomer && !posLoading && !userRemovedDefaultCustomer && !isLoading) {
       const defaultCustomer = posDetails.default_customer;
-      console.log("Default customer details:", defaultCustomer);
-      // Transform the default customer data to match the Customer interface
-      const transformedCustomer: Customer = {
-        id: defaultCustomer.id,
-        name: defaultCustomer.name,
-        email: defaultCustomer.email,
-        phone: defaultCustomer.phone,
-        customer_type: defaultCustomer.customer_type === "Company" ? "company" : "individual",
-        address: {
-          street: "",
-          city: "",
-          state: "",
-          zipCode: "",
-          country: "Saudi Arabia",
-        },
-        loyaltyPoints: 0,
-        totalSpent: 0,
-        totalOrders: 0,
-        preferredPaymentMethod: "Cash",
-        notes: "",
-        tags: [],
-        status: "active",
-        createdAt: new Date().toISOString(),
-        defaultCurrency: defaultCustomer.default_currency,
-      };
 
-      setSelectedCustomer(transformedCustomer);
-      setCustomerSearchQuery(transformedCustomer.name);
-      setShowCustomerDropdown(false);
+      // Check if the default customer is in the list of customers the user has permission to access
+      const hasPermissionToDefaultCustomer = customers.some(customer => customer.id === defaultCustomer.id);
+
+      if (hasPermissionToDefaultCustomer) {
+        console.log("Default customer details:", defaultCustomer);
+        // Transform the default customer data to match the Customer interface
+        const transformedCustomer: Customer = {
+          id: defaultCustomer.id,
+          name: defaultCustomer.name,
+          email: defaultCustomer.email,
+          phone: defaultCustomer.phone,
+          customer_type: defaultCustomer.customer_type === "Company" ? "company" : "individual",
+          address: {
+            street: "",
+            city: "",
+            state: "",
+            zipCode: "",
+            country: "Saudi Arabia",
+          },
+          loyaltyPoints: 0,
+          totalSpent: 0,
+          totalOrders: 0,
+          preferredPaymentMethod: "Cash",
+          notes: "",
+          tags: [],
+          status: "active",
+          createdAt: new Date().toISOString(),
+          defaultCurrency: defaultCustomer.default_currency,
+        };
+
+        setSelectedCustomer(transformedCustomer);
+        setCustomerSearchQuery(transformedCustomer.name);
+        setShowCustomerDropdown(false);
+      } else {
+        console.log("User does not have permission to access default customer:", defaultCustomer.id);
+        // Don't set the default customer if user doesn't have permission
+        // The single customer auto-selection logic below will handle selecting the first available customer
+      }
     }
-  }, [posDetails, selectedCustomer, posLoading, userRemovedDefaultCustomer]);
+  }, [posDetails, selectedCustomer, posLoading, userRemovedDefaultCustomer, customers, isLoading]);
 
   useEffect(() => {
     const fetchAndSetInfo = async () => {
