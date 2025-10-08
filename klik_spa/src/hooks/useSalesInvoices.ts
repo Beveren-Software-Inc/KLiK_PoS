@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import type { SalesInvoice } from "../../types";
 
 export function useSalesInvoices(searchTerm: string = "") {
@@ -14,6 +14,18 @@ export function useSalesInvoices(searchTerm: string = "") {
 
   const LIMIT = 100;
 
+  // Debounced search term state
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+
+  // Debounce search term to prevent excessive API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   const fetchInvoices = useCallback(async (page = 0, append = false) => {
     if (append) {
       setIsLoadingMore(true);
@@ -25,7 +37,7 @@ export function useSalesInvoices(searchTerm: string = "") {
       const start = page * LIMIT;
       // console.log(`Fetching sales invoices - page: ${page}, start: ${start}, limit: ${LIMIT}, search: ${searchTerm}`);
 
-      const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
+      const searchParam = debouncedSearchTerm ? `&search=${encodeURIComponent(debouncedSearchTerm)}` : '';
       const response = await fetch(
         `/api/method/klik_pos.api.sales_invoice.get_sales_invoices?limit=${LIMIT}&start=${start}${searchParam}`,
         {
@@ -121,7 +133,7 @@ export function useSalesInvoices(searchTerm: string = "") {
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [searchTerm]);
+  }, [debouncedSearchTerm]);
 
   const loadMore = useCallback(() => {
     if (!isLoadingMore && hasMore) {
@@ -136,19 +148,13 @@ export function useSalesInvoices(searchTerm: string = "") {
     fetchInvoices(0, false);
   }, [fetchInvoices]);
 
+  // Initial load and refetch when debounced search term changes
   useEffect(() => {
+    setCurrentPage(0);
+    setTotalLoaded(0);
+    setHasMore(true);
     fetchInvoices(0, false);
-  }, [fetchInvoices]);
-
-  // Refetch when search term changes
-  useEffect(() => {
-    if (searchTerm !== undefined) {
-      setCurrentPage(0);
-      setTotalLoaded(0);
-      setHasMore(true);
-      fetchInvoices(0, false);
-    }
-  }, [searchTerm, fetchInvoices]);
+  }, [debouncedSearchTerm, fetchInvoices]);
 
   return {
     invoices,
