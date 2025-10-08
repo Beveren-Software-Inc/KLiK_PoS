@@ -43,7 +43,7 @@ jobs:
 
     - name: Run tests
       run: |
-        # Add your test commands here
+        # Mania: Add test commands here
         echo "Running tests..."
         # python -m pytest tests/
         # python -m unittest discover
@@ -79,7 +79,7 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '22.12'
         cache: 'npm'
         cache-dependency-path: klik_spa/package-lock.json
 

@@ -2,12 +2,11 @@ import json
 
 import erpnext
 import frappe
+from erpnext.accounts.doctype.sales_invoice.sales_invoice import SalesInvoice
 from frappe import _
 from frappe.utils import flt
 
 from klik_pos.klik_pos.utils import get_current_pos_profile, get_user_default_company
-
-from erpnext.accounts.doctype.sales_invoice.sales_invoice import SalesInvoice
 
 
 def get_current_pos_opening_entry():
@@ -62,7 +61,7 @@ def get_sales_invoices(limit=100, start=0, search=""):
 		# Add search filter if provided
 		if search and search.strip():
 			search_term = search.strip()
-	
+
 		sales_invoice_meta = frappe.get_meta("Sales Invoice")
 		has_zatca_status = any(
 			df.fieldname == "custom_zatca_submit_status" for df in sales_invoice_meta.fields
@@ -96,7 +95,7 @@ def get_sales_invoices(limit=100, start=0, search=""):
 
 			# Add role-based filtering
 			if is_admin_user:
-				pass  
+				pass
 			elif current_opening_entry:
 				base_conditions.append(f"custom_pos_opening_entry = '{current_opening_entry}'")
 
@@ -189,9 +188,8 @@ def get_sales_invoices(limit=100, start=0, search=""):
 			inv["items"] = items
 
 			# Get payment method from payment child table
-			payment_method = "-"  
+			payment_method = "-"
 			if invoice_doc.payments:
-
 				payment_method = invoice_doc.payments[0].mode_of_payment
 			elif invoice_doc.status == "Draft":
 				payment_method = "-"
@@ -399,7 +397,7 @@ def create_and_submit_invoice(data):
 			"success": True,
 			"invoice_name": doc.name,
 			"invoice_id": doc.name,
-			"invoice": doc, 
+			"invoice": doc,
 			"payment_entry": payment_entry.name if payment_entry else None,
 			"processing_time": round(processing_time, 2),
 		}
@@ -528,11 +526,11 @@ def build_sales_invoice_doc(
 	elif business_type == "B2B & B2C":
 		customer_doc = frappe.get_doc("Customer", customer)
 		if customer_doc.customer_type == "Individual":
-			doc.is_pos = 1  
+			doc.is_pos = 1
 		else:
-			doc.is_pos = 0 
+			doc.is_pos = 0
 	else:
-		doc.is_pos = 0 
+		doc.is_pos = 0
 
 	doc.update_stock = 1
 	doc.warehouse = pos_profile.warehouse
@@ -1278,12 +1276,11 @@ def create_partial_return(invoice_name, return_items, payment_method=None, retur
 		final_payment_method = payment_method if payment_method else "Cash"
 
 		if final_return_amount > 0:
-		
 			return_doc.append(
 				"payments",
 				{
 					"mode_of_payment": final_payment_method,
-					"amount": -abs(final_return_amount), 
+					"amount": -abs(final_return_amount),
 					# "account": payment_account,
 				},
 			)

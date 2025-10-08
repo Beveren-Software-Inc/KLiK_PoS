@@ -208,8 +208,8 @@ def create_closing_entry():
 		# If no closing amounts provided, create entries for all opening payment modes with zero amounts
 		if not closing_balance:
 			for mode, opening_amount in opening_balance_map.items():
-				expected_amount = sales_map.get(mode, 0)  
-				difference = 0 - float(expected_amount) 
+				expected_amount = sales_map.get(mode, 0)
+				difference = 0 - float(expected_amount)
 
 				doc.append(
 					"payment_reconciliation",
@@ -225,7 +225,7 @@ def create_closing_entry():
 			# Use provided closing amounts
 			for mode, closing_amount in closing_balance.items():
 				opening_amount = opening_balance_map.get(mode, 0)
-				expected_amount = sales_map.get(mode, 0) 
+				expected_amount = sales_map.get(mode, 0)
 				difference = float(closing_amount) - float(expected_amount)
 
 				doc.append(

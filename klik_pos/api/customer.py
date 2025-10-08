@@ -34,7 +34,9 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
 			has_customer_permissions = True
 
 		# Debug logging for customer filtering
-		frappe.logger().info(f"Customer API Debug - Business Type: {business_type}, Customer Groups: {customer_group_names}, User Permitted Customers: {len(permitted_customer_names)}, Search: '{search}'")
+		frappe.logger().info(
+			f"Customer API Debug - Business Type: {business_type}, Customer Groups: {customer_group_names}, User Permitted Customers: {len(permitted_customer_names)}, Search: '{search}'"
+		)
 
 		# If user has customer permissions configured but no customers are permitted, return empty result
 		if has_customer_permissions and not permitted_customer_names:
@@ -135,7 +137,17 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
                 {cust_group_filter}
                 {user_perm_filter}
                 """,
-				tuple([like_param, like_param, like_param, like_param, *cust_type_params, *cust_group_params, *user_perm_params]),
+				tuple(
+					[
+						like_param,
+						like_param,
+						like_param,
+						like_param,
+						*cust_type_params,
+						*cust_group_params,
+						*user_perm_params,
+					]
+				),
 				as_dict=True,
 			)
 			total_count = (total_count_row[0].total if total_count_row else 0) or 0
@@ -859,7 +871,9 @@ def check_customer_permission(customer_name):
 			if has_permission and customer_group_names:
 				if customer.customer_group not in customer_group_names:
 					has_permission = False
-					frappe.logger().info(f"Customer {customer_name} not in allowed groups: {customer_group_names}")
+					frappe.logger().info(
+						f"Customer {customer_name} not in allowed groups: {customer_group_names}"
+					)
 
 		return {
 			"success": True,
@@ -867,13 +881,9 @@ def check_customer_permission(customer_name):
 			"customer_name": customer_name,
 			"business_type": business_type,
 			"customer_groups": customer_group_names,
-			"user_permissions": len(permitted_customer_names) if has_customer_permissions else 0
+			"user_permissions": len(permitted_customer_names) if has_customer_permissions else 0,
 		}
 
 	except Exception as e:
-		frappe.logger().error(f"Error checking customer permission: {str(e)}")
-		return {
-			"success": False,
-			"error": str(e),
-			"has_permission": False
-		}
+		frappe.logger().error(f"Error checking customer permission: {e!s}")
+		return {"success": False, "error": str(e), "has_permission": False}

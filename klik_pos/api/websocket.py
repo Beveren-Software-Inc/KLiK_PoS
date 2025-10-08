@@ -11,6 +11,7 @@ from frappe.utils import get_site_name
 # Store active connections
 active_connections = set()
 
+
 @frappe.whitelist(allow_guest=True)
 def stock_updates():
 	"""WebSocket endpoint for real-time stock updates"""
@@ -88,7 +89,7 @@ def start_websocket_server():
 		start_server = websockets.serve(
 			handle_client,
 			"localhost",
-			8765,  
+			8765,
 			ping_interval=30,
 			ping_timeout=10,
 		)
