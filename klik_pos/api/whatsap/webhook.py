@@ -59,7 +59,7 @@ def post():
 			if message_type == "text":
 				frappe.get_doc(
 					{
-						"doctype": "WhatsApp Message",
+						"doctype": "WhatsApp Chat",
 						"type": "Incoming",
 						"from": message["from"],
 						"message": message["text"]["body"],
@@ -73,7 +73,7 @@ def post():
 			elif message_type == "reaction":
 				frappe.get_doc(
 					{
-						"doctype": "WhatsApp Message",
+						"doctype": "WhatsApp Chat",
 						"type": "Incoming",
 						"from": message["from"],
 						"message": message["reaction"]["emoji"],
@@ -200,13 +200,13 @@ def update_template_status(data):
 		data,
 	)
 
-
+#UPdate
 def update_message_status(data):
 	"""Update message status."""
 	id = data["statuses"][0]["id"]
 	status = data["statuses"][0]["status"]
 	conversation = data["statuses"][0].get("conversation", {}).get("id")
-	name = frappe.db.get_value("WhatsApp Message", filters={"message_id": id})
+	name = frappe.db.get_value("WhatsApp Chat", filters={"message_id": id})
 
 	doc = frappe.get_doc("WhatsApp Chat", name)
 	doc.status = status
