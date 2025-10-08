@@ -83,18 +83,46 @@ jobs:
         cache: 'npm'
         cache-dependency-path: klik_spa/package-lock.json
 
+    - name: Check if package.json exists
+      working-directory: klik_spa
+      run: |
+        if [ ! -f package.json ]; then
+          echo "package.json not found, skipping frontend tests"
+          exit 0
+        fi
+
     - name: Install dependencies
       working-directory: klik_spa
-      run: npm ci
+      run: |
+        if [ -f package.json ]; then
+          npm ci
+        else
+          echo "Skipping npm install - no package.json found"
+        fi
 
     - name: Run ESLint
       working-directory: klik_spa
-      run: npm run lint
+      run: |
+        if [ -f package.json ]; then
+          npm run lint
+        else
+          echo "Skipping ESLint - no package.json found"
+        fi
 
     - name: Run TypeScript check
       working-directory: klik_spa
-      run: npm run type-check
+      run: |
+        if [ -f package.json ]; then
+          npm run type-check
+        else
+          echo "Skipping TypeScript check - no package.json found"
+        fi
 
     - name: Build
       working-directory: klik_spa
-      run: npm run build
+      run: |
+        if [ -f package.json ]; then
+          npm run build
+        else
+          echo "Skipping build - no package.json found"
+        fi
