@@ -25,6 +25,7 @@ import type { SalesInvoice, DashboardStats } from "../../types"
 import BottomNavigation from "../components/BottomNavigation"
 import { useMediaQuery } from "../hooks/useMediaQuery"
 import { usePOSDetails } from "../hooks/usePOSProfile"
+import { useAllPaymentModes } from "../hooks/usePaymentModes"
 import { useSalesInvoices } from "../hooks/useSalesInvoices"
 import { useUserInfo } from "../hooks/useUserInfo"
 
@@ -34,7 +35,11 @@ export default function DashboardPage() {
   const { posDetails } = usePOSDetails()
   const { invoices, isLoading: invoicesLoading, error: invoicesError } = useSalesInvoices()
   const { userInfo, isLoading: userInfoLoading } = useUserInfo()
-  const [timeRange, setTimeRange] = useState("today")
+  // Blank => current POS opening session
+  const [timeRange, setTimeRange] = useState("")
+  // Current session payment summary from backend (includes zero-amount methods)
+  const { modes: sessionPaymentSummary, isLoading: sessionSummaryLoading } = useAllPaymentModes()
+
 
   // Get currency symbol from POS details
   const currencySymbol = getCurrencySymbol(posDetails?.currency || 'USD')
@@ -70,48 +75,56 @@ export default function DashboardPage() {
     );
   }
 
-  const getStatsForRange = () => {
-    switch (timeRange) {
-      case "today":
-        return stats.todaySales
-      case "week":
-        return stats.weekSales
-      case "month":
-        return stats.monthSales
-      default:
-        return stats.todaySales
-    }
-  }
-
-  const currentStats = getStatsForRange()
-
   // Filter data based on selected filters and user role
   const filteredInvoices = invoices.filter((invoice) => {
     const matchesCashier = cashierFilter === "all" || invoice.cashier === cashierFilter
     const matchesPayment = paymentFilter === "all" || invoice.paymentMethod === paymentFilter
 
-    // Apply time range filter
+    // Apply time range filter (blank = current session → do not restrict by date)
     const today = new Date().toISOString().split("T")[0]
     const matchesTime =
+      (timeRange === "" && true) ||
       (timeRange === "today" && invoice.date === today) ||
       (timeRange === "week" && new Date(invoice.date) >= new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)) ||
       (timeRange === "month" && new Date(invoice.date) >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
 
+    // For current session: restrict to current POS opening entry
+    const matchesOpening =
+      timeRange !== "" || !posDetails?.current_opening_entry
+        ? true
+        : invoice.custom_pos_opening_entry === posDetails.current_opening_entry
+
     // Role-based filtering: Non-admin users only see invoices for their POS profile
     const matchesPOSProfile = isAdminUser || !posDetails?.name || invoice.posProfile === posDetails.name
 
-    return matchesCashier && matchesPayment && matchesTime && matchesPOSProfile
+    return matchesCashier && matchesPayment && matchesTime && matchesOpening && matchesPOSProfile
   })
 
-  const filteredStats = {
-    totalRevenue: filteredInvoices.reduce((sum: number, inv: SalesInvoice) => sum + inv.totalAmount, 0),
-    totalTransactions: filteredInvoices.length,
-    averageOrderValue:
-      filteredInvoices.length > 0
-        ? filteredInvoices.reduce((sum: number, inv: SalesInvoice) => sum + inv.totalAmount, 0) / filteredInvoices.length
-        : 0,
-    totalItems: filteredInvoices.reduce((sum: number, inv: SalesInvoice) => sum + inv.items.length, 0),
-  }
+  // Inline debug logs (no hooks added)
+  try {
+    // eslint-disable-next-line no-console
+    console.log('[Dashboard] timeRange:', timeRange, 'current_opening_entry:', posDetails?.current_opening_entry)
+    const summary = filteredInvoices.map((inv: SalesInvoice) => ({
+      id: inv.id,
+      date: inv.date,
+      time: inv.time,
+      posOpening: (inv as any).custom_pos_opening_entry,
+      total: inv.totalAmount,
+      paymentMethod: inv.paymentMethod,
+    }))
+    // eslint-disable-next-line no-console
+    console.log('[Dashboard] invoices used for metrics:', summary)
+  } catch {}
+
+  const filteredStats = (() => {
+    // Always derive core stats from the filtered invoices (respects current opening entry when blank)
+    const totalRevenue = filteredInvoices.reduce((sum: number, inv: SalesInvoice) => sum + inv.totalAmount, 0)
+    const totalTransactions = filteredInvoices.length
+    const averageOrderValue = totalTransactions > 0 ? totalRevenue / totalTransactions : 0
+    const totalItems = filteredInvoices.reduce((sum: number, inv: SalesInvoice) => sum + inv.items.length, 0)
+    console.log("here",totalRevenue)
+    return { totalRevenue, totalTransactions, averageOrderValue, totalItems }
+  })()
 
   // Calculate sales by hour for today only using posting_time
   const calculateSalesByHour = () => {
@@ -126,7 +139,6 @@ export default function DashboardPage() {
       const hour = `${i.toString().padStart(2, '0')}:00`
       hourlySales[hour] = 0
     }
-
     // Aggregate total revenue by hour using posting_time
     todayInvoices.forEach(invoice => {
       // Extract hour from posting_time (format: HH:MM:SS)
@@ -144,30 +156,55 @@ export default function DashboardPage() {
 
   const salesByHourData = calculateSalesByHour()
 
-  // Calculate payment methods from real invoice data
+  // Calculate payment methods - show all POS profile methods, even with zero amounts
   const calculatePaymentMethods = () => {
-    const paymentMethods: { [key: string]: { amount: number; transactions: number } } = {}
+    const methodMap: { [key: string]: { amount: number; transactions: number } } = {}
 
-    filteredInvoices.forEach(invoice => {
-      const method = invoice.paymentMethod || 'Cash'
-      if (!paymentMethods[method]) {
-        paymentMethods[method] = { amount: 0, transactions: 0 }
-      }
-      paymentMethods[method].amount += invoice.totalAmount
-      paymentMethods[method].transactions += 1
+    // Initialize with all POS profile payment methods (from session summary)
+    const allMethods = (sessionPaymentSummary || []) as any[]
+    allMethods.forEach((m: any) => {
+      const key = m.name || m.mode_of_payment
+      methodMap[key] = { amount: 0, transactions: 0 }
     })
 
-    const totalAmount = Object.values(paymentMethods).reduce((sum, method) => sum + method.amount, 0)
+    // Aggregate from filtered invoices (respects current opening entry)
+    filteredInvoices.forEach(invoice => {
+      const method = invoice.paymentMethod || 'Cash'
+      if (!methodMap[method]) {
+        methodMap[method] = { amount: 0, transactions: 0 }
+      }
+      methodMap[method].amount += invoice.totalAmount
+      methodMap[method].transactions += 1
+    })
 
-    return Object.entries(paymentMethods).map(([method, data]) => ({
+    const totalAmount = Object.values(methodMap).reduce((sum, m) => sum + m.amount, 0)
+    return Object.entries(methodMap).map(([method, data]) => ({
       method,
       amount: data.amount,
       percentage: totalAmount > 0 ? (data.amount / totalAmount) * 100 : 0,
-      transactions: data.transactions
+      transactions: data.transactions,
     }))
   }
 
   const paymentMethodsData = calculatePaymentMethods()
+
+  // Inline debug: log the exact invoices used for metrics (respects current opening entry when timeRange is blank)
+  try {
+    // Summarize to keep console readable
+    // eslint-disable-next-line no-console
+    console.log('[Dashboard] timeRange:', timeRange, 'current_opening_entry:', posDetails?.current_opening_entry)
+    const summary = filteredInvoices.map((inv: SalesInvoice) => ({
+      id: inv.id,
+      date: inv.date,
+      time: inv.time,
+      posOpening: (inv as any).custom_pos_opening_entry || inv.custom_pos_opening_entry,
+      total: inv.totalAmount,
+      paymentMethod: inv.paymentMethod,
+    }))
+    // eslint-disable-next-line no-console
+    console.log('[Dashboard] invoices used for metrics:', summary)
+  } catch (_) {}
+
 
   // ZATCA status distribution from invoices
   const calculateZatcaStatus = () => {
@@ -294,6 +331,7 @@ export default function DashboardPage() {
                     onChange={(e) => setTimeRange(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
+                    <option value="">Current POS Session</option>
                     <option value="today">Today</option>
                     <option value="week">This Week</option>
                     <option value="month">This Month</option>
@@ -359,12 +397,7 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</p>
                   <p className="text-xl font-bold text-gray-900 dark:text-white">
-                    {formatCurrency(
-                      (cashierFilter !== "all" || paymentFilter !== "all"
-                        ? filteredStats.totalRevenue
-                        : currentStats.totalRevenue
-                      ), posDetails?.currency || 'USD'
-                    )}
+                    {formatCurrency(filteredStats.totalRevenue, posDetails?.currency || 'USD')}
                   </p>
                   <div className="flex items-center mt-2">
                     <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
@@ -383,9 +416,7 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Transactions</p>
                   <p className="text-xl font-bold text-gray-900 dark:text-white">
-                    {cashierFilter !== "all" || paymentFilter !== "all"
-                      ? filteredStats.totalTransactions
-                      : currentStats.totalTransactions}
+                    {filteredStats.totalTransactions}
                   </p>
                   <div className="flex items-center mt-2">
                     <TrendingUp className="w-4 h-4 text-blue-500 mr-1" />
@@ -404,12 +435,7 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Avg Order Value</p>
                   <p className="text-xl font-bold text-gray-900 dark:text-white">
-                    {formatCurrency(
-                      (cashierFilter !== "all" || paymentFilter !== "all"
-                        ? filteredStats.averageOrderValue
-                        : currentStats.averageOrderValue
-                      ), posDetails?.currency || 'USD'
-                    )}
+                    {formatCurrency(filteredStats.averageOrderValue, posDetails?.currency || 'USD')}
                   </p>
                   <div className="flex items-center mt-2">
                     <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
@@ -428,9 +454,7 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Items Sold</p>
                   <p className="text-xl font-bold text-gray-900 dark:text-white">
-                    {cashierFilter !== "all" || paymentFilter !== "all"
-                      ? filteredStats.totalItems
-                      : currentStats.totalItems}
+                    {filteredStats.totalItems}
                   </p>
                   <div className="flex items-center mt-2">
                     <TrendingDown className="w-4 h-4 text-red-500 mr-1" />
@@ -682,7 +706,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="pt-2 border-t border-gray-200 dark:border-gray-600">
                   <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {((stats.giftCardUsage.totalTransactions / currentStats.totalTransactions) * 100).toFixed(1)}% of all
+                    {((stats.giftCardUsage.totalTransactions / (filteredStats.totalTransactions || 1)) * 100).toFixed(1)}% of all
                     transactions
                   </div>
                 </div>
@@ -913,6 +937,7 @@ export default function DashboardPage() {
                   onChange={(e) => setTimeRange(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
+                  <option value="">Current POS Session</option>
                   <option value="today">Today</option>
                   <option value="week">This Week</option>
                   <option value="month">This Month</option>
@@ -978,12 +1003,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</p>
                 <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                  {formatCurrency(
-                    (cashierFilter !== "all" || paymentFilter !== "all"
-                      ? filteredStats.totalRevenue
-                      : currentStats.totalRevenue
-                    ), posDetails?.currency || 'USD'
-                  )}
+                  {formatCurrency(filteredStats.totalRevenue, posDetails?.currency || 'USD')}
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
@@ -1002,9 +1022,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Transactions</p>
                 <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                  {cashierFilter !== "all" || paymentFilter !== "all"
-                    ? filteredStats.totalTransactions
-                    : currentStats.totalTransactions}
+                  {filteredStats.totalTransactions}
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
@@ -1023,12 +1041,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Avg Order Value</p>
                 <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                  {formatCurrency(
-                    (cashierFilter !== "all" || paymentFilter !== "all"
-                      ? filteredStats.averageOrderValue
-                      : currentStats.averageOrderValue
-                    ), posDetails?.currency || 'USD'
-                  )}
+                  {formatCurrency(filteredStats.averageOrderValue, posDetails?.currency || 'USD')}
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
@@ -1047,9 +1060,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Items Sold</p>
                 <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                  {cashierFilter !== "all" || paymentFilter !== "all"
-                    ? filteredStats.totalItems
-                    : currentStats.totalItems}
+                  {filteredStats.totalItems}
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingDown className="w-4 h-4 text-red-500 mr-1" />
@@ -1301,7 +1312,7 @@ export default function DashboardPage() {
               </div>
               <div className="pt-2 border-t border-gray-200 dark:border-gray-600">
                 <div className="text-xs text-gray-500 dark:text-gray-400">
-                  {((stats.giftCardUsage.totalTransactions / currentStats.totalTransactions) * 100).toFixed(1)}% of all
+                  {((stats.giftCardUsage.totalTransactions / (filteredStats.totalTransactions || 1)) * 100).toFixed(1)}% of all
                   transactions
                 </div>
               </div>

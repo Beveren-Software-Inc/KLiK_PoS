@@ -1170,6 +1170,7 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None, s
 				"posting_time",
 				"customer",
 				"grand_total",
+				"paid_amount",
 				"status",
 			],
 			order_by="posting_date desc",

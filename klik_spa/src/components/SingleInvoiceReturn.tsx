@@ -31,6 +31,8 @@ export default function SingleInvoiceReturn({
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingReturnData, setLoadingReturnData] = useState(true);
+  const [originalInvoiceGrandTotal, setOriginalInvoiceGrandTotal] = useState<number>(0);
+  const [originalInvoicePaidAmount, setOriginalInvoicePaidAmount] = useState<number>(0);
 
   // Currency from invoice or POS profile
   const { posDetails } = usePOSDetails();
@@ -52,11 +54,32 @@ export default function SingleInvoiceReturn({
 
   // Update return amount when items change
   useEffect(() => {
-    const total = returnItems.reduce((sum, item) => {
-      return sum + ((item.return_qty || 0) * item.rate);
-    }, 0);
-    setReturnAmount(total);
-  }, [returnItems]);
+    if (originalInvoicePaidAmount > 0) {
+      // Calculate return amount based on percentage of items being returned
+      const totalItemsAmount = returnItems.reduce((sum, item) => {
+        return sum + (item.qty * item.rate);
+      }, 0);
+
+      const returnedItemsAmount = returnItems.reduce((sum, item) => {
+        return sum + ((item.return_qty || 0) * item.rate);
+      }, 0);
+
+      // Calculate percentage of items being returned
+      const returnPercentage = totalItemsAmount > 0 ? returnedItemsAmount / totalItemsAmount : 0;
+
+      // Apply the same percentage to the original paid amount (what customer actually paid)
+      const calculatedReturnAmount = originalInvoicePaidAmount * returnPercentage;
+
+      // Round to 2 decimal places to avoid floating point precision issues
+      setReturnAmount(Math.round(calculatedReturnAmount * 100) / 100);
+    } else {
+      // Fallback to item-based calculation if paid amount is not available
+      const total = returnItems.reduce((sum, item) => {
+        return sum + ((item.return_qty || 0) * item.rate);
+      }, 0);
+      setReturnAmount(Math.round(total * 100) / 100);
+    }
+  }, [returnItems, originalInvoicePaidAmount]);
 
   // Set default payment method when payment modes are loaded
   useEffect(() => {
@@ -71,19 +94,19 @@ export default function SingleInvoiceReturn({
     setLoadingReturnData(true);
     try {
 
-      // If invoice.items is empty, fetch complete invoice details from backend
+      // Always fetch complete invoice details from backend to get accurate grand_total
       let invoiceWithItems = invoice;
-              if (!invoice.items || invoice.items.length === 0) {
-          const invoiceDetails = await getInvoiceDetails(invoice.name || invoice.id);
+      const invoiceDetails = await getInvoiceDetails(invoice.name || invoice.id);
 
-          if (invoiceDetails.success && invoiceDetails.data) {
-            invoiceWithItems = invoiceDetails.data.data || invoiceDetails.data;
-
-          } else {
-            console.error('Failed to fetch invoice details:', invoiceDetails.error);
-            throw new Error(invoiceDetails.error || 'Failed to fetch invoice details from backend');
-          }
-        }
+      if (invoiceDetails.success && invoiceDetails.data) {
+        invoiceWithItems = invoiceDetails.data.data || invoiceDetails.data;
+        // Store the original invoice grand total and paid amount for return calculations
+        setOriginalInvoiceGrandTotal(invoiceWithItems.grand_total || 0);
+        setOriginalInvoicePaidAmount(invoiceWithItems.paid_amount || invoiceWithItems.grand_total || 0);
+      } else {
+        console.error('Failed to fetch invoice details:', invoiceDetails.error);
+        throw new Error(invoiceDetails.error || 'Failed to fetch invoice details from backend');
+      }
 
         const items: ReturnItem[] = [];
 
@@ -268,6 +291,11 @@ export default function SingleInvoiceReturn({
                   <p className="text-xl font-bold text-black-600 dark:text-orange-400">
                     {formatCurrency(totalReturnAmount, currency)}
                   </p>
+                  {originalInvoicePaidAmount > 0 && (
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Customer Paid: {formatCurrency(originalInvoicePaidAmount, currency)}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -438,7 +466,11 @@ export default function SingleInvoiceReturn({
                         <input
                           type="number"
                           value={returnAmount}
-                          onChange={(e) => setReturnAmount(parseFloat(e.target.value) || 0)}
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value) || 0;
+                            // Round to 2 decimal places to avoid floating point precision issues
+                            setReturnAmount(Math.round(value * 100) / 100);
+                          }}
                           step="0.01"
                           min="0"
                           className="w-full pl-8 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-beveren-500 focus:border-beveren-500 transition-colors text-right text-lg font-semibold"
