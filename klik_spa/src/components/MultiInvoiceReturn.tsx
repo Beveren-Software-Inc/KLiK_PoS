@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   X,
   RotateCcw,
@@ -17,9 +17,13 @@ import {
   getCustomerInvoicesForReturn,
   createMultiInvoiceReturn,
   type InvoiceForReturn,
-  type ReturnItem,
   type ReturnData
 } from "../services/returnService";
+
+// Extended interface to include paid_amount
+interface InvoiceWithPaidAmount extends InvoiceForReturn {
+  paid_amount?: number;
+}
 import { formatCurrency, getCurrencySymbol } from "../utils/currency";
 import { useCustomers } from "../hooks/useCustomers";
 import { usePOSDetails } from "../hooks/usePOSProfile";
@@ -30,15 +34,13 @@ interface MultiInvoiceReturnProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (returnInvoices: string[]) => void;
-  customers?: Array<{name: string, customer_name: string}>;
 }
 
 export default function MultiInvoiceReturn({
   customer,
   isOpen,
   onClose,
-  onSuccess,
-  customers = []
+  onSuccess
 }: MultiInvoiceReturnProps) {
   const [invoices, setInvoices] = useState<InvoiceForReturn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -67,30 +69,7 @@ export default function MultiInvoiceReturn({
   const [customerAddresses, setCustomerAddresses] = useState<Array<{name: string, address_line1: string, city: string}>>([]);
   const [selectedAddress, setSelectedAddress] = useState<string>('');
 
-  useEffect(() => {
-    if (isOpen) {
-      if (customer) {
-        setWorkflowStep('select-items');
-        setSelectedCustomer(customer);
-      } else {
-        setWorkflowStep('select-customer');
-        setSelectedCustomer('');
-      }
-      setSelectedItems([]);
-      setInvoices([]);
-      setSelectedInvoices(new Set());
-      setFilteredAvailableItems([]);
-      setCustomerSearchQuery('');
-      setSelectedAddress('');
-
-      if (customer) {
-        loadAvailableItems();
-        loadCustomerAddresses();
-      }
-    }
-  }, [isOpen, customer]);
-
-    const loadCustomerAddresses = async () => {
+  const loadCustomerAddresses = useCallback(async () => {
     try {
       const response = await fetch(`/api/method/klik_pos.api.customer.get_customer_addresses?customer=${selectedCustomer}`);
       const data = await response.json();
@@ -104,9 +83,9 @@ export default function MultiInvoiceReturn({
       console.error('Error loading customer addresses:', error);
       setCustomerAddresses([]);
     }
-  };
+  }, [selectedCustomer]);
 
-  const loadAvailableItems = async () => {
+  const loadAvailableItems = useCallback(async () => {
     try {
       const endDate = new Date().toISOString().split('T')[0];
       const startDate = new Date(Date.now() - (daysBack * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
@@ -140,7 +119,30 @@ export default function MultiInvoiceReturn({
       setAvailableItems([]);
       setFilteredAvailableItems([]);
     }
-  };
+  }, [selectedCustomer, daysBack, selectedAddress]);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (customer) {
+        setWorkflowStep('select-items');
+        setSelectedCustomer(customer);
+      } else {
+        setWorkflowStep('select-customer');
+        setSelectedCustomer('');
+      }
+      setSelectedItems([]);
+      setInvoices([]);
+      setSelectedInvoices(new Set());
+      setFilteredAvailableItems([]);
+      setCustomerSearchQuery('');
+      setSelectedAddress('');
+
+      if (customer) {
+        loadAvailableItems();
+        loadCustomerAddresses();
+      }
+    }
+  }, [isOpen, customer, loadAvailableItems, loadCustomerAddresses]);
 
   const loadCustomerInvoices = async () => {
     if (selectedItems.length === 0) {
@@ -182,7 +184,19 @@ export default function MultiInvoiceReturn({
           const next = { ...prev } as Record<string, { method: string; amount: number }>;
           for (const inv of filteredInvoices) {
             if (selectedInvoices.has(inv.name)) {
-              const amount = inv.items.reduce((sum, item) => sum + (item.return_qty || 0) * item.rate, 0);
+              // Calculate return amount based on percentage of items being returned vs original paid amount
+              const totalItemsAmount = inv.items.reduce((sum, item) => sum + (item.qty * item.rate), 0);
+              const returnedItemsAmount = inv.items.reduce((sum, item) => sum + (item.return_qty || 0) * item.rate, 0);
+
+              // Calculate percentage of items being returned
+              const returnPercentage = totalItemsAmount > 0 ? returnedItemsAmount / totalItemsAmount : 0;
+
+              // Apply the same percentage to the original paid amount (what customer actually paid)
+              const calculatedReturnAmount = ((inv as InvoiceWithPaidAmount).paid_amount || inv.grand_total) * returnPercentage;
+
+              // Round to 2 decimal places to avoid floating point precision issues
+              const amount = Math.round(calculatedReturnAmount * 100) / 100;
+
               const defaultMode = paymentModes.find((m) => m.default === 1)?.mode_of_payment || paymentModes[0]?.mode_of_payment || 'Cash';
               // @ts-expect-error backend may provide payments array
               const inferred = inv.payments?.[0]?.mode_of_payment || defaultMode;
@@ -253,7 +267,19 @@ export default function MultiInvoiceReturn({
         // Initialize payment config when selecting
         const inv = invoices.find(i => i.name === invoiceName);
         if (inv) {
-          const amount = inv.items.reduce((sum, item) => sum + (item.return_qty || 0) * item.rate, 0);
+              // Calculate return amount based on percentage of items being returned vs original paid amount
+              const totalItemsAmount = inv.items.reduce((sum, item) => sum + (item.qty * item.rate), 0);
+              const returnedItemsAmount = inv.items.reduce((sum, item) => sum + (item.return_qty || 0) * item.rate, 0);
+
+              // Calculate percentage of items being returned
+              const returnPercentage = totalItemsAmount > 0 ? returnedItemsAmount / totalItemsAmount : 0;
+
+              // Apply the same percentage to the original paid amount (what customer actually paid)
+              const calculatedReturnAmount = ((inv as InvoiceWithPaidAmount).paid_amount || inv.grand_total) * returnPercentage;
+
+          // Round to 2 decimal places to avoid floating point precision issues
+          const amount = Math.round(calculatedReturnAmount * 100) / 100;
+
           const defaultMode = paymentModes.find((m) => m.default === 1)?.mode_of_payment || paymentModes[0]?.mode_of_payment || 'Cash';
           // @ts-expect-error backend may provide payments array
           const inferred = inv.payments?.[0]?.mode_of_payment || defaultMode;
@@ -319,7 +345,7 @@ export default function MultiInvoiceReturn({
     }
 
     const returnData: ReturnData = {
-      customer,
+      customer: customer || '',
       invoice_returns: invoiceReturns
     };
 
@@ -584,7 +610,7 @@ export default function MultiInvoiceReturn({
                           }
                         }
                       }}
-                      onBlur={(e) => {
+                      onBlur={() => {
                         if (!daysBack || daysBack < 1) {
                           setDaysBack(90);
                         }
@@ -1033,14 +1059,27 @@ export default function MultiInvoiceReturn({
                                 ...prev,
                                 [invoice.name]: {
                                   method,
-                                  amount: prev[invoice.name]?.amount ?? invoice.items.reduce((sum, it) => sum + (it.return_qty || 0) * it.rate, 0)
+                                  amount: prev[invoice.name]?.amount ?? (() => {
+                                // Calculate return amount based on percentage of items being returned vs original paid amount
+                                const totalItemsAmount = invoice.items.reduce((sum, item) => sum + (item.qty * item.rate), 0);
+                                const returnedItemsAmount = invoice.items.reduce((sum, item) => sum + (item.return_qty || 0) * item.rate, 0);
+
+                                // Calculate percentage of items being returned
+                                const returnPercentage = totalItemsAmount > 0 ? returnedItemsAmount / totalItemsAmount : 0;
+
+                                // Apply the same percentage to the original paid amount (what customer actually paid)
+                                const calculatedReturnAmount = ((invoice as InvoiceWithPaidAmount).paid_amount || invoice.grand_total) * returnPercentage;
+
+                                    // Round to 2 decimal places to avoid floating point precision issues
+                                    return Math.round(calculatedReturnAmount * 100) / 100;
+                                  })()
                                 }
                               }));
                             }}
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-beveren-500"
                           >
                             {paymentModes.map((mode) => (
-                              <option key={mode.name} value={mode.mode_of_payment}>{mode.mode_of_payment}</option>
+                              <option key={mode.mode_of_payment} value={mode.mode_of_payment}>{mode.mode_of_payment}</option>
                             ))}
                           </select>
                         </div>
@@ -1054,14 +1093,29 @@ export default function MultiInvoiceReturn({
                               type="number"
                               step="0.01"
                               min="0"
-                              value={invoicePayments[invoice.name]?.amount ?? invoice.items.reduce((sum, it) => sum + (it.return_qty || 0) * it.rate, 0)}
+                              value={invoicePayments[invoice.name]?.amount ?? (() => {
+                                // Calculate return amount based on percentage of items being returned vs original paid amount
+                                const totalItemsAmount = invoice.items.reduce((sum, item) => sum + (item.qty * item.rate), 0);
+                                const returnedItemsAmount = invoice.items.reduce((sum, item) => sum + (item.return_qty || 0) * item.rate, 0);
+
+                                // Calculate percentage of items being returned
+                                const returnPercentage = totalItemsAmount > 0 ? returnedItemsAmount / totalItemsAmount : 0;
+
+                                // Apply the same percentage to the original paid amount (what customer actually paid)
+                                const calculatedReturnAmount = ((invoice as InvoiceWithPaidAmount).paid_amount || invoice.grand_total) * returnPercentage;
+
+                                // Round to 2 decimal places to avoid floating point precision issues
+                                return Math.round(calculatedReturnAmount * 100) / 100;
+                              })()}
                               onChange={(e) => {
                                 const value = parseFloat(e.target.value) || 0;
+                                // Round to 2 decimal places to avoid floating point precision issues
+                                const roundedValue = Math.round(value * 100) / 100;
                                 setInvoicePayments(prev => ({
                                   ...prev,
                                   [invoice.name]: {
                                     method: prev[invoice.name]?.method || (paymentModes.find(m=>m.default===1)?.mode_of_payment || paymentModes[0]?.mode_of_payment || 'Cash'),
-                                    amount: value
+                                    amount: roundedValue
                                   }
                                 }));
                               }}

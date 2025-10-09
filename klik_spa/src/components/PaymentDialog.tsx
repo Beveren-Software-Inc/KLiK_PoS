@@ -844,7 +844,7 @@ export default function PaymentDialog({
             const [lastMethod, lastAmount] = validPayments[lastPaymentIndex];
 
             // Reduce the last payment method by the excess amount
-            const adjustedLastAmount = Math.max(0, lastAmount - excess);
+            const adjustedLastAmount = parseFloat(Math.max(0, lastAmount - excess).toFixed(2));
 
             return validPayments.map(([method, amount], index) => {
               if (index === lastPaymentIndex) {
@@ -869,7 +869,7 @@ export default function PaymentDialog({
         discountAmount: itemDiscounts[item.id]?.discountAmount || 0,
       })),
       customer: selectedCustomer,
-      paymentMethods: adjustedPaymentMethods.map(([method, amount]) => ({ method, amount })),
+      paymentMethods: adjustedPaymentMethods.map(([method, amount]) => ({ method, amount: parseFloat((amount || 0).toFixed(2)) })),
       subtotal: calculations.subtotal,
       SalesTaxCharges: selectedSalesTaxCharges,
       taxAmount: calculations.taxAmount,
