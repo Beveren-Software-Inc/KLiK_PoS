@@ -60,11 +60,9 @@ export const useCartStore = create<CartState>()(
 
           if (state.selectedCustomer) {
             try {
-              console.log(`🔄 Fetching correct price for ${item.name} with customer: ${state.selectedCustomer.name}`);
               const priceInfo = await getItemPriceForCustomer(item.id, state.selectedCustomer.id);
               if (priceInfo.success) {
                 finalPrice = priceInfo.price;
-                console.log(`💰 Updated price for ${item.name}: ${item.price} → ${finalPrice}`);
               }
             } catch (error) {
               console.error('❌ Error fetching price for customer:', error);
@@ -108,11 +106,9 @@ export const useCartStore = create<CartState>()(
 
           if (state.selectedCustomer) {
             try {
-              console.log(`🔄 Fetching correct price for ${item.name} with customer: ${state.selectedCustomer.name}`);
               const priceInfo = await getItemPriceForCustomer(item.id, state.selectedCustomer.id);
               if (priceInfo.success) {
                 finalPrice = priceInfo.price;
-                console.log(`💰 Updated price for ${item.name}: ${item.price} → ${finalPrice}`);
               }
             } catch (error) {
               console.error('❌ Error fetching price for customer:', error);
@@ -200,7 +196,6 @@ export const useCartStore = create<CartState>()(
         if (state.cartItems.length === 0) return;
 
         try {
-          console.log(`🔄 Updating prices for ${state.cartItems.length} items with customer: ${customerId || 'None'}`);
 
           // Get updated prices for all items
           const priceUpdates = await updateItemPricesForCustomer(state.cartItems, customerId);
@@ -210,7 +205,6 @@ export const useCartStore = create<CartState>()(
             cartItems: state.cartItems.map(item => {
               const priceUpdate = priceUpdates[item.id];
               if (priceUpdate && priceUpdate.success) {
-                console.log(`💰 Updated price for ${item.name}: ${item.price} → ${priceUpdate.price}`);
                 return { ...item, price: priceUpdate.price };
               }
               return item;

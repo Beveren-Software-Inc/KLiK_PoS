@@ -24,7 +24,6 @@ export function useCreatePOSOpeningEntry(): UseCreateOpeningReturn {
     setSuccess(false);
     const csrfToken = window.csrf_token;
 
-    console.log("Opening", openingBalance, "POS Profile:", posProfile)
     try {
       const requestBody: any = { opening_balance: openingBalance };
       if (posProfile) {

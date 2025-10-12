@@ -426,13 +426,12 @@ export default function OrderSummary({
 
   // Debug selectedCustomer changes
   useEffect(() => {
-    console.log("🔄 OrderSummary: selectedCustomer changed:", selectedCustomer);
+    console.log();
   }, [selectedCustomer]);
 
   // Update prices when customer changes
   useEffect(() => {
     if (selectedCustomer && cartItems.length > 0) {
-      console.log(`🔄 Customer changed to: ${selectedCustomer.name}, updating prices for ${cartItems.length} items`);
       updatePricesForCustomer(selectedCustomer.id);
     }
   }, [selectedCustomer?.id, cartItems.length, updatePricesForCustomer]);

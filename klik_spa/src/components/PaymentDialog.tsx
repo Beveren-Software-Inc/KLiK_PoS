@@ -133,6 +133,7 @@ export default function PaymentDialog({
   const [selectedSalesTaxCharges, setSelectedSalesTaxCharges] = useState("");
   const [paymentAmounts, setPaymentAmounts] = useState<PaymentAmount>({});
   const [activeMethodId, setActiveMethodId] = useState<string | null>(null);
+  const [lastModifiedMethodId, setLastModifiedMethodId] = useState<string | null>(null);
   const [roundOffAmount, setRoundOffAmount] = useState(0);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isHoldingOrder, setIsHoldingOrder] = useState(false);
@@ -456,30 +457,41 @@ export default function PaymentDialog({
       const defaultMode = modes.find((mode) => mode.default === 1);
       if (defaultMode && Object.keys(paymentAmounts).length === 0) {
         const defaultAmount = parseFloat(calculations.grandTotal.toFixed(2));
+        setLastModifiedMethodId(defaultMode.mode_of_payment); // Track the auto-filled method
         setPaymentAmounts({ [defaultMode.mode_of_payment]: defaultAmount });
       }
     }
-  }, [isOpen, modes, calculations.grandTotal, paymentAmounts, isB2B, isB2C]);
+  }, [isOpen, modes, calculations.grandTotal, isB2B, isB2C]);
 
   useEffect(() => {
+
     if (modes.length > 0 && Object.keys(paymentAmounts).length > 0) {
       const defaultMode = modes.find((mode) => mode.default === 1);
       if (defaultMode) {
-        const otherPayments = Object.entries(paymentAmounts)
-          .filter(([key]) => key !== defaultMode.mode_of_payment)
-          .map(([, amount]) => amount || 0);
+        // Calculate total of all payment methods
+        const totalPayments = Object.values(paymentAmounts).reduce((sum, amount) => sum + (amount || 0), 0);
+        const excess = totalPayments - calculations.grandTotal;
 
-        const remainingAmount = (isB2C || isCombined)
-          ? calculateRemainingAmount(calculations.grandTotal, otherPayments)
-          : 0;
+        // Find the payment method with the highest amount
+        const paymentEntries = Object.entries(paymentAmounts);
+        const highestAmountMethod = paymentEntries.reduce((max, current) =>
+          (current[1] || 0) > (max[1] || 0) ? current : max
+        );
+        const [highestMethodId, highestAmount] = highestAmountMethod;
 
-        setPaymentAmounts((prev) => ({
-          ...prev,
-          [defaultMode.mode_of_payment]: remainingAmount,
-        }));
+
+
+        if (highestAmount > 0 && excess > 0) {
+          // Subtract excess from the method with highest amount
+          const newAmount = Math.max(0, highestAmount - excess);
+          setPaymentAmounts((prev) => ({
+            ...prev,
+            [highestMethodId]: newAmount,
+          }));
+        }
       }
     }
-  }, [calculations.grandTotal, modes, isB2C, isB2B, isCombined]);
+  }, [calculations.grandTotal, modes, isB2C, isB2B, isCombined, paymentAmounts]);
 
   // Auto-print when invoice is submitted and auto-print is enabled
   useEffect(() => {
@@ -561,10 +573,16 @@ export default function PaymentDialog({
     if (invoiceSubmitted || isProcessingPayment) return;
 
     const numericAmount = roundCurrency(parseFloat(amount) || 0);
-    setPaymentAmounts((prev) => ({
-      ...prev,
-      [methodId]: numericAmount,
-    }));
+
+    setLastModifiedMethodId(methodId); // Track which method was just modified
+    setPaymentAmounts((prev) => {
+      const newAmounts = {
+        ...prev,
+        [methodId]: numericAmount,
+      };
+
+      return newAmounts;
+    });
   };
 
   // Auto-fill payment method with grand total and clear others
@@ -582,6 +600,8 @@ export default function PaymentDialog({
     // Set the selected method to grand total
     newPaymentAmounts[methodId] = grandTotal;
 
+
+    setLastModifiedMethodId(methodId); // Track which method was just modified
     setPaymentAmounts(newPaymentAmounts);
     setActiveMethodId(methodId);
   };
@@ -618,31 +638,9 @@ export default function PaymentDialog({
     const numericAmount = roundCurrency(parseFloat(amount) || 0);
     const grandTotal = calculations.grandTotal;
 
-    // Calculate total of all other payment methods
-    const otherPayments = Object.entries(paymentAmounts)
-      .filter(([id]) => id !== methodId)
-      .map(([, amount]) => amount || 0);
-    const otherMethodsTotal = calculateTotalPayments(otherPayments);
 
-    // Calculate remaining amount for other methods
-    const remainingAmount = subtractCurrency(grandTotal, numericAmount);
-
-    // If remaining amount is positive, distribute it to other methods
-    if (remainingAmount > 0) {
-      const otherMethods = paymentMethods.filter(method => method.id !== methodId);
-      if (otherMethods.length > 0) {
-        // Distribute remaining amount to the first other method
-        const targetMethod = otherMethods[0];
-        setPaymentAmounts((prev) => ({
-          ...prev,
-          [methodId]: numericAmount,
-          [targetMethod.id]: roundCurrency(remainingAmount),
-        }));
-        return;
-      }
-    }
-
-    // If no other methods or remaining amount is 0, just update the current method
+    // Update the payment amount and let the adjustment useEffect handle the logic
+    setLastModifiedMethodId(methodId); // Track which method was just modified
     setPaymentAmounts((prev) => ({
       ...prev,
       [methodId]: numericAmount,

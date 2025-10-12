@@ -16,7 +16,7 @@ import {
   PieChart,
   Activity,
   Filter,
-  Download,
+
 
 } from "lucide-react"
 import { mockDashboardStats, mockSalesInvoices } from "../data/mockSalesData"
@@ -169,12 +169,30 @@ export default function DashboardPage() {
 
     // Aggregate from filtered invoices (respects current opening entry)
     filteredInvoices.forEach(invoice => {
-      const method = invoice.paymentMethod || 'Cash'
-      if (!methodMap[method]) {
-        methodMap[method] = { amount: 0, transactions: 0 }
+
+      // Check if invoice has multiple payment methods
+      if (invoice.payment_methods && Array.isArray(invoice.payment_methods)) {
+        // Distribute amounts across all payment methods
+        invoice.payment_methods.forEach((payment: any) => {
+          const method = payment.mode_of_payment
+          if (!methodMap[method]) {
+            methodMap[method] = { amount: 0, transactions: 0 }
+          }
+          methodMap[method].amount += payment.amount
+          // Only count transaction once per invoice, not per payment method
+          if (invoice.payment_methods.indexOf(payment) === 0) {
+            methodMap[method].transactions += 1
+          }
+        })
+      } else {
+        // Fallback to single payment method (backward compatibility)
+        const method = invoice.paymentMethod || 'Cash'
+        if (!methodMap[method]) {
+          methodMap[method] = { amount: 0, transactions: 0 }
+        }
+        methodMap[method].amount += invoice.totalAmount
+        methodMap[method].transactions += 1
       }
-      methodMap[method].amount += invoice.totalAmount
-      methodMap[method].transactions += 1
     })
 
     const totalAmount = Object.values(methodMap).reduce((sum, m) => sum + m.amount, 0)
