@@ -761,8 +761,6 @@ export default function ClosingShiftPage() {
                   </div>
                 ))}
               </div>
-
-
             </>
           )}
 

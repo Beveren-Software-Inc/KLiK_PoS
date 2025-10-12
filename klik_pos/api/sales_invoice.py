@@ -191,10 +191,9 @@ def get_sales_invoices(limit=100, start=0, search=""):
 			payment_methods = []
 			if invoice_doc.payments:
 				for payment in invoice_doc.payments:
-					payment_methods.append({
-						"mode_of_payment": payment.mode_of_payment,
-						"amount": payment.amount
-					})
+					payment_methods.append(
+						{"mode_of_payment": payment.mode_of_payment, "amount": payment.amount}
+					)
 			elif invoice_doc.status == "Draft":
 				payment_methods = []
 			else:
@@ -205,16 +204,18 @@ def get_sales_invoices(limit=100, start=0, search=""):
 						"Payment Entry Reference",
 						filters={"reference_name": invoice_doc.name, "reference_doctype": "Sales Invoice"},
 						fields=["parent", "allocated_amount"],
-						parent_doctype="Payment Entry"
+						parent_doctype="Payment Entry",
 					)
 
 					for pe_ref in payment_entries:
 						payment_entry = frappe.get_doc("Payment Entry", pe_ref.parent)
 						if payment_entry.docstatus == 1:  # Only submitted payment entries
-							payment_methods.append({
-								"mode_of_payment": payment_entry.mode_of_payment,
-								"amount": pe_ref.allocated_amount
-							})
+							payment_methods.append(
+								{
+									"mode_of_payment": payment_entry.mode_of_payment,
+									"amount": pe_ref.allocated_amount,
+								}
+							)
 
 			inv["payment_methods"] = payment_methods
 			# Keep backward compatibility - show first payment method or combined display
@@ -813,6 +814,8 @@ def set_grand_total_with_roundoff(doc, method):
 
 
 def custom_calculate_totals(self):
+	"""Main function to calculate invoice totals with custom round-off logic"""
+	# Calculate basic grand total and taxes
 	if self.doc.get("taxes"):
 		self.doc.grand_total = flt(self.doc.get("taxes")[-1].total) + flt(self.doc.get("grand_total_diff"))
 	else:
@@ -826,7 +829,7 @@ def custom_calculate_totals(self):
 	else:
 		self.doc.total_taxes_and_charges = 0.0
 
-	# Make Grand Total Less Retention
+	# Apply existing roundoff amount
 	if (
 		self.doc.doctype == "Sales Invoice"
 		and self.doc.custom_roundoff_account
@@ -836,6 +839,7 @@ def custom_calculate_totals(self):
 
 	self._set_in_company_currency(self.doc, ["total_taxes_and_charges", "rounding_adjustment"])
 
+	# Calculate base currency totals
 	if self.doc.doctype in [
 		"Quotation",
 		"Sales Order",
@@ -872,6 +876,31 @@ def custom_calculate_totals(self):
 
 	self.doc.round_floats_in(self.doc, ["grand_total", "base_grand_total"])
 
+	#Mania: Auto write-off small decimal amounts (like 10.01 to 10.00)
+	if self.doc.doctype == "Sales Invoice" and self.doc.grand_total > 0:
+		grand_total_int = int(self.doc.grand_total)
+		decimal_part = self.doc.grand_total - grand_total_int
+
+		# If decimal part is very small (<= 0.01), write it off
+		if 0 < decimal_part <= 0.01:
+			writeoff_account = get_writeoff_account()
+			if writeoff_account:
+				small_amount = decimal_part
+
+				# Add to existing roundoff or create new roundoff
+				if self.doc.custom_roundoff_amount:
+					self.doc.custom_roundoff_amount += small_amount
+				else:
+					self.doc.custom_roundoff_amount = small_amount
+					self.doc.custom_roundoff_account = writeoff_account
+
+				self.doc.custom_base_roundoff_amount = self.doc.custom_roundoff_amount * (
+					self.doc.conversion_rate or 1
+				)
+
+				self.doc.grand_total -= small_amount
+				self.doc.base_grand_total = self.doc.grand_total * (self.doc.conversion_rate or 1)
+
 	self.set_rounded_total()
 
 
@@ -880,7 +909,6 @@ def create_roundoff_writeoff_entry(self):
 	if not self.doc.custom_roundoff_amount or not self.doc.custom_roundoff_account:
 		return
 
-	# Add round-off entry as a separate line item or tax entry
 	roundoff_entry = {
 		"charge_type": "Actual",
 		"account_head": self.doc.custom_roundoff_account,
@@ -895,7 +923,6 @@ def create_roundoff_writeoff_entry(self):
 		or frappe.get_cached_value("Company", self.doc.company, "cost_center"),
 	}
 
-	# Add to taxes table
 	self.doc.append("taxes", roundoff_entry)
 
 
@@ -1227,10 +1254,9 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None, s
 			payment_methods = []
 			if invoice_doc.payments:
 				for payment in invoice_doc.payments:
-					payment_methods.append({
-						"mode_of_payment": payment.mode_of_payment,
-						"amount": payment.amount
-					})
+					payment_methods.append(
+						{"mode_of_payment": payment.mode_of_payment, "amount": payment.amount}
+					)
 			elif invoice_doc.status == "Draft":
 				payment_methods = []
 			else:
@@ -1241,16 +1267,18 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None, s
 						"Payment Entry Reference",
 						filters={"reference_name": invoice_doc.name, "reference_doctype": "Sales Invoice"},
 						fields=["parent", "allocated_amount"],
-						parent_doctype="Payment Entry"
+						parent_doctype="Payment Entry",
 					)
 
 					for pe_ref in payment_entries:
 						payment_entry = frappe.get_doc("Payment Entry", pe_ref.parent)
 						if payment_entry.docstatus == 1:  # Only submitted payment entries
-							payment_methods.append({
-								"mode_of_payment": payment_entry.mode_of_payment,
-								"amount": pe_ref.allocated_amount
-							})
+							payment_methods.append(
+								{
+									"mode_of_payment": payment_entry.mode_of_payment,
+									"amount": pe_ref.allocated_amount,
+								}
+							)
 
 			invoice.payment_methods = payment_methods
 			# Keep backward compatibility - show first payment method or combined display
