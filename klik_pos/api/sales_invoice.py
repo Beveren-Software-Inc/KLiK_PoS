@@ -16,7 +16,6 @@ def get_current_pos_opening_entry():
 	"""
 	try:
 		user = frappe.session.user
-		# Find the most recent submitted POS Opening Entry with no linked closing entry for this user
 		opening_entries = frappe.get_all(
 			"POS Opening Entry",
 			filters={"user": user, "docstatus": 1, "status": "Open"},
@@ -89,7 +88,6 @@ def get_sales_invoices(limit=100, start=0, search=""):
 
 		# Get total count first
 		if search and search.strip():
-			# Use SQL for comprehensive search
 			search_term = search.strip()
 			base_conditions = []
 
@@ -137,7 +135,6 @@ def get_sales_invoices(limit=100, start=0, search=""):
 			"""
 			invoices = frappe.db.sql(query, as_dict=True)
 		else:
-			# Use regular frappe.get_all for non-search queries
 			total_count = frappe.db.count("Sales Invoice", filters=filters)
 
 			invoices = frappe.get_all(
@@ -240,7 +237,6 @@ def get_invoice_details(invoice_id):
 		invoice = frappe.get_doc("Sales Invoice", invoice_id)
 		invoice_data = invoice.as_dict()
 
-		# Get items explicitly with return quantities
 		items = []
 		for item in invoice.items:
 			# Get returned quantity for this item
@@ -271,7 +267,6 @@ def get_invoice_details(invoice_id):
 		if invoice.customer_address:
 			customer_address_doc = frappe.get_doc("Address", invoice.customer_address).as_dict()
 		else:
-			# fallback to primary address linked to customer
 			primary_address = frappe.db.get_value(
 				"Dynamic Link",
 				{
@@ -287,7 +282,6 @@ def get_invoice_details(invoice_id):
 		# Format posting_time from timedelta to HH:MM:SS
 		if invoice_data.get("posting_time"):
 			if hasattr(invoice_data["posting_time"], "total_seconds"):
-				# It's a timedelta object
 				total_seconds = int(invoice_data["posting_time"].total_seconds())
 				hours = total_seconds // 3600
 				minutes = (total_seconds % 3600) // 60
@@ -349,7 +343,6 @@ def get_invoice_details(invoice_id):
 @frappe.whitelist()
 def create_and_submit_invoice(data):
 	try:
-		# Start timing for performance monitoring
 		import time
 
 		start_time = time.time()
@@ -416,10 +409,8 @@ def create_and_submit_invoice(data):
 				payment_entry = create_payment_entry(doc, mode_of_payment, amount_paid)
 			except Exception:
 				frappe.log_error(frappe.get_traceback(), f"Payment Entry Error for {doc.name}")
-				# Don't fail the invoice if payment entry fails
 				payment_entry = None
 
-		# Calculate processing time
 		processing_time = time.time() - start_time
 		frappe.logger().info(f"Invoice {doc.name} processed in {processing_time:.2f} seconds")
 
@@ -628,10 +619,8 @@ def build_sales_invoice_doc(
 		if has_batch_no:
 			batch_number = item.get("batchNumber")
 			if batch_number:
-				# User selected a specific batch - use serial/batch fields
 				item_data["use_serial_batch_fields"] = 1
 				item_data["batch_no"] = batch_number
-			# If no batch selected, leave use_serial_batch_fields = 0 for FIFO
 
 		# Handle serial number if provided
 		serial_number = item.get("serialNumber")
@@ -660,7 +649,6 @@ def build_sales_invoice_doc(
 					},
 				)
 
-	# Add round-off entry to taxes if present and not zero
 	if roundoff_amount != 0:
 		conversion_rate = doc.conversion_rate or 1
 
@@ -876,7 +864,7 @@ def custom_calculate_totals(self):
 
 	self.doc.round_floats_in(self.doc, ["grand_total", "base_grand_total"])
 
-	#Mania: Auto write-off small decimal amounts (like 10.01 to 10.00)
+	# Mania: Auto write-off small decimal amounts (like 10.01 to 10.00)
 	if self.doc.doctype == "Sales Invoice" and self.doc.grand_total > 0:
 		grand_total_int = int(self.doc.grand_total)
 		decimal_part = self.doc.grand_total - grand_total_int
@@ -1022,10 +1010,8 @@ def create_payment_entry(sales_invoice, mode_of_payment, amount_paid):
 		payment_entry.source_exchange_rate = 1
 		payment_entry.target_exchange_rate = 1
 
-		# Get default accounts
 		company_doc = frappe.get_doc("Company", company)
 
-		# Set party account (Customer's receivable account)
 		payment_entry.party_account = get_customer_receivable_account(customer, company)
 
 		# Handle multiple payment methods
@@ -1043,7 +1029,6 @@ def create_payment_entry(sales_invoice, mode_of_payment, amount_paid):
 
 			payment_entry.mode_of_payment = first_payment["method"]
 
-			# Add reference to Sales Invoice
 			payment_entry.append(
 				"references",
 				{
@@ -1057,7 +1042,6 @@ def create_payment_entry(sales_invoice, mode_of_payment, amount_paid):
 			payment_entry.paid_to = company_doc.default_cash_account
 			payment_entry.mode_of_payment = "Cash"
 
-			# Add reference to Sales Invoice
 			payment_entry.append(
 				"references",
 				{
@@ -1165,7 +1149,6 @@ def get_valid_sales_invoices(doctype, txt, searchfield, start, page_len, filters
 		conditions.append("si.posting_date >= %(start_date)s")
 		query_params["start_date"] = start_date
 
-	# Add logic for returned quantities dynamically in SQL
 	conditions.append(
 		"""
 		(sii.qty + COALESCE((
@@ -1181,7 +1164,6 @@ def get_valid_sales_invoices(doctype, txt, searchfield, start, page_len, filters
 	"""
 	)
 
-	# Construct query
 	where_clause = " AND ".join(conditions)
 	query = f"""
 		SELECT DISTINCT si.name,si.posting_date,sii.qty
@@ -1233,7 +1215,6 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None, s
 			order_by="posting_date desc",
 		)
 
-		# Get items for each invoice with returned quantities
 		for invoice in invoices:
 			items = frappe.get_all(
 				"Sales Invoice Item",
@@ -1262,7 +1243,6 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None, s
 			else:
 				# Check Payment Entry if invoice payments table is empty but invoice is paid
 				if invoice_doc.status in ["Paid", "Partly Paid"] and not invoice_doc.payments:
-					# Get payment entries for this invoice
 					payment_entries = frappe.get_all(
 						"Payment Entry Reference",
 						filters={"reference_name": invoice_doc.name, "reference_doctype": "Sales Invoice"},
@@ -1272,7 +1252,7 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None, s
 
 					for pe_ref in payment_entries:
 						payment_entry = frappe.get_doc("Payment Entry", pe_ref.parent)
-						if payment_entry.docstatus == 1:  # Only submitted payment entries
+						if payment_entry.docstatus == 1:
 							payment_methods.append(
 								{
 									"mode_of_payment": payment_entry.mode_of_payment,
@@ -1301,7 +1281,6 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None, s
 def create_partial_return(invoice_name, return_items, payment_method=None, return_amount=None):
 	"""Create a partial return for selected items from an invoice with custom payment method"""
 	try:
-		# Handle parameter formats
 		if isinstance(return_items, str):
 			return_items = json.loads(return_items)
 
@@ -1343,7 +1322,6 @@ def create_partial_return(invoice_name, return_items, payment_method=None, retur
 		filtered_items = []
 		for return_item in return_items:
 			if return_item.get("return_qty", 0) > 0:
-				# Find the corresponding item in the mapped doc
 				for item in return_doc.items:
 					if item.item_code == return_item["item_code"]:
 						item.qty = -abs(return_item["return_qty"])
@@ -1368,7 +1346,6 @@ def create_partial_return(invoice_name, return_items, payment_method=None, retur
 				{
 					"mode_of_payment": final_payment_method,
 					"amount": -abs(final_return_amount),
-					# "account": payment_account,
 				},
 			)
 
@@ -1393,7 +1370,6 @@ def create_multi_invoice_return(return_data):
 		if isinstance(return_data, str):
 			return_data = json.loads(return_data)
 
-		# customer = return_data.get("customer")
 		invoice_returns = return_data.get("invoice_returns", [])
 
 		created_returns = []
@@ -1458,7 +1434,6 @@ def submit_draft_invoice(invoice_id):
 	This converts a draft invoice to submitted status.
 	"""
 	try:
-		# Get the invoice document
 		invoice_doc = frappe.get_doc("Sales Invoice", invoice_id)
 
 		if invoice_doc.status != "Draft":
@@ -1467,7 +1442,6 @@ def submit_draft_invoice(invoice_id):
 				"error": f"Cannot submit invoice {invoice_id}. Only Draft invoices can be submitted. Current status: {invoice_doc.status}",
 			}
 
-		# Submit the invoice
 		invoice_doc.submit()
 
 		return {
