@@ -53,7 +53,7 @@ fixtures = [
 				),
 			]
 		],
-	}
+	},
 ]
 
 add_to_apps_screen = [
@@ -82,6 +82,9 @@ doc_events = {
 override_doctype_class = {
 	"Sales Invoice": "klik_pos.api.sales_invoice.CustomSalesInvoice",
 }
+
+# Migration hooks
+before_migrate = ["klik_pos.setup.pos_opening_entry_links.ensure_pos_opening_entry_links"]
 # Includes in <head>
 # ------------------
 
