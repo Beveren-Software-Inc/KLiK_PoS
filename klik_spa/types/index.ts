@@ -114,9 +114,13 @@ export interface SalesInvoice {
   taxAmount: number;
   totalAmount: number;
   paymentMethod: "Cash" | "Debit Card";
+  payment_methods?: Array<{
+    mode_of_payment: string;
+    amount: number;
+  }>;
   amountPaid: number;
   changeGiven: number;
-  status: "Completed" | "Pending" | "Cancelled" | "Refunded" | "Paid" | "Unpaid" | "Overdue";
+  status: "Completed" | "Pending" | "Cancelled" | "Refunded" | "Paid" | "Unpaid" | "Overdue" | "Return";
   custom_zatca_submit_status?: string;
   refundAmount: number;
   notes: string;

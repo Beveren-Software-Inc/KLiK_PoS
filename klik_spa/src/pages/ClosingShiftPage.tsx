@@ -57,10 +57,6 @@ export default function ClosingShiftPage() {
   const { modes, isLoading: modesLoading, error: modesError } = useAllPaymentModes()
   const { posDetails } = usePOSDetails();
 
-  // Debug: Log payment modes
-  console.log("Payment modes:", modes);
-  console.log("Modes loading:", modesLoading);
-  console.log("Modes error:", modesError);
 
   const hideExpectedAmount = posDetails?.custom_hide_expected_amount || false;
 
@@ -154,25 +150,16 @@ export default function ClosingShiftPage() {
       const matchesOpeningEntry = !posDetails?.current_opening_entry ||
         (invoice.custom_pos_opening_entry && invoice.custom_pos_opening_entry === posDetails.current_opening_entry);
 
-      // Debug logging to understand filtering
-      console.log('Invoice filtering debug:', {
-        invoiceId: invoice.id,
-        invoiceOpeningEntry: invoice.custom_pos_opening_entry,
-        posDetailsOpeningEntry: posDetails?.current_opening_entry,
-        matchesPOSProfile,
-        matchesOpeningEntry,
-        posDetails: posDetails
-      });
 
       return matchesSearch && matchesPayment && matchesStatus && matchesDate && matchesPOSProfile && matchesOpeningEntry;
     });
 
   }, [invoices, searchQuery, statusFilter, dateFilter, paymentFilter, isLoading, error, posDetails]);
 
+
   // Payment Stats Calculation - Calculate from filtered invoices
   const paymentStats = useMemo(() => {
     if (!modes || modes.length === 0) {
-      console.log("No payment modes available");
       return {};
     }
 
@@ -188,14 +175,32 @@ export default function ClosingShiftPage() {
 
     // Calculate amounts and transactions from filtered invoices
     filteredInvoices.forEach(invoice => {
-      if (invoice.paymentMethod && stats[invoice.paymentMethod]) {
-        // For return invoices, ensure the amount is subtracted (negative)
-        // Check if this is a return invoice by looking at the status
-        const isReturn = invoice.status === "Return";
-        const amount = isReturn ? -Math.abs(invoice.totalAmount || 0) : (invoice.totalAmount || 0);
+      // Check if invoice has multiple payment methods
+      if (invoice.payment_methods && Array.isArray(invoice.payment_methods)) {
+        // Distribute amounts across all payment methods
+        invoice.payment_methods.forEach((payment: any) => {
+          if (stats[payment.mode_of_payment]) {
+            // For return invoices, ensure the amount is subtracted (negative)
+            const isReturn = invoice.status === "Return";
+            const amount = isReturn ? -Math.abs(payment.amount || 0) : (payment.amount || 0);
 
-        stats[invoice.paymentMethod].amount += amount;
-        stats[invoice.paymentMethod].transactions += 1;
+            stats[payment.mode_of_payment].amount += amount;
+            // Only count transaction once per invoice, not per payment method
+            if (invoice.payment_methods.indexOf(payment) === 0) {
+              stats[payment.mode_of_payment].transactions += 1;
+            }
+          }
+        });
+      } else {
+        // Fallback to single payment method (backward compatibility)
+        if (invoice.paymentMethod && stats[invoice.paymentMethod]) {
+          // For return invoices, ensure the amount is subtracted (negative)
+          const isReturn = invoice.status === "Return";
+          const amount = isReturn ? -Math.abs(invoice.totalAmount || 0) : (invoice.totalAmount || 0);
+
+          stats[invoice.paymentMethod].amount += amount;
+          stats[invoice.paymentMethod].transactions += 1;
+        }
       }
     });
 
@@ -340,7 +345,13 @@ export default function ClosingShiftPage() {
   const handleFinalClose = async () => {
 
     try {
-      await createClosingEntry(closingAmounts);
+      // Convert closingAmounts object to array format expected by the service
+      const closingBalanceArray = Object.entries(closingAmounts).map(([mode_of_payment, closing_amount]) => ({
+        mode_of_payment,
+        closing_amount: closing_amount || 0
+      }));
+
+      await createClosingEntry(closingBalanceArray);
       setShowCloseModal(false);
 
       // Clear all cache when closing shift for a fresh start
@@ -411,9 +422,9 @@ export default function ClosingShiftPage() {
                     <div className="text-2xl font-bold text-gray-900 dark:text-white">
                       {formatCurrency(stat.amount, posDetails?.currency || 'USD')}
                     </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                    {/* <div className="text-sm text-gray-600 dark:text-gray-400">
                       {stat.transactions} transactions
-                    </div>
+                    </div> */}
                     <div className="text-sm text-gray-600 dark:text-gray-400">
                       {total > 0 ? ((stat.amount / total) * 100).toFixed(1) : 0}% of total
                     </div>
@@ -740,9 +751,9 @@ export default function ClosingShiftPage() {
                       <div className="text-2xl font-bold text-gray-900 dark:text-white">
                         {formatCurrency(stat.amount, posDetails?.currency || 'USD')}
                       </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                      {/* <div className="text-sm text-gray-600 dark:text-gray-400">
                         {stat.transactions} transactions
-                      </div>
+                      </div> */}
                       <div className="text-sm text-gray-600 dark:text-gray-400">
                         {total > 0 ? ((stat.amount / total) * 100).toFixed(1) : 0}% of total
                       </div>

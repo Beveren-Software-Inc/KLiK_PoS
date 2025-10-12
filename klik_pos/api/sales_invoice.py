@@ -187,14 +187,44 @@ def get_sales_invoices(limit=100, start=0, search=""):
 				)
 			inv["items"] = items
 
-			# Get payment method from payment child table
-			payment_method = "-"
+			# Get all payment methods from payment child table with amounts
+			payment_methods = []
 			if invoice_doc.payments:
-				payment_method = invoice_doc.payments[0].mode_of_payment
+				for payment in invoice_doc.payments:
+					payment_methods.append({
+						"mode_of_payment": payment.mode_of_payment,
+						"amount": payment.amount
+					})
 			elif invoice_doc.status == "Draft":
-				payment_method = "-"
+				payment_methods = []
+			else:
+				# Check Payment Entry if invoice payments table is empty but invoice is paid
+				if invoice_doc.status in ["Paid", "Partly Paid"] and not invoice_doc.payments:
+					# Get payment entries for this invoice
+					payment_entries = frappe.get_all(
+						"Payment Entry Reference",
+						filters={"reference_name": invoice_doc.name, "reference_doctype": "Sales Invoice"},
+						fields=["parent", "allocated_amount"],
+						parent_doctype="Payment Entry"
+					)
 
-			inv["mode_of_payment"] = payment_method
+					for pe_ref in payment_entries:
+						payment_entry = frappe.get_doc("Payment Entry", pe_ref.parent)
+						if payment_entry.docstatus == 1:  # Only submitted payment entries
+							payment_methods.append({
+								"mode_of_payment": payment_entry.mode_of_payment,
+								"amount": pe_ref.allocated_amount
+							})
+
+			inv["payment_methods"] = payment_methods
+			# Keep backward compatibility - show first payment method or combined display
+			if len(payment_methods) == 0:
+				inv["mode_of_payment"] = "-"
+			elif len(payment_methods) == 1:
+				inv["mode_of_payment"] = payment_methods[0]["mode_of_payment"]
+			else:
+				# Show combined payment methods like "Cash/Credit Card"
+				inv["mode_of_payment"] = "/".join([pm["mode_of_payment"] for pm in payment_methods])
 
 		return {"success": True, "data": invoices, "total_count": total_count}
 
@@ -1192,17 +1222,45 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None, s
 
 			invoice.items = items
 
-			# Get payment method from payment child table
+			# Get all payment methods from payment child table
 			invoice_doc = frappe.get_doc("Sales Invoice", invoice.name)
-			payment_method = "-"  # Default for unpaid invoices
+			payment_methods = []
 			if invoice_doc.payments:
-				# Always get payment method from the payment child table if it exists
-				# This ensures original invoices with returns still show their payment method
-				payment_method = invoice_doc.payments[0].mode_of_payment
+				for payment in invoice_doc.payments:
+					payment_methods.append({
+						"mode_of_payment": payment.mode_of_payment,
+						"amount": payment.amount
+					})
 			elif invoice_doc.status == "Draft":
-				payment_method = "-"
+				payment_methods = []
+			else:
+				# Check Payment Entry if invoice payments table is empty but invoice is paid
+				if invoice_doc.status in ["Paid", "Partly Paid"] and not invoice_doc.payments:
+					# Get payment entries for this invoice
+					payment_entries = frappe.get_all(
+						"Payment Entry Reference",
+						filters={"reference_name": invoice_doc.name, "reference_doctype": "Sales Invoice"},
+						fields=["parent", "allocated_amount"],
+						parent_doctype="Payment Entry"
+					)
 
-			invoice.payment_method = payment_method
+					for pe_ref in payment_entries:
+						payment_entry = frappe.get_doc("Payment Entry", pe_ref.parent)
+						if payment_entry.docstatus == 1:  # Only submitted payment entries
+							payment_methods.append({
+								"mode_of_payment": payment_entry.mode_of_payment,
+								"amount": pe_ref.allocated_amount
+							})
+
+			invoice.payment_methods = payment_methods
+			# Keep backward compatibility - show first payment method or combined display
+			if len(payment_methods) == 0:
+				invoice.payment_method = "-"
+			elif len(payment_methods) == 1:
+				invoice.payment_method = payment_methods[0]["mode_of_payment"]
+			else:
+				# Show combined payment methods like "Cash/Credit Card"
+				invoice.payment_method = "/".join([pm["mode_of_payment"] for pm in payment_methods])
 
 		return {"success": True, "data": invoices}
 
