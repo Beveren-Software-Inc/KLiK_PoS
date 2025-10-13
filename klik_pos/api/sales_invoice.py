@@ -757,6 +757,22 @@ def return_sales_invoice(invoice_name):
 		for item in return_doc.items:
 			item.qty = -abs(item.qty)
 
+		# Mirror original round-off/write-off as POSITIVE on return; totals logic handles sign for returns
+		try:
+			if getattr(original_invoice, "custom_roundoff_amount", 0):
+				return_doc.custom_roundoff_amount = abs(original_invoice.custom_roundoff_amount or 0)
+				return_doc.custom_base_roundoff_amount = abs(
+					getattr(original_invoice, "custom_base_roundoff_amount", 0) or 0
+				)
+				# keep same account
+				return_doc.custom_roundoff_account = getattr(
+					original_invoice, "custom_roundoff_account", None
+				)
+				# Do not set standard write_off fields on returns to avoid double impact in GL
+		except Exception:
+			# non-fatal; continue without custom roundoff
+			pass
+
 		return_doc.payments = []
 		for p in original_invoice.payments:
 			return_doc.append(
@@ -823,7 +839,13 @@ def custom_calculate_totals(self):
 		and self.doc.custom_roundoff_account
 		and self.doc.custom_roundoff_amount
 	):
-		self.doc.grand_total -= self.doc.custom_roundoff_amount
+		adjustment = self.doc.custom_roundoff_amount or 0
+		# For returns, add the round-off to reduce the negative magnitude (e.g., -13 + 3.01 = -9.99)
+		if getattr(self.doc, "is_return", 0):
+			self.doc.grand_total += adjustment
+		else:
+			# Normal invoices subtract the round-off (e.g., 13 - 3.01 = 9.99)
+			self.doc.grand_total -= adjustment
 
 	self._set_in_company_currency(self.doc, ["total_taxes_and_charges", "rounding_adjustment"])
 
@@ -1330,7 +1352,9 @@ def create_partial_return(invoice_name, return_items, payment_method=None, retur
 
 		return_doc.items = filtered_items
 
-		# Clear existing payments and add custom payment method
+		# No custom roundoff mirroring for now
+
+		# Clear existing payments
 		return_doc.payments = []
 
 		# Calculate total returned amount
