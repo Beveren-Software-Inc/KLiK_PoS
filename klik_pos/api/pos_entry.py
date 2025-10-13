@@ -131,7 +131,7 @@ def create_closing_entry():
 
 		opening_entry = _get_open_pos_entry(user)
 		payment_data = _calculate_payment_reconciliation(opening_entry, data)
-		
+
 		doc = _create_and_submit_closing_doc(opening_entry, data, payment_data, user)
 
 		return {
@@ -153,14 +153,14 @@ def _parse_request_data():
 	# Normalize closing_balance format
 	closing_balance_raw = data.get("closing_balance", {})
 	closing_balance = {}
-	
+
 	if isinstance(closing_balance_raw, list):
 		for item in closing_balance_raw:
 			if isinstance(item, dict) and "mode_of_payment" in item and "closing_amount" in item:
 				closing_balance[item["mode_of_payment"]] = item["closing_amount"]
 	elif isinstance(closing_balance_raw, dict):
 		closing_balance = closing_balance_raw
-	
+
 	data["closing_balance"] = closing_balance
 	return data
 
@@ -227,13 +227,15 @@ def _calculate_payment_reconciliation(opening_entry, data):
 		expected_amount = float(opening_amount) + float(sales_amount)
 		difference = float(closing_amount) - float(expected_amount)
 
-		reconciliation.append({
-			"mode_of_payment": mode,
-			"opening_amount": opening_amount,
-			"expected_amount": expected_amount,
-			"closing_amount": closing_amount,
-			"difference": difference,
-		})
+		reconciliation.append(
+			{
+				"mode_of_payment": mode,
+				"opening_amount": opening_amount,
+				"expected_amount": expected_amount,
+				"closing_amount": closing_amount,
+				"difference": difference,
+			}
+		)
 
 	# Process modes without closing amounts (including all opening modes if no closing data)
 	for mode, opening_amount in opening_balance_map.items():
@@ -242,13 +244,15 @@ def _calculate_payment_reconciliation(opening_entry, data):
 			expected_amount = float(opening_amount) + float(sales_amount)
 			difference = 0 - float(expected_amount)
 
-			reconciliation.append({
-				"mode_of_payment": mode,
-				"opening_amount": opening_amount,
-				"expected_amount": expected_amount,
-				"closing_amount": 0,
-				"difference": difference,
-			})
+			reconciliation.append(
+				{
+					"mode_of_payment": mode,
+					"opening_amount": opening_amount,
+					"expected_amount": expected_amount,
+					"closing_amount": 0,
+					"difference": difference,
+				}
+			)
 
 	return reconciliation
 
@@ -276,11 +280,14 @@ def _create_and_submit_closing_doc(opening_entry, data, payment_data, user):
 
 	# Append taxes
 	for tax in data.get("taxes", []):
-		doc.append("taxes", {
-			"account_head": tax.get("account_head"),
-			"rate": tax.get("rate"),
-			"amount": tax.get("amount"),
-		})
+		doc.append(
+			"taxes",
+			{
+				"account_head": tax.get("account_head"),
+				"rate": tax.get("rate"),
+				"amount": tax.get("amount"),
+			},
+		)
 
 	# Submit and link back to opening entry
 	doc.submit()
