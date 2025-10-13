@@ -123,10 +123,11 @@ export default function MultiInvoiceReturn({
 
   useEffect(() => {
     if (isOpen) {
+      // Only reset on initial open, not on subsequent renders
       if (customer) {
         setWorkflowStep('select-items');
         setSelectedCustomer(customer);
-      } else {
+      } else if (!selectedCustomer) {
         setWorkflowStep('select-customer');
         setSelectedCustomer('');
       }
@@ -142,7 +143,8 @@ export default function MultiInvoiceReturn({
         loadCustomerAddresses();
       }
     }
-  }, [isOpen, customer, loadAvailableItems, loadCustomerAddresses]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, customer]);
 
   const loadCustomerInvoices = async () => {
     if (selectedItems.length === 0) {
