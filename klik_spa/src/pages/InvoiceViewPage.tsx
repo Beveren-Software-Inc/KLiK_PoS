@@ -725,7 +725,7 @@ export default function InvoiceViewPage() {
                                 </div>
                                 <div>
                                   <p className="text-xs text-beveren-700 dark:text-beveren-300 font-medium">Total Orders</p>
-                                  <p className="text-xl font-bold text-beveren-900 dark:text-beveren-100">
+                                  <p className="text-xs font-bold text-beveren-900 dark:text-beveren-100">
                                     {customerStats.total_orders}
                                   </p>
                                 </div>
@@ -739,7 +739,7 @@ export default function InvoiceViewPage() {
                                 </div>
                                 <div>
                                   <p className="text-xs text-orange-700 dark:text-orange-300 font-medium">Total Spent</p>
-                                  <p className="text-xl font-bold text-orange-900 dark:text-orange-100">
+                                  <p className="text-xs font-small text-orange-900 dark:text-orange-100">
                                     {formatCurrency(customerStats.total_spent, invoice.currency)}
                                   </p>
                                 </div>
