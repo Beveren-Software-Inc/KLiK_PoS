@@ -587,9 +587,8 @@ def get_item_groups_for_pos():
 		pos_profile = get_current_pos_profile()
 
 		formatted_groups = []
-		total_item_count = frappe.db.count("Item", filters={"disabled": 0, "is_stock_item": 1})
-
-		# Check if the POS Profile has child item groups
+		# Determine allowed item groups from POS Profile (if configured)
+		item_group_names = []
 		if pos_profile.item_groups:
 			item_group_names = [d.item_group for d in pos_profile.item_groups if d.item_group]
 
@@ -607,6 +606,19 @@ def get_item_groups_for_pos():
 				limit=100,
 				order_by="modified desc",
 			)
+
+		# Compute total items constrained to POS Profile's allowed groups (if any)
+		if item_group_names:
+			total_item_count = frappe.db.count(
+				"Item",
+				filters={
+					"disabled": 0,
+					"is_stock_item": 1,
+					"item_group": ["in", item_group_names],
+				},
+			)
+		else:
+			total_item_count = frappe.db.count("Item", filters={"disabled": 0, "is_stock_item": 1})
 
 		for group in item_groups:
 			item_count = frappe.db.count("Item", filters={"item_group": group["name"]})
