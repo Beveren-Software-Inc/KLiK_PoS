@@ -848,7 +848,6 @@ def set_grand_total_with_roundoff(doc, method):
 
 
 def custom_calculate_totals(self):
-
 	"""Main function to calculate invoice totals with custom round-off logic"""
 	# Calculate basic grand total and taxes
 	if self.doc.get("taxes"):
@@ -914,7 +913,6 @@ def custom_calculate_totals(self):
 
 		self._set_in_company_currency(self.doc, ["taxes_and_charges_added", "taxes_and_charges_deducted"])
 
-
 	self.doc.round_floats_in(self.doc, ["grand_total", "base_grand_total"])
 	# Mania: Auto write-off small decimal amounts (like 10.01 to 10.00)
 	if self.doc.doctype == "Sales Invoice" and self.doc.grand_total > 0:
@@ -941,7 +939,7 @@ def custom_calculate_totals(self):
 
 				self.doc.grand_total -= small_amount
 				self.doc.base_grand_total = self.doc.grand_total * (self.doc.conversion_rate or 1)
-	#print("Round-off amount before adjustment:", self.doc.custom_roundoff_amount)
+	# print("Round-off amount before adjustment:", self.doc.custom_roundoff_amount)
 
 	self.set_rounded_total()
 
@@ -951,7 +949,7 @@ def create_roundoff_writeoff_entry(self):
 	if not self.doc.custom_roundoff_amount or not self.doc.custom_roundoff_account:
 		return
 	if self.doc.is_return:
-		write_off_amount =- self.doc.custom_roundoff_amount
+		write_off_amount = -self.doc.custom_roundoff_amount
 	else:
 		write_off_amount = self.doc.custom_roundoff_amount
 
@@ -960,8 +958,7 @@ def create_roundoff_writeoff_entry(self):
 		"account_head": self.doc.custom_roundoff_account,
 		"description": "Round Off Adjustment",
 		"tax_amount": write_off_amount,
-		"base_tax_amount": write_off_amount
-		or (write_off_amount * self.doc.conversion_rate),
+		"base_tax_amount": write_off_amount or (write_off_amount * self.doc.conversion_rate),
 		"add_deduct_tax": "Add" if write_off_amount > 0 else "Deduct",
 		"category": "Total",
 		"included_in_print_rate": 0,
