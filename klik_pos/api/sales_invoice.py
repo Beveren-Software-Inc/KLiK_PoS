@@ -784,7 +784,37 @@ def return_sales_invoice(invoice_name):
 				},
 			)
 
+		# Payment sync will be handled after save so totals include write-off adjustments
+
 		return_doc.save()
+
+		# After save (totals finalized by validate), sync payments to match grand/rounded total
+		if getattr(return_doc, "custom_roundoff_amount", 0):
+			try:
+				return_doc.reload()
+			except Exception:
+				pass
+			final_total = getattr(return_doc, "rounded_total", None)
+			if final_total is None:
+				final_total = return_doc.grand_total
+			desired_payment = abs(flt(final_total, return_doc.precision("grand_total")))
+			if desired_payment > 0:
+				if return_doc.payments and len(return_doc.payments) > 0:
+					# For returns, record refund as positive amount on payment row
+					return_doc.payments[0].amount = desired_payment
+					for _p in return_doc.payments[1:]:
+						_p.amount = 0
+				else:
+					return_doc.append(
+						"payments",
+						{"mode_of_payment": "Cash", "amount": desired_payment},
+					)
+			# Sync totals fields
+			return_doc.paid_amount = desired_payment
+			return_doc.base_paid_amount = desired_payment * (return_doc.conversion_rate or 1)
+			return_doc.outstanding_amount = 0
+			return_doc.save()
+
 		return_doc.submit()
 
 		return {"success": True, "return_invoice": return_doc.name}
@@ -818,6 +848,7 @@ def set_grand_total_with_roundoff(doc, method):
 
 
 def custom_calculate_totals(self):
+
 	"""Main function to calculate invoice totals with custom round-off logic"""
 	# Calculate basic grand total and taxes
 	if self.doc.get("taxes"):
@@ -832,7 +863,6 @@ def custom_calculate_totals(self):
 		)
 	else:
 		self.doc.total_taxes_and_charges = 0.0
-
 	# Apply existing roundoff amount
 	if (
 		self.doc.doctype == "Sales Invoice"
@@ -840,6 +870,7 @@ def custom_calculate_totals(self):
 		and self.doc.custom_roundoff_amount
 	):
 		adjustment = self.doc.custom_roundoff_amount or 0
+
 		# For returns, add the round-off to reduce the negative magnitude (e.g., -13 + 3.01 = -9.99)
 		if getattr(self.doc, "is_return", 0):
 			self.doc.grand_total += adjustment
@@ -848,7 +879,6 @@ def custom_calculate_totals(self):
 			self.doc.grand_total -= adjustment
 
 	self._set_in_company_currency(self.doc, ["total_taxes_and_charges", "rounding_adjustment"])
-
 	# Calculate base currency totals
 	if self.doc.doctype in [
 		"Quotation",
@@ -884,15 +914,16 @@ def custom_calculate_totals(self):
 
 		self._set_in_company_currency(self.doc, ["taxes_and_charges_added", "taxes_and_charges_deducted"])
 
-	self.doc.round_floats_in(self.doc, ["grand_total", "base_grand_total"])
 
+	self.doc.round_floats_in(self.doc, ["grand_total", "base_grand_total"])
 	# Mania: Auto write-off small decimal amounts (like 10.01 to 10.00)
 	if self.doc.doctype == "Sales Invoice" and self.doc.grand_total > 0:
 		grand_total_int = int(self.doc.grand_total)
-		decimal_part = self.doc.grand_total - grand_total_int
+		# Float-safe fractional part (handles cases like 100.0100000001)
+		decimal_part = flt(self.doc.grand_total - grand_total_int, 6)
 
-		# If decimal part is very small (<= 0.01), write it off
-		if 0 < decimal_part <= 0.01:
+		# If decimal part is very small (<= 0.01), write it off (with small tolerance)
+		if decimal_part > 0 and decimal_part <= (0.01 + 1e-6):
 			writeoff_account = get_writeoff_account()
 			if writeoff_account:
 				small_amount = decimal_part
@@ -910,6 +941,7 @@ def custom_calculate_totals(self):
 
 				self.doc.grand_total -= small_amount
 				self.doc.base_grand_total = self.doc.grand_total * (self.doc.conversion_rate or 1)
+	#print("Round-off amount before adjustment:", self.doc.custom_roundoff_amount)
 
 	self.set_rounded_total()
 
@@ -918,15 +950,19 @@ def create_roundoff_writeoff_entry(self):
 	"""Create a write-off entry for round-off amount"""
 	if not self.doc.custom_roundoff_amount or not self.doc.custom_roundoff_account:
 		return
+	if self.doc.is_return:
+		write_off_amount =- self.doc.custom_roundoff_amount
+	else:
+		write_off_amount = self.doc.custom_roundoff_amount
 
 	roundoff_entry = {
 		"charge_type": "Actual",
 		"account_head": self.doc.custom_roundoff_account,
 		"description": "Round Off Adjustment",
-		"tax_amount": self.doc.custom_roundoff_amount,
-		"base_tax_amount": self.doc.custom_base_roundoff_amount
-		or (self.doc.custom_roundoff_amount * self.doc.conversion_rate),
-		"add_deduct_tax": "Add" if self.doc.custom_roundoff_amount > 0 else "Deduct",
+		"tax_amount": write_off_amount,
+		"base_tax_amount": write_off_amount
+		or (write_off_amount * self.doc.conversion_rate),
+		"add_deduct_tax": "Add" if write_off_amount > 0 else "Deduct",
 		"category": "Total",
 		"included_in_print_rate": 0,
 		"cost_center": self.doc.cost_center
@@ -940,6 +976,45 @@ def get_writeoff_account():
 	pos_profile = get_current_pos_profile()
 	if pos_profile.write_off_account:
 		return pos_profile.write_off_account
+
+
+@frappe.whitelist()
+def sync_return_payments_before_submit(doc, method):
+	"""Ensure return invoice payments match finalized total when round-off is present.
+	Runs just before submit to avoid validation errors like
+	"Total payments amount can't be greater than X".
+	"""
+	try:
+		# Only for returns with explicit round-off
+		if not getattr(doc, "is_return", 0):
+			return
+		if not getattr(doc, "custom_roundoff_amount", 0):
+			return
+
+		# Prefer rounded_total if present, fallback to grand_total
+		final_total = getattr(doc, "rounded_total", None)
+		if final_total is None:
+			final_total = doc.grand_total
+
+		desired_payment = abs(flt(final_total, doc.precision("grand_total")))
+		if desired_payment <= 0:
+			return
+
+		# On returns, store refund as positive payment row
+		if getattr(doc, "payments", None) and len(doc.payments) > 0:
+			doc.payments[0].amount = desired_payment
+			for _p in doc.payments[1:]:
+				_p.amount = 0
+		else:
+			doc.append("payments", {"mode_of_payment": "Cash", "amount": desired_payment})
+
+		# Sync totals
+		doc.paid_amount = desired_payment
+		doc.base_paid_amount = desired_payment * (doc.conversion_rate or 1)
+		doc.outstanding_amount = 0
+	except Exception:
+		# Do not block submit; validation will still catch inconsistencies
+		frappe.log_error(frappe.get_traceback(), "sync_return_payments_before_submit error")
 
 
 class CustomSalesInvoice(SalesInvoice):
@@ -975,33 +1050,63 @@ class CustomSalesInvoice(SalesInvoice):
 	def make_roundoff_gl_entry(self, gl_entries):
 		if self.custom_roundoff_account and self.custom_roundoff_amount:
 			against_voucher = self.name
-			gl_entries.append(
-				self.get_gl_dict(
-					{
-						"account": self.custom_roundoff_account,
-						"party_type": "Customer",
-						"party": self.customer,
-						"due_date": self.due_date,
-						"against": against_voucher,
-						"debit": self.custom_base_roundoff_amount,
-						"debit_in_account_currency": (
-							self.custom_base_roundoff_amount
-							if self.party_account_currency == self.company_currency
-							else self.custom_roundoff_amount
-						),
-						"against_voucher": against_voucher,
-						"against_voucher_type": self.doctype,
-						"cost_center": (
-							self.cost_center
-							if self.cost_center
-							else "Main - " + frappe.db.get_value("Company", self.company, "abbr")
-						),
-						"project": self.project,
-					},
-					self.party_account_currency,
-					item=self,
+			# For return invoices, reverse the GL impact (credit instead of debit)
+			if getattr(self, "is_return", 0):
+				gl_entries.append(
+					self.get_gl_dict(
+						{
+							"account": self.custom_roundoff_account,
+							"party_type": "Customer",
+							"party": self.customer,
+							"due_date": self.due_date,
+							"against": against_voucher,
+							"credit": self.custom_base_roundoff_amount,
+							"credit_in_account_currency": (
+								self.custom_base_roundoff_amount
+								if self.party_account_currency == self.company_currency
+								else self.custom_roundoff_amount
+							),
+							"against_voucher": against_voucher,
+							"against_voucher_type": self.doctype,
+							"cost_center": (
+								self.cost_center
+								if self.cost_center
+								else "Main - " + frappe.db.get_value("Company", self.company, "abbr")
+							),
+							"project": self.project,
+						},
+						self.party_account_currency,
+						item=self,
+					)
 				)
-			)
+			else:
+				gl_entries.append(
+					self.get_gl_dict(
+						{
+							"account": self.custom_roundoff_account,
+							"party_type": "Customer",
+							"party": self.customer,
+							"due_date": self.due_date,
+							"against": against_voucher,
+							"debit": self.custom_base_roundoff_amount,
+							"debit_in_account_currency": (
+								self.custom_base_roundoff_amount
+								if self.party_account_currency == self.company_currency
+								else self.custom_roundoff_amount
+							),
+							"against_voucher": against_voucher,
+							"against_voucher_type": self.doctype,
+							"cost_center": (
+								self.cost_center
+								if self.cost_center
+								else "Main - " + frappe.db.get_value("Company", self.company, "abbr")
+							),
+							"project": self.project,
+						},
+						self.party_account_currency,
+						item=self,
+					)
+				)
 
 
 @erpnext.allow_regional
@@ -1372,6 +1477,23 @@ def create_partial_return(invoice_name, return_items, payment_method=None, retur
 					"amount": -abs(final_return_amount),
 				},
 			)
+
+		# Recalculate and sync payment to match grand total
+		try:
+			return_doc.calculate_taxes_and_totals()
+		except Exception:
+			pass
+		desired_payment = abs(flt(return_doc.grand_total))
+		if desired_payment > 0:
+			if return_doc.payments and len(return_doc.payments) > 0:
+				return_doc.payments[0].amount = -desired_payment
+				for _p in return_doc.payments[1:]:
+					_p.amount = 0
+			else:
+				return_doc.append(
+					"payments",
+					{"mode_of_payment": final_payment_method or "Cash", "amount": -desired_payment},
+				)
 
 		return_doc.save()
 		return_doc.submit()
