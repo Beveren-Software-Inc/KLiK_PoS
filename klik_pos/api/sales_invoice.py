@@ -914,31 +914,47 @@ def custom_calculate_totals(self):
 		self._set_in_company_currency(self.doc, ["taxes_and_charges_added", "taxes_and_charges_deducted"])
 
 	self.doc.round_floats_in(self.doc, ["grand_total", "base_grand_total"])
-	# Mania: Auto write-off small decimal amounts (like 10.01 to 10.00)
-	if self.doc.doctype == "Sales Invoice" and self.doc.grand_total > 0:
-		grand_total_int = int(self.doc.grand_total)
-		# Float-safe fractional part (handles cases like 100.0100000001)
-		decimal_part = flt(self.doc.grand_total - grand_total_int, 6)
-
-		# If decimal part is very small (<= 0.01), write it off (with small tolerance)
-		if decimal_part > 0 and decimal_part <= (0.01 + 1e-6):
-			writeoff_account = get_writeoff_account()
-			if writeoff_account:
-				small_amount = decimal_part
-
-				# Add to existing roundoff or create new roundoff
-				if self.doc.custom_roundoff_amount:
-					self.doc.custom_roundoff_amount += small_amount
-				else:
-					self.doc.custom_roundoff_amount = small_amount
+	# Mania: Auto write-off small decimal amounts (e.g., 10.01 -> 10.00, -50.01 -> -50.00)
+	if self.doc.doctype == "Sales Invoice":
+		if self.doc.grand_total > 0:
+			grand_total_int = int(self.doc.grand_total)
+			# Float-safe fractional part (handles cases like 100.0100000001)
+			decimal_part = flt(self.doc.grand_total - grand_total_int, 6)
+			# If decimal part is very small (<= 0.01), write it off (with small tolerance)
+			if decimal_part > 0 and decimal_part <= (0.01 + 1e-6):
+				writeoff_account = get_writeoff_account()
+				if writeoff_account:
+					small_amount = decimal_part
+					if self.doc.custom_roundoff_amount:
+						self.doc.custom_roundoff_amount += small_amount
+					else:
+						self.doc.custom_roundoff_amount = small_amount
 					self.doc.custom_roundoff_account = writeoff_account
-
-				self.doc.custom_base_roundoff_amount = self.doc.custom_roundoff_amount * (
-					self.doc.conversion_rate or 1
-				)
-
-				self.doc.grand_total -= small_amount
-				self.doc.base_grand_total = self.doc.grand_total * (self.doc.conversion_rate or 1)
+					self.doc.custom_base_roundoff_amount = self.doc.custom_roundoff_amount * (
+						self.doc.conversion_rate or 1
+					)
+					# For positive totals, subtract to reach .00
+					self.doc.grand_total -= small_amount
+					self.doc.base_grand_total = self.doc.grand_total * (self.doc.conversion_rate or 1)
+		elif self.doc.grand_total < 0:
+			abs_total = abs(self.doc.grand_total)
+			abs_int = int(abs_total)
+			decimal_part = flt(abs_total - abs_int, 6)
+			if decimal_part > 0 and decimal_part <= (0.01 + 1e-6):
+				writeoff_account = get_writeoff_account()
+				if writeoff_account:
+					small_amount = decimal_part
+					if self.doc.custom_roundoff_amount:
+						self.doc.custom_roundoff_amount += small_amount
+					else:
+						self.doc.custom_roundoff_amount = small_amount
+					self.doc.custom_roundoff_account = writeoff_account
+					self.doc.custom_base_roundoff_amount = self.doc.custom_roundoff_amount * (
+						self.doc.conversion_rate or 1
+					)
+					# For negative totals, add to reach .00 (e.g., -50.01 + 0.01 = -50)
+					self.doc.grand_total += small_amount
+					self.doc.base_grand_total = self.doc.grand_total * (self.doc.conversion_rate or 1)
 	# print("Round-off amount before adjustment:", self.doc.custom_roundoff_amount)
 
 	self.set_rounded_total()
@@ -1402,7 +1418,9 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None, s
 
 
 @frappe.whitelist()
-def create_partial_return(invoice_name, return_items, payment_method=None, return_amount=None):
+def create_partial_return(
+	invoice_name, return_items, payment_method=None, return_amount=None, expected_return_amount=None
+):
 	"""Create a partial return for selected items from an invoice with custom payment method"""
 	try:
 		if isinstance(return_items, str):
@@ -1442,6 +1460,11 @@ def create_partial_return(invoice_name, return_items, payment_method=None, retur
 		if current_opening_entry:
 			return_doc.custom_pos_opening_entry = current_opening_entry
 
+		# Ensure no original round-off leaks into partial return
+		return_doc.custom_roundoff_amount = 0
+		return_doc.custom_base_roundoff_amount = 0
+		return_doc.custom_roundoff_account = get_writeoff_account()
+
 		# Filter items to only include selected ones with return quantities
 		filtered_items = []
 		for return_item in return_items:
@@ -1459,12 +1482,47 @@ def create_partial_return(invoice_name, return_items, payment_method=None, retur
 		# Clear existing payments
 		return_doc.payments = []
 
-		# Calculate total returned amount
-		total_returned_amount = sum(abs(item.qty * item.rate) for item in return_doc.items)
+		# Calculate total returned amount (baseline expected refund)
+		# Prefer client-provided expected amount; fallback to backend computation
+		if expected_return_amount is not None:
+			try:
+				total_returned_amount = flt(expected_return_amount, return_doc.precision("grand_total") or 2)
+			except Exception:
+				total_returned_amount = sum(abs(item.qty * item.rate) for item in return_doc.items)
+		else:
+			total_returned_amount = sum(abs(item.qty * item.rate) for item in return_doc.items)
 
 		final_return_amount = return_amount if return_amount is not None else total_returned_amount
 
 		final_payment_method = payment_method if payment_method else "Cash"
+
+		# Optionally persist the auto-calculated expected refund if a custom field exists
+		try:
+			_si_meta = frappe.get_meta("Sales Invoice")
+			if any(df.fieldname == "custom_expected_refund_amount" for df in _si_meta.fields):
+				return_doc.custom_expected_refund_amount = flt(
+					total_returned_amount, return_doc.precision("grand_total") or 2
+				)
+		except Exception:
+			pass
+
+		# If cashier entered a custom refund (partial return), push the difference to round-off on the return
+		try:
+			# Only apply when there's a meaningful difference
+			prec = return_doc.precision("grand_total") or 2
+			_diff = flt(total_returned_amount, prec) - flt(final_return_amount, prec)
+			if abs(_diff) > (10 ** (-prec)) / 2:
+				# For returns, custom_calculate_totals ADDS custom_roundoff_amount to grand_total.
+				# This is a NEW write-off specific to this partial return. Do not accumulate.
+				return_doc.custom_roundoff_amount = 0
+				return_doc.custom_base_roundoff_amount = 0
+				return_doc.custom_roundoff_amount = abs(flt(_diff, prec))
+				return_doc.custom_roundoff_account = get_writeoff_account()
+				return_doc.custom_base_roundoff_amount = flt(
+					return_doc.custom_roundoff_amount * (return_doc.conversion_rate or 1), prec
+				)
+		except Exception:
+			pass
 
 		if final_return_amount > 0:
 			return_doc.append(
