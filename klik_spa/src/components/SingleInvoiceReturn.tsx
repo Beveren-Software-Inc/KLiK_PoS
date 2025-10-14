@@ -43,7 +43,7 @@ export default function SingleInvoiceReturn({
   const { modes: paymentModes, isLoading: paymentModesLoading } = usePaymentModes(posDetails?.name || 'Test POS Profile');
 
   // Payment method states
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("Cash");
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("");
   const [returnAmount, setReturnAmount] = useState<number>(0);
 
   useEffect(() => {
@@ -82,11 +82,13 @@ export default function SingleInvoiceReturn({
   }, [returnItems, originalInvoicePaidAmount]);
 
   // Set default payment method when payment modes are loaded
+
+  // Set default payment method when payment modes are loaded
   useEffect(() => {
     if (paymentModes.length > 0 && !selectedPaymentMethod) {
       // Find default payment method or use first one
       const defaultMode = paymentModes.find(mode => mode.default === 1);
-      setSelectedPaymentMethod(defaultMode?.name || paymentModes[0].name);
+      setSelectedPaymentMethod(defaultMode?.mode_of_payment || paymentModes[0].mode_of_payment || 'Cash');
     }
   }, [paymentModes, selectedPaymentMethod]);
 
