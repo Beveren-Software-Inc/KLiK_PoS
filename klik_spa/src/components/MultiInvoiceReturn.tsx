@@ -85,29 +85,6 @@ export default function MultiInvoiceReturn({
     }
   }, [selectedCustomer]);
 
-  const resetModalState = useCallback(() => {
-    // Only reset workflow step if no customer is provided
-    if (!customer) {
-      setWorkflowStep('select-customer');
-      setSelectedCustomer('');
-    } else {
-      setWorkflowStep('select-items');
-      setSelectedCustomer(customer);
-    }
-
-    setSelectedItems([]);
-    setInvoices([]);
-    setSelectedInvoices(new Set());
-    setInvoicePayments({});
-    setFilteredAvailableItems([]);
-    setCustomerSearchQuery('');
-    setSelectedAddress('');
-    setSearchQuery('');
-    setDaysBack(90);
-    setIsLoading(false);
-    setLoadingInvoices(false);
-  }, [customer]);
-
   const loadAvailableItems = useCallback(async () => {
     try {
       const endDate = new Date().toISOString().split('T')[0];
@@ -146,16 +123,28 @@ export default function MultiInvoiceReturn({
 
   useEffect(() => {
     if (isOpen) {
-      // Reset all state when modal opens
-      resetModalState();
+      // Only reset on initial open, not on subsequent renders
+      if (customer) {
+        setWorkflowStep('select-items');
+        setSelectedCustomer(customer);
+      } else if (!selectedCustomer) {
+        setWorkflowStep('select-customer');
+        setSelectedCustomer('');
+      }
+      setSelectedItems([]);
+      setInvoices([]);
+      setSelectedInvoices(new Set());
+      setFilteredAvailableItems([]);
+      setCustomerSearchQuery('');
+      setSelectedAddress('');
 
-      // Load data if customer is provided
       if (customer) {
         loadAvailableItems();
         loadCustomerAddresses();
       }
     }
-  }, [isOpen, customer, resetModalState, loadAvailableItems, loadCustomerAddresses]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, customer]);
 
   const loadCustomerInvoices = async () => {
     if (selectedItems.length === 0) {
@@ -372,11 +361,6 @@ export default function MultiInvoiceReturn({
     ), 0
   );
 
-  const handleClose = useCallback(() => {
-    resetModalState();
-    onClose();
-  }, [resetModalState, onClose]);
-
   const handleSubmitReturn = async () => {
     const invoiceReturns = invoices
       .filter(invoice => selectedInvoices.has(invoice.name))
@@ -408,7 +392,9 @@ export default function MultiInvoiceReturn({
       if (result.success) {
         toast.success(result.message || 'Returns created successfully');
         onSuccess(result.createdReturns || []);
-        handleClose();
+        onClose();
+        // Reload the page to refresh all data
+        window.location.reload();
       } else {
         toast.error(result.error || 'Failed to create returns');
       }
@@ -442,7 +428,7 @@ export default function MultiInvoiceReturn({
               </div>
             </div>
             <button
-              onClick={handleClose}
+              onClick={onClose}
               className="p-1.5 sm:p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
             >
               <X className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -1201,7 +1187,7 @@ export default function MultiInvoiceReturn({
               </div>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:space-x-3">
                 <button
-                  onClick={handleClose}
+                  onClick={onClose}
                   className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium"
                 >
                   Cancel
