@@ -85,6 +85,29 @@ export default function MultiInvoiceReturn({
     }
   }, [selectedCustomer]);
 
+  const resetModalState = useCallback(() => {
+    // Only reset workflow step if no customer is provided
+    if (!customer) {
+      setWorkflowStep('select-customer');
+      setSelectedCustomer('');
+    } else {
+      setWorkflowStep('select-items');
+      setSelectedCustomer(customer);
+    }
+
+    setSelectedItems([]);
+    setInvoices([]);
+    setSelectedInvoices(new Set());
+    setInvoicePayments({});
+    setFilteredAvailableItems([]);
+    setCustomerSearchQuery('');
+    setSelectedAddress('');
+    setSearchQuery('');
+    setDaysBack(90);
+    setIsLoading(false);
+    setLoadingInvoices(false);
+  }, [customer]);
+
   const loadAvailableItems = useCallback(async () => {
     try {
       const endDate = new Date().toISOString().split('T')[0];
@@ -123,28 +146,16 @@ export default function MultiInvoiceReturn({
 
   useEffect(() => {
     if (isOpen) {
-      // Only reset on initial open, not on subsequent renders
-      if (customer) {
-        setWorkflowStep('select-items');
-        setSelectedCustomer(customer);
-      } else if (!selectedCustomer) {
-        setWorkflowStep('select-customer');
-        setSelectedCustomer('');
-      }
-      setSelectedItems([]);
-      setInvoices([]);
-      setSelectedInvoices(new Set());
-      setFilteredAvailableItems([]);
-      setCustomerSearchQuery('');
-      setSelectedAddress('');
+      // Reset all state when modal opens
+      resetModalState();
 
+      // Load data if customer is provided
       if (customer) {
         loadAvailableItems();
         loadCustomerAddresses();
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, customer]);
+  }, [isOpen, customer, resetModalState, loadAvailableItems, loadCustomerAddresses]);
 
   const loadCustomerInvoices = async () => {
     if (selectedItems.length === 0) {
@@ -245,6 +256,40 @@ export default function MultiInvoiceReturn({
     }));
   };
 
+  // Auto-update payment amounts when quantities change
+  useEffect(() => {
+    setInvoicePayments(prev => {
+      const updated = { ...prev };
+
+      invoices.forEach(invoice => {
+        if (selectedInvoices.has(invoice.name)) {
+          // Calculate return amount based on percentage of items being returned vs original paid amount
+          const totalItemsAmount = invoice.items.reduce((sum, item) => sum + (item.qty * item.rate), 0);
+          const returnedItemsAmount = invoice.items.reduce((sum, item) => sum + (item.return_qty || 0) * item.rate, 0);
+
+          // Calculate percentage of items being returned
+          const returnPercentage = totalItemsAmount > 0 ? returnedItemsAmount / totalItemsAmount : 0;
+
+          // Apply the same percentage to the original paid amount (what customer actually paid)
+          const calculatedReturnAmount = ((invoice as InvoiceWithPaidAmount).paid_amount || invoice.grand_total) * returnPercentage;
+
+          // Round to 2 decimal places to avoid floating point precision issues
+          const amount = Math.round(calculatedReturnAmount * 100) / 100;
+
+          // Update the payment amount for this invoice
+          if (updated[invoice.name]) {
+            updated[invoice.name] = {
+              ...updated[invoice.name],
+              amount
+            };
+          }
+        }
+      });
+
+      return updated;
+    });
+  }, [invoices, selectedInvoices]);
+
   const toggleInvoiceSelection = (invoiceName: string) => {
     setSelectedInvoices(prev => {
       const newSet = new Set(prev);
@@ -327,6 +372,11 @@ export default function MultiInvoiceReturn({
     ), 0
   );
 
+  const handleClose = useCallback(() => {
+    resetModalState();
+    onClose();
+  }, [resetModalState, onClose]);
+
   const handleSubmitReturn = async () => {
     const invoiceReturns = invoices
       .filter(invoice => selectedInvoices.has(invoice.name))
@@ -358,7 +408,7 @@ export default function MultiInvoiceReturn({
       if (result.success) {
         toast.success(result.message || 'Returns created successfully');
         onSuccess(result.createdReturns || []);
-        onClose();
+        handleClose();
       } else {
         toast.error(result.error || 'Failed to create returns');
       }
@@ -392,7 +442,7 @@ export default function MultiInvoiceReturn({
               </div>
             </div>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="p-1.5 sm:p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
             >
               <X className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -1151,7 +1201,7 @@ export default function MultiInvoiceReturn({
               </div>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:space-x-3">
                 <button
-                  onClick={onClose}
+                  onClick={handleClose}
                   className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium"
                 >
                   Cancel

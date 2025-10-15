@@ -1426,9 +1426,8 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None, s
 def create_partial_return(
 	invoice_name, return_items, payment_method=None, return_amount=None, expected_return_amount=None
 ):
-    
 	"""Create a partial return for selected items from an invoice with custom payment method"""
-	
+
 	try:
 		if isinstance(return_items, str):
 			return_items = json.loads(return_items)
@@ -1530,7 +1529,7 @@ def create_partial_return(
 				)
 		except Exception:
 			pass
-		
+
 		if final_return_amount > 0:
 			return_doc.append(
 				"payments",
@@ -1574,10 +1573,14 @@ def create_multi_invoice_return(return_data):
 		for _i, invoice_return in enumerate(invoice_returns):
 			invoice_name = invoice_return.get("invoice_name")
 			return_items = invoice_return.get("return_items", [])
+			payment_method = invoice_return.get("payment_method")
+			return_amount = invoice_return.get("return_amount")
 
 			if return_items:
-				# Call create_partial_return with separate parameters
-				result = create_partial_return(invoice_name, return_items)
+				# Call create_partial_return with payment method and return amount
+				result = create_partial_return(
+					invoice_name, return_items, payment_method=payment_method, return_amount=return_amount
+				)
 				if result.get("success"):
 					created_returns.append(result.get("return_invoice"))
 				else:
