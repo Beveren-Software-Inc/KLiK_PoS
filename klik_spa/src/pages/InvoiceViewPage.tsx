@@ -330,7 +330,7 @@ export default function InvoiceViewPage() {
                   </span>
                 </button>
 
-                {posDetails?.custom_enable_whatsapp && (
+                {(posDetails?.custom_enable_whatsapp === 1 || posDetails?.custom_enable_whatsapp === '1' || posDetails?.custom_enable_whatsapp === true) ? (
                   <button
                     className="group relative p-2 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900 rounded-lg transition-all duration-200"
                     onClick={() => {
@@ -343,9 +343,9 @@ export default function InvoiceViewPage() {
                       Send via WhatsApp
                     </span>
                   </button>
-                )}
+                ) : ""}
 
-                {posDetails?.custom_enable_sms && (
+                {(posDetails?.custom_enable_sms === 1 || posDetails?.custom_enable_sms === '1' || posDetails?.custom_enable_sms === true) ? (
                   <button
                     className="group relative p-2 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900 rounded-lg transition-all duration-200"
                     onClick={() => {
@@ -358,7 +358,7 @@ export default function InvoiceViewPage() {
                       Send via SMS
                     </span>
                   </button>
-                )}
+                ) : ""}
 
                 {/* Return Buttons */}
                 {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && !invoice.is_return && hasReturnableItems() && (

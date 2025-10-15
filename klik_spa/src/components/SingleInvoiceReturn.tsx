@@ -301,8 +301,8 @@ export default function SingleInvoiceReturn({
                         <span>{formatCurrency(returnAmount, currency)}</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-red-600 dark:text-red-400 font-semibold">Write-off:</span>
-                        <span className="text-red-600 dark:text-red-400 font-semibold">
+                        <span className="text-orange-600 dark:text-red-400 font-semibold">Write-off:</span>
+                        <span className="text-orange-600 dark:text-red-400 font-semibold">
                           {formatCurrency(totalReturnAmount - returnAmount, currency)}
                         </span>
                       </div>
