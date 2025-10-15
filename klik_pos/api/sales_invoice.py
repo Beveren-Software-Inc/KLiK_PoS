@@ -992,8 +992,8 @@ def get_writeoff_account():
 
 
 @frappe.whitelist()
-def sync_return_payments_before_submit(doc, method):
-	"""Ensure return invoice payments match finalized total when round-off is present.
+def sync_return_payments_before_save(doc, method):
+	"""Ensure return invoice payments match original invoice's paid amount when round-off is present.
 	Runs just before submit to avoid validation errors like
 	"Total payments amount can't be greater than X".
 	"""
@@ -1004,26 +1004,31 @@ def sync_return_payments_before_submit(doc, method):
 		if not getattr(doc, "custom_roundoff_amount", 0):
 			return
 
-		# Prefer rounded_total if present, fallback to grand_total
-		final_total = getattr(doc, "rounded_total", None)
-		if final_total is None:
-			final_total = doc.grand_total
-
-		desired_payment = abs(flt(final_total, doc.precision("grand_total")))
-		if desired_payment <= 0:
+		# Get the original invoice to check its paid amount
+		original_invoice_name = getattr(doc, "return_against", None)
+		if not original_invoice_name:
 			return
+
+		original_invoice = frappe.get_doc("Sales Invoice", original_invoice_name)
+		original_paid_amount = original_invoice.paid_amount or 0
+
+		if original_paid_amount <= 0:
+			return
+
+		# Use the original invoice's paid amount as the desired payment
+		desired_payment = abs(flt(original_paid_amount, doc.precision("grand_total")))
 
 		# On returns, store refund as positive payment row
 		if getattr(doc, "payments", None) and len(doc.payments) > 0:
-			doc.payments[0].amount = desired_payment
+			doc.payments[0].amount = -desired_payment
 			for _p in doc.payments[1:]:
 				_p.amount = 0
 		else:
 			doc.append("payments", {"mode_of_payment": "Cash", "amount": desired_payment})
 
 		# Sync totals
-		doc.paid_amount = desired_payment
-		doc.base_paid_amount = desired_payment * (doc.conversion_rate or 1)
+		doc.paid_amount = -desired_payment
+		doc.base_paid_amount = -(desired_payment * (doc.conversion_rate or 1))
 		doc.outstanding_amount = 0
 	except Exception:
 		# Do not block submit; validation will still catch inconsistencies

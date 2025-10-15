@@ -88,7 +88,8 @@ export default function SingleInvoiceReturn({
     if (paymentModes.length > 0 && !selectedPaymentMethod) {
       // Find default payment method or use first one
       const defaultMode = paymentModes.find(mode => mode.default === 1);
-      setSelectedPaymentMethod(defaultMode?.mode_of_payment || paymentModes[0].mode_of_payment || 'Cash');
+      const resolved = defaultMode?.mode_of_payment || paymentModes[0].mode_of_payment || "";
+      setSelectedPaymentMethod(resolved);
     }
   }, [paymentModes, selectedPaymentMethod]);
 
@@ -289,11 +290,29 @@ export default function SingleInvoiceReturn({
                   </button>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Return Amount</p>
-                  <p className="text-xl font-bold text-black-600 dark:text-orange-400">
-                    {formatCurrency(totalReturnAmount, currency)}
-                  </p>
-                  {originalInvoicePaidAmount > 0 && (
+                  {originalInvoicePaidAmount > 0 && totalReturnAmount !== returnAmount ? (
+                    <div className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                      <div className="flex justify-between items-center">
+                        <span>Total Return Amount:</span>
+                        <span>{formatCurrency(totalReturnAmount, currency)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span>Paid Amount:</span>
+                        <span>{formatCurrency(returnAmount, currency)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-red-600 dark:text-red-400 font-semibold">Write-off:</span>
+                        <span className="text-red-600 dark:text-red-400 font-semibold">
+                          {formatCurrency(totalReturnAmount - returnAmount, currency)}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-lg font-bold text-black-600 dark:text-orange-400">
+                      {formatCurrency(totalReturnAmount, currency)}
+                    </div>
+                  )}
+                  {originalInvoicePaidAmount > 0 && totalReturnAmount === returnAmount && (
                     <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       Customer Paid: {formatCurrency(originalInvoicePaidAmount, currency)}
                     </div>
@@ -450,11 +469,17 @@ export default function SingleInvoiceReturn({
                         {paymentModesLoading ? (
                           <option>Loading payment methods...</option>
                         ) : (
-                          paymentModes.map((mode) => (
-                            <option key={mode.name} value={mode.name}>
-                              {mode.mode_of_payment}
-                            </option>
-                          ))
+                          <>
+                            <option value="">{""}</option>
+                            {paymentModes.map((mode) => {
+                              const val = mode.mode_of_payment || mode.name;
+                              return (
+                                <option key={val} value={val}>
+                                  {val}
+                                </option>
+                              );
+                            })}
+                          </>
                         )}
                       </select>
                     </div>
