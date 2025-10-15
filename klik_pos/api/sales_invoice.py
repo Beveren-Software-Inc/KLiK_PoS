@@ -991,43 +991,48 @@ def get_writeoff_account():
 		return pos_profile.write_off_account
 
 
-@frappe.whitelist()
-def sync_return_payments_before_submit(doc, method):
-	"""Ensure return invoice payments match finalized total when round-off is present.
-	Runs just before submit to avoid validation errors like
-	"Total payments amount can't be greater than X".
-	"""
-	try:
-		# Only for returns with explicit round-off
-		if not getattr(doc, "is_return", 0):
-			return
-		if not getattr(doc, "custom_roundoff_amount", 0):
-			return
+# @frappe.whitelist()
+# def sync_return_payments_before_save(doc, method):
+# 	"""Ensure return invoice payments match original invoice's paid amount when round-off is present.
+# 	Runs just before submit to avoid validation errors like
+# 	"Total payments amount can't be greater than X".
+# 	"""
+# 	try:
+# 		# Only for returns with explicit round-off
+# 		if not getattr(doc, "is_return", 0):
+# 			return
+# 		if not getattr(doc, "custom_roundoff_amount", 0):
+# 			return
 
-		# Prefer rounded_total if present, fallback to grand_total
-		final_total = getattr(doc, "rounded_total", None)
-		if final_total is None:
-			final_total = doc.grand_total
+# 		# Get the original invoice to check its paid amount
+# 		original_invoice_name = getattr(doc, "return_against", None)
+# 		if not original_invoice_name:
+# 			return
 
-		desired_payment = abs(flt(final_total, doc.precision("grand_total")))
-		if desired_payment <= 0:
-			return
+# 		original_invoice = frappe.get_doc("Sales Invoice", original_invoice_name)
+# 		original_paid_amount = original_invoice.paid_amount or 0
 
-		# On returns, store refund as positive payment row
-		if getattr(doc, "payments", None) and len(doc.payments) > 0:
-			doc.payments[0].amount = desired_payment
-			for _p in doc.payments[1:]:
-				_p.amount = 0
-		else:
-			doc.append("payments", {"mode_of_payment": "Cash", "amount": desired_payment})
+# 		if original_paid_amount <= 0:
+# 			return
 
-		# Sync totals
-		doc.paid_amount = desired_payment
-		doc.base_paid_amount = desired_payment * (doc.conversion_rate or 1)
-		doc.outstanding_amount = 0
-	except Exception:
-		# Do not block submit; validation will still catch inconsistencies
-		frappe.log_error(frappe.get_traceback(), "sync_return_payments_before_submit error")
+# 		# Use the original invoice's paid amount as the desired payment
+# 		desired_payment = abs(flt(original_paid_amount, doc.precision("grand_total")))
+
+# 		# On returns, store refund as positive payment row
+# 		if getattr(doc, "payments", None) and len(doc.payments) > 0:
+# 			doc.payments[0].amount = -desired_payment
+# 			for _p in doc.payments[1:]:
+# 				_p.amount = 0
+# 		else:
+# 			doc.append("payments", {"mode_of_payment": "Cash", "amount": desired_payment})
+
+# 		# Sync totals
+# 		doc.paid_amount = -desired_payment
+# 		doc.base_paid_amount = -(desired_payment * (doc.conversion_rate or 1))
+# 		doc.outstanding_amount = 0
+# 	except Exception:
+# 		# Do not block submit; validation will still catch inconsistencies
+# 		frappe.log_error(frappe.get_traceback(), "sync_return_payments_before_submit error")
 
 
 class CustomSalesInvoice(SalesInvoice):
@@ -1422,6 +1427,7 @@ def create_partial_return(
 	invoice_name, return_items, payment_method=None, return_amount=None, expected_return_amount=None
 ):
 	"""Create a partial return for selected items from an invoice with custom payment method"""
+
 	try:
 		if isinstance(return_items, str):
 			return_items = json.loads(return_items)
@@ -1532,23 +1538,12 @@ def create_partial_return(
 					"amount": -abs(final_return_amount),
 				},
 			)
-
-		# Recalculate and sync payment to match grand total
+		print("Mko 3", -abs(final_return_amount))
+		# Recalculate totals (payment amount stays as user entered)
 		try:
 			return_doc.calculate_taxes_and_totals()
 		except Exception:
 			pass
-		desired_payment = abs(flt(return_doc.grand_total))
-		if desired_payment > 0:
-			if return_doc.payments and len(return_doc.payments) > 0:
-				return_doc.payments[0].amount = -desired_payment
-				for _p in return_doc.payments[1:]:
-					_p.amount = 0
-			else:
-				return_doc.append(
-					"payments",
-					{"mode_of_payment": final_payment_method or "Cash", "amount": -desired_payment},
-				)
 
 		return_doc.save()
 		return_doc.submit()
@@ -1578,10 +1573,14 @@ def create_multi_invoice_return(return_data):
 		for _i, invoice_return in enumerate(invoice_returns):
 			invoice_name = invoice_return.get("invoice_name")
 			return_items = invoice_return.get("return_items", [])
+			payment_method = invoice_return.get("payment_method")
+			return_amount = invoice_return.get("return_amount")
 
 			if return_items:
-				# Call create_partial_return with separate parameters
-				result = create_partial_return(invoice_name, return_items)
+				# Call create_partial_return with payment method and return amount
+				result = create_partial_return(
+					invoice_name, return_items, payment_method=payment_method, return_amount=return_amount
+				)
 				if result.get("success"):
 					created_returns.append(result.get("return_invoice"))
 				else:

@@ -71,8 +71,8 @@ doc_events = {
 			"klik_pos.api.sales_invoice.set_base_roundoff_amount",
 			"klik_pos.api.sales_invoice.set_grand_total_with_roundoff",
 		],
-		# "before_submit": [
-		# 	"klik_pos.api.sales_invoice.sync_return_payments_before_submit",
+		# "before_save": [
+		# 	"klik_pos.api.sales_invoice.sync_return_payments_before_save",
 		# ],
 	},
 	"POS Opening Entry": {

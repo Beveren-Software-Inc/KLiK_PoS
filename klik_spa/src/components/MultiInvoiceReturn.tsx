@@ -245,6 +245,40 @@ export default function MultiInvoiceReturn({
     }));
   };
 
+  // Auto-update payment amounts when quantities change
+  useEffect(() => {
+    setInvoicePayments(prev => {
+      const updated = { ...prev };
+
+      invoices.forEach(invoice => {
+        if (selectedInvoices.has(invoice.name)) {
+          // Calculate return amount based on percentage of items being returned vs original paid amount
+          const totalItemsAmount = invoice.items.reduce((sum, item) => sum + (item.qty * item.rate), 0);
+          const returnedItemsAmount = invoice.items.reduce((sum, item) => sum + (item.return_qty || 0) * item.rate, 0);
+
+          // Calculate percentage of items being returned
+          const returnPercentage = totalItemsAmount > 0 ? returnedItemsAmount / totalItemsAmount : 0;
+
+          // Apply the same percentage to the original paid amount (what customer actually paid)
+          const calculatedReturnAmount = ((invoice as InvoiceWithPaidAmount).paid_amount || invoice.grand_total) * returnPercentage;
+
+          // Round to 2 decimal places to avoid floating point precision issues
+          const amount = Math.round(calculatedReturnAmount * 100) / 100;
+
+          // Update the payment amount for this invoice
+          if (updated[invoice.name]) {
+            updated[invoice.name] = {
+              ...updated[invoice.name],
+              amount
+            };
+          }
+        }
+      });
+
+      return updated;
+    });
+  }, [invoices, selectedInvoices]);
+
   const toggleInvoiceSelection = (invoiceName: string) => {
     setSelectedInvoices(prev => {
       const newSet = new Set(prev);
@@ -359,6 +393,8 @@ export default function MultiInvoiceReturn({
         toast.success(result.message || 'Returns created successfully');
         onSuccess(result.createdReturns || []);
         onClose();
+        // Reload the page to refresh all data
+        window.location.reload();
       } else {
         toast.error(result.error || 'Failed to create returns');
       }
