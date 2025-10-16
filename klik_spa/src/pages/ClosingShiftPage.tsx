@@ -585,7 +585,7 @@ export default function ClosingShiftPage() {
                               <span>Delete</span>
                             </button>
                           )}
-                          {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && hasReturnableItems(invoice) && (
+                          {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && !invoice.is_return && hasReturnableItems(invoice) && (
                             <button
                               onClick={() => handleSingleReturnClick(invoice)}
                               className="text-orange-600 hover:text-orange-900 flex items-center space-x-1"
@@ -927,7 +927,7 @@ export default function ClosingShiftPage() {
                               <span>Delete</span>
                             </button>
                           )}
-                          {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && hasReturnableItems(invoice) && (
+                          {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && !invoice.is_return && hasReturnableItems(invoice) && (
                             <button
                               onClick={() => handleSingleReturnClick(invoice)}
                               className="text-orange-600 hover:text-orange-900 flex items-center space-x-1"
