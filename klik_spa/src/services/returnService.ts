@@ -29,17 +29,20 @@ export interface ReturnData {
 }
 
 export async function getReturnedQty(customer: string, salesInvoice: string, item: string) {
+  const csrfToken = window.csrf_token
   try {
     const response = await fetch(`/api/method/klik_pos.api.sales_invoice.returned_qty`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-Frappe-CSRF-Token': csrfToken
       },
       body: JSON.stringify({
         customer,
         sales_invoice: salesInvoice,
         item
-      })
+      }),
+       credentials: 'include'
     });
 
     const data = await response.json();

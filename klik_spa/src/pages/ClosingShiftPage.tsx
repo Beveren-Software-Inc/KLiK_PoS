@@ -790,7 +790,6 @@ export default function ClosingShiftPage() {
                     <option value="year">This Year</option>
                   </select>
 
-
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
