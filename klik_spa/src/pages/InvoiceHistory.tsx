@@ -531,7 +531,7 @@ const getStatusBadge = (status: string) => {
                           <span>Edit</span>
                         </button>
                       )}
-                      {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && hasReturnableItems(invoice) && (
+                      {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && !invoice.is_return && hasReturnableItems(invoice) && (
 
                         <button
                           onClick={() => handleSingleReturnClick(invoice)}

@@ -85,6 +85,8 @@ def get_opening_entry_payment_summary():
                 WHERE si.pos_profile = %s
                   AND si.docstatus = 1
                   AND si.posting_date = %s
+                  AND si.custom_pos_opening_entry IS NOT NULL
+                  AND si.custom_pos_opening_entry != ''
                 GROUP BY sip.mode_of_payment
             """,
 				(pos_profile_name, opening_date),

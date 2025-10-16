@@ -624,7 +624,7 @@ export default function CustomerDetailsPage() {
                                   Edit
                                 </button>
                               )}
-                              {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && hasReturnableItems(invoice) && (
+                              {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && !invoice.is_return && hasReturnableItems(invoice) && (
                                 <button
                                   onClick={() => handleSingleReturnClick(invoice)}
                                   className="text-orange-600 hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-300"

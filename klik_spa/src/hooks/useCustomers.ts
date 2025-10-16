@@ -143,8 +143,11 @@ export function useCustomerDetails(customerId: string | null) {
     const fetchCustomer = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch(`/api/method/klik_pos.api.customer.get_customer_info?customer_name=${customerId}`);
+        console.log('Fetching customer details for ID:', customerId);
+        const response = await fetch(`/api/method/klik_pos.api.customer.get_customer_info?customer_name=${encodeURIComponent(customerId)}`);
         const resData = await response.json();
+
+        console.log('Customer API response:', resData);
 
         if (!resData.message || resData.message.success === false) {
           throw new Error(resData.message?.error || "Failed to fetch customer");

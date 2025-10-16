@@ -69,36 +69,43 @@ export function useCustomerInvoices(customerName: string) {
       setHasMore(newInvoicesCount === LIMIT);
       setTotalCount(totalCountFromAPI);
 
-      const transformed: SalesInvoice[] = rawInvoices.map((invoice: Record<string, unknown>) => ({
-        id: invoice.name,
-        date: invoice.posting_date || new Date().toISOString().split("T")[0],
-        time: invoice.posting_time || "00:00:00",
-        cashier: invoice.cashier_name || "Unknown",
-        customer: invoice.customer_name || invoice.customer || "Walk-in Customer",
+      // IMPORTANT: Filter by raw customer id BEFORE transforming labels to names
+      const rawCustomerInvoices = (rawInvoices as Array<Record<string, unknown>>).filter((inv) => {
+        const rawCustomerId = (inv && (inv as any).customer) as string | undefined;
+        return !!rawCustomerId && rawCustomerId === customerName;
+      });
+
+      const transformed: SalesInvoice[] = rawCustomerInvoices.map((invoice: Record<string, unknown>) => ({
+        id: invoice.name as string,
+        date: (invoice.posting_date as string) || new Date().toISOString().split("T")[0],
+        time: (invoice.posting_time as string) || "00:00:00",
+        cashier: (invoice.cashier_name as string) || "Unknown",
+        // Use customer_name for display, but keep id separately for future if needed
+        customer: (invoice.customer_name as string) || (invoice.customer as string) || "Walk-in Customer",
         totalAmount: Number(invoice.base_grand_total) || 0,
-        status: invoice.status || "Draft",
-        paymentMethod: invoice.payment_method || "-",
+        status: (invoice.status as string) || "Draft",
+        // FIX: payment_method isn't provided by backend; use mode_of_payment or derive from payment_methods
+        paymentMethod: (invoice.mode_of_payment as string)
+          || (((invoice.payment_methods as Array<{ mode_of_payment: string }> | undefined)?.length || 0) > 1
+                ? (invoice.payment_methods as Array<{ mode_of_payment: string }>).map(pm => pm.mode_of_payment).join("/")
+                : ((invoice.payment_methods as Array<{ mode_of_payment: string }> | undefined)?.[0]?.mode_of_payment))
+          || "-",
         discount: Number(invoice.discount_amount) || 0,
         tax: Number(invoice.total_taxes_and_charges) || 0,
-        items: invoice.items || [],
-        posProfile: invoice.pos_profile || "",
-        customPosOpeningEntry: invoice.custom_pos_opening_entry || "",
-        currency: invoice.currency || "USD",
-        name: invoice.name,
-        customZatcaSubmitStatus: invoice.custom_zatca_submit_status || null
+        items: (invoice.items as any[]) || [],
+        posProfile: (invoice.pos_profile as string) || "",
+        customPosOpeningEntry: (invoice.custom_pos_opening_entry as string) || "",
+        currency: (invoice.currency as string) || "USD",
+        name: invoice.name as string,
+        customZatcaSubmitStatus: (invoice.custom_zatca_submit_status as string) || null
       }));
 
-      // Filter to only include invoices for this specific customer
-      const customerSpecificInvoices = transformed.filter(invoice =>
-        invoice.customer === customerName
-      );
-
       if (append) {
-        setInvoices(prev => [...prev, ...customerSpecificInvoices]);
-        setTotalLoaded(prev => prev + customerSpecificInvoices.length);
+        setInvoices(prev => [...prev, ...transformed]);
+        setTotalLoaded(prev => prev + transformed.length);
       } else {
-        setInvoices(customerSpecificInvoices);
-        setTotalLoaded(customerSpecificInvoices.length);
+        setInvoices(transformed);
+        setTotalLoaded(transformed.length);
       }
 
       setCurrentPage(page);

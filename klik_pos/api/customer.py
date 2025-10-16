@@ -318,15 +318,27 @@ def get_currency_exchange_rate(from_currency: str, to_currency: str, transaction
 		return {"success": False, "error": str(e)}
 
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def get_customer_info(customer_name: str):
-	"""Fetch comprehensive customer document by customer name."""
+	"""Fetch comprehensive customer document by customer name or ID."""
 	try:
+		# URL decode the customer name to handle special characters like +
+		import urllib.parse
+
+		customer_name = urllib.parse.unquote(customer_name)
+		print("CUSTOMER WETU", customer_name)
+		# First try to find by customer_name
 		customers = frappe.get_all("Customer", filters={"customer_name": customer_name}, fields=["name"])
+
+		# If not found by customer_name, try by name (ID)
 		if not customers:
 			customers = frappe.get_all("Customer", filters={"name": customer_name}, fields=["name"])
 
 		if not customers:
+			# Log the search attempt for debugging
+			frappe.logger().info(
+				f"Customer not found: '{customer_name}'. Searched by customer_name and name."
+			)
 			return {"success": False, "error": f"Customer not found: {customer_name}"}
 
 		customer = frappe.get_doc("Customer", customers[0]["name"])
@@ -747,6 +759,7 @@ def get_customer_statistics(customer_id):
 				"docstatus": 1,
 				"is_return": 0,
 				"status": ["!=", "Cancelled"],
+				"custom_pos_opening_entry": ["!=", ""],  # Only POS-created invoices
 			},
 		)
 
@@ -759,6 +772,8 @@ def get_customer_statistics(customer_id):
             AND docstatus = 1
             AND is_return = 0
             AND status != 'Cancelled'
+            AND custom_pos_opening_entry IS NOT NULL
+            AND custom_pos_opening_entry != ''
         """,
 			(customer_id,),
 			as_dict=True,
@@ -775,6 +790,8 @@ def get_customer_statistics(customer_id):
             AND docstatus = 1
             AND is_return = 0
             AND status != 'Cancelled'
+            AND custom_pos_opening_entry IS NOT NULL
+            AND custom_pos_opening_entry != ''
         """,
 			(customer_id,),
 			as_dict=True,
@@ -807,6 +824,7 @@ def get_global_totals():
 				"docstatus": 1,
 				"is_return": 0,
 				"status": ["!=", "Cancelled"],
+				"custom_pos_opening_entry": ["!=", ""],  # Only POS-created invoices
 			},
 		)
 		return {

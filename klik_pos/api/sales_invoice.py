@@ -34,38 +34,39 @@ def get_current_pos_opening_entry():
 
 @frappe.whitelist(allow_guest=True)
 def get_sales_invoices(limit=100, start=0, search=""):
+	"""
+	Get sales invoices with proper filtering based on user role and POS opening entry.
+	"""
 	try:
 		# Get current user's POS opening entry
 		current_opening_entry = get_current_pos_opening_entry()
 
-		# Check if user has administrative privileges
-		user_roles = frappe.get_roles(frappe.session.user)
-		is_admin_user = any(
-			role in ["Administrator", "Sales Manager", "System Manager"] for role in user_roles
-		)
-
-		# Base filters
-		filters = {}
+		# Check if user is admin
+		user_roles = frappe.get_roles()
+		is_admin_user = "Administrator" in user_roles or "System Manager" in user_roles
+		print("user roles", search)
+		# Base filters - ALWAYS filter to only show POS-created invoices
+		filters = {
+			"custom_pos_opening_entry": ["!=", ""]  # Only show invoices with POS opening entry
+		}
 
 		if is_admin_user:
 			frappe.logger().info(
-				f"Admin user {frappe.session.user} with roles {user_roles} - showing all invoices"
+				f"Admin user {frappe.session.user} with roles {user_roles} - showing all POS invoices"
 			)
 		elif current_opening_entry:
 			filters["custom_pos_opening_entry"] = current_opening_entry
 			frappe.logger().info(f"Filtering invoices by POS opening entry: {current_opening_entry}")
 		else:
-			frappe.logger().info("No active POS opening entry found, showing all invoices")
+			frappe.logger().info("No active POS opening entry found, showing all POS invoices")
 
-		# Add search filter if provided
-		if search and search.strip():
-			search_term = search.strip()
-
+		# Check if ZATCA status field exists
 		sales_invoice_meta = frappe.get_meta("Sales Invoice")
 		has_zatca_status = any(
 			df.fieldname == "custom_zatca_submit_status" for df in sales_invoice_meta.fields
 		)
 
+		# Build fields list
 		fields = [
 			"name",
 			"posting_date",
@@ -86,72 +87,40 @@ def get_sales_invoices(limit=100, start=0, search=""):
 		if has_zatca_status:
 			fields.append("custom_zatca_submit_status")
 
-		# Get total count first
+		# Build optional OR filters for search
+		or_filters = None
 		if search and search.strip():
 			search_term = search.strip()
-			base_conditions = []
-
-			# Add role-based filtering
-			if is_admin_user:
-				pass
-			elif current_opening_entry:
-				base_conditions.append(f"custom_pos_opening_entry = '{current_opening_entry}'")
-
-			# Build search conditions
-			search_conditions = [
-				f"name LIKE '%{search_term}%'",
-				f"customer_name LIKE '%{search_term}%'",
-				f"customer LIKE '%{search_term}%'",
+			or_filters = [
+				["name", "like", f"%{search_term}%"],
+				["customer_name", "like", f"%{search_term}%"],
+				["customer", "like", f"%{search_term}%"],
 			]
 
-			# Combine base conditions with search
-			where_clause = ""
-			if base_conditions:
-				where_clause = (
-					f"WHERE ({' AND '.join(base_conditions)}) AND ({' OR '.join(search_conditions)})"
-				)
-			else:
-				where_clause = f"WHERE {' OR '.join(search_conditions)}"
+		# Get invoices
+		invoices = frappe.get_all(
+			"Sales Invoice",
+			filters=filters,
+			or_filters=or_filters,
+			fields=fields,
+			order_by="modified desc",
+			limit=limit,
+			start=start,
+		)
 
-			# Get total count with search
-			count_query = f"""
-				SELECT COUNT(*) as total
-				FROM `tabSales Invoice`
-				{where_clause}
-			"""
-			total_count = frappe.db.sql(count_query, as_dict=True)[0]["total"]
+		# Get total count for pagination (supports or_filters via aggregate)
+		count_rows = frappe.get_all(
+			"Sales Invoice", filters=filters, or_filters=or_filters, fields=["count(name) as total"]
+		)
+		total_count = count_rows[0].total if count_rows else 0
 
-			# Get invoices with search
-			fields_str = ", ".join([f"`{field}`" for field in fields])
-			if has_zatca_status:
-				fields_str += ", `custom_zatca_submit_status`"
-
-			query = f"""
-				SELECT {fields_str}
-				FROM `tabSales Invoice`
-				{where_clause}
-				ORDER BY modified DESC
-				LIMIT {limit} OFFSET {start}
-			"""
-			invoices = frappe.db.sql(query, as_dict=True)
-		else:
-			total_count = frappe.db.count("Sales Invoice", filters=filters)
-
-			invoices = frappe.get_all(
-				"Sales Invoice",
-				filters=filters,
-				fields=fields,
-				order_by="modified desc",
-				limit=limit,
-				start=start,
-			)
-
-		# Fetch full name for each owner and add item details with return quantities
+		# Process each invoice
 		for inv in invoices:
-			full_name = frappe.db.get_value("User", inv["owner"], "full_name") or inv["owner"]
-			inv["cashier_name"] = full_name
+			# Get cashier full name
+			cashier_name = frappe.db.get_value("User", inv.owner, "full_name") or inv.owner
+			inv["cashier_name"] = cashier_name
 
-			# Format posting_time
+			# Format posting_time from timedelta to HH:MM:SS
 			if inv.get("posting_time"):
 				if hasattr(inv["posting_time"], "total_seconds"):
 					total_seconds = int(inv["posting_time"].total_seconds())
@@ -162,67 +131,34 @@ def get_sales_invoices(limit=100, start=0, search=""):
 				else:
 					inv["posting_time"] = str(inv["posting_time"])
 
-			# Get items with return quantities
-			invoice_doc = frappe.get_doc("Sales Invoice", inv["name"])
-			items = []
-			for item in invoice_doc.items:
-				returned_data = returned_qty(invoice_doc.customer, invoice_doc.name, item.item_code)
-				returned_qty_value = returned_data.get("total_returned_qty", 0)
-				available_qty = item.qty - returned_qty_value
-
-				items.append(
-					{
-						"item_code": item.item_code,
-						"item_name": item.item_name,
-						"qty": item.qty,
-						"rate": item.rate,
-						"amount": item.amount,
-						"description": item.description,
-						"returned_qty": returned_qty_value,
-						"available_qty": available_qty,
-					}
-				)
-			inv["items"] = items
-
-			# Get all payment methods from payment child table with amounts
-			payment_methods = []
-			if invoice_doc.payments:
-				for payment in invoice_doc.payments:
-					payment_methods.append(
-						{"mode_of_payment": payment.mode_of_payment, "amount": payment.amount}
-					)
-			elif invoice_doc.status == "Draft":
-				payment_methods = []
-			else:
-				# Check Payment Entry if invoice payments table is empty but invoice is paid
-				if invoice_doc.status in ["Paid", "Partly Paid"] and not invoice_doc.payments:
-					# Get payment entries for this invoice
-					payment_entries = frappe.get_all(
-						"Payment Entry Reference",
-						filters={"reference_name": invoice_doc.name, "reference_doctype": "Sales Invoice"},
-						fields=["parent", "allocated_amount"],
-						parent_doctype="Payment Entry",
-					)
-
-					for pe_ref in payment_entries:
-						payment_entry = frappe.get_doc("Payment Entry", pe_ref.parent)
-						if payment_entry.docstatus == 1:  # Only submitted payment entries
-							payment_methods.append(
-								{
-									"mode_of_payment": payment_entry.mode_of_payment,
-									"amount": pe_ref.allocated_amount,
-								}
-							)
-
+			# Get payment methods
+			payment_methods = frappe.get_all(
+				"Sales Invoice Payment", filters={"parent": inv.name}, fields=["mode_of_payment", "amount"]
+			)
 			inv["payment_methods"] = payment_methods
-			# Keep backward compatibility - show first payment method or combined display
+
+			# Set backward-compatible mode_of_payment field
 			if len(payment_methods) == 0:
 				inv["mode_of_payment"] = "-"
 			elif len(payment_methods) == 1:
 				inv["mode_of_payment"] = payment_methods[0]["mode_of_payment"]
 			else:
-				# Show combined payment methods like "Cash/Credit Card"
 				inv["mode_of_payment"] = "/".join([pm["mode_of_payment"] for pm in payment_methods])
+
+			# Get items for return logic
+			items = frappe.get_all(
+				"Sales Invoice Item",
+				filters={"parent": inv.name},
+				fields=["item_code", "qty", "rate", "amount"],
+			)
+
+			# Calculate returned quantities for each item
+			for item in items:
+				returned_data = returned_qty(inv.customer, inv.name, item.item_code)
+				item["returned_qty"] = returned_data.get("total_returned_qty", 0)
+				item["quantity"] = item.qty  # For backward compatibility
+
+			inv["items"] = items
 
 		return {"success": True, "data": invoices, "total_count": total_count}
 
@@ -233,15 +169,45 @@ def get_sales_invoices(limit=100, start=0, search=""):
 
 @frappe.whitelist(allow_guest=True)
 def get_invoice_details(invoice_id):
+	"""
+	Optimized invoice details fetching with batch queries for items and returns.
+	"""
 	try:
 		invoice = frappe.get_doc("Sales Invoice", invoice_id)
 		invoice_data = invoice.as_dict()
 
+		# Batch fetch all items for this invoice
+		items_query = """
+			SELECT item_code, item_name, qty, rate, amount, description
+			FROM `tabSales Invoice Item`
+			WHERE parent = %s
+		"""
+		items_data = frappe.db.sql(items_query, (invoice_id,), as_dict=True)
+
+		# Batch fetch return quantities for all items at once
+		item_codes = [item.item_code for item in items_data]
+		returned_qty_map = {}
+
+		if item_codes:
+			returns_query = """
+				SELECT sii.item_code, COALESCE(SUM(ABS(sii.qty)), 0) as total_returned_qty
+				FROM `tabSales Invoice` si
+				JOIN `tabSales Invoice Item` sii ON si.name = sii.parent
+				WHERE si.is_return = 1
+				  AND si.return_against = %s
+				  AND sii.item_code IN ({})
+				  AND si.docstatus = 1
+				  AND si.customer = %s
+				GROUP BY sii.item_code
+			""".format(",".join([f"'{code}'" for code in item_codes]))
+
+			returns_data = frappe.db.sql(returns_query, (invoice_id, invoice.customer), as_dict=True)
+			returned_qty_map = {row.item_code: row.total_returned_qty for row in returns_data}
+
+		# Build items list with batch-fetched return data
 		items = []
-		for item in invoice.items:
-			# Get returned quantity for this item
-			returned_data = returned_qty(invoice.customer, invoice.name, item.item_code)
-			returned_qty_value = returned_data.get("total_returned_qty", 0)
+		for item in items_data:
+			returned_qty_value = returned_qty_map.get(item.item_code, 0)
 			available_qty = item.qty - returned_qty_value
 
 			items.append(
@@ -1271,7 +1237,11 @@ def get_valid_sales_invoices(doctype, txt, searchfield, start, page_len, filters
 		return []
 
 	# Build dynamic conditions
-	conditions = ["si.docstatus = 1", "si.is_return = 0"]
+	conditions = [
+		"si.docstatus = 1",
+		"si.is_return = 0",
+		"si.custom_pos_opening_entry IS NOT NULL AND si.custom_pos_opening_entry != ''",  # Only POS-created invoices
+	]
 	query_params = {
 		"txt": f"%{txt}%",
 		"start": start,
@@ -1331,6 +1301,7 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None, s
 			"docstatus": 1,
 			"is_return": 0,
 			"status": ["!=", "Cancelled"],
+			"custom_pos_opening_entry": ["!=", ""],  # Only show POS-created invoices
 		}
 
 		if start_date:

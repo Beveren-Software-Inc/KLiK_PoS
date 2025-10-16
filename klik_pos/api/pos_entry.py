@@ -209,6 +209,8 @@ def _calculate_payment_reconciliation(opening_entry, data):
 		  AND si.docstatus = 1
 		  AND si.posting_date = %s
 		  AND si.posting_time >= %s
+		  AND si.custom_pos_opening_entry IS NOT NULL
+		  AND si.custom_pos_opening_entry != ''
 		GROUP BY sip.mode_of_payment
 		""",
 		(opening_entry.pos_profile, opening_date, opening_time),
