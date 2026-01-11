@@ -176,6 +176,7 @@ def get_pos_details():
 		"custom_allow_write_off": pos.custom_allow_write_off or 0,
 		"custom_ignore_write_off_on_partial_returns": pos.custom_ignore_write_off_on_partial_returns or 1.0,
 		"custom_delivery_required": int(getattr(pos, "custom_delivery_required", 0) or 0),
+		"custom_is_pharmacy": int(getattr(pos, "custom_is_pharmacy", 0) or 0),
 	}
 	return details
 

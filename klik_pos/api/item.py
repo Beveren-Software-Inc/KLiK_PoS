@@ -626,8 +626,8 @@ def get_items_with_balance_and_price(
 	pos_doc, warehouse, price_list, hide_unavailable = _get_pos_context()
 
 	try:
-		# Build the base query
-		select_fields = "i.name, i.item_name, i.description, i.item_group, i.image, i.stock_uom"
+		# Build the base query - include pharmacy custom fields if they exist
+		select_fields = "i.name, i.item_name, i.description, i.item_group, i.image, i.stock_uom, i.custom_strength, i.custom_pharmaceutical_form, i.custom_number_of_pack, i.custom_pack_size, i.custom_route_of_administration"
 
 		if hide_unavailable:
 			base_query = [
@@ -821,23 +821,36 @@ def get_items_with_balance_and_price(
 			price_info = price_map.get(item_code, {"price": 0, "currency": "SAR", "currency_symbol": "SAR"})
 			primary_barcode = barcode_map.get(item_code)
 
-			enriched_items.append(
-				{
-					"id": item_code,
-					"name": item.get("item_name") or item_code,
-					"description": item.get("description", ""),
-					"category": item.get("item_group", "General"),
-					"price": price_info["price"],
-					"currency": price_info["currency"],
-					"currency_symbol": price_info["currency_symbol"],
-					"available": balance,
-					"image": item.get("image"),
-					"sold": 0,
-					"preparationTime": 10,
-					"uom": default_uom,
-					"barcode": primary_barcode,
-				}
-			)
+			# Include pharmacy custom fields if they exist
+			enriched_item = {
+				"id": item_code,
+				"name": item.get("item_name") or item_code,
+				"description": item.get("description", ""),
+				"category": item.get("item_group", "General"),
+				"price": price_info["price"],
+				"currency": price_info["currency"],
+				"currency_symbol": price_info["currency_symbol"],
+				"available": balance,
+				"image": item.get("image"),
+				"sold": 0,
+				"preparationTime": 10,
+				"uom": default_uom,
+				"barcode": primary_barcode,
+			}
+			
+			# Add pharmacy fields if they exist (from beveren_health app)
+			if item.get("custom_strength"):
+				enriched_item["custom_strength"] = item.get("custom_strength")
+			if item.get("custom_pharmaceutical_form"):
+				enriched_item["custom_pharmaceutical_form"] = item.get("custom_pharmaceutical_form")
+			if item.get("custom_number_of_pack") is not None:
+				enriched_item["custom_number_of_pack"] = item.get("custom_number_of_pack")
+			if item.get("custom_pack_size"):
+				enriched_item["custom_pack_size"] = item.get("custom_pack_size")
+			if item.get("custom_route_of_administration"):
+				enriched_item["custom_route_of_administration"] = item.get("custom_route_of_administration")
+			
+			enriched_items.append(enriched_item)
 
 		has_more = (offset + len(enriched_items)) < total_count
 		return {

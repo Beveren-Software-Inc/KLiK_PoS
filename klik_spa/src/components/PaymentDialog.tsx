@@ -2297,19 +2297,19 @@ export default function PaymentDialog({
                     // Show cart items for payment
                     cartItems.map((item, index) => (
                       <div key={index} className="flex justify-between text-sm">
-                        <div className="flex-1">
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900 dark:text-white">
+                              {item.name}
+                            </p>
+                            <p className="text-gray-600 dark:text-gray-400">
+                              {item.quantity} x {formatCurrency(item.price)}
+                            </p>
+                          </div>
                           <p className="font-medium text-gray-900 dark:text-white">
-                            {item.name}
-                          </p>
-                          <p className="text-gray-600 dark:text-gray-400">
-                            {item.quantity} x {formatCurrency(item.price)}
+                            {formatCurrency(item.quantity * item.price)}
                           </p>
                         </div>
-                        <p className="font-medium text-gray-900 dark:text-white">
-                          {formatCurrency(item.quantity * item.price)}
-                        </p>
-                      </div>
-                    ))
+                      ))
                   ) : (
                     // Show invoice details for sharing
                     <div className="space-y-4">

@@ -53,6 +53,7 @@ fixtures = [
 					"POS Profile-custom_ignore_write_off_on_partial_returns",
 					"POS Profile-custom_allow_write_off",
 					"POS Closing Entry-custom_sales_invoice",
+					"POS Profile-custom_is_pharmacy",
 					"POS Profile-custom_delivery_required",
 					"Sales Invoice-custom_delivery",
 					"Sales Invoice-custom_column_break_hnemi",
