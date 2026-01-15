@@ -50,25 +50,39 @@ class ERPNextAPI {
   private sessionId: string | null = null;
 
   constructor() {
-    // When served from Frappe itself (production), use empty baseUrl for same-origin requests
-    // In development with Vite dev server, use full URL
-    const isDevelopment = (import.meta as ImportMeta).env?.DEV;
+    // Determine the base URL based on the environment
+    // 1. If served from Frappe (production), use empty baseUrl for same-origin requests
+    // 2. If running in Vite dev server (port 8080), use relative URLs to leverage proxy
+    // 3. Otherwise, use the configured base URL or default to localhost:8000
+    
+    const isDevelopment = import.meta.env.DEV || import.meta.env.MODE === 'development';
     const isServedFromFrappe = !isDevelopment && window.location.pathname.startsWith('/klik_pos');
+    const isViteDevServer = isDevelopment && (window.location.port === '8080' || window.location.hostname === 'localhost');
+    
+    // In Vite dev server, use relative URLs to leverage the proxy configured in vite.config.ts
+    // The proxy will forward /api requests to http://127.0.0.1:8000
+    const baseUrl = isServedFromFrappe
+      ? '' // Use relative URL for same-origin requests when served from Frappe
+      : isViteDevServer
+      ? '' // Use relative URL in dev server to leverage Vite proxy
+      : ((import.meta as ImportMeta).env?.VITE_ERPNEXT_BASE_URL || 'http://localhost:8000');
 
     this.config = {
-      baseUrl: isServedFromFrappe
-        ? '' // Use relative URL for same-origin requests when served from Frappe
-        : ((import.meta as ImportMeta).env?.VITE_ERPNEXT_BASE_URL || 'http://localhost:8000'),
+      baseUrl,
       apiKey: (import.meta as ImportMeta).env?.VITE_API_KEY || '',
       apiSecret: (import.meta as ImportMeta).env?.VITE_API_SECRET || ''
     };
 
-    // console.log('ERPNext API Config:', {
-    //   isDevelopment,
-    //   baseUrl: this.config.baseUrl || '[using proxy]',
-    //   hasApiKey: !!this.config.apiKey,
-    //   hasApiSecret: !!this.config.apiSecret
-    // });
+    console.log('ERPNext API Config:', {
+      isDevelopment,
+      isServedFromFrappe,
+      isViteDevServer,
+      baseUrl: this.config.baseUrl || '[using proxy/relative]',
+      port: window.location.port,
+      pathname: window.location.pathname,
+      hasApiKey: !!this.config.apiKey,
+      hasApiSecret: !!this.config.apiSecret
+    });
   }
 
   private getHeaders(includeAuth: boolean = true): HeadersInit {

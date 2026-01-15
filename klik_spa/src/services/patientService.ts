@@ -25,7 +25,6 @@ export interface InpatientMedicationOrder {
 
 export async function searchPatients(searchQuery: string): Promise<Patient[]> {
   try {
-    console.log('📡 Searching patients:', searchQuery);
     const response = await fetch(`/api/method/klik_pos.api.patient.search_patients?search_query=${encodeURIComponent(searchQuery)}`, {
       method: 'GET',
       headers: {
@@ -34,32 +33,28 @@ export async function searchPatients(searchQuery: string): Promise<Patient[]> {
       credentials: 'include',
     });
 
-    console.log('📡 Patient search response status:', response.status);
-
     const data = await response.json();
-    console.log('📡 Patient search response data:', data);
 
     if (!response.ok) {
-      console.error('❌ Patient search error:', data.message || 'Failed to search patients');
       throw new Error(data.message || 'Failed to search patients');
     }
 
     if (data?.message) {
-      console.log('✅ Patients found:', data.message);
       return data.message;
     }
 
     return [];
   } catch (error) {
-    console.error(`❌ Error searching patients:`, error);
+    console.error(`Error searching patients:`, error);
     return [];
   }
 }
 
 export async function getPendingInpatientMedicationOrders(patient: string): Promise<InpatientMedicationOrder[]> {
   try {
-    console.log('📡 Fetching pending medication orders for patient:', patient);
-    const response = await fetch(`/api/method/klik_pos.api.patient.get_pending_inpatient_medication_orders?patient=${encodeURIComponent(patient)}`, {
+    const apiUrl = `/api/method/klik_pos.api.patient.get_pending_inpatient_medication_orders?patient=${encodeURIComponent(patient)}`;
+    
+    const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -67,24 +62,19 @@ export async function getPendingInpatientMedicationOrders(patient: string): Prom
       credentials: 'include',
     });
 
-    console.log('📡 Medication orders response status:', response.status);
-
     const data = await response.json();
-    console.log('📡 Medication orders response data:', data);
 
     if (!response.ok) {
-      console.error('❌ Medication orders error:', data.message || 'Failed to fetch medication orders');
       throw new Error(data.message || 'Failed to fetch medication orders');
     }
 
     if (data?.message) {
-      console.log('✅ Medication orders found:', data.message);
       return data.message;
     }
 
     return [];
   } catch (error) {
-    console.error(`❌ Error fetching medication orders:`, error);
+    console.error(`Error fetching medication orders:`, error);
     return [];
   }
 }

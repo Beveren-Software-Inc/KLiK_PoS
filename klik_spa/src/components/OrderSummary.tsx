@@ -9,6 +9,8 @@ import {
   UserPlus,
   User,
   Building,
+  Pill,
+  FileText,
 } from "lucide-react";
 import type { CartItem, GiftCoupon } from "../../types";
 import type { Customer } from "../types/customer";
@@ -193,7 +195,6 @@ const UOMSelectField = ({ item, onUOMChange, isMobile, selectedCustomer }: UOMSe
             //eslint-disable-next-line @typescript-eslint/no-explicit-any
             const selectedUOMData = data.message.uoms.find((uom: any) => uom.uom === newUOM);
             if (selectedUOMData && selectedUOMData.price !== undefined) {
-              console.log(`✅ Found UOM data for ${newUOM}:`, selectedUOMData);
               onUOMChange(item.id, newUOM, selectedUOMData.price);
             } else {
               console.warn(`⚠️ UOM data not found for ${newUOM}. Available UOMs:`, data.message.uoms.map((u: any) => u.uom));
@@ -209,7 +210,6 @@ const UOMSelectField = ({ item, onUOMChange, isMobile, selectedCustomer }: UOMSe
                 if (priceResponse.ok) {
                   const priceData = await priceResponse.json();
                   if (priceData?.message?.success && priceData.message.price > 0) {
-                    console.log(`✅ Got price from fallback API for ${newUOM}:`, priceData.message.price);
                     onUOMChange(item.id, newUOM, priceData.message.price);
                   } else {
                     console.error(`❌ Fallback API returned invalid price for ${newUOM}`);
@@ -504,7 +504,7 @@ export default function OrderSummary({
   isMobile = false,
 }: OrderSummaryProps) {
   // const [showCouponPopover, setShowCouponPopover] = useState(false);
-  const { selectedCustomer, setSelectedCustomer, updateUOM, updatePricesForCustomer } = useCartStore();
+  const { selectedCustomer, setSelectedCustomer, updateUOM, updatePricesForCustomer, addToCartWithQuantity } = useCartStore();
 
   // Track if user has manually removed the default customer
   const [userRemovedDefaultCustomer, setUserRemovedDefaultCustomer] = useState(false);
@@ -544,7 +544,7 @@ export default function OrderSummary({
   // const couponButtonRef = useRef<HTMLButtonElement>(null);
   const { customers, isLoading, refetch: refetchCustomers } = useCustomers(customerSearchQuery);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { refetch: _refetchProducts, refreshStockOnly, updateStockForItems: _updateStockForItems, updateBatchQuantitiesForItems } = useProducts();
+  const { products, refetch: _refetchProducts, refreshStockOnly, updateStockForItems: _updateStockForItems, updateBatchQuantitiesForItems } = useProducts();
   // const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { posDetails, loading: _posLoading } = usePOSDetails();
@@ -580,10 +580,8 @@ export default function OrderSummary({
   // Load prescription dosages when pharmacy is enabled OR when items are added to cart
   useEffect(() => {
     if (isPharmacy && !dosagesLoaded) {
-      console.log('🔄 Loading prescription dosages...');
       getPrescriptionDosages()
         .then((dosages) => {
-          console.log('✅ Prescription dosages loaded:', dosages);
           setPrescriptionDosages(dosages);
           setDosagesLoaded(true);
         })
@@ -596,10 +594,8 @@ export default function OrderSummary({
   // Also load dosages when items are added to cart (if pharmacy mode is enabled)
   useEffect(() => {
     if (isPharmacy && cartItems.length > 0 && !dosagesLoaded) {
-      console.log('🛒 Items in cart, loading prescription dosages...');
       getPrescriptionDosages()
         .then((dosages) => {
-          console.log('✅ Prescription dosages loaded (from cart):', dosages);
           setPrescriptionDosages(dosages);
           setDosagesLoaded(true);
         })
@@ -842,10 +838,23 @@ export default function OrderSummary({
   };
   
   const handlePatientSelect = async (patient: Patient) => {
+    if (!patient || !patient.name) {
+      return;
+    }
     setSelectedPatient(patient);
     const patientName = patient.patient_name || patient.name;
     setCustomerSearchQuery(patientName);
+    // Force close dropdown immediately after selection - use multiple methods to ensure it closes
     setShowCustomerDropdown(false);
+    // Use a ref to track if we should close
+    setTimeout(() => {
+      setShowCustomerDropdown(false);
+      // Also blur the input if it's focused
+      const input = document.activeElement as HTMLInputElement;
+      if (input && input.tagName === 'INPUT') {
+        input.blur();
+      }
+    }, 50);
     
     // Patient full name (patient_name) is the same as customer name, try to find matching customer
     const matchingCustomer = customers.find(
@@ -858,23 +867,122 @@ export default function OrderSummary({
       setSelectedCustomer(matchingCustomer);
     }
     
-    // Fetch pending medication orders for this patient
+    // Fetch pending medication orders for this patient and automatically add to cart
     try {
       const orders = await getPendingInpatientMedicationOrders(patient.name);
       setMedicationOrders(orders);
-      setSelectedOrders(new Set());
-      if (orders.length > 0) {
-        setShowMedicationOrdersModal(true);
-      } else {
+      
+      if (orders.length === 0) {
         toast.info("No pending medication orders found for this patient.");
+        return;
       }
+      
+      // Automatically add all medication orders to cart
+      // Collect all items from all orders
+      const itemsToAdd: Array<{ item_code: string; quantity: number; dosage?: string; drug_name?: string }> = [];
+      
+      orders.forEach(order => {
+        order.items.forEach(item => {
+          if (item.drug) {
+            itemsToAdd.push({
+              item_code: item.drug,
+              quantity: item.quantity || 1,
+              dosage: item.dosage || undefined,
+              drug_name: item.drug_name || undefined
+            });
+          }
+        });
+      });
+      
+      if (itemsToAdd.length === 0) {
+        toast.warning("No items found in medication orders.");
+        return;
+      }
+      
+      // Show loading toast
+      const loadingToast = toast.loading(`Adding ${itemsToAdd.length} item(s) from ${orders.length} order(s) to cart...`);
+      
+      try {
+        let addedCount = 0;
+        let notFoundCount = 0;
+        
+        // Process each item
+        for (const itemToAdd of itemsToAdd) {
+          // Find the product in the products list
+          const product = products.find(p => p.id === itemToAdd.item_code || p.item_code === itemToAdd.item_code);
+          
+          if (!product) {
+            console.warn(`Product not found for item_code: ${itemToAdd.item_code}`);
+            notFoundCount++;
+            continue;
+          }
+          
+          // Check if item is already in cart
+          const existingCartItem = cartItems.find(ci => ci.id === product.id || ci.item_code === product.id);
+          
+          if (existingCartItem) {
+            // Item already in cart, just update quantity and dosage
+            const newQuantity = existingCartItem.quantity + itemToAdd.quantity;
+            await onUpdateQuantity(product.id, newQuantity);
+            
+            // Update dosage if provided
+            if (itemToAdd.dosage) {
+              updateItemDiscount(product.id, "dosage", itemToAdd.dosage);
+            }
+            
+            addedCount++;
+          } else {
+            // Add new item to cart
+            await addToCartWithQuantity(
+              {
+                id: product.id,
+                name: product.name,
+                category: product.category || 'General',
+                price: product.price,
+                image: product.image || '',
+                available: product.available,
+                uom: product.uom,
+                item_code: product.id, // item.id is the item_code from the API
+              },
+              itemToAdd.quantity
+            );
+            
+            // Set dosage if provided
+            if (itemToAdd.dosage) {
+              // Use setTimeout to ensure item is added to cart first
+              setTimeout(() => {
+                updateItemDiscount(product.id, "dosage", itemToAdd.dosage!);
+              }, 100);
+            }
+            
+            addedCount++;
+          }
+        }
+        
+        // Show success/error message
+        toast.dismiss(loadingToast);
+        
+        if (addedCount > 0 && notFoundCount === 0) {
+          toast.success(`Successfully added ${addedCount} item(s) from ${orders.length} order(s) to cart.`);
+        } else if (addedCount > 0 && notFoundCount > 0) {
+          toast.warning(`Added ${addedCount} item(s) to cart. ${notFoundCount} item(s) not found.`);
+        } else {
+          toast.error(`Failed to add items. None of the items were found in the product list.`);
+        }
+        
+      } catch (error) {
+        console.error('Error adding items to cart:', error);
+        toast.dismiss(loadingToast);
+        toast.error('Failed to add items to cart. Please try again.');
+      }
+      
     } catch (error) {
-      console.error('Error fetching medication orders:', error);
+      console.error('❌ Error fetching medication orders:', error);
       toast.error("Failed to fetch medication orders.");
     }
   };
   
-  const handleAddOrdersToCart = () => {
+  const handleAddOrdersToCart = async () => {
     if (selectedOrders.size === 0) {
       toast.warning("Please select at least one medication order.");
       return;
@@ -884,7 +992,7 @@ export default function OrderSummary({
     const ordersToAdd = medicationOrders.filter(order => selectedOrders.has(order.name));
     
     // Collect all items from selected orders
-    const itemsToAdd: Array<{ item_code: string; quantity: number; dosage?: string }> = [];
+    const itemsToAdd: Array<{ item_code: string; quantity: number; dosage?: string; drug_name?: string }> = [];
     
     ordersToAdd.forEach(order => {
       order.items.forEach(item => {
@@ -892,23 +1000,100 @@ export default function OrderSummary({
           itemsToAdd.push({
             item_code: item.drug,
             quantity: item.quantity || 1,
-            dosage: item.dosage || undefined
+            dosage: item.dosage || undefined,
+            drug_name: item.drug_name || undefined
           });
         }
       });
     });
     
-    // Add items to cart (this will need to be implemented based on your cart structure)
-    // For now, we'll need to call the parent's onAddToCart or similar
-    // This is a placeholder - you'll need to integrate with your actual cart system
-    console.log('Items to add to cart:', itemsToAdd);
-    toast.success(`Adding ${itemsToAdd.length} items from ${ordersToAdd.length} order(s) to cart...`);
+    if (itemsToAdd.length === 0) {
+      toast.warning("No items found in selected orders.");
+      setShowMedicationOrdersModal(false);
+      setSelectedOrders(new Set());
+      return;
+    }
     
-    // TODO: Implement actual cart addition logic
-    // You may need to fetch item details first, then add them
+    // Show loading toast
+    const loadingToast = toast.loading(`Adding ${itemsToAdd.length} item(s) to cart...`);
     
-    setShowMedicationOrdersModal(false);
-    setSelectedOrders(new Set());
+    try {
+      let addedCount = 0;
+      let notFoundCount = 0;
+      
+      // Process each item
+      for (const itemToAdd of itemsToAdd) {
+        // Find the product in the products list
+        const product = products.find(p => p.id === itemToAdd.item_code || p.item_code === itemToAdd.item_code);
+        
+        if (!product) {
+          console.warn(`Product not found for item_code: ${itemToAdd.item_code}`);
+          notFoundCount++;
+          continue;
+        }
+        
+        // Check if item is already in cart
+        const existingCartItem = cartItems.find(ci => ci.id === product.id || ci.item_code === product.id);
+        
+        if (existingCartItem) {
+          // Item already in cart, just update quantity and dosage
+          const newQuantity = existingCartItem.quantity + itemToAdd.quantity;
+          await onUpdateQuantity(product.id, newQuantity);
+          
+          // Update dosage if provided
+          if (itemToAdd.dosage) {
+            updateItemDiscount(product.id, "dosage", itemToAdd.dosage);
+          }
+          
+          addedCount++;
+        } else {
+          // Add new item to cart
+          await addToCartWithQuantity(
+            {
+              id: product.id,
+              name: product.name,
+              category: product.category || 'General',
+              price: product.price,
+              image: product.image || '',
+              available: product.available,
+              uom: product.uom,
+              item_code: product.id, // item.id is the item_code from the API
+            },
+            itemToAdd.quantity
+          );
+          
+          // Set dosage if provided
+          if (itemToAdd.dosage) {
+            // Use setTimeout to ensure item is added to cart first
+            setTimeout(() => {
+              updateItemDiscount(product.id, "dosage", itemToAdd.dosage!);
+            }, 100);
+          }
+          
+          addedCount++;
+        }
+      }
+      
+      // Show success/error message
+      toast.dismiss(loadingToast);
+      
+      if (addedCount > 0 && notFoundCount === 0) {
+        toast.success(`Successfully added ${addedCount} item(s) to cart.`);
+      } else if (addedCount > 0 && notFoundCount > 0) {
+        toast.warning(`Added ${addedCount} item(s) to cart. ${notFoundCount} item(s) not found.`);
+      } else {
+        toast.error(`Failed to add items. None of the items were found in the product list.`);
+      }
+      
+      // Close modal and reset selection
+      setShowMedicationOrdersModal(false);
+      setSelectedOrders(new Set());
+      
+    } catch (error) {
+      console.error('Error adding items to cart:', error);
+      toast.dismiss(loadingToast);
+      toast.error('Failed to add items to cart. Please try again.');
+    }
   };
 
   const handleSaveCustomer = async (newCustomer: Partial<Customer> & { customer_name?: string }) => {
@@ -1374,10 +1559,24 @@ export default function OrderSummary({
                   value={customerSearchQuery}
                   onChange={(e) => {
                     setCustomerSearchQuery(e.target.value);
-                    setShowCustomerDropdown(e.target.value.length > 0);
+                    // Always show dropdown when typing
+                    setShowCustomerDropdown(true);
                   }}
                   onKeyDown={handleCustomerSearchKeyDown} // Add this line
-                  onFocus={() => setShowCustomerDropdown(true)}
+                  onFocus={() => {
+                    setShowCustomerDropdown(true);
+                  }}
+                  onBlur={(e) => {
+                    // Don't close dropdown immediately on blur - allow time for click
+                    // Check if the blur is due to clicking on dropdown
+                    setTimeout(() => {
+                      const activeElement = document.activeElement;
+                      const dropdown = e.currentTarget.closest('.relative')?.querySelector('.absolute');
+                      if (!dropdown?.contains(activeElement)) {
+                        setShowCustomerDropdown(false);
+                      }
+                    }, 200);
+                  }}
                   className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
 
@@ -1387,14 +1586,22 @@ export default function OrderSummary({
                     {/* Customers */}
                     {filteredCustomers.slice(0, 8).map((customer) => {
                       // Check if this customer also exists as a patient (patient_name matches customer name)
-                      const isAlsoPatient = isPharmacy && patients.some(
+                      const matchingPatient = isPharmacy ? patients.find(
                         p => (p.patient_name || p.name).toLowerCase() === customer.name.toLowerCase()
-                      );
+                      ) : null;
+                      const isAlsoPatient = !!matchingPatient;
                       
                       return (
                         <button
                           key={customer.id}
-                          onClick={() => handleCustomerSelect(customer)}
+                          onClick={() => {
+                            // If customer is also a patient, show medication orders modal
+                            if (isAlsoPatient && matchingPatient) {
+                              handlePatientSelect(matchingPatient);
+                            } else {
+                              handleCustomerSelect(customer);
+                            }
+                          }}
                           className="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700"
                         >
                           <div className="flex items-center space-x-2">
@@ -1431,9 +1638,10 @@ export default function OrderSummary({
                           .filter(patient => {
                             // Filter out patients where patient_name matches an existing customer name
                             const patientName = (patient.patient_name || patient.name).toLowerCase();
-                            return !filteredCustomers.some(
+                            const matchesCustomer = filteredCustomers.some(
                               c => c.name.toLowerCase() === patientName
                             );
+                            return !matchesCustomer;
                           })
                           .slice(0, 8)
                           .map((patient) => (
@@ -1517,16 +1725,57 @@ export default function OrderSummary({
                       </div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      setSelectedCustomer(null);
-                      setCustomerSearchQuery("");
-                      setUserRemovedDefaultCustomer(true);
-                    }}
-                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                  >
-                    <X size={14} />
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    {/* Medication Orders Icon - Show if patient is selected OR if customer is also a patient */}
+                    {isPharmacy && (selectedPatient || (selectedCustomer && patients.find(
+                      p => (p.patient_name || p.name).toLowerCase() === selectedCustomer.name.toLowerCase()
+                    ))) && (
+                      <button
+                        onClick={async () => {
+                          // Get patient - either from selectedPatient or find from patients list
+                          const patientToUse = selectedPatient || (selectedCustomer ? patients.find(
+                            p => (p.patient_name || p.name).toLowerCase() === selectedCustomer.name.toLowerCase()
+                          ) : null);
+                          
+                          if (!patientToUse) {
+                            toast.error("Patient not found.");
+                            return;
+                          }
+                          // Fetch fresh medication orders and show modal
+                          try {
+                            const orders = await getPendingInpatientMedicationOrders(patientToUse.name);
+                            setMedicationOrders(orders);
+                            setSelectedOrders(new Set(orders.map(o => o.name))); // Select all orders by default
+                            if (orders.length > 0) {
+                              setShowMedicationOrdersModal(true);
+                            } else {
+                              toast.info("No pending medication orders found for this patient.");
+                            }
+                          } catch (error) {
+                            console.error('Error fetching medication orders:', error);
+                            toast.error("Failed to fetch medication orders.");
+                          }
+                        }}
+                        className="text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                        title="View medication orders"
+                      >
+                        <Pill size={16} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setSelectedCustomer(null);
+                        setSelectedPatient(null);
+                        setCustomerSearchQuery("");
+                        setUserRemovedDefaultCustomer(true);
+                        setMedicationOrders([]);
+                        setSelectedOrders(new Set());
+                      }}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -1634,19 +1883,61 @@ export default function OrderSummary({
                         <span className="text-gray-400 italic">No additional info</span>
                       )}
                     </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {/* Medication Orders Icon - Show if patient is selected OR if customer is also a patient */}
+                    {isPharmacy && (selectedPatient || (selectedCustomer && patients.find(
+                      p => (p.patient_name || p.name).toLowerCase() === selectedCustomer.name.toLowerCase()
+                    ))) && (
+                      <button
+                        onClick={async () => {
+                          // Get patient - either from selectedPatient or find from patients list
+                          const patientToUse = selectedPatient || (selectedCustomer ? patients.find(
+                            p => (p.patient_name || p.name).toLowerCase() === selectedCustomer.name.toLowerCase()
+                          ) : null);
+                          
+                          if (!patientToUse) {
+                            toast.error("Patient not found.");
+                            return;
+                          }
+                          // Fetch fresh medication orders and show modal
+                          try {
+                            const orders = await getPendingInpatientMedicationOrders(patientToUse.name);
+                            setMedicationOrders(orders);
+                            setSelectedOrders(new Set(orders.map(o => o.name))); // Select all orders by default
+                            if (orders.length > 0) {
+                              setShowMedicationOrdersModal(true);
+                            } else {
+                              toast.info("No pending medication orders found for this patient.");
+                            }
+                          } catch (error) {
+                            console.error('Error fetching medication orders:', error);
+                            toast.error("Failed to fetch medication orders.");
+                          }
+                        }}
+                        className="text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors p-1"
+                        title="View medication orders"
+                      >
+                        <Pill size={18} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setSelectedCustomer(null);
+                        setSelectedPatient(null);
+                        setCustomerSearchQuery("");
+                        setUserRemovedDefaultCustomer(true);
+                        setMedicationOrders([]);
+                        setSelectedOrders(new Set());
+                        setShowCustomerDropdown(false);
+                      }}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <X size={14} />
+                    </button>
                   </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setSelectedCustomer(null);
-                    setCustomerSearchQuery("");
-                    setUserRemovedDefaultCustomer(true);
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X size={14} />
-                </button>
-              </div>
             </div>
           )}
         </div>

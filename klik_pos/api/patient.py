@@ -69,22 +69,36 @@ def get_pending_inpatient_medication_orders(patient: str):
 		if not frappe.db.exists("DocType", "Inpatient Medication Order"):
 			frappe.throw("Inpatient Medication Order doctype not found. Please ensure the healthcare app is installed.")
 		
+		# Get the doctype meta to check which fields exist
+		order_meta = frappe.get_meta("Inpatient Medication Order")
+		available_fields = [f.fieldname for f in order_meta.fields]
+		
+		# Build fields list based on what's available
+		fields_to_fetch = ["name", "patient", "patient_name", "status"]
+		order_by_field = None
+		
+		# Check if posting_date exists
+		if "posting_date" in available_fields:
+			fields_to_fetch.append("posting_date")
+			order_by_field = "posting_date desc"
+		elif "creation" in available_fields:
+			# Fallback to creation date if posting_date doesn't exist
+			fields_to_fetch.append("creation")
+			order_by_field = "creation desc"
+		
 		# Fetch pending orders for the patient
 		orders = frappe.get_all(
 			"Inpatient Medication Order",
-			fields=["name", "patient", "patient_name", "status", "posting_date"],
+			fields=fields_to_fetch,
 			filters={
 				"patient": patient,
 				"status": ["in", ["Pending", "Active"]]
 			},
-			order_by="posting_date desc"
+			order_by=order_by_field if order_by_field else "name desc"
 		)
-		
-		print(f"🔍 Found {len(orders)} pending medication orders for patient {patient}")
 		
 		# For each order, get the child table items
 		for order in orders:
-			print(f"🔍 Processing order: {order.name}")
 			order_doc = frappe.get_doc("Inpatient Medication Order", order.name)
 			order["items"] = []
 			
@@ -101,14 +115,10 @@ def get_pending_inpatient_medication_orders(patient: str):
 			if not child_table_fields:
 				child_table_fields = ["drug_prescription", "medication_orders", "items", "drugs", "drug_prescription_detail"]
 			
-			print(f"🔍 Checking child table fields: {child_table_fields}")
-			
 			for fieldname in child_table_fields:
 				if hasattr(order_doc, fieldname):
 					child_table = getattr(order_doc, fieldname)
 					if child_table and len(child_table) > 0:
-						print(f"✅ Found child table '{fieldname}' with {len(child_table)} items")
-						
 						for item in child_table:
 							# Get all available attributes
 							item_dict = {}
@@ -146,20 +156,9 @@ def get_pending_inpatient_medication_orders(patient: str):
 							# Only add if we have a drug/item_code
 							if item_dict.get("drug"):
 								order["items"].append(item_dict)
-								print(f"  ✅ Added item: {item_dict.get('drug_name') or item_dict.get('drug')}")
 						
 						if order["items"]:
-							print(f"✅ Order {order.name} now has {len(order['items'])} items")
 							break  # Found items, no need to check other fields
-					else:
-						print(f"⚠️ Field '{fieldname}' exists but is empty")
-				else:
-					print(f"⚠️ Field '{fieldname}' does not exist on order")
-			
-			if not order["items"]:
-				print(f"⚠️ Warning: Order {order.name} has no items found in any child table")
-		
-		print(f"✅ Returning {len(orders)} orders with items")
 		return orders
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Error fetching Inpatient Medication Orders")
