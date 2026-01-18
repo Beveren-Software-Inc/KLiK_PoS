@@ -104,6 +104,63 @@ const QuantityInput = ({ item, onUpdateQuantity, isMobile }: QuantityInputProps)
   );
 };
 
+// Component to handle dosage input with local state (allows empty + decimals)
+interface DosageInputProps {
+  itemId: string;
+  value: number | null | undefined;
+  onChange: (itemId: string, value: number | null) => void;
+  isMobile?: boolean;
+}
+
+const DosageInput = ({ itemId, value, onChange, isMobile }: DosageInputProps) => {
+  const initial = value === null || value === undefined ? "" : String(value);
+  const [inputValue, setInputValue] = useState<string>(initial);
+  const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setInputValue(value === null || value === undefined ? "" : String(value));
+    }
+  }, [value, isEditing]);
+
+  const handleBlur = () => {
+    setIsEditing(false);
+    const trimmed = inputValue.trim();
+    if (trimmed === "") {
+      onChange(itemId, null);
+      setInputValue("");
+      return;
+    }
+
+    const numValue = Number(trimmed);
+    if (Number.isNaN(numValue) || numValue < 0) {
+      // Invalid input - reset to last known good value
+      setInputValue(value === null || value === undefined ? "" : String(value));
+      return;
+    }
+
+    // Normalize to remove leading zeros etc.
+    onChange(itemId, numValue);
+    setInputValue(String(numValue));
+  };
+
+  return (
+    <input
+      type="number"
+      step="0.01"
+      min="0"
+      value={inputValue}
+      onChange={(e) => setInputValue(e.target.value)}
+      onFocus={() => setIsEditing(true)}
+      onBlur={handleBlur}
+      placeholder="e.g. 9.8"
+      className={`w-full ${
+        isMobile ? "text-sm" : "text-sm"
+      } px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+    />
+  );
+};
+
 // Simple UOM Select Field Component
 interface UOMSelectFieldProps {
   item: CartItem;
@@ -661,7 +718,7 @@ export default function OrderSummary({
         serialNumber: string;
         availableQuantity: number;
         prescriptionDosage?: string; // From Prescription Dosage doctype (dropdown)
-        dosage?: number; // Actual dosage amount/quantity (float input)
+        dosage?: number | null; // Actual dosage amount/quantity (float input)
       }
     >
   >({});
@@ -794,7 +851,7 @@ export default function OrderSummary({
   const updateItemDiscount = (
     itemId: string,
     field: string,
-    value: number | string
+    value: number | string | null
   ) => {
     setItemDiscounts((prev) => ({
       ...prev,
@@ -806,7 +863,12 @@ export default function OrderSummary({
           serialNumber: "",
           availableQuantity: 150,
         }),
-        [field]: typeof value === "string" ? value : Math.max(0, value),
+        [field]:
+          value === null
+            ? null
+            : typeof value === "string"
+              ? value
+              : Math.max(0, value),
       },
     }));
   };
@@ -2287,9 +2349,20 @@ export default function OrderSummary({
                           </div>
                         </div>
 
-                        {/* Row 4: Prescription Dosage | Dosage (Pharmacy only) */}
+                        {/* Row 4: Dosage | Prescription Frequency (Pharmacy only) */}
                         {isPharmacy && (
                           <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
+                                Dosage
+                              </label>
+                              <DosageInput
+                                itemId={item.id}
+                                value={itemDiscount.dosage}
+                                onChange={(id, v) => updateItemDiscount(id, "dosage", v)}
+                                isMobile={isMobile}
+                              />
+                            </div>
                             <div>
                               <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
                                 Prescription Frequency
@@ -2300,26 +2373,6 @@ export default function OrderSummary({
                                 value={itemDiscount.prescriptionDosage || ""}
                                 onChange={(dosageName) => updateItemDiscount(item.id, "prescriptionDosage", dosageName)}
                                 isMobile={isMobile}
-                              />
-                            </div>
-                            <div>
-                              <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
-                                Dosage
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={itemDiscount.dosage ?? ""}
-                                onChange={(e) =>
-                                  updateItemDiscount(
-                                    item.id,
-                                    "dosage",
-                                    parseFloat(e.target.value) || 0
-                                  )
-                                }
-                                placeholder="0.00"
-                                className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
                               />
                             </div>
                           </div>
