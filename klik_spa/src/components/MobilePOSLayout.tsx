@@ -12,6 +12,7 @@ import CategoryTabs from "./CategoryTabs"
 import ProductGrid from "./ProductGrid"
 import BottomNavigation from "./BottomNavigation"
 import type { MenuItem, CartItem } from "../../types"
+import { getItemPriceForCustomer } from "../services/dynamicPricing"
 
 interface MobilePOSLayoutProps {
   items: MenuItem[]
@@ -47,7 +48,7 @@ export default function MobilePOSLayout({
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const { posDetails, loading: posLoading } = usePOSDetails()
-  const { cartItems, addToCart } = useCartStore()
+  const { cartItems, addToCart, selectedCustomer } = useCartStore()
   const navigate = useNavigate()
   const [showUserMenu, setShowUserMenu] = useState(false)
 
@@ -107,6 +108,40 @@ export default function MobilePOSLayout({
 
   const totalItems = cartItems.reduce((sum: number, item: CartItem) => sum + item.quantity, 0)
   const totalAmount = cartItems.reduce((sum: number, item: CartItem) => sum + item.price * item.quantity, 0)
+
+  const isPharmacy = posDetails?.custom_is_pharmacy === 1 ||
+    posDetails?.custom_is_pharmacy === true ||
+    posDetails?.custom_is_pharmacy === "1"
+
+  const pharmacyDefaultUom =
+    typeof posDetails?.custom_pharmacy_default_uom === "string"
+      ? posDetails.custom_pharmacy_default_uom.trim()
+      : ""
+
+  const handleAddToCart = async (item: MenuItem) => {
+    if (!item || item.available <= 0) return
+
+    const uomToUse = (isPharmacy && pharmacyDefaultUom) ? pharmacyDefaultUom : item.uom
+    let priceToUse = item.price
+
+    if (isPharmacy && pharmacyDefaultUom && !selectedCustomer && pharmacyDefaultUom !== item.uom) {
+      const priceInfo = await getItemPriceForCustomer(item.id, undefined, pharmacyDefaultUom)
+      if (priceInfo?.success && priceInfo.price > 0) {
+        priceToUse = priceInfo.price
+      }
+    }
+
+    await addToCart({
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      price: priceToUse,
+      image: item.image || '',
+      available: item.available,
+      uom: uomToUse,
+      item_code: item.id,
+    })
+  }
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
@@ -299,7 +334,7 @@ export default function MobilePOSLayout({
         ) : (
           <ProductGrid
             items={items}
-            onAddToCart={addToCart}
+            onAddToCart={handleAddToCart}
             isMobile={true}
             scannerOnly={scannerOnly}
             viewMode={viewMode}

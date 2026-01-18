@@ -30,6 +30,7 @@ import { useCustomerPermission } from "../hooks/useCustomerPermission";
 import { useCartStore } from "../stores/cartStore";
 import { getPrescriptionDosages, type PrescriptionDosage } from "../services/prescriptionDosageService";
 import { searchPatients, getPendingInpatientMedicationOrders, type Patient, type InpatientMedicationOrder } from "../services/patientService";
+import { getItemPriceForCustomer } from "../services/dynamicPricing";
 
 
 interface OrderSummaryProps {
@@ -459,7 +460,7 @@ const DosageSelectField = ({ itemId: _itemId, options, value, onChange, isMobile
         <svg className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
       </button>
       {isOpen && (
-        <div className="absolute z-50 w-[280px] mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-44 overflow-hidden">
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-44 overflow-hidden">
           <div className="p-1 border-b border-gray-200 dark:border-gray-600">
             <input
               type="text"
@@ -554,6 +555,11 @@ export default function OrderSummary({
   const isPharmacy = posDetails?.custom_is_pharmacy === 1 ||
                      posDetails?.custom_is_pharmacy === true ||
                      posDetails?.custom_is_pharmacy === "1";
+
+  const pharmacyDefaultUom =
+    typeof posDetails?.custom_pharmacy_default_uom === "string"
+      ? posDetails.custom_pharmacy_default_uom.trim()
+      : "";
   
   // Search for patients when pharmacy mode is enabled and search query changes
   useEffect(() => {
@@ -654,7 +660,8 @@ export default function OrderSummary({
         batchNumber: string;
         serialNumber: string;
         availableQuantity: number;
-        dosage?: string; // Prescription Dosage for pharmacy items
+        prescriptionDosage?: string; // From Prescription Dosage doctype (dropdown)
+        dosage?: number; // Actual dosage amount/quantity (float input)
       }
     >
   >({});
@@ -925,33 +932,45 @@ export default function OrderSummary({
             const newQuantity = existingCartItem.quantity + itemToAdd.quantity;
             await onUpdateQuantity(product.id, newQuantity);
             
-            // Update dosage if provided
+            // Update prescription dosage if provided
             if (itemToAdd.dosage) {
-              updateItemDiscount(product.id, "dosage", itemToAdd.dosage);
+              updateItemDiscount(product.id, "prescriptionDosage", itemToAdd.dosage);
             }
             
             addedCount++;
           } else {
             // Add new item to cart
+            const uomToUse = (isPharmacy && pharmacyDefaultUom) ? pharmacyDefaultUom : product.uom;
+            let priceToUse = product.price;
+
+            // If we override UOM in pharmacy mode and there is no selected customer yet,
+            // fetch the base price for the chosen UOM so the cart doesn't show the wrong rate.
+            if (isPharmacy && pharmacyDefaultUom && pharmacyDefaultUom !== product.uom && !selectedCustomer) {
+              const priceInfo = await getItemPriceForCustomer(product.id, undefined, pharmacyDefaultUom);
+              if (priceInfo?.success && priceInfo.price > 0) {
+                priceToUse = priceInfo.price;
+              }
+            }
+
             await addToCartWithQuantity(
               {
                 id: product.id,
                 name: product.name,
                 category: product.category || 'General',
-                price: product.price,
+                price: priceToUse,
                 image: product.image || '',
                 available: product.available,
-                uom: product.uom,
+                uom: uomToUse,
                 item_code: product.id, // item.id is the item_code from the API
               },
               itemToAdd.quantity
             );
             
-            // Set dosage if provided
+            // Set prescription dosage if provided
             if (itemToAdd.dosage) {
               // Use setTimeout to ensure item is added to cart first
               setTimeout(() => {
-                updateItemDiscount(product.id, "dosage", itemToAdd.dosage!);
+                updateItemDiscount(product.id, "prescriptionDosage", itemToAdd.dosage!);
               }, 100);
             }
             
@@ -1040,33 +1059,43 @@ export default function OrderSummary({
           const newQuantity = existingCartItem.quantity + itemToAdd.quantity;
           await onUpdateQuantity(product.id, newQuantity);
           
-          // Update dosage if provided
+          // Update prescription dosage if provided
           if (itemToAdd.dosage) {
-            updateItemDiscount(product.id, "dosage", itemToAdd.dosage);
+            updateItemDiscount(product.id, "prescriptionDosage", itemToAdd.dosage);
           }
           
           addedCount++;
         } else {
           // Add new item to cart
+          const uomToUse = (isPharmacy && pharmacyDefaultUom) ? pharmacyDefaultUom : product.uom;
+          let priceToUse = product.price;
+
+          if (isPharmacy && pharmacyDefaultUom && pharmacyDefaultUom !== product.uom && !selectedCustomer) {
+            const priceInfo = await getItemPriceForCustomer(product.id, undefined, pharmacyDefaultUom);
+            if (priceInfo?.success && priceInfo.price > 0) {
+              priceToUse = priceInfo.price;
+            }
+          }
+
           await addToCartWithQuantity(
             {
               id: product.id,
               name: product.name,
               category: product.category || 'General',
-              price: product.price,
+              price: priceToUse,
               image: product.image || '',
               available: product.available,
-              uom: product.uom,
+              uom: uomToUse,
               item_code: product.id, // item.id is the item_code from the API
             },
             itemToAdd.quantity
           );
           
-          // Set dosage if provided
+          // Set prescription dosage if provided
           if (itemToAdd.dosage) {
             // Use setTimeout to ensure item is added to cart first
             setTimeout(() => {
-              updateItemDiscount(product.id, "dosage", itemToAdd.dosage!);
+              updateItemDiscount(product.id, "prescriptionDosage", itemToAdd.dosage!);
             }, 100);
           }
           
@@ -1973,7 +2002,8 @@ export default function OrderSummary({
                 batchNumber: "",
                 serialNumber: "",
                 availableQuantity: 150,
-                dosage: "",
+                prescriptionDosage: "",
+                dosage: 0,
               };
 
               return (
@@ -2257,19 +2287,41 @@ export default function OrderSummary({
                           </div>
                         </div>
 
-                        {/* Row 4: Dosage (Pharmacy only) */}
+                        {/* Row 4: Prescription Dosage | Dosage (Pharmacy only) */}
                         {isPharmacy && (
-                          <div className="mb-4">
-                            <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
-                              Dosage
-                            </label>
-                            <DosageSelectField
-                              itemId={item.id}
-                              options={prescriptionDosages}
-                              value={itemDiscount.dosage || ""}
-                              onChange={(dosage) => updateItemDiscount(item.id, "dosage", dosage)}
-                              isMobile={isMobile}
-                            />
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
+                                Prescription Frequency
+                              </label>
+                              <DosageSelectField
+                                itemId={item.id}
+                                options={prescriptionDosages}
+                                value={itemDiscount.prescriptionDosage || ""}
+                                onChange={(dosageName) => updateItemDiscount(item.id, "prescriptionDosage", dosageName)}
+                                isMobile={isMobile}
+                              />
+                            </div>
+                            <div>
+                              <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
+                                Dosage
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={itemDiscount.dosage ?? ""}
+                                onChange={(e) =>
+                                  updateItemDiscount(
+                                    item.id,
+                                    "dosage",
+                                    parseFloat(e.target.value) || 0
+                                  )
+                                }
+                                placeholder="0.00"
+                                className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+                              />
+                            </div>
                           </div>
                         )}
                       </div>

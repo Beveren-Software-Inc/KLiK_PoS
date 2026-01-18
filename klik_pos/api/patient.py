@@ -65,12 +65,12 @@ def get_pending_inpatient_medication_orders(patient: str):
 	Returns orders with their child table items (drug and dosage).
 	"""
 	try:
-		# Check if Inpatient Medication Order doctype exists
-		if not frappe.db.exists("DocType", "Inpatient Medication Order"):
-			frappe.throw("Inpatient Medication Order doctype not found. Please ensure the healthcare app is installed.")
+		# Check if Patient Medication Order doctype exists
+		if not frappe.db.exists("DocType", "Patient Medication Order"):
+			frappe.throw("Patient Medication Order doctype not found. Please ensure the healthcare app is installed.")
 		
 		# Get the doctype meta to check which fields exist
-		order_meta = frappe.get_meta("Inpatient Medication Order")
+		order_meta = frappe.get_meta("Patient Medication Order")
 		available_fields = [f.fieldname for f in order_meta.fields]
 		
 		# Build fields list based on what's available
@@ -88,7 +88,7 @@ def get_pending_inpatient_medication_orders(patient: str):
 		
 		# Fetch pending orders for the patient
 		orders = frappe.get_all(
-			"Inpatient Medication Order",
+			"Patient Medication Order",
 			fields=fields_to_fetch,
 			filters={
 				"patient": patient,
@@ -99,11 +99,11 @@ def get_pending_inpatient_medication_orders(patient: str):
 		
 		# For each order, get the child table items
 		for order in orders:
-			order_doc = frappe.get_doc("Inpatient Medication Order", order.name)
+			order_doc = frappe.get_doc("Patient Medication Order", order.name)
 			order["items"] = []
 			
 			# Get the doctype meta to find child tables
-			order_meta = frappe.get_meta("Inpatient Medication Order")
+			order_meta = frappe.get_meta("Patient Medication Order")
 			child_table_fields = []
 			
 			# Find all child table fields
@@ -161,5 +161,5 @@ def get_pending_inpatient_medication_orders(patient: str):
 							break  # Found items, no need to check other fields
 		return orders
 	except Exception as e:
-		frappe.log_error(frappe.get_traceback(), "Error fetching Inpatient Medication Orders")
-		frappe.throw(f"Failed to fetch Inpatient Medication Orders: {str(e)}")
+		frappe.log_error(frappe.get_traceback(), "Error fetching Patient Medication Orders")
+		frappe.throw(f"Failed to fetch Patient Medication Orders: {str(e)}")

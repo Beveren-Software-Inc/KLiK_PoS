@@ -164,6 +164,7 @@ def get_pos_details():
 		"custom_hide_expected_amount": pos.custom_hide_expected_amount,
 		"hide_unavailable_items": pos.hide_unavailable_items,
 		"custom_default_view": getattr(pos, "custom_default_view", "Grid View"),
+		"custom_pharmacy_default_uom": getattr(pos, "custom_pharmacy_default_uom", None),
 		"custom_whatsap_template": getattr(pos, "custom_whatsap_template", None),
 		"custom_email_template": getattr(pos, "custom_email_template", None),
 		"custom_enable_whatsapp": getattr(pos, "custom_enable_whatsapp", 0),

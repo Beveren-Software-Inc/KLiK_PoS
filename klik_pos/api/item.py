@@ -628,6 +628,9 @@ def get_items_with_balance_and_price(
 	try:
 		# Build the base query - include pharmacy custom fields if they exist
 		select_fields = "i.name, i.item_name, i.description, i.item_group, i.image, i.stock_uom, i.custom_strength, i.custom_pharmaceutical_form, i.custom_number_of_pack, i.custom_pack_size, i.custom_route_of_administration"
+		# Optional pharmacy field (may not exist on all installs)
+		if frappe.db.has_column("Item", "custom_active_substances"):
+			select_fields += ", i.custom_active_substances"
 
 		if hide_unavailable:
 			base_query = [
@@ -849,6 +852,8 @@ def get_items_with_balance_and_price(
 				enriched_item["custom_pack_size"] = item.get("custom_pack_size")
 			if item.get("custom_route_of_administration"):
 				enriched_item["custom_route_of_administration"] = item.get("custom_route_of_administration")
+			if item.get("custom_active_substances"):
+				enriched_item["custom_active_substances"] = item.get("custom_active_substances")
 			
 			enriched_items.append(enriched_item)
 

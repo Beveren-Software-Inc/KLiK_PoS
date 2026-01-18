@@ -14,6 +14,7 @@ import type { MenuItem, GiftCoupon } from "../../types"
 import { useMediaQuery } from "../hooks/useMediaQuery"
 import { useCartStore } from "../stores/cartStore"
 import { toast } from "react-toastify"
+import { getItemPriceForCustomer } from "../services/dynamicPricing"
 
 export default function RetailPOSLayout() {
   const [selectedCategory, setSelectedCategory] = useState("all")
@@ -27,7 +28,7 @@ export default function RetailPOSLayout() {
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null)
 
   // Use cart store instead of local state
-  const { cartItems, addToCart, updateQuantity, removeItem, clearCart } = useCartStore()
+  const { cartItems, addToCart, updateQuantity, removeItem, clearCart, selectedCustomer } = useCartStore()
 
   // Use professional data management with pagination
   const {
@@ -50,6 +51,20 @@ export default function RetailPOSLayout() {
   const hideUnavailableItems = posDetails?.hide_unavailable_items || false
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const scalePrefix = (posDetails as any)?.custom_scale_barcodes_start_with || ""
+
+  const isPharmacy = posDetails?.custom_is_pharmacy === 1 ||
+    posDetails?.custom_is_pharmacy === true ||
+    posDetails?.custom_is_pharmacy === "1"
+
+  const pharmacyDefaultUom =
+    typeof posDetails?.custom_pharmacy_default_uom === "string"
+      ? posDetails.custom_pharmacy_default_uom.trim()
+      : ""
+
+  const resolveUomForCart = (item: MenuItem) => {
+    if (isPharmacy && pharmacyDefaultUom) return pharmacyDefaultUom
+    return item.uom
+  }
 
   // Use media query to detect mobile/tablet screens
   const isMobile = useMediaQuery("(max-width: 1024px)")
@@ -121,20 +136,32 @@ export default function RetailPOSLayout() {
     if (existingItem) {
       updateQuantity(item.id, existingItem.quantity + quantity)
     } else {
+      const uomToUse = resolveUomForCart(item)
+      let priceToUse = item.price
+
+      // If we override the UOM in pharmacy mode and no customer is selected,
+      // fetch the base price for that UOM so the cart starts with the correct rate.
+      if (isPharmacy && pharmacyDefaultUom && !selectedCustomer && pharmacyDefaultUom !== item.uom) {
+        const priceInfo = await getItemPriceForCustomer(item.id, undefined, pharmacyDefaultUom)
+        if (priceInfo?.success && priceInfo.price > 0) {
+          priceToUse = priceInfo.price
+        }
+      }
+
       // Add to cart first (async), then set exact quantity to avoid initial qty=1
       await addToCart({
         id: item.id,
         name: item.name,
         category: item.category,
-        price: item.price,
+        price: priceToUse,
         image: item.image,
         available: item.available,
-        uom: item.uom,
+        uom: uomToUse,
         item_code: item.id,
       })
       updateQuantity(item.id, quantity)
     }
-  }, [cartItems, updateQuantity, addToCart])
+  }, [cartItems, updateQuantity, addToCart, isPharmacy, pharmacyDefaultUom, selectedCustomer])
 
   // Separate function for adding items to cart (used by both click and barcode)
   const addItemToCart = (item: MenuItem) => {
@@ -142,16 +169,46 @@ export default function RetailPOSLayout() {
     if (existingItem) {
       updateQuantity(item.id, existingItem.quantity + 1)
     } else {
-      addToCart({
-        id: item.id,
-        name: item.name,
-        category: item.category,
-        price: item.price,
-        image: item.image,
-        available: item.available,
-        uom: item.uom,
-        item_code: item.id, // item.id is the item_code from the API
-      })
+      const uomToUse = resolveUomForCart(item)
+      const shouldFetchPrice = isPharmacy && pharmacyDefaultUom && !selectedCustomer && pharmacyDefaultUom !== item.uom
+
+      if (shouldFetchPrice) {
+        getItemPriceForCustomer(item.id, undefined, pharmacyDefaultUom).then((priceInfo) => {
+          const priceToUse = (priceInfo?.success && priceInfo.price > 0) ? priceInfo.price : item.price
+          addToCart({
+            id: item.id,
+            name: item.name,
+            category: item.category,
+            price: priceToUse,
+            image: item.image,
+            available: item.available,
+            uom: uomToUse,
+            item_code: item.id, // item.id is the item_code from the API
+          })
+        }).catch(() => {
+          addToCart({
+            id: item.id,
+            name: item.name,
+            category: item.category,
+            price: item.price,
+            image: item.image,
+            available: item.available,
+            uom: uomToUse,
+            item_code: item.id, // item.id is the item_code from the API
+          })
+        })
+      } else {
+        addToCart({
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          price: item.price,
+          image: item.image,
+          available: item.available,
+          uom: uomToUse,
+          item_code: item.id, // item.id is the item_code from the API
+        })
+      }
     }
 
     // Show success message for barcode scanning

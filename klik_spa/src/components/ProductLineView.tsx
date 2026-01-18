@@ -60,15 +60,25 @@ export default function ProductLineView({ items, onAddToCart, isMobile = false, 
           <div className={`${isMobile ? "col-span-2" : "col-span-2"} text-center`}>
             <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Rate</span>
           </div>
-          <div className={`${isMobile ? "col-span-2" : "col-span-2"} text-center`}>
+          <div className={`${isMobile ? "col-span-2" : isPharmacy ? "col-span-1" : "col-span-2"} text-center`}>
             <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Qty</span>
           </div>
-          {!isMobile && (
+          {!isMobile && !isPharmacy && (
             <div className="col-span-2 text-center">
               <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">UOM</span>
             </div>
           )}
-          <div className={`${isMobile ? "col-span-1" : "col-span-2"} text-center`}>
+          {!isMobile && isPharmacy && (
+            <>
+              <div className="col-span-2 text-center">
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Strength</span>
+              </div>
+              <div className="col-span-2 text-center">
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Active Organic</span>
+              </div>
+            </>
+          )}
+          <div className={`${isMobile ? "col-span-1" : isPharmacy ? "col-span-1" : "col-span-2"} text-center`}>
             <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Action</span>
           </div>
         </div>
@@ -161,7 +171,7 @@ export default function ProductLineView({ items, onAddToCart, isMobile = false, 
                 </div>
 
                 {/* Available Qty */}
-                <div className={`${isMobile ? "col-span-2" : "col-span-2"} flex items-center justify-center`}>
+                <div className={`${isMobile ? "col-span-2" : isPharmacy ? "col-span-1" : "col-span-2"} flex items-center justify-center`}>
                   <span className={`font-medium ${isMobile ? "text-xs" : "text-sm"} ${
                     isOutOfStock
                       ? "text-red-600 dark:text-red-400"
@@ -171,8 +181,8 @@ export default function ProductLineView({ items, onAddToCart, isMobile = false, 
                   </span>
                 </div>
 
-                {/* UOM - Desktop only */}
-                {!isMobile && (
+                {/* UOM - Desktop only (non-pharmacy) */}
+                {!isMobile && !isPharmacy && (
                   <div className="col-span-2 flex items-center justify-center">
                     <span className="text-sm text-gray-500 dark:text-gray-400">
                       {item.uom || "Nos"}
@@ -180,8 +190,24 @@ export default function ProductLineView({ items, onAddToCart, isMobile = false, 
                   </div>
                 )}
 
+                {/* Strength + Active Organic - Desktop only (pharmacy) */}
+                {!isMobile && isPharmacy && (
+                  <>
+                    <div className="col-span-2 flex items-center justify-center">
+                      <span className="text-xs text-gray-700 dark:text-gray-300 truncate">
+                        {(item as any).custom_strength || "-"}
+                      </span>
+                    </div>
+                    <div className="col-span-2 flex items-center justify-center">
+                      <span className="text-xs text-gray-700 dark:text-gray-300 truncate">
+                        {(item as any).custom_active_substances || "-"}
+                      </span>
+                    </div>
+                  </>
+                )}
+
                 {/* Action */}
-                <div className={`${isMobile ? "col-span-1" : "col-span-2"} flex items-center justify-center`}>
+                <div className={`${isMobile ? "col-span-1" : isPharmacy ? "col-span-1" : "col-span-2"} flex items-center justify-center`}>
                   {isDisabled ? (
                     <span className={`text-gray-400 dark:text-gray-500 ${isMobile ? "text-xs" : "text-xs"}`}>
                       {isOutOfStock ? "0" : "S"}

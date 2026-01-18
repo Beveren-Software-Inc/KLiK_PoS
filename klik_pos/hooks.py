@@ -59,6 +59,7 @@ fixtures = [
 					"Sales Invoice-custom_column_break_hnemi",
 					"Sales Invoice-custom_delivery_personnel",
 					"Sales Invoice-custom_delivery_personnel_name",
+					"POS Profile-custom_pharmacy_default_uom",
 				),
 			]
 		],
