@@ -141,8 +141,7 @@ export default function PaymentDialog({
   const [paymentAmounts, setPaymentAmounts] = useState<PaymentAmount>({});
   const [activeMethodId, setActiveMethodId] = useState<string | null>(null);
   // Track which payment method was last modified for round-off targeting
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [lastModifiedMethodId, setLastModifiedMethodId] = useState<string | null>(null);
+  const [, setLastModifiedMethodId] = useState<string | null>(null);
   const [roundOffAmount, setRoundOffAmount] = useState(0);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isHoldingOrder, setIsHoldingOrder] = useState(false);
@@ -182,6 +181,7 @@ export default function PaymentDialog({
   // Delivery personnel states (optional, user-controlled via footer field)
   const [showDeliveryPersonnelModal, setShowDeliveryPersonnelModal] = useState(false);
   const [selectedDeliveryPersonnel, setSelectedDeliveryPersonnel] = useState<string | null>(null);
+  const [selectedDeliveryVia, setSelectedDeliveryVia] = useState<string | null>(null);
 
   // Hooks
   const { posDetails, loading: posLoading } = usePOSDetails();
@@ -363,7 +363,6 @@ export default function PaymentDialog({
   }, [sharingMode, emailTemplates.length]);
 
   // Helper function to get processed WhatsApp message
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const getProcessedMessage = () => {
     const parameters: Record<string, string> = {
       customer_name: sharingData.name || 'there',
@@ -377,7 +376,6 @@ export default function PaymentDialog({
   };
 
   // Helper function to get processed email message
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const getProcessedEmailMessage = () => {
     const parameters: Record<string, string | null> = {
       customer_name: sharingData.name || 'Customer',
@@ -651,34 +649,6 @@ export default function PaymentDialog({
     setActiveMethodId(methodId);
   };
 
-  // Auto-distribute remaining amount to other payment methods
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleAutoDistribute = (methodId: string) => {
-    if (invoiceSubmitted || isProcessingPayment) return;
-
-    const grandTotal = calculations.grandTotal;
-    const currentAmount = paymentAmounts[methodId] || 0;
-    const remainingAmount = subtractCurrency(grandTotal, currentAmount);
-
-    if (remainingAmount <= 0) return;
-
-    // Find other payment methods that have 0 amount
-    const otherMethods = paymentMethods.filter(method =>
-      method.id !== methodId && (paymentAmounts[method.id] || 0) === 0
-    );
-
-    if (otherMethods.length > 0) {
-      // Distribute remaining amount to the first available method
-      const targetMethod = otherMethods[0];
-      if (targetMethod) {
-        setPaymentAmounts((prev) => ({
-          ...prev,
-          [targetMethod.id]: roundCurrency(remainingAmount),
-        }));
-      }
-    }
-  };
-
   // Handle manual amount adjustment
   const handleManualAmountChange = (methodId: string, amount: string) => {
     if (invoiceSubmitted || isProcessingPayment) return;
@@ -850,7 +820,7 @@ export default function PaymentDialog({
     }
   };
 
-  const processPayment = async (deliveryPersonnel: string | null = null) => {
+  const processPayment = async (deliveryPersonnel: string | null = null, deliveryVia: string | null = null) => {
     if (!selectedCustomer || !selectedCustomer.name) {
       toast.error("Kindly select a customer");
       return;
@@ -896,8 +866,7 @@ export default function PaymentDialog({
             const lastPaymentIndex = validPayments.length - 1;
             const lastPayment = validPayments[lastPaymentIndex];
             if (!lastPayment) return;
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const [lastMethod, lastAmount] = lastPayment;
+            const lastAmount = lastPayment[1];
 
             // Reduce the last payment method by the excess amount
             const adjustedLastAmount = parseFloat(Math.max(0, lastAmount - excess).toFixed(2));
@@ -939,6 +908,7 @@ export default function PaymentDialog({
       appliedCoupons,
       businessType: posDetails?.business_type,
       deliveryPersonnel: deliveryPersonnel || null,
+      deliveryVia: deliveryVia || null,
     };
 
     try {
@@ -991,12 +961,13 @@ export default function PaymentDialog({
     );
 
     // Always process payment directly; delivery personnel is optional
-    await processPayment(selectedDeliveryPersonnel);
+    await processPayment(selectedDeliveryPersonnel, selectedDeliveryVia);
   };
 
-  const handleDeliveryPersonnelSelect = (personnelName: string) => {
+  const handleDeliveryPersonnelSelect = (selection: { personnelName: string; deliveryVia: string | null }) => {
     // Called from the footer-triggered modal only; just store selection
-    setSelectedDeliveryPersonnel(personnelName);
+    setSelectedDeliveryPersonnel(selection.personnelName);
+    setSelectedDeliveryVia(selection.deliveryVia);
     setShowDeliveryPersonnelModal(false);
   };
 
@@ -1032,6 +1003,8 @@ export default function PaymentDialog({
       appliedCoupons,
       status: "held",
       businessType: posDetails?.business_type,
+      deliveryPersonnel: selectedDeliveryPersonnel || null,
+      deliveryVia: selectedDeliveryVia || null,
     };
 
     try {
@@ -2297,19 +2270,19 @@ export default function PaymentDialog({
                     // Show cart items for payment
                     cartItems.map((item, index) => (
                       <div key={index} className="flex justify-between text-sm">
-                        <div className="flex-1">
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900 dark:text-white">
+                              {item.name}
+                            </p>
+                            <p className="text-gray-600 dark:text-gray-400">
+                              {item.quantity} x {formatCurrency(item.price)}
+                            </p>
+                          </div>
                           <p className="font-medium text-gray-900 dark:text-white">
-                            {item.name}
-                          </p>
-                          <p className="text-gray-600 dark:text-gray-400">
-                            {item.quantity} x {formatCurrency(item.price)}
+                            {formatCurrency(item.quantity * item.price)}
                           </p>
                         </div>
-                        <p className="font-medium text-gray-900 dark:text-white">
-                          {formatCurrency(item.quantity * item.price)}
-                        </p>
-                      </div>
-                    ))
+                      ))
                   ) : (
                     // Show invoice details for sharing
                     <div className="space-y-4">

@@ -3,9 +3,10 @@ import { useState, useEffect } from "react";
 export interface DeliveryPersonnel {
   name: string;
   delivery_personnel: string;
+  delivery_via?: string;
 }
 
-export function useDeliveryPersonnel() {
+export function useDeliveryPersonnel(deliveryVia?: string | null) {
   const [personnel, setPersonnel] = useState<DeliveryPersonnel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -14,8 +15,10 @@ export function useDeliveryPersonnel() {
     const fetchDeliveryPersonnel = async () => {
       try {
         setLoading(true);
+        setError(null);
+        const viaParam = deliveryVia ? `?delivery_via=${encodeURIComponent(deliveryVia)}` : "";
         const response = await fetch(
-          "/api/method/klik_pos.api.delivery_personnel.get_delivery_personnel_list",
+          `/api/method/klik_pos.api.delivery_personnel.get_delivery_personnel_list${viaParam}`,
           {
             method: "GET",
             headers: {
@@ -40,7 +43,7 @@ export function useDeliveryPersonnel() {
     };
 
     fetchDeliveryPersonnel();
-  }, []);
+  }, [deliveryVia]);
 
   return { personnel, loading, error };
 }

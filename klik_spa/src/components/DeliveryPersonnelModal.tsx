@@ -3,11 +3,12 @@
 import { useState, useEffect, useMemo } from "react";
 import { X, Loader2, Search, ChevronDown } from "lucide-react";
 import { useDeliveryPersonnel } from "../hooks/useDeliveryPersonnel";
+import { useDeliveryChannels } from "../hooks/useDeliveryChannels";
 
 interface DeliveryPersonnelModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (personnelName: string) => void;
+  onSelect: (selection: { personnelName: string; deliveryVia: string | null }) => void;
 }
 
 export default function DeliveryPersonnelModal({
@@ -15,55 +16,91 @@ export default function DeliveryPersonnelModal({
   onClose,
   onSelect,
 }: DeliveryPersonnelModalProps) {
-  const { personnel, loading, error } = useDeliveryPersonnel();
+  const { channels, loading: channelsLoading, error: channelsError } = useDeliveryChannels();
+  const [selectedChannel, setSelectedChannel] = useState<string>("");
+  const [channelSearchQuery, setChannelSearchQuery] = useState<string>("");
+  const [isChannelDropdownOpen, setIsChannelDropdownOpen] = useState<boolean>(false);
+
+  const { personnel, loading, error } = useDeliveryPersonnel(selectedChannel || null);
   const [selectedPersonnel, setSelectedPersonnel] = useState<string>("");
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
+  const [personnelSearchQuery, setPersonnelSearchQuery] = useState<string>("");
+  const [isPersonnelDropdownOpen, setIsPersonnelDropdownOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (isOpen) {
+      setSelectedChannel("");
+      setChannelSearchQuery("");
+      setIsChannelDropdownOpen(false);
       setSelectedPersonnel("");
-      setSearchQuery("");
-      setIsDropdownOpen(false);
+      setPersonnelSearchQuery("");
+      setIsPersonnelDropdownOpen(false);
     }
   }, [isOpen]);
 
-  // Find selected personnel name for display
-  const selectedPersonnelName = useMemo(() => {
-    if (!selectedPersonnel) return "";
-    const person = personnel.find((p) => p.name === selectedPersonnel);
-    return person?.delivery_personnel || "";
-  }, [selectedPersonnel, personnel]);
+  const filteredChannels = useMemo(() => {
+    if (!channelSearchQuery.trim()) return channels;
+    const q = channelSearchQuery.toLowerCase();
+    return channels.filter((c) => (c.delivery_via || c.name || "").toLowerCase().includes(q));
+  }, [channels, channelSearchQuery]);
+
+  const visiblePersonnel = useMemo(() => {
+    // If no channel is chosen, only show personnel that are NOT linked to any channel.
+    if (!selectedChannel) {
+      return personnel.filter((p) => !p.delivery_via);
+    }
+    return personnel;
+  }, [personnel, selectedChannel]);
 
   // Filter personnel based on search query
   const filteredPersonnel = useMemo(() => {
-    if (!searchQuery.trim()) return personnel;
-    const query = searchQuery.toLowerCase();
-    return personnel.filter(
+    if (!personnelSearchQuery.trim()) return visiblePersonnel;
+    const query = personnelSearchQuery.toLowerCase();
+    return visiblePersonnel.filter(
       (person) =>
         person.delivery_personnel.toLowerCase().includes(query) ||
         person.name.toLowerCase().includes(query)
     );
-  }, [personnel, searchQuery]);
+  }, [visiblePersonnel, personnelSearchQuery]);
 
   if (!isOpen) return null;
 
-  const handleSelect = (personnelName: string, personnelDisplayName: string) => {
+  const handleSelectChannel = (channelName: string, channelDisplayName: string) => {
+    setSelectedChannel(channelName);
+    setChannelSearchQuery(channelDisplayName);
+    setIsChannelDropdownOpen(false);
+    // Reset personnel selection when channel changes
+    setSelectedPersonnel("");
+    setPersonnelSearchQuery("");
+    setIsPersonnelDropdownOpen(false);
+  };
+
+  const handleSelectPersonnel = (personnelName: string, personnelDisplayName: string) => {
     setSelectedPersonnel(personnelName);
-    setSearchQuery(personnelDisplayName);
-    setIsDropdownOpen(false);
+    setPersonnelSearchQuery(personnelDisplayName);
+    setIsPersonnelDropdownOpen(false);
   };
 
   const handleConfirm = () => {
     if (selectedPersonnel) {
-      onSelect(selectedPersonnel);
+      onSelect({ personnelName: selectedPersonnel, deliveryVia: selectedChannel || null });
       onClose();
     }
   };
 
-  const handleInputChange = (value: string) => {
-    setSearchQuery(value);
-    setIsDropdownOpen(true);
+  const handleChannelInputChange = (value: string) => {
+    setChannelSearchQuery(value);
+    setIsChannelDropdownOpen(true);
+    const currentSelected = channels.find((c) => c.name === selectedChannel)?.delivery_via || selectedChannel;
+    if (value !== currentSelected) {
+      setSelectedChannel("");
+      setSelectedPersonnel("");
+      setPersonnelSearchQuery("");
+    }
+  };
+
+  const handlePersonnelInputChange = (value: string) => {
+    setPersonnelSearchQuery(value);
+    setIsPersonnelDropdownOpen(true);
     // Clear selection if user is typing and it doesn't match the selected name
     const currentSelectedName = personnel.find((p) => p.name === selectedPersonnel)?.delivery_personnel || "";
     if (value !== currentSelectedName) {
@@ -71,14 +108,18 @@ export default function DeliveryPersonnelModal({
     }
   };
 
-  const handleInputFocus = () => {
-    setIsDropdownOpen(true);
+  const handleChannelInputFocus = () => setIsChannelDropdownOpen(true);
+  const handlePersonnelInputFocus = () => setIsPersonnelDropdownOpen(true);
+
+  const handleChannelInputBlur = () => {
+    setTimeout(() => {
+      setIsChannelDropdownOpen(false);
+    }, 200);
   };
 
-  const handleInputBlur = () => {
-    // Delay closing to allow click on dropdown items
+  const handlePersonnelInputBlur = () => {
     setTimeout(() => {
-      setIsDropdownOpen(false);
+      setIsPersonnelDropdownOpen(false);
     }, 200);
   };
 
@@ -106,69 +147,163 @@ export default function DeliveryPersonnelModal({
 
         {/* Content */}
         <div className="p-4">
-          {loading ? (
+          {channelsLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 size={24} className="animate-spin text-beveren-600" />
               <span className="ml-2 text-gray-600 dark:text-gray-400">Loading...</span>
             </div>
-          ) : error ? (
+          ) : channelsError ? (
             <div className="text-red-600 dark:text-red-400 text-center py-8">
-              {error}
-            </div>
-          ) : personnel.length === 0 ? (
-            <div className="text-gray-600 dark:text-gray-400 text-center py-8">
-              No delivery personnel available
+              {channelsError}
             </div>
           ) : (
-            <div className="relative">
-              {/* Searchable Select Input */}
+            <div className="space-y-4">
+              {/* Delivery Channel */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
-                <input
-                  type="text"
-                  placeholder="Search delivery personnel..."
-                  value={searchQuery}
-                  onChange={(e) => handleInputChange(e.target.value)}
-                  onFocus={handleInputFocus}
-                  onBlur={handleInputBlur}
-                  className="w-full pl-10 pr-10 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                  autoFocus
-                />
-                <ChevronDown
-                  className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 transition-transform ${
-                    isDropdownOpen ? "rotate-180" : ""
-                  }`}
-                  size={18}
-                />
+                <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Delivery Channel (optional)
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
+                  <input
+                    type="text"
+                    placeholder="Search delivery channel..."
+                    value={channelSearchQuery}
+                    onChange={(e) => handleChannelInputChange(e.target.value)}
+                    onFocus={handleChannelInputFocus}
+                    onBlur={handleChannelInputBlur}
+                    className="w-full pl-10 pr-10 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                    autoFocus
+                  />
+                  <ChevronDown
+                    className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 transition-transform ${
+                      isChannelDropdownOpen ? "rotate-180" : ""
+                    }`}
+                    size={18}
+                  />
+                </div>
+
+                {isChannelDropdownOpen && (
+                  <div className="absolute z-10 w-full mt-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-64 overflow-hidden">
+                    <div className="max-h-64 overflow-y-auto">
+                      <button
+                        key="__no_channel__"
+                        type="button"
+                        onClick={() => handleSelectChannel("", "")}
+                        className={`w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                          !selectedChannel
+                            ? "bg-beveren-50 dark:bg-beveren-900/20 text-beveren-600 dark:text-beveren-400"
+                            : "text-gray-900 dark:text-white"
+                        }`}
+                      >
+                        <div className="font-medium">No Delivery Channel</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                          Show unassigned delivery personnel only
+                        </div>
+                      </button>
+
+                      {filteredChannels.length > 0 ? (
+                        filteredChannels.map((c) => (
+                          <button
+                            key={c.name}
+                            type="button"
+                            onClick={() => handleSelectChannel(c.name, c.delivery_via || c.name)}
+                            className={`w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                              selectedChannel === c.name
+                                ? "bg-beveren-50 dark:bg-beveren-900/20 text-beveren-600 dark:text-beveren-400"
+                                : "text-gray-900 dark:text-white"
+                            }`}
+                          >
+                            <div className="font-medium">{c.delivery_via || c.name}</div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-4 py-3 text-gray-500 dark:text-gray-400 text-center">
+                          No matches found
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Dropdown List */}
-              {isDropdownOpen && (
-                <div className="absolute z-10 w-full mt-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-64 overflow-hidden">
-                  <div className="max-h-64 overflow-y-auto">
-                    {filteredPersonnel.length > 0 ? (
-                      filteredPersonnel.map((person) => (
-                        <button
-                          key={person.name}
-                          type="button"
-                          onClick={() => handleSelect(person.name, person.delivery_personnel)}
-                          className={`w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
-                            selectedPersonnel === person.name
-                              ? "bg-beveren-50 dark:bg-beveren-900/20 text-beveren-600 dark:text-beveren-400"
-                              : "text-gray-900 dark:text-white"
-                          }`}
-                        >
-                          <div className="font-medium">{person.delivery_personnel}</div>
-                        </button>
-                      ))
-                    ) : (
-                      <div className="px-4 py-3 text-gray-500 dark:text-gray-400 text-center">
-                        No matches found
+              {/* Delivery Personnel (filtered by channel) */}
+              <div className="relative">
+                <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Delivery Personnel
+                </div>
+
+                {!selectedChannel && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    Showing personnel not linked to any delivery channel.
+                  </div>
+                )}
+
+                {loading ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 size={20} className="animate-spin text-beveren-600" />
+                    <span className="ml-2 text-gray-600 dark:text-gray-400">Loading personnel...</span>
+                  </div>
+                ) : error ? (
+                  <div className="text-red-600 dark:text-red-400 text-center py-6">
+                    {error}
+                  </div>
+                ) : visiblePersonnel.length === 0 ? (
+                  <div className="text-gray-600 dark:text-gray-400 text-center py-6">
+                    {selectedChannel
+                      ? "No delivery personnel available for this channel"
+                      : "No unassigned delivery personnel available"}
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
+                      <input
+                        type="text"
+                        placeholder="Search delivery personnel..."
+                        value={personnelSearchQuery}
+                        onChange={(e) => handlePersonnelInputChange(e.target.value)}
+                        onFocus={handlePersonnelInputFocus}
+                        onBlur={handlePersonnelInputBlur}
+                        className="w-full pl-10 pr-10 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                      />
+                      <ChevronDown
+                        className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 transition-transform ${
+                          isPersonnelDropdownOpen ? "rotate-180" : ""
+                        }`}
+                        size={18}
+                      />
+                    </div>
+
+                    {isPersonnelDropdownOpen && (
+                      <div className="absolute z-10 w-full mt-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-64 overflow-hidden">
+                        <div className="max-h-64 overflow-y-auto">
+                          {filteredPersonnel.length > 0 ? (
+                            filteredPersonnel.map((person) => (
+                              <button
+                                key={person.name}
+                                type="button"
+                                onClick={() => handleSelectPersonnel(person.name, person.delivery_personnel)}
+                                className={`w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                                  selectedPersonnel === person.name
+                                    ? "bg-beveren-50 dark:bg-beveren-900/20 text-beveren-600 dark:text-beveren-400"
+                                    : "text-gray-900 dark:text-white"
+                                }`}
+                              >
+                                <div className="font-medium">{person.delivery_personnel}</div>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-4 py-3 text-gray-500 dark:text-gray-400 text-center">
+                              No matches found
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -183,7 +318,7 @@ export default function DeliveryPersonnelModal({
           </button>
           <button
             onClick={handleConfirm}
-            disabled={!selectedPersonnel || loading}
+            disabled={!selectedPersonnel || loading || channelsLoading}
             className="px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
             Confirm

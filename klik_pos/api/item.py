@@ -593,6 +593,246 @@ def _fetch_batch_prices(item_codes: list, price_list: str | None, uom_map: dict)
 	return price_map
 
 
+def _coerce_limit_offset(limit, offset) -> tuple[int, int]:
+	"""Coerce query params to ints and apply safety caps."""
+	try:
+		limit_int = int(limit) if limit else 1000
+		offset_int = int(offset) if offset else 0
+	except (ValueError, TypeError):
+		limit_int = 1000
+		offset_int = 0
+
+	# Cap limit to prevent abuse
+	return min(limit_int, 2000), max(offset_int, 0)
+
+
+def _get_item_select_fields() -> str:
+	"""Build SELECT fields for Item query, including optional pharmacy fields."""
+	select_fields = (
+		"i.name, i.item_name, i.description, i.item_group, i.image, i.stock_uom, "
+		"i.custom_strength, i.custom_pharmaceutical_form, i.custom_number_of_pack, "
+		"i.custom_pack_size, i.custom_route_of_administration"
+	)
+
+	# Optional pharmacy field (may not exist on all installs)
+	if frappe.db.has_column("Item", "custom_active_substances"):
+		select_fields += ", i.custom_active_substances"
+
+	return select_fields
+
+
+def _build_base_and_count_queries(select_fields: str, hide_unavailable: bool) -> tuple[list[str], list[str]]:
+	"""Build the base SQL and count SQL (as list parts) depending on stock filtering mode."""
+	if hide_unavailable:
+		base_query = [
+			f"SELECT DISTINCT {select_fields}",
+			"FROM `tabItem` i",
+			"INNER JOIN `tabBin` b ON i.name = b.item_code",
+			"WHERE i.disabled = 0",
+			"AND i.is_stock_item = 1",
+			"AND b.actual_qty > 0",
+		]
+		count_query = [
+			"SELECT COUNT(DISTINCT i.name) as total",
+			"FROM `tabItem` i",
+			"INNER JOIN `tabBin` b ON i.name = b.item_code",
+			"WHERE i.disabled = 0",
+			"AND i.is_stock_item = 1",
+			"AND b.actual_qty > 0",
+		]
+	else:
+		base_query = [
+			f"SELECT DISTINCT {select_fields}",
+			"FROM `tabItem` i",
+			"WHERE i.disabled = 0",
+			"AND i.is_stock_item = 1",
+		]
+		count_query = [
+			"SELECT COUNT(DISTINCT i.name) as total",
+			"FROM `tabItem` i",
+			"WHERE i.disabled = 0",
+			"AND i.is_stock_item = 1",
+		]
+
+	return base_query, count_query
+
+
+def _append_item_group_filters(
+	base_query: list[str],
+	count_query: list[str],
+	params_list: list[object],
+	count_params: list[object],
+	pos_doc,
+):
+	"""Append POS Profile item group filters to both base and count queries."""
+	if getattr(pos_doc, "item_groups", None):
+		item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
+		if item_group_names:
+			placeholders = ", ".join(["%s"] * len(item_group_names))
+			base_query.append(f"AND i.item_group IN ({placeholders})")
+			count_query.append(f"AND i.item_group IN ({placeholders})")
+			params_list.extend(item_group_names)
+			count_params.extend(item_group_names)
+
+
+def _append_category_filter(
+	base_query: list[str],
+	count_query: list[str],
+	params_list: list[object],
+	count_params: list[object],
+	category: str | None,
+):
+	"""Append a direct Item Group filter (overrides POS groups) if category is provided."""
+	if category and category != "all":
+		base_query.append("AND i.item_group = %s")
+		count_query.append("AND i.item_group = %s")
+		params_list.append(category)
+		count_params.append(category)
+
+
+def _append_search_filter(
+	query_parts: list[str],
+	params: list[object],
+	search: str | None,
+):
+	"""Append search condition (name, item_name, description, barcode) to a query."""
+	if not (search and search.strip()):
+		return
+
+	search_term = f"%{search.strip()}%"
+	search_condition = """
+				AND (
+					i.name LIKE %s
+					OR i.item_name LIKE %s
+					OR i.description LIKE %s
+					OR EXISTS (
+						SELECT 1 FROM `tabItem Barcode` ib
+						WHERE ib.parent = i.name AND ib.barcode LIKE %s
+					)
+				)
+			"""
+	query_parts.append(search_condition)
+	params.extend([search_term, search_term, search_term, search_term])
+
+
+def _get_total_count(count_query: list[str], count_params: list[object]) -> int:
+	count_sql = "\n".join(count_query)
+	total_result = frappe.db.sql(count_sql, tuple(count_params), as_dict=True)
+	return total_result[0]["total"] if total_result else 0
+
+
+def _get_unfiltered_total_count(pos_doc, category: str | None, search: str | None) -> int:
+	"""
+	Count total items matching filters WITHOUT stock/bin filters.
+	This is used when hide_unavailable_items is enabled to show the real total.
+	"""
+	unfiltered_count_query = [
+		"SELECT COUNT(DISTINCT i.name) as total",
+		"FROM `tabItem` i",
+		"WHERE i.disabled = 0",
+		"AND i.is_stock_item = 1",
+	]
+	unfiltered_count_params: list[object] = []
+
+	# Apply item group filter from POS profile
+	if getattr(pos_doc, "item_groups", None):
+		item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
+		if item_group_names:
+			placeholders = ", ".join(["%s"] * len(item_group_names))
+			unfiltered_count_query.append(f"AND i.item_group IN ({placeholders})")
+			unfiltered_count_params.extend(item_group_names)
+
+	# Apply category filter if specified
+	if category and category != "all":
+		unfiltered_count_query.append("AND i.item_group = %s")
+		unfiltered_count_params.append(category)
+
+	# Apply search filter if specified
+	_append_search_filter(unfiltered_count_query, unfiltered_count_params, search)
+
+	unfiltered_count_sql = "\n".join(unfiltered_count_query)
+	unfiltered_total_result = frappe.db.sql(
+		unfiltered_count_sql, tuple(unfiltered_count_params), as_dict=True
+	)
+	return unfiltered_total_result[0]["total"] if unfiltered_total_result else 0
+
+
+def _fetch_primary_barcodes(item_codes: list[str]) -> dict[str, str]:
+	"""Fetch one (primary/first) barcode per item in a single query."""
+	barcode_map: dict[str, str] = {}
+	try:
+		barcode_results = frappe.get_all(
+			"Item Barcode",
+			filters={"parent": ["in", item_codes]},
+			fields=["parent", "barcode"],
+			limit=0,
+		)
+		for barcode_row in barcode_results:
+			item_code = barcode_row.get("parent")
+			if item_code and item_code not in barcode_map:
+				barcode_map[item_code] = barcode_row.get("barcode")
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Error fetching item barcodes for POS")
+	return barcode_map
+
+
+def _build_enriched_items(
+	items: list[dict],
+	stock_map: dict[str, float],
+	price_map: dict[str, dict],
+	barcode_map: dict[str, str],
+	hide_unavailable: bool,
+) -> list[dict]:
+	"""Convert raw item rows into the SPA payload shape."""
+	enriched_items: list[dict] = []
+
+	for item in items:
+		item_code = item["name"]
+		balance = stock_map.get(item_code, 0)
+
+		# Skip items with no stock if hide_unavailable is enabled
+		if hide_unavailable and balance <= 0:
+			continue
+
+		default_uom = item.get("stock_uom", "Nos")
+		price_info = price_map.get(item_code, {"price": 0, "currency": "SAR", "currency_symbol": "SAR"})
+		primary_barcode = barcode_map.get(item_code)
+
+		enriched_item = {
+			"id": item_code,
+			"name": item.get("item_name") or item_code,
+			"description": item.get("description", ""),
+			"category": item.get("item_group", "General"),
+			"price": price_info["price"],
+			"currency": price_info["currency"],
+			"currency_symbol": price_info["currency_symbol"],
+			"available": balance,
+			"image": item.get("image"),
+			"sold": 0,
+			"preparationTime": 10,
+			"uom": default_uom,
+			"barcode": primary_barcode,
+		}
+
+		# Add pharmacy fields if they exist (from beveren_health app)
+		if item.get("custom_strength"):
+			enriched_item["custom_strength"] = item.get("custom_strength")
+		if item.get("custom_pharmaceutical_form"):
+			enriched_item["custom_pharmaceutical_form"] = item.get("custom_pharmaceutical_form")
+		if item.get("custom_number_of_pack") is not None:
+			enriched_item["custom_number_of_pack"] = item.get("custom_number_of_pack")
+		if item.get("custom_pack_size"):
+			enriched_item["custom_pack_size"] = item.get("custom_pack_size")
+		if item.get("custom_route_of_administration"):
+			enriched_item["custom_route_of_administration"] = item.get("custom_route_of_administration")
+		if item.get("custom_active_substances"):
+			enriched_item["custom_active_substances"] = item.get("custom_active_substances")
+
+		enriched_items.append(enriched_item)
+
+	return enriched_items
+
+
 @frappe.whitelist(allow_guest=True)
 def get_items_with_balance_and_price(
 	limit: int = 1000,
@@ -612,53 +852,13 @@ def get_items_with_balance_and_price(
 	Returns:
 		dict with items, total_count, and has_more flag
 	"""
-	# Convert string params to proper types (frappe passes strings from URL)
-	try:
-		limit = int(limit) if limit else 1000
-		offset = int(offset) if offset else 0
-	except (ValueError, TypeError):
-		limit = 1000
-		offset = 0
-
-	# Cap limit to prevent abuse
-	limit = min(limit, 2000)
+	limit, offset = _coerce_limit_offset(limit, offset)
 
 	pos_doc, warehouse, price_list, hide_unavailable = _get_pos_context()
 
 	try:
-		# Build the base query
-		select_fields = "i.name, i.item_name, i.description, i.item_group, i.image, i.stock_uom"
-
-		if hide_unavailable:
-			base_query = [
-				f"SELECT DISTINCT {select_fields}",
-				"FROM `tabItem` i",
-				"INNER JOIN `tabBin` b ON i.name = b.item_code",
-				"WHERE i.disabled = 0",
-				"AND i.is_stock_item = 1",
-				"AND b.actual_qty > 0",
-			]
-			count_query = [
-				"SELECT COUNT(DISTINCT i.name) as total",
-				"FROM `tabItem` i",
-				"INNER JOIN `tabBin` b ON i.name = b.item_code",
-				"WHERE i.disabled = 0",
-				"AND i.is_stock_item = 1",
-				"AND b.actual_qty > 0",
-			]
-		else:
-			base_query = [
-				f"SELECT DISTINCT {select_fields}",
-				"FROM `tabItem` i",
-				"WHERE i.disabled = 0",
-				"AND i.is_stock_item = 1",
-			]
-			count_query = [
-				"SELECT COUNT(DISTINCT i.name) as total",
-				"FROM `tabItem` i",
-				"WHERE i.disabled = 0",
-				"AND i.is_stock_item = 1",
-			]
+		select_fields = _get_item_select_fields()
+		base_query, count_query = _build_base_and_count_queries(select_fields, hide_unavailable)
 
 		params_list: list[object] = []
 		count_params: list[object] = []
@@ -670,99 +870,17 @@ def get_items_with_balance_and_price(
 			params_list.append(warehouse)
 			count_params.append(warehouse)
 
-		# Item group filter from POS profile
-		if getattr(pos_doc, "item_groups", None):
-			item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
-			if item_group_names:
-				placeholders = ", ".join(["%s"] * len(item_group_names))
-				base_query.append(f"AND i.item_group IN ({placeholders})")
-				count_query.append(f"AND i.item_group IN ({placeholders})")
-				params_list.extend(item_group_names)
-				count_params.extend(item_group_names)
+		_append_item_group_filters(base_query, count_query, params_list, count_params, pos_doc)
+		_append_category_filter(base_query, count_query, params_list, count_params, category)
+		_append_search_filter(base_query, params_list, search)
+		_append_search_filter(count_query, count_params, search)
 
-		# Category filter (overrides POS profile groups if specified)
-		if category and category != "all":
-			base_query.append("AND i.item_group = %s")
-			count_query.append("AND i.item_group = %s")
-			params_list.append(category)
-			count_params.append(category)
+		# Get total count
+		total_count = _get_total_count(count_query, count_params)
 
-		# Search filter - search by name, item_code, description, or barcode
-		if search and search.strip():
-			search_term = f"%{search.strip()}%"
-			# Join with Item Barcode to search by barcode
-			search_condition = """
-				AND (
-					i.name LIKE %s
-					OR i.item_name LIKE %s
-					OR i.description LIKE %s
-					OR EXISTS (
-						SELECT 1 FROM `tabItem Barcode` ib
-						WHERE ib.parent = i.name AND ib.barcode LIKE %s
-					)
-				)
-			"""
-			base_query.append(search_condition)
-			count_query.append(search_condition)
-			params_list.extend([search_term, search_term, search_term, search_term])
-			count_params.extend([search_term, search_term, search_term, search_term])
-
-		# Get total count - count ALL items matching filters (excluding stock availability for count)
-		# This shows the real total even if hide_unavailable_items is enabled
-		count_sql = "\n".join(count_query)
-		total_result = frappe.db.sql(count_sql, tuple(count_params), as_dict=True)
-		total_count = total_result[0]["total"] if total_result else 0
-
-		# If hide_unavailable is enabled, we also need to count ALL items (without stock filter) for display
-		# The actual items returned will still be filtered by stock, but count shows real total
+		# For hide_unavailable: show real total without stock filter
 		if hide_unavailable:
-			# Build count query without stock filter to get real total
-			unfiltered_count_query = [
-				"SELECT COUNT(DISTINCT i.name) as total",
-				"FROM `tabItem` i",
-				"WHERE i.disabled = 0",
-				"AND i.is_stock_item = 1",
-			]
-			unfiltered_count_params: list[object] = []
-
-			# Apply item group filter from POS profile
-			if getattr(pos_doc, "item_groups", None):
-				item_group_names = [d.item_group for d in pos_doc.item_groups if d.item_group]
-				if item_group_names:
-					placeholders = ", ".join(["%s"] * len(item_group_names))
-					unfiltered_count_query.append(f"AND i.item_group IN ({placeholders})")
-					unfiltered_count_params.extend(item_group_names)
-
-			# Apply category filter if specified
-			if category and category != "all":
-				unfiltered_count_query.append("AND i.item_group = %s")
-				unfiltered_count_params.append(category)
-
-			# Apply search filter if specified
-			if search and search.strip():
-				search_term = f"%{search.strip()}%"
-				unfiltered_count_query.append("""
-					AND (
-						i.name LIKE %s
-						OR i.item_name LIKE %s
-						OR i.description LIKE %s
-						OR EXISTS (
-							SELECT 1 FROM `tabItem Barcode` ib
-							WHERE ib.parent = i.name AND ib.barcode LIKE %s
-						)
-					)
-				""")
-				unfiltered_count_params.extend([search_term, search_term, search_term, search_term])
-
-			# Get unfiltered total count
-			unfiltered_count_sql = "\n".join(unfiltered_count_query)
-			unfiltered_total_result = frappe.db.sql(
-				unfiltered_count_sql, tuple(unfiltered_count_params), as_dict=True
-			)
-			unfiltered_total_count = unfiltered_total_result[0]["total"] if unfiltered_total_result else 0
-
-			# Use the unfiltered count for display (real total)
-			total_count = unfiltered_total_count
+			total_count = _get_unfiltered_total_count(pos_doc, category, search)
 
 		# Add ordering and pagination
 		base_query.append("ORDER BY i.item_name ASC")
@@ -784,21 +902,7 @@ def get_items_with_balance_and_price(
 
 		item_codes = [item["name"] for item in items]
 
-		# Fetch barcodes in batch
-		barcode_map = {}
-		try:
-			barcode_results = frappe.get_all(
-				"Item Barcode",
-				filters={"parent": ["in", item_codes]},
-				fields=["parent", "barcode"],
-				limit=0,
-			)
-			for barcode_row in barcode_results:
-				item_code = barcode_row.get("parent")
-				if item_code and item_code not in barcode_map:
-					barcode_map[item_code] = barcode_row.get("barcode")
-		except Exception:
-			frappe.log_error(frappe.get_traceback(), "Error fetching item barcodes for POS")
+		barcode_map = _fetch_primary_barcodes(item_codes)
 
 		# Build UOM map for price fetching
 		uom_map = {item["name"]: item.get("stock_uom", "Nos") for item in items}
@@ -807,37 +911,7 @@ def get_items_with_balance_and_price(
 		stock_map = _fetch_batch_stock(item_codes, warehouse)
 		price_map = _fetch_batch_prices(item_codes, price_list, uom_map)
 
-		# Build enriched items
-		enriched_items = []
-		for item in items:
-			item_code = item["name"]
-			balance = stock_map.get(item_code, 0)
-
-			# Skip items with no stock if hide_unavailable is enabled
-			if hide_unavailable and balance <= 0:
-				continue
-
-			default_uom = item.get("stock_uom", "Nos")
-			price_info = price_map.get(item_code, {"price": 0, "currency": "SAR", "currency_symbol": "SAR"})
-			primary_barcode = barcode_map.get(item_code)
-
-			enriched_items.append(
-				{
-					"id": item_code,
-					"name": item.get("item_name") or item_code,
-					"description": item.get("description", ""),
-					"category": item.get("item_group", "General"),
-					"price": price_info["price"],
-					"currency": price_info["currency"],
-					"currency_symbol": price_info["currency_symbol"],
-					"available": balance,
-					"image": item.get("image"),
-					"sold": 0,
-					"preparationTime": 10,
-					"uom": default_uom,
-					"barcode": primary_barcode,
-				}
-			)
+		enriched_items = _build_enriched_items(items, stock_map, price_map, barcode_map, hide_unavailable)
 
 		has_more = (offset + len(enriched_items)) < total_count
 		return {

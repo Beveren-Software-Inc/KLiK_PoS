@@ -9,11 +9,14 @@ import {
   UserPlus,
   User,
   Building,
+  Pill,
+  FileText,
 } from "lucide-react";
 import type { CartItem, GiftCoupon } from "../../types";
 import type { Customer } from "../types/customer";
 import PaymentDialog from "./PaymentDialog";
 import AddCustomerModal from "./AddCustomerModal";
+import InpatientMedicationOrdersModal from "./InpatientMedicationOrdersModal";
 import { createDraftSalesInvoice } from "../services/salesInvoice";
 import { useCustomers } from "../hooks/useCustomers";
 import { useProducts } from "../hooks/useProducts";
@@ -25,6 +28,9 @@ import { usePOSDetails } from "../hooks/usePOSProfile";
 import { useCustomerStatistics } from "../hooks/useCustomerStatistics";
 import { useCustomerPermission } from "../hooks/useCustomerPermission";
 import { useCartStore } from "../stores/cartStore";
+import { getPrescriptionDosages, type PrescriptionDosage } from "../services/prescriptionDosageService";
+import { searchPatients, getPendingInpatientMedicationOrders, type Patient, type InpatientMedicationOrder } from "../services/patientService";
+import { getItemPriceForCustomer } from "../services/dynamicPricing";
 
 
 interface OrderSummaryProps {
@@ -91,6 +97,63 @@ const QuantityInput = ({ item, onUpdateQuantity, isMobile }: QuantityInputProps)
       onChange={handleChange}
       onFocus={handleFocus}
       onBlur={handleBlur}
+      className={`w-full ${
+        isMobile ? "text-sm" : "text-sm"
+      } px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+    />
+  );
+};
+
+// Component to handle dosage input with local state (allows empty + decimals)
+interface DosageInputProps {
+  itemId: string;
+  value: number | null | undefined;
+  onChange: (itemId: string, value: number | null) => void;
+  isMobile?: boolean;
+}
+
+const DosageInput = ({ itemId, value, onChange, isMobile }: DosageInputProps) => {
+  const initial = value === null || value === undefined ? "" : String(value);
+  const [inputValue, setInputValue] = useState<string>(initial);
+  const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setInputValue(value === null || value === undefined ? "" : String(value));
+    }
+  }, [value, isEditing]);
+
+  const handleBlur = () => {
+    setIsEditing(false);
+    const trimmed = inputValue.trim();
+    if (trimmed === "") {
+      onChange(itemId, null);
+      setInputValue("");
+      return;
+    }
+
+    const numValue = Number(trimmed);
+    if (Number.isNaN(numValue) || numValue < 0) {
+      // Invalid input - reset to last known good value
+      setInputValue(value === null || value === undefined ? "" : String(value));
+      return;
+    }
+
+    // Normalize to remove leading zeros etc.
+    onChange(itemId, numValue);
+    setInputValue(String(numValue));
+  };
+
+  return (
+    <input
+      type="number"
+      step="0.01"
+      min="0"
+      value={inputValue}
+      onChange={(e) => setInputValue(e.target.value)}
+      onFocus={() => setIsEditing(true)}
+      onBlur={handleBlur}
+      placeholder="e.g. 9.8"
       className={`w-full ${
         isMobile ? "text-sm" : "text-sm"
       } px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
@@ -190,7 +253,6 @@ const UOMSelectField = ({ item, onUOMChange, isMobile, selectedCustomer }: UOMSe
             //eslint-disable-next-line @typescript-eslint/no-explicit-any
             const selectedUOMData = data.message.uoms.find((uom: any) => uom.uom === newUOM);
             if (selectedUOMData && selectedUOMData.price !== undefined) {
-              console.log(`✅ Found UOM data for ${newUOM}:`, selectedUOMData);
               onUOMChange(item.id, newUOM, selectedUOMData.price);
             } else {
               console.warn(`⚠️ UOM data not found for ${newUOM}. Available UOMs:`, data.message.uoms.map((u: any) => u.uom));
@@ -206,7 +268,6 @@ const UOMSelectField = ({ item, onUOMChange, isMobile, selectedCustomer }: UOMSe
                 if (priceResponse.ok) {
                   const priceData = await priceResponse.json();
                   if (priceData?.message?.success && priceData.message.price > 0) {
-                    console.log(`✅ Got price from fallback API for ${newUOM}:`, priceData.message.price);
                     onUOMChange(item.id, newUOM, priceData.message.price);
                   } else {
                     console.error(`❌ Fallback API returned invalid price for ${newUOM}`);
@@ -417,6 +478,79 @@ const SerialSelectField = ({ itemId: _itemId, itemCode: _itemCode, options, valu
   );
 };
 
+// Compact searchable dropdown for Prescription Dosage selection
+interface DosageSelectFieldProps {
+  itemId: string;
+  options: PrescriptionDosage[];
+  value: string;
+  onChange: (value: string) => void;
+  isMobile?: boolean;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const DosageSelectField = ({ itemId: _itemId, options, value, onChange, isMobile }: DosageSelectFieldProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const filtered = options.filter(dosage => 
+    (dosage.name || "").toLowerCase().includes(query.toLowerCase()) ||
+    (dosage.dosage || "").toLowerCase().includes(query.toLowerCase())
+  );
+
+  const handleSelect = (dosageName: string) => {
+    onChange(dosageName);
+    setIsOpen(false);
+    setQuery("");
+  };
+
+  const getDisplayName = (dosage: PrescriptionDosage) => {
+    return dosage.dosage || dosage.name || "";
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full ${isMobile ? "text-xs" : "text-xs"} px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-left flex items-center justify-between`}
+      >
+        <span className="truncate">{value || "Select Dosage"}</span>
+        <svg className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      </button>
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-44 overflow-hidden">
+          <div className="p-1 border-b border-gray-200 dark:border-gray-600">
+            <input
+              type="text"
+              placeholder="Filter dosage..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              autoFocus
+            />
+          </div>
+          <div className="max-h-36 overflow-y-auto">
+            {filtered.length > 0 ? filtered.map((dosage) => {
+              const displayName = getDisplayName(dosage);
+              return (
+                <button
+                  key={dosage.name}
+                  type="button"
+                  onClick={() => handleSelect(dosage.name)}
+                  className={`w-full px-2 py-1 text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-700 ${value === dosage.name ? 'bg-beveren-50 dark:bg-beveren-900/20 text-beveren-600 dark:text-beveren-400' : 'text-gray-900 dark:text-white'}`}
+                >
+                  {displayName}
+                </button>
+              );
+            }) : (
+              <div className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">No matches</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function OrderSummary({
   cartItems,
   onUpdateQuantity,
@@ -428,7 +562,7 @@ export default function OrderSummary({
   isMobile = false,
 }: OrderSummaryProps) {
   // const [showCouponPopover, setShowCouponPopover] = useState(false);
-  const { selectedCustomer, setSelectedCustomer, updateUOM, updatePricesForCustomer } = useCartStore();
+  const { selectedCustomer, setSelectedCustomer, updateUOM, updatePricesForCustomer, addToCartWithQuantity } = useCartStore();
 
   // Track if user has manually removed the default customer
   const [userRemovedDefaultCustomer, setUserRemovedDefaultCustomer] = useState(false);
@@ -460,14 +594,79 @@ export default function OrderSummary({
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [showMedicationOrdersModal, setShowMedicationOrdersModal] = useState(false);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [medicationOrders, setMedicationOrders] = useState<InpatientMedicationOrder[]>([]);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   // const couponButtonRef = useRef<HTMLButtonElement>(null);
   const { customers, isLoading, refetch: refetchCustomers } = useCustomers(customerSearchQuery);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { refetch: _refetchProducts, refreshStockOnly, updateStockForItems: _updateStockForItems, updateBatchQuantitiesForItems } = useProducts();
+  const { products, refetch: _refetchProducts, refreshStockOnly, updateStockForItems: _updateStockForItems, updateBatchQuantitiesForItems } = useProducts();
   // const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { posDetails, loading: _posLoading } = usePOSDetails();
   const { checkCustomerPermission } = useCustomerPermission();
+  
+  // Check if pharmacy mode is enabled
+  const isPharmacy = posDetails?.custom_is_pharmacy === 1 ||
+                     posDetails?.custom_is_pharmacy === true ||
+                     posDetails?.custom_is_pharmacy === "1";
+
+  const pharmacyDefaultUom =
+    typeof posDetails?.custom_pharmacy_default_uom === "string"
+      ? posDetails.custom_pharmacy_default_uom.trim()
+      : "";
+  
+  // Search for patients when pharmacy mode is enabled and search query changes
+  useEffect(() => {
+    if (isPharmacy && customerSearchQuery.trim().length >= 2) {
+      const searchPatientsDebounced = setTimeout(() => {
+        searchPatients(customerSearchQuery.trim())
+          .then(setPatients)
+          .catch((error) => {
+            console.error('Error searching patients:', error);
+            setPatients([]);
+          });
+      }, 300);
+      
+      return () => clearTimeout(searchPatientsDebounced);
+    } else {
+      setPatients([]);
+    }
+  }, [customerSearchQuery, isPharmacy]);
+  
+  // State for prescription dosages
+  const [prescriptionDosages, setPrescriptionDosages] = useState<PrescriptionDosage[]>([]);
+  const [dosagesLoaded, setDosagesLoaded] = useState(false);
+  
+  // Load prescription dosages when pharmacy is enabled OR when items are added to cart
+  useEffect(() => {
+    if (isPharmacy && !dosagesLoaded) {
+      getPrescriptionDosages()
+        .then((dosages) => {
+          setPrescriptionDosages(dosages);
+          setDosagesLoaded(true);
+        })
+        .catch((error) => {
+          console.error('❌ Error loading prescription dosages:', error);
+        });
+    }
+  }, [isPharmacy, dosagesLoaded]);
+  
+  // Also load dosages when items are added to cart (if pharmacy mode is enabled)
+  useEffect(() => {
+    if (isPharmacy && cartItems.length > 0 && !dosagesLoaded) {
+      getPrescriptionDosages()
+        .then((dosages) => {
+          setPrescriptionDosages(dosages);
+          setDosagesLoaded(true);
+        })
+        .catch((error) => {
+          console.error('❌ Error loading prescription dosages:', error);
+        });
+    }
+  }, [cartItems.length, isPharmacy, dosagesLoaded]);
 
   // Get customer statistics for the selected customer
   const { statistics: customerStats } = useCustomerStatistics(selectedCustomer?.id || null);
@@ -518,6 +717,8 @@ export default function OrderSummary({
         batchNumber: string;
         serialNumber: string;
         availableQuantity: number;
+        prescriptionDosage?: string; // From Prescription Dosage doctype (dropdown)
+        dosage?: number | null; // Actual dosage amount/quantity (float input)
       }
     >
   >({});
@@ -650,7 +851,7 @@ export default function OrderSummary({
   const updateItemDiscount = (
     itemId: string,
     field: string,
-    value: number | string
+    value: number | string | null
   ) => {
     setItemDiscounts((prev) => ({
       ...prev,
@@ -662,7 +863,12 @@ export default function OrderSummary({
           serialNumber: "",
           availableQuantity: 150,
         }),
-        [field]: typeof value === "string" ? value : Math.max(0, value),
+        [field]:
+          value === null
+            ? null
+            : typeof value === "string"
+              ? value
+              : Math.max(0, value),
       },
     }));
   };
@@ -694,11 +900,291 @@ export default function OrderSummary({
   };
 
   const handleCustomerSelect = (customer: Customer) => {
-
     setSelectedCustomer(customer);
     setCustomerSearchQuery(customer.name);
     setShowCustomerDropdown(false);
     setUserRemovedDefaultCustomer(false); // Reset flag when user explicitly selects a customer
+  };
+  
+  const handlePatientSelect = async (patient: Patient) => {
+    if (!patient || !patient.name) {
+      return;
+    }
+    setSelectedPatient(patient);
+    const patientName = patient.patient_name || patient.name;
+    setCustomerSearchQuery(patientName);
+    // Force close dropdown immediately after selection - use multiple methods to ensure it closes
+    setShowCustomerDropdown(false);
+    // Use a ref to track if we should close
+    setTimeout(() => {
+      setShowCustomerDropdown(false);
+      // Also blur the input if it's focused
+      const input = document.activeElement as HTMLInputElement;
+      if (input && input.tagName === 'INPUT') {
+        input.blur();
+      }
+    }, 50);
+    
+    // Patient full name (patient_name) is the same as customer name, try to find matching customer
+    const matchingCustomer = customers.find(
+      c => c.name.toLowerCase() === patientName.toLowerCase() || 
+           c.customer_name?.toLowerCase() === patientName.toLowerCase()
+    );
+    
+    if (matchingCustomer) {
+      // Set the customer as well since patient_name matches customer name
+      setSelectedCustomer(matchingCustomer);
+    }
+    
+    // Fetch pending medication orders for this patient and automatically add to cart
+    try {
+      const orders = await getPendingInpatientMedicationOrders(patient.name);
+      setMedicationOrders(orders);
+      
+      if (orders.length === 0) {
+        toast.info("No pending medication orders found for this patient.");
+        return;
+      }
+      
+      // Automatically add all medication orders to cart
+      // Collect all items from all orders
+      const itemsToAdd: Array<{ item_code: string; quantity: number; dosage?: string; drug_name?: string }> = [];
+      
+      orders.forEach(order => {
+        order.items.forEach(item => {
+          if (item.drug) {
+            itemsToAdd.push({
+              item_code: item.drug,
+              quantity: item.quantity || 1,
+              dosage: item.dosage || undefined,
+              drug_name: item.drug_name || undefined
+            });
+          }
+        });
+      });
+      
+      if (itemsToAdd.length === 0) {
+        toast.warning("No items found in medication orders.");
+        return;
+      }
+      
+      // Show loading toast
+      const loadingToast = toast.loading(`Adding ${itemsToAdd.length} item(s) from ${orders.length} order(s) to cart...`);
+      
+      try {
+        let addedCount = 0;
+        let notFoundCount = 0;
+        
+        // Process each item
+        for (const itemToAdd of itemsToAdd) {
+          // Find the product in the products list
+          const product = products.find(p => p.id === itemToAdd.item_code || p.item_code === itemToAdd.item_code);
+          
+          if (!product) {
+            console.warn(`Product not found for item_code: ${itemToAdd.item_code}`);
+            notFoundCount++;
+            continue;
+          }
+          
+          // Check if item is already in cart
+          const existingCartItem = cartItems.find(ci => ci.id === product.id || ci.item_code === product.id);
+          
+          if (existingCartItem) {
+            // Item already in cart, just update quantity and dosage
+            const newQuantity = existingCartItem.quantity + itemToAdd.quantity;
+            await onUpdateQuantity(product.id, newQuantity);
+            
+            // Update prescription dosage if provided
+            if (itemToAdd.dosage) {
+              updateItemDiscount(product.id, "prescriptionDosage", itemToAdd.dosage);
+            }
+            
+            addedCount++;
+          } else {
+            // Add new item to cart
+            const uomToUse = (isPharmacy && pharmacyDefaultUom) ? pharmacyDefaultUom : product.uom;
+            let priceToUse = product.price;
+
+            // If we override UOM in pharmacy mode and there is no selected customer yet,
+            // fetch the base price for the chosen UOM so the cart doesn't show the wrong rate.
+            if (isPharmacy && pharmacyDefaultUom && pharmacyDefaultUom !== product.uom && !selectedCustomer) {
+              const priceInfo = await getItemPriceForCustomer(product.id, undefined, pharmacyDefaultUom);
+              if (priceInfo?.success && priceInfo.price > 0) {
+                priceToUse = priceInfo.price;
+              }
+            }
+
+            await addToCartWithQuantity(
+              {
+                id: product.id,
+                name: product.name,
+                category: product.category || 'General',
+                price: priceToUse,
+                image: product.image || '',
+                available: product.available,
+                uom: uomToUse,
+                item_code: product.id, // item.id is the item_code from the API
+              },
+              itemToAdd.quantity
+            );
+            
+            // Set prescription dosage if provided
+            if (itemToAdd.dosage) {
+              // Use setTimeout to ensure item is added to cart first
+              setTimeout(() => {
+                updateItemDiscount(product.id, "prescriptionDosage", itemToAdd.dosage!);
+              }, 100);
+            }
+            
+            addedCount++;
+          }
+        }
+        
+        // Show success/error message
+        toast.dismiss(loadingToast);
+        
+        if (addedCount > 0 && notFoundCount === 0) {
+          toast.success(`Successfully added ${addedCount} item(s) from ${orders.length} order(s) to cart.`);
+        } else if (addedCount > 0 && notFoundCount > 0) {
+          toast.warning(`Added ${addedCount} item(s) to cart. ${notFoundCount} item(s) not found.`);
+        } else {
+          toast.error(`Failed to add items. None of the items were found in the product list.`);
+        }
+        
+      } catch (error) {
+        console.error('Error adding items to cart:', error);
+        toast.dismiss(loadingToast);
+        toast.error('Failed to add items to cart. Please try again.');
+      }
+      
+    } catch (error) {
+      console.error('❌ Error fetching medication orders:', error);
+      toast.error("Failed to fetch medication orders.");
+    }
+  };
+  
+  const handleAddOrdersToCart = async () => {
+    if (selectedOrders.size === 0) {
+      toast.warning("Please select at least one medication order.");
+      return;
+    }
+    
+    // Get selected orders
+    const ordersToAdd = medicationOrders.filter(order => selectedOrders.has(order.name));
+    
+    // Collect all items from selected orders
+    const itemsToAdd: Array<{ item_code: string; quantity: number; dosage?: string; drug_name?: string }> = [];
+    
+    ordersToAdd.forEach(order => {
+      order.items.forEach(item => {
+        if (item.drug) {
+          itemsToAdd.push({
+            item_code: item.drug,
+            quantity: item.quantity || 1,
+            dosage: item.dosage || undefined,
+            drug_name: item.drug_name || undefined
+          });
+        }
+      });
+    });
+    
+    if (itemsToAdd.length === 0) {
+      toast.warning("No items found in selected orders.");
+      setShowMedicationOrdersModal(false);
+      setSelectedOrders(new Set());
+      return;
+    }
+    
+    // Show loading toast
+    const loadingToast = toast.loading(`Adding ${itemsToAdd.length} item(s) to cart...`);
+    
+    try {
+      let addedCount = 0;
+      let notFoundCount = 0;
+      
+      // Process each item
+      for (const itemToAdd of itemsToAdd) {
+        // Find the product in the products list
+        const product = products.find(p => p.id === itemToAdd.item_code || p.item_code === itemToAdd.item_code);
+        
+        if (!product) {
+          console.warn(`Product not found for item_code: ${itemToAdd.item_code}`);
+          notFoundCount++;
+          continue;
+        }
+        
+        // Check if item is already in cart
+        const existingCartItem = cartItems.find(ci => ci.id === product.id || ci.item_code === product.id);
+        
+        if (existingCartItem) {
+          // Item already in cart, just update quantity and dosage
+          const newQuantity = existingCartItem.quantity + itemToAdd.quantity;
+          await onUpdateQuantity(product.id, newQuantity);
+          
+          // Update prescription dosage if provided
+          if (itemToAdd.dosage) {
+            updateItemDiscount(product.id, "prescriptionDosage", itemToAdd.dosage);
+          }
+          
+          addedCount++;
+        } else {
+          // Add new item to cart
+          const uomToUse = (isPharmacy && pharmacyDefaultUom) ? pharmacyDefaultUom : product.uom;
+          let priceToUse = product.price;
+
+          if (isPharmacy && pharmacyDefaultUom && pharmacyDefaultUom !== product.uom && !selectedCustomer) {
+            const priceInfo = await getItemPriceForCustomer(product.id, undefined, pharmacyDefaultUom);
+            if (priceInfo?.success && priceInfo.price > 0) {
+              priceToUse = priceInfo.price;
+            }
+          }
+
+          await addToCartWithQuantity(
+            {
+              id: product.id,
+              name: product.name,
+              category: product.category || 'General',
+              price: priceToUse,
+              image: product.image || '',
+              available: product.available,
+              uom: uomToUse,
+              item_code: product.id, // item.id is the item_code from the API
+            },
+            itemToAdd.quantity
+          );
+          
+          // Set prescription dosage if provided
+          if (itemToAdd.dosage) {
+            // Use setTimeout to ensure item is added to cart first
+            setTimeout(() => {
+              updateItemDiscount(product.id, "prescriptionDosage", itemToAdd.dosage!);
+            }, 100);
+          }
+          
+          addedCount++;
+        }
+      }
+      
+      // Show success/error message
+      toast.dismiss(loadingToast);
+      
+      if (addedCount > 0 && notFoundCount === 0) {
+        toast.success(`Successfully added ${addedCount} item(s) to cart.`);
+      } else if (addedCount > 0 && notFoundCount > 0) {
+        toast.warning(`Added ${addedCount} item(s) to cart. ${notFoundCount} item(s) not found.`);
+      } else {
+        toast.error(`Failed to add items. None of the items were found in the product list.`);
+      }
+      
+      // Close modal and reset selection
+      setShowMedicationOrdersModal(false);
+      setSelectedOrders(new Set());
+      
+    } catch (error) {
+      console.error('Error adding items to cart:', error);
+      toast.dismiss(loadingToast);
+      toast.error('Failed to add items to cart. Please try again.');
+    }
   };
 
   const handleSaveCustomer = async (newCustomer: Partial<Customer> & { customer_name?: string }) => {
@@ -1160,44 +1646,118 @@ export default function OrderSummary({
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
                   type="text"
-                  placeholder="Search customers... (name, email, or phone)"
+                  placeholder={isPharmacy ? "Search customers or patients... (name, email, phone, patient ID, or file no)" : "Search customers... (name, email, or phone)"}
                   value={customerSearchQuery}
                   onChange={(e) => {
                     setCustomerSearchQuery(e.target.value);
-                    setShowCustomerDropdown(e.target.value.length > 0);
+                    // Always show dropdown when typing
+                    setShowCustomerDropdown(true);
                   }}
                   onKeyDown={handleCustomerSearchKeyDown} // Add this line
-                  onFocus={() => setShowCustomerDropdown(true)}
+                  onFocus={() => {
+                    setShowCustomerDropdown(true);
+                  }}
+                  onBlur={(e) => {
+                    // Don't close dropdown immediately on blur - allow time for click
+                    // Check if the blur is due to clicking on dropdown
+                    setTimeout(() => {
+                      const activeElement = document.activeElement;
+                      const dropdown = e.currentTarget.closest('.relative')?.querySelector('.absolute');
+                      if (!dropdown?.contains(activeElement)) {
+                        setShowCustomerDropdown(false);
+                      }
+                    }, 200);
+                  }}
                   className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
 
-                {/* Customer Dropdown */}
-                {showCustomerDropdown && filteredCustomers.length > 0 && (
+                {/* Customer/Patient Dropdown */}
+                {showCustomerDropdown && (filteredCustomers.length > 0 || (isPharmacy && patients.length > 0)) && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-                    {filteredCustomers.slice(0, 8).map((customer) => (
-                      <button
-                        key={customer.id}
-                        onClick={() => handleCustomerSelect(customer)}
-                        className="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
-                      >
-                        <div className="flex items-center space-x-2">
-                          {getCustomerTypeIcon(customer)}
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-gray-900 dark:text-white text-sm truncate">
-                              {customer.name}
-                            </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                               {customer.phone} • {customer.email}
+                    {/* Customers */}
+                    {filteredCustomers.slice(0, 8).map((customer) => {
+                      // Check if this customer also exists as a patient (patient_name matches customer name)
+                      const matchingPatient = isPharmacy ? patients.find(
+                        p => (p.patient_name || p.name).toLowerCase() === customer.name.toLowerCase()
+                      ) : null;
+                      const isAlsoPatient = !!matchingPatient;
+                      
+                      return (
+                        <button
+                          key={customer.id}
+                          onClick={() => {
+                            // If customer is also a patient, show medication orders modal
+                            if (isAlsoPatient && matchingPatient) {
+                              handlePatientSelect(matchingPatient);
+                            } else {
+                              handleCustomerSelect(customer);
+                            }
+                          }}
+                          className="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700"
+                        >
+                          <div className="flex items-center space-x-2">
+                            {getCustomerTypeIcon(customer)}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center space-x-2">
+                                <div className="font-medium text-gray-900 dark:text-white text-sm truncate">
+                                  {customer.name}
+                                </div>
+                                {isAlsoPatient && (
+                                  <span className="px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                                    Patient
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                 {customer.phone} • {customer.email}
+                              </div>
                             </div>
                           </div>
-                          {/* {customer.status === "vip" && (
-                            <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300 rounded">
-                              VIP
-                            </span>
-                          )} */}
-                        </div>
-                      </button>
-                    ))}
+                        </button>
+                      );
+                    })}
+                    
+                    {/* Patients (Pharmacy mode only) - Filter out duplicates with customers */}
+                    {isPharmacy && patients.length > 0 && (
+                      <>
+                        {filteredCustomers.length > 0 && (
+                          <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                            Patients (without customer record)
+                          </div>
+                        )}
+                        {patients
+                          .filter(patient => {
+                            // Filter out patients where patient_name matches an existing customer name
+                            const patientName = (patient.patient_name || patient.name).toLowerCase();
+                            const matchesCustomer = filteredCustomers.some(
+                              c => c.name.toLowerCase() === patientName
+                            );
+                            return !matchesCustomer;
+                          })
+                          .slice(0, 8)
+                          .map((patient) => (
+                            <button
+                              key={patient.name}
+                              onClick={() => handlePatientSelect(patient)}
+                              className="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
+                            >
+                              <div className="flex items-center space-x-2">
+                                <User className="w-4 h-4 text-blue-500" />
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-gray-900 dark:text-white text-sm truncate">
+                                    {patient.patient_name || patient.name}
+                                  </div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                    {patient.patient_id && `ID: ${patient.patient_id}`}
+                                    {patient.patient_id && patient.file_no && " • "}
+                                    {patient.file_no && `File: ${patient.file_no}`}
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -1256,16 +1816,57 @@ export default function OrderSummary({
                       </div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      setSelectedCustomer(null);
-                      setCustomerSearchQuery("");
-                      setUserRemovedDefaultCustomer(true);
-                    }}
-                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                  >
-                    <X size={14} />
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    {/* Medication Orders Icon - Show if patient is selected OR if customer is also a patient */}
+                    {isPharmacy && (selectedPatient || (selectedCustomer && patients.find(
+                      p => (p.patient_name || p.name).toLowerCase() === selectedCustomer.name.toLowerCase()
+                    ))) && (
+                      <button
+                        onClick={async () => {
+                          // Get patient - either from selectedPatient or find from patients list
+                          const patientToUse = selectedPatient || (selectedCustomer ? patients.find(
+                            p => (p.patient_name || p.name).toLowerCase() === selectedCustomer.name.toLowerCase()
+                          ) : null);
+                          
+                          if (!patientToUse) {
+                            toast.error("Patient not found.");
+                            return;
+                          }
+                          // Fetch fresh medication orders and show modal
+                          try {
+                            const orders = await getPendingInpatientMedicationOrders(patientToUse.name);
+                            setMedicationOrders(orders);
+                            setSelectedOrders(new Set(orders.map(o => o.name))); // Select all orders by default
+                            if (orders.length > 0) {
+                              setShowMedicationOrdersModal(true);
+                            } else {
+                              toast.info("No pending medication orders found for this patient.");
+                            }
+                          } catch (error) {
+                            console.error('Error fetching medication orders:', error);
+                            toast.error("Failed to fetch medication orders.");
+                          }
+                        }}
+                        className="text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                        title="View medication orders"
+                      >
+                        <Pill size={16} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setSelectedCustomer(null);
+                        setSelectedPatient(null);
+                        setCustomerSearchQuery("");
+                        setUserRemovedDefaultCustomer(true);
+                        setMedicationOrders([]);
+                        setSelectedOrders(new Set());
+                      }}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -1373,19 +1974,61 @@ export default function OrderSummary({
                         <span className="text-gray-400 italic">No additional info</span>
                       )}
                     </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {/* Medication Orders Icon - Show if patient is selected OR if customer is also a patient */}
+                    {isPharmacy && (selectedPatient || (selectedCustomer && patients.find(
+                      p => (p.patient_name || p.name).toLowerCase() === selectedCustomer.name.toLowerCase()
+                    ))) && (
+                      <button
+                        onClick={async () => {
+                          // Get patient - either from selectedPatient or find from patients list
+                          const patientToUse = selectedPatient || (selectedCustomer ? patients.find(
+                            p => (p.patient_name || p.name).toLowerCase() === selectedCustomer.name.toLowerCase()
+                          ) : null);
+                          
+                          if (!patientToUse) {
+                            toast.error("Patient not found.");
+                            return;
+                          }
+                          // Fetch fresh medication orders and show modal
+                          try {
+                            const orders = await getPendingInpatientMedicationOrders(patientToUse.name);
+                            setMedicationOrders(orders);
+                            setSelectedOrders(new Set(orders.map(o => o.name))); // Select all orders by default
+                            if (orders.length > 0) {
+                              setShowMedicationOrdersModal(true);
+                            } else {
+                              toast.info("No pending medication orders found for this patient.");
+                            }
+                          } catch (error) {
+                            console.error('Error fetching medication orders:', error);
+                            toast.error("Failed to fetch medication orders.");
+                          }
+                        }}
+                        className="text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors p-1"
+                        title="View medication orders"
+                      >
+                        <Pill size={18} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setSelectedCustomer(null);
+                        setSelectedPatient(null);
+                        setCustomerSearchQuery("");
+                        setUserRemovedDefaultCustomer(true);
+                        setMedicationOrders([]);
+                        setSelectedOrders(new Set());
+                        setShowCustomerDropdown(false);
+                      }}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <X size={14} />
+                    </button>
                   </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setSelectedCustomer(null);
-                    setCustomerSearchQuery("");
-                    setUserRemovedDefaultCustomer(true);
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X size={14} />
-                </button>
-              </div>
             </div>
           )}
         </div>
@@ -1421,6 +2064,8 @@ export default function OrderSummary({
                 batchNumber: "",
                 serialNumber: "",
                 availableQuantity: 150,
+                prescriptionDosage: "",
+                dosage: 0,
               };
 
               return (
@@ -1703,6 +2348,35 @@ export default function OrderSummary({
                             />
                           </div>
                         </div>
+
+                        {/* Row 4: Dosage | Prescription Frequency (Pharmacy only) */}
+                        {isPharmacy && (
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
+                                Dosage
+                              </label>
+                              <DosageInput
+                                itemId={item.id}
+                                value={itemDiscount.dosage}
+                                onChange={(id, v) => updateItemDiscount(id, "dosage", v)}
+                                isMobile={isMobile}
+                              />
+                            </div>
+                            <div>
+                              <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
+                                Prescription Frequency
+                              </label>
+                              <DosageSelectField
+                                itemId={item.id}
+                                options={prescriptionDosages}
+                                value={itemDiscount.prescriptionDosage || ""}
+                                onChange={(dosageName) => updateItemDiscount(item.id, "prescriptionDosage", dosageName)}
+                                isMobile={isMobile}
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Discount Summary */}
@@ -1842,6 +2516,30 @@ export default function OrderSummary({
           totalItemDiscount={totalItemDiscount}
         />
       )}
+
+      {/* Inpatient Medication Orders Modal */}
+      <InpatientMedicationOrdersModal
+        isOpen={showMedicationOrdersModal}
+        onClose={() => {
+          setShowMedicationOrdersModal(false);
+          setSelectedOrders(new Set());
+        }}
+        orders={medicationOrders}
+        selectedOrders={selectedOrders}
+        onToggleOrder={(orderName) => {
+          setSelectedOrders(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(orderName)) {
+              newSet.delete(orderName);
+            } else {
+              newSet.add(orderName);
+            }
+            return newSet;
+          });
+        }}
+        onAddToCart={handleAddOrdersToCart}
+        patientName={selectedPatient?.patient_name || selectedPatient?.name}
+      />
     </div>
   );
 }

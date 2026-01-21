@@ -5,12 +5,22 @@ import frappe
 
 
 @frappe.whitelist()
-def get_delivery_personnel_list():
-	"""Get list of all delivery personnel."""
+def get_delivery_personnel_list(delivery_via: str | None = None):
+	"""Get list of delivery personnel (optionally filtered by Delivery Channel)."""
 	try:
+		fields = ["name", "delivery_personnel"]
+		filters: dict[str, object] = {}
+
+		# Optional new field (added in this app)
+		if frappe.db.has_column("Delivery Personnel", "delivery_via"):
+			fields.append("delivery_via")
+			if delivery_via:
+				filters["delivery_via"] = delivery_via
+
 		personnel = frappe.get_all(
 			"Delivery Personnel",
-			fields=["name", "delivery_personnel"],
+			fields=fields,
+			filters=filters,
 			order_by="delivery_personnel asc",
 		)
 		return {"success": True, "data": personnel}

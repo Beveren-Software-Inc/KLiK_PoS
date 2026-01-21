@@ -1,6 +1,9 @@
 "use client"
 
 // import { useI18n } from "../hooks/useI18n"
+import { useState, useEffect, useRef } from "react"
+import { usePOSDetails } from "../hooks/usePOSProfile"
+import PharmacyItemDetailsModal from "./PharmacyItemDetailsModal"
 import type { MenuItem } from "../../types"
 
 interface ProductLineViewProps {
@@ -12,6 +15,27 @@ interface ProductLineViewProps {
 
 export default function ProductLineView({ items, onAddToCart, isMobile = false, scannerOnly = false }: ProductLineViewProps) {
   // const { t } = useI18n()
+  const { posDetails } = usePOSDetails()
+  const [showPharmacyModal, setShowPharmacyModal] = useState(false)
+  const [selectedPharmacyItem, setSelectedPharmacyItem] = useState<MenuItem | null>(null)
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Check if pharmacy mode is enabled
+  const isPharmacy = posDetails?.custom_is_pharmacy === 1 ||
+                     posDetails?.custom_is_pharmacy === true ||
+                     posDetails?.custom_is_pharmacy === "1"
+  
+  // Track mouse position for better hover handling
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(window as any).lastMouseX = e.clientX
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(window as any).lastMouseY = e.clientY
+    }
+    window.addEventListener('mousemove', handleMouseMove)
+    return () => window.removeEventListener('mousemove', handleMouseMove)
+  }, [])
 
   if (items.length === 0) {
     return (
@@ -36,15 +60,28 @@ export default function ProductLineView({ items, onAddToCart, isMobile = false, 
           <div className={`${isMobile ? "col-span-2" : "col-span-2"} text-center`}>
             <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Rate</span>
           </div>
-          <div className={`${isMobile ? "col-span-2" : "col-span-2"} text-center`}>
+          <div className={`${isMobile ? "col-span-2" : isPharmacy ? "col-span-1" : "col-span-2"} text-center`}>
             <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Qty</span>
           </div>
-          {!isMobile && (
+          {!isMobile && !isPharmacy && (
             <div className="col-span-2 text-center">
               <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">UOM</span>
             </div>
           )}
-          <div className={`${isMobile ? "col-span-1" : "col-span-2"} text-center`}>
+          {!isMobile && isPharmacy && (
+            <>
+              <div className="col-span-1 text-center">
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Strength</span>
+              </div>
+              <div className="col-span-1 text-center">
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">No of Pack</span>
+              </div>
+              <div className="col-span-2 text-center">
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Active Organic</span>
+              </div>
+            </>
+          )}
+          <div className={`${isMobile ? "col-span-1" : isPharmacy ? "col-span-1" : "col-span-2"} text-center`}>
             <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Action</span>
           </div>
         </div>
@@ -55,6 +92,18 @@ export default function ProductLineView({ items, onAddToCart, isMobile = false, 
             const isOutOfStock = item.available <= 0
             const isDisabled = isOutOfStock || scannerOnly
             const formattedPrice = `${item.currency_symbol}${item.price.toFixed(2)}`
+            
+            // Check if item has pharmacy fields
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const itemData = item as any
+            const hasPharmacyData = isPharmacy && (
+              itemData.custom_strength ||
+              itemData.custom_pharmaceutical_form ||
+              itemData.custom_number_of_pack !== null ||
+              itemData.custom_number_of_pack !== undefined ||
+              itemData.custom_pack_size ||
+              itemData.custom_route_of_administration
+            )
 
             return (
               <div
@@ -63,6 +112,43 @@ export default function ProductLineView({ items, onAddToCart, isMobile = false, 
                   isDisabled ? "opacity-60" : "cursor-pointer"
                 }`}
                 onClick={() => !isDisabled && onAddToCart(item)}
+                onMouseEnter={() => {
+                  if (hasPharmacyData) {
+                    // Clear any pending timeout
+                    if (hoverTimeoutRef.current) {
+                      clearTimeout(hoverTimeoutRef.current)
+                      hoverTimeoutRef.current = null
+                    }
+                    setSelectedPharmacyItem(item)
+                    setShowPharmacyModal(true)
+                  }
+                }}
+                onMouseLeave={() => {
+                  if (hasPharmacyData) {
+                    // Clear any existing timeout
+                    if (hoverTimeoutRef.current) {
+                      clearTimeout(hoverTimeoutRef.current)
+                    }
+                    // Longer delay to allow moving to next product - tooltip stays visible
+                    hoverTimeoutRef.current = setTimeout(() => {
+                      // Check if mouse is over another product or the modal
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      const mouseX = (window as any).lastMouseX || 0
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      const mouseY = (window as any).lastMouseY || 0
+                      const hoveredElement = document.elementFromPoint(mouseX, mouseY)
+                      const isOverProduct = hoveredElement?.closest('[data-pharmacy-item]')
+                      const isOverModal = hoveredElement?.closest('.pharmacy-tooltip')
+                      
+                      // Only close if not over any product or modal
+                      if (!isOverProduct && !isOverModal) {
+                        setShowPharmacyModal(false)
+                        setSelectedPharmacyItem(null)
+                      }
+                    }, 500) // Longer delay to keep tooltip visible when moving between products
+                  }
+                }}
+                data-pharmacy-item={hasPharmacyData ? 'true' : undefined}
               >
                 {/* Product Name */}
                 <div className={`${isMobile ? "col-span-3" : "col-span-4"} flex items-start`}>
@@ -88,7 +174,7 @@ export default function ProductLineView({ items, onAddToCart, isMobile = false, 
                 </div>
 
                 {/* Available Qty */}
-                <div className={`${isMobile ? "col-span-2" : "col-span-2"} flex items-center justify-center`}>
+                <div className={`${isMobile ? "col-span-2" : isPharmacy ? "col-span-1" : "col-span-2"} flex items-center justify-center`}>
                   <span className={`font-medium ${isMobile ? "text-xs" : "text-sm"} ${
                     isOutOfStock
                       ? "text-red-600 dark:text-red-400"
@@ -98,8 +184,8 @@ export default function ProductLineView({ items, onAddToCart, isMobile = false, 
                   </span>
                 </div>
 
-                {/* UOM - Desktop only */}
-                {!isMobile && (
+                {/* UOM - Desktop only (non-pharmacy) */}
+                {!isMobile && !isPharmacy && (
                   <div className="col-span-2 flex items-center justify-center">
                     <span className="text-sm text-gray-500 dark:text-gray-400">
                       {item.uom || "Nos"}
@@ -107,8 +193,29 @@ export default function ProductLineView({ items, onAddToCart, isMobile = false, 
                   </div>
                 )}
 
+                {/* Strength + Active Organic - Desktop only (pharmacy) */}
+                {!isMobile && isPharmacy && (
+                  <>
+                    <div className="col-span-1 flex items-center justify-center">
+                      <span className="text-xs text-gray-700 dark:text-gray-300 truncate">
+                        {(item as any).custom_strength || "-"}
+                      </span>
+                    </div>
+                    <div className="col-span-1 flex items-center justify-center">
+                      <span className="text-xs text-gray-700 dark:text-gray-300 truncate">
+                        {(item as any).custom_number_of_pack ?? "-"}
+                      </span>
+                    </div>
+                    <div className="col-span-2 flex items-center justify-center">
+                      <span className="text-xs text-gray-700 dark:text-gray-300 truncate">
+                        {(item as any).custom_active_substances || "-"}
+                      </span>
+                    </div>
+                  </>
+                )}
+
                 {/* Action */}
-                <div className={`${isMobile ? "col-span-1" : "col-span-2"} flex items-center justify-center`}>
+                <div className={`${isMobile ? "col-span-1" : isPharmacy ? "col-span-1" : "col-span-2"} flex items-center justify-center`}>
                   {isDisabled ? (
                     <span className={`text-gray-400 dark:text-gray-500 ${isMobile ? "text-xs" : "text-xs"}`}>
                       {isOutOfStock ? "0" : "S"}
@@ -132,6 +239,29 @@ export default function ProductLineView({ items, onAddToCart, isMobile = false, 
           })}
         </div>
       </div>
+      
+      {/* Pharmacy Item Details Modal - List View (right side) */}
+      {selectedPharmacyItem && (
+        <PharmacyItemDetailsModal
+          isOpen={showPharmacyModal}
+          onClose={() => {
+            setShowPharmacyModal(false)
+            setSelectedPharmacyItem(null)
+          }}
+          itemName={selectedPharmacyItem.name}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          custom_strength={(selectedPharmacyItem as any).custom_strength}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          custom_pharmaceutical_form={(selectedPharmacyItem as any).custom_pharmaceutical_form}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          custom_number_of_pack={(selectedPharmacyItem as any).custom_number_of_pack}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          custom_pack_size={(selectedPharmacyItem as any).custom_pack_size}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          custom_route_of_administration={(selectedPharmacyItem as any).custom_route_of_administration}
+          position="right"
+        />
+      )}
     </div>
   )
 }

@@ -116,7 +116,9 @@ export type POSDetails = {
   write_off_limit?: number;
   write_off_account?: string;
   write_off_cost_center?: string;
-  custom_delivery_required?: number;
+  custom_delivery_required?: number | boolean | string;
+  custom_is_pharmacy?: number | boolean | string;
+  custom_pharmacy_default_uom?: string | null;
   // extend with any other server-provided fields as needed
   [key: string]: unknown;
 }
