@@ -1,39 +1,29 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "format:DP-{MM}-{####}",
- "creation": "2026-01-05 10:41:53.425751",
+ "autoname": "field:delivery_via",
+ "creation": "2026-01-21 14:30:43.078467",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "delivery_personnel",
   "delivery_via"
  ],
  "fields": [
   {
-   "fieldname": "delivery_personnel",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "label": "Delivery Personnel Name",
-   "reqd": 1,
-   "unique": 1
-  },
-  {
    "fieldname": "delivery_via",
-   "fieldtype": "Link",
+   "fieldtype": "Data",
    "label": "Delivery Via",
-   "options": "Delivery Channel"
+   "unique": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-21 14:34:49.366692",
+ "modified": "2026-01-21 14:31:02.741180",
  "modified_by": "Administrator",
  "module": "KLiK PoS",
- "name": "Delivery Personnel",
- "naming_rule": "Expression",
+ "name": "Delivery Channel",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
@@ -51,7 +41,6 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
- "search_fields": "delivery_personnel",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
