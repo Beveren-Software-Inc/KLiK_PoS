@@ -70,8 +70,11 @@ export default function ProductLineView({ items, onAddToCart, isMobile = false, 
           )}
           {!isMobile && isPharmacy && (
             <>
-              <div className="col-span-2 text-center">
+              <div className="col-span-1 text-center">
                 <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Strength</span>
+              </div>
+              <div className="col-span-1 text-center">
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">No of Pack</span>
               </div>
               <div className="col-span-2 text-center">
                 <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Active Organic</span>
@@ -193,9 +196,14 @@ export default function ProductLineView({ items, onAddToCart, isMobile = false, 
                 {/* Strength + Active Organic - Desktop only (pharmacy) */}
                 {!isMobile && isPharmacy && (
                   <>
-                    <div className="col-span-2 flex items-center justify-center">
+                    <div className="col-span-1 flex items-center justify-center">
                       <span className="text-xs text-gray-700 dark:text-gray-300 truncate">
                         {(item as any).custom_strength || "-"}
+                      </span>
+                    </div>
+                    <div className="col-span-1 flex items-center justify-center">
+                      <span className="text-xs text-gray-700 dark:text-gray-300 truncate">
+                        {(item as any).custom_number_of_pack ?? "-"}
                       </span>
                     </div>
                     <div className="col-span-2 flex items-center justify-center">
