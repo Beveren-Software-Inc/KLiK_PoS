@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { getPrintFormatHTML } from "./getPrintHTML.js";
 import { usePOSDetails } from "../hooks/usePOSProfile.js";
+import { useI18n } from "../hooks/useI18n";
 
 type PrintPreviewProps = {
   invoice: {
@@ -17,6 +18,7 @@ export default function PrintPreview({ invoice }: PrintPreviewProps) {
   const [loading, setLoading] = useState(true);
 
   const { posDetails, loading: posLoading } = usePOSDetails();
+  const { tl } = useI18n();
 
   const printFormat = posDetails?.print_format ?? "Sales Invoice";
 
@@ -48,7 +50,7 @@ export default function PrintPreview({ invoice }: PrintPreviewProps) {
     fetchPrintHTML();
   }, [invoice, posDetails, posLoading, printFormat]); // re-run when posDetails or invoice changes
 
-  if (loading) return <p>Loading Print Preview...</p>;
+  if (loading) return <p>{tl("Loading Print Preview...")}</p>;
 
   return (
     <div className="print-preview-container p-4 bg-white shadow overflow-auto max-h-[90vh]">

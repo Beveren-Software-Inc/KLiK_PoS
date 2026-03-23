@@ -1,30 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { WifiOff, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
-import websocketService from '../services/websocketService';
+import { WifiOff, RefreshCw, CheckCircle } from 'lucide-react';
 import backgroundSyncService from '../services/backgroundSyncService';
+import { useI18n } from '../hooks/useI18n';
+import { formatRelativeTime } from '../i18n/runtime';
 
 interface ConnectionStatusProps {
   className?: string;
 }
 
 export default function ConnectionStatus({ className = '' }: ConnectionStatusProps) {
-  const [wsStatus, setWsStatus] = useState(websocketService.getConnectionStatus());
+  const { tl, isRTL } = useI18n();
   const [syncStatus, setSyncStatus] = useState(backgroundSyncService.getStatus());
 
   useEffect(() => {
-    const handleWsStatusChange = () => {
-      setWsStatus(websocketService.getConnectionStatus());
-    };
-
     const handleSyncStatusChange = (status: { isOnline: boolean; isSyncing: boolean; lastSync: Date | null; pendingUpdates: number }) => {
       setSyncStatus(status);
     };
 
-    websocketService.on('connection_status', handleWsStatusChange);
     backgroundSyncService.on('status_change', handleSyncStatusChange);
 
     return () => {
-      websocketService.off('connection_status', handleWsStatusChange);
       backgroundSyncService.off('status_change', handleSyncStatusChange);
     };
   }, []);
@@ -39,40 +34,30 @@ export default function ConnectionStatus({ className = '' }: ConnectionStatusPro
 
   const getStatusColor = () => {
     if (!syncStatus.isOnline) return 'text-red-500';
-    if (wsStatus.connected) return 'text-green-500';
     if (syncStatus.isSyncing) return 'text-yellow-500';
     return 'text-orange-500';
   };
 
   const getStatusIcon = () => {
     if (!syncStatus.isOnline) return <WifiOff className="w-4 h-4" />;
-    if (wsStatus.connected) return <CheckCircle className="w-4 h-4" />;
     if (syncStatus.isSyncing) return <RefreshCw className="w-4 h-4 animate-spin" />;
-    return <AlertCircle className="w-4 h-4" />;
+    return <CheckCircle className="w-4 h-4" />;
   };
 
   const getStatusText = () => {
-    if (!syncStatus.isOnline) return 'Offline';
-    if (wsStatus.connected) return 'Real-time';
-    if (syncStatus.isSyncing) return 'Syncing...';
-    return 'Polling';
+    if (!syncStatus.isOnline) return tl('Offline');
+    if (syncStatus.isSyncing) return tl('Syncing...');
+    return tl('Polling');
   };
 
   const formatLastSync = () => {
-    if (!syncStatus.lastSync) return 'Never';
-    const now = new Date();
-    const diff = now.getTime() - syncStatus.lastSync.getTime();
-    const minutes = Math.floor(diff / 60000);
-
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    return `${hours}h ago`;
+    if (!syncStatus.lastSync) return tl('Never');
+    return formatRelativeTime(syncStatus.lastSync);
   };
 
   return (
-    <div className={`flex items-center space-x-2 text-sm ${className}`}>
-      <div className={`flex items-center space-x-1 ${getStatusColor()}`}>
+    <div className={`flex items-center text-sm ${isRTL ? "flex-row-reverse space-x-reverse space-x-2" : "space-x-2"} ${className}`}>
+      <div className={`flex items-center ${isRTL ? "flex-row-reverse space-x-reverse space-x-1" : "space-x-1"} ${getStatusColor()}`}>
         {getStatusIcon()}
         <span className="font-medium">{getStatusText()}</span>
       </div>
@@ -81,14 +66,14 @@ export default function ConnectionStatus({ className = '' }: ConnectionStatusPro
         <>
           <span className="text-gray-400">•</span>
           <span className="text-gray-500">
-            Last sync: {formatLastSync()}
+            {tl('Last sync: {{time}}', { time: formatLastSync() })}
           </span>
 
           {syncStatus.pendingUpdates > 0 && (
             <>
               <span className="text-gray-400">•</span>
               <span className="text-orange-500">
-                {syncStatus.pendingUpdates} pending
+                {tl('{{count}} pending', { count: syncStatus.pendingUpdates })}
               </span>
             </>
           )}
@@ -97,7 +82,7 @@ export default function ConnectionStatus({ className = '' }: ConnectionStatusPro
             onClick={handleForceSync}
             disabled={syncStatus.isSyncing}
             className="ml-2 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
-            title="Force sync"
+            title={tl('Force sync')}
           >
             <RefreshCw className={`w-3 h-3 ${syncStatus.isSyncing ? 'animate-spin' : ''}`} />
           </button>

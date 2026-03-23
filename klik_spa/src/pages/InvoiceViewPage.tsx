@@ -35,14 +35,17 @@ import { usePOSDetails } from "../hooks/usePOSProfile";
 import { deleteDraftInvoice } from "../services/salesInvoice";
 import { toast } from "react-toastify";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import PageHeader from "../components/ui/PageHeader";
 import DisplayPrintPreview from "../utils/invoicePrint";
 import { handlePrintInvoice } from "../utils/printHandler";
 import SingleInvoiceReturn from "../components/SingleInvoiceReturn";
 import MultiInvoiceReturn from "../components/MultiInvoiceReturn";
 import { formatCurrency } from "../utils/currency";
 import AddCustomerModal from "../components/AddCustomerModal";
+import { useI18n } from "../hooks/useI18n";
 
 export default function InvoiceViewPage() {
+  const { tl, formatDate: formatLocalizedDate } = useI18n();
 
   const { id } = useParams()
   const invoiceId = id ?? ""
@@ -140,7 +143,7 @@ export default function InvoiceViewPage() {
 
   const handleEditCustomer = async () => {
     if (!invoice?.customer) {
-      toast.error("Customer information not available");
+      toast.error(tl("Customer information not available"));
       return;
     }
 
@@ -190,12 +193,12 @@ export default function InvoiceViewPage() {
         setCustomerData(transformedCustomer);
         setShowCustomerEditModal(true);
       } else {
-        throw new Error(result?.message?.error || 'Failed to fetch customer details');
+        throw new Error(result?.message?.error || tl('Failed to fetch customer details'));
       }
       //eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error('Error fetching customer details:', error);
-      toast.error(error.message || 'Failed to fetch customer details');
+      toast.error(tl(error.message || 'Failed to fetch customer details'));
     } finally {
       setIsLoadingCustomer(false);
     }
@@ -210,12 +213,12 @@ export default function InvoiceViewPage() {
     console.log('Saving customer:', updatedCustomer);
     setShowCustomerEditModal(false);
     setCustomerData(null);
-    toast.success('Customer updated successfully!');
+    toast.success(tl('Customer updated successfully!'));
     // Optionally refresh the invoice data to show updated customer info
   };
 
   const handleMultiReturnSuccess = (returnInvoices: string[]) => {
-    toast.success(`${returnInvoices.length} return invoices created successfully`);
+    toast.success(tl('{{count}} return invoices created successfully', { count: returnInvoices.length }));
     navigate('/invoice');
   };
 
@@ -233,12 +236,10 @@ export default function InvoiceViewPage() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
-        <div className="flex-1 flex items-center justify-center ml-20">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400">Loading invoice...</p>
-          </div>
+      <div className="min-h-screen bg-app-bg flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-app-primary mx-auto mb-4"></div>
+          <p className="text-app-muted">{tl("Loading invoice...")}</p>
         </div>
       </div>
     );
@@ -247,18 +248,16 @@ export default function InvoiceViewPage() {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
-        <div className="flex-1 flex items-center justify-center ml-20">
-          <div className="text-center">
-            <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <p className="text-red-600 dark:text-red-400">Error loading invoice: {error}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Retry
-            </button>
-          </div>
+      <div className="min-h-screen bg-app-bg flex items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <p className="text-red-300">{tl("Error loading invoice: {{error}}", { error })}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 rounded-2xl bg-app-primary px-4 py-2 text-white hover:opacity-90"
+          >
+            {tl("Retry")}
+          </button>
         </div>
       </div>
     );
@@ -267,158 +266,126 @@ export default function InvoiceViewPage() {
   // No invoice found
   if (!invoice) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
-        <div className="flex-1 flex items-center justify-center ml-20">
-          <div className="text-center">
-            <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600 dark:text-gray-400">Invoice not found</p>
-          </div>
+      <div className="min-h-screen bg-app-bg flex items-center justify-center">
+        <div className="text-center">
+          <FileText className="h-12 w-12 text-app-muted mx-auto mb-4" />
+          <p className="text-app-muted">{tl("Invoice not found")}</p>
         </div>
       </div>
     );
   }
 
+  const invoiceHeaderLeading = (
+    <button
+      onClick={handleBackClick}
+      className="rounded-2xl p-2 text-app-muted transition-colors hover:bg-app-elevated hover:text-foreground"
+    >
+      <ArrowLeft size={20} />
+    </button>
+  );
+
+  const invoiceHeaderTrailing = (
+    <div className={getStatusBadge(invoice.status)}>
+      <CheckCircle size={16} />
+      <span>{invoice.status}</span>
+    </div>
+  );
+
+  const invoiceHeaderActions = (
+    <div className="flex items-center space-x-3">
+      <div className="sr-only">
+        <DisplayPrintPreview invoice={invoice} />
+      </div>
+
+      <button
+        className="group relative rounded-2xl p-2 text-app-muted transition-all duration-200 hover:bg-app-elevated hover:text-foreground"
+        onClick={() => handlePrintInvoice(invoice)}
+      >
+        <Printer size={20} />
+      </button>
+
+      <button
+        className="group relative rounded-2xl p-2 text-sky-700 transition-all duration-200 hover:bg-sky-500/10 dark:text-sky-300"
+        onClick={() => {
+          setSharingMode('email')
+          setShowPaymentDialog(true)
+        }}
+      >
+        <MailPlus size={20} />
+      </button>
+
+      {(posDetails?.custom_enable_whatsapp === 1 || posDetails?.custom_enable_whatsapp === '1' || posDetails?.custom_enable_whatsapp === true) ? (
+        <button
+          className="group relative rounded-2xl p-2 text-emerald-700 transition-all duration-200 hover:bg-emerald-500/10 dark:text-emerald-300"
+          onClick={() => {
+            setSharingMode('whatsapp')
+            setShowPaymentDialog(true)
+          }}
+        >
+          <MessageCirclePlus size={20} />
+        </button>
+      ) : null}
+
+      {(posDetails?.custom_enable_sms === 1 || posDetails?.custom_enable_sms === '1' || posDetails?.custom_enable_sms === true) ? (
+        <button
+          className="group relative rounded-2xl p-2 text-cyan-700 transition-all duration-200 hover:bg-cyan-500/10 dark:text-cyan-300"
+          onClick={() => {
+            setSharingMode('sms')
+            setShowPaymentDialog(true)
+          }}
+        >
+          <MessageSquarePlus size={20} />
+        </button>
+      ) : null}
+
+      {
+        // @ts-expect-error just ignore
+        ["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && !invoice.is_return && hasReturnableItems() ? (
+          <>
+            <div className="h-6 w-px bg-app-border"></div>
+            <button
+              className="rounded-2xl p-2 text-amber-700 transition-all duration-200 hover:bg-amber-500/10 dark:text-amber-300"
+              onClick={() => setShowSingleReturn(true)}
+            >
+              <RotateCcw size={20} />
+            </button>
+
+            <button
+              className="rounded-2xl p-2 text-fuchsia-700 transition-all duration-200 hover:bg-fuchsia-500/10 dark:text-fuchsia-300"
+              onClick={() => setShowMultiReturn(true)}
+            >
+              <FileMinus size={20} />
+            </button>
+          </>
+        ) : null
+      }
+
+      {invoice.status === "Pending" ? (
+        <>
+          <div className="h-6 w-px bg-app-border"></div>
+          <button
+            className="rounded-2xl p-2 text-rose-300 transition-all duration-200 hover:bg-rose-500/10"
+            onClick={handleDeleteClick}
+          >
+            <FileMinus size={20} />
+          </button>
+        </>
+      ) : null}
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex pb-12">
-      <div className="flex-1 flex flex-col overflow-hidden ml-20">
-        {/* Header */}
-        <div className="fixed top-0 left-20 right-0 z-50 bg-beveren-50 dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-          <div className="px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <button
-                  onClick={handleBackClick}
-                  className="p-2 text-gray-600 dark:text-gray-400 hover:bg-beveren-200 dark:hover:bg-gray-700 rounded-lg"
-                >
-                  <ArrowLeft size={20} />
-                </button>
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                    Invoice {invoice.name || invoice.id}
-                  </h1>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {invoice.posting_date} at {invoice.posting_time}
-                  </p>
-                </div>
-                <div className={getStatusBadge(invoice.status)}>
-                  <CheckCircle size={16} />
-                  <span>{invoice.status}</span>
-                </div>
-              </div>
+    <div className="min-h-screen bg-app-bg pb-14">
+      <PageHeader
+        title={`Invoice ${invoice.name || invoice.id}`}
+        description={`${invoice.posting_date} at ${invoice.posting_time}`}
+        leading={invoiceHeaderLeading}
+        trailing={invoiceHeaderTrailing}
+        actions={invoiceHeaderActions}
+      />
 
-              {/* Action Buttons */}
-              <div className="flex items-center space-x-3">
-                <div className="sr-only">
-                             {/* @ts-expect-error just ignore */}
-
-                  <DisplayPrintPreview invoice={invoice} />
-                </div>
-
-                <button
-                  className="group relative p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
-                  // @ts-expect-error just ignore
-                  onClick={() => handlePrintInvoice(invoice)}
-                >
-                  <Printer size={20} />
-                  <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
-                    Print Invoice
-                  </span>
-                </button>
-
-                <button
-                  className="group relative p-2 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900 rounded-lg transition-all duration-200"
-                  onClick={() => {
-                    setSharingMode('email')
-                    setShowPaymentDialog(true)
-                  }}
-                >
-                  <MailPlus size={20} />
-                  <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
-                    Send via Email
-                  </span>
-                </button>
-
-                {(posDetails?.custom_enable_whatsapp === 1 || posDetails?.custom_enable_whatsapp === '1' || posDetails?.custom_enable_whatsapp === true) ? (
-                  <button
-                    className="group relative p-2 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900 rounded-lg transition-all duration-200"
-                    onClick={() => {
-                      setSharingMode('whatsapp')
-                      setShowPaymentDialog(true)
-                    }}
-                  >
-                    <MessageCirclePlus size={20} />
-                    <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
-                      Send via WhatsApp
-                    </span>
-                  </button>
-                ) : ""}
-
-                {(posDetails?.custom_enable_sms === 1 || posDetails?.custom_enable_sms === '1' || posDetails?.custom_enable_sms === true) ? (
-                  <button
-                    className="group relative p-2 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900 rounded-lg transition-all duration-200"
-                    onClick={() => {
-                      setSharingMode('sms')
-                      setShowPaymentDialog(true)
-                    }}
-                  >
-                    <MessageSquarePlus size={20} />
-                    <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
-                      Send via SMS
-                    </span>
-                  </button>
-                ) : ""}
-
-                {/* Return Buttons */}
-                           {/* @ts-expect-error just ignore */}
-                {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && !invoice.is_return && hasReturnableItems() && (
-                  <>
-                    <div className="w-px h-6 bg-gray-300 dark:bg-gray-600"></div>
-
-                    <button
-                      className="group relative p-2 text-orange-600 hover:bg-orange-100 dark:text-orange-400 dark:hover:bg-orange-900 rounded-lg transition-all duration-200"
-                      onClick={() => setShowSingleReturn(true)}
-                    >
-                      <RotateCcw size={20} />
-                      <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
-                        Return Items (Single Invoice)
-                      </span>
-                    </button>
-
-                    <button
-                      className="group relative p-2 text-orange-600 hover:bg-indigo-100 dark:text-indigo-400 dark:hover:bg-indigo-900 rounded-lg transition-all duration-200"
-                      onClick={() => setShowMultiReturn(true)}
-                    >
-                      <FileMinus size={20} />
-                      <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
-                        Multi-Invoice Return
-                      </span>
-                    </button>
-                  </>
-                )}
-
-                {/* Delete Button for Draft Invoices */}
-                {invoice.status === "Pending" && (
-                  <>
-                    <div className="w-px h-6 bg-gray-300 dark:bg-gray-600"></div>
-                    <button
-                      className="group relative p-2 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900 rounded-lg transition-all duration-200"
-                      onClick={handleDeleteClick}
-                    >
-                      <FileMinus size={20} />
-                      <span className="absolute top-full left-1/2 transform -translate-x-1/2 mt-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
-                        Delete Draft Invoice
-                      </span>
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="flex-1 pt-20 pb-20 overflow-auto">
-          <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="pb-20">
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Invoice Details - 70% */}
               <div className="lg:col-span-2">
@@ -443,7 +410,7 @@ export default function InvoiceViewPage() {
                   <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-600">
                     <div className="grid grid-cols-2 gap-8">
                       <div>
-                        <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Bill To:</h4>
+                        <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">{tl("Bill To:")}</h4>
                         <p className="text-sm text-gray-900 dark:text-white font-medium">{invoice.customer}</p>
                         <p className="text-sm text-gray-600 dark:text-gray-400">{invoice.customer_address_doc?.address_line1}</p>
                         <p className="text-sm text-gray-600 dark:text-gray-400">{invoice.customer_address_doc?.email_id}</p>
@@ -456,7 +423,7 @@ export default function InvoiceViewPage() {
                             <span className="text-sm text-gray-900 dark:text-white">{invoice.posting_date}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-600 dark:text-gray-400">Time:</span>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">{tl("Time:")}</span>
                             <span className="text-sm text-gray-900 dark:text-white">{invoice.posting_time}</span>
                           </div>
                           <div className="flex justify-between">
@@ -521,7 +488,7 @@ export default function InvoiceViewPage() {
                     <div className="px-6 py-4 bg-beveren-50 dark:bg-beveren-900/20 border-t border-gray-200 dark:border-gray-600">
                       <div className="flex items-center space-x-2 mb-3">
                         <Percent className="w-5 h-5 text-beveren-600 dark:text-beveren-400" />
-                        <h4 className="text-sm font-semibold text-beveren-900 dark:text-beveren-100">Tax Details</h4>
+                        <h4 className="text-sm font-semibold text-beveren-900 dark:text-beveren-100">{tl("Tax Details")}</h4>
                       </div>
                       <div className="space-y-2">
                         {invoice.taxes.map((tax, index) => (
@@ -633,7 +600,7 @@ export default function InvoiceViewPage() {
                   <div className="px-6 py-4 bg-orange-50 dark:bg-orange-900/20 border-t border-gray-200 dark:border-gray-600">
                     <div className="flex items-center space-x-2 mb-3">
                       <CreditCard className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                      <h4 className="text-sm font-semibold text-orange-900 dark:text-orange-100">Payment Details</h4>
+                      <h4 className="text-sm font-semibold text-orange-900 dark:text-orange-100">{tl("Payment Details")}</h4>
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div className="space-y-2">
@@ -680,7 +647,7 @@ export default function InvoiceViewPage() {
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
                         <User size={20} />
-                        <span>Customer Details</span>
+                        <span>{tl("Customer Details")}</span>
                       </h3>
                       <button
                         onClick={handleEditCustomer}
@@ -723,13 +690,13 @@ export default function InvoiceViewPage() {
                     <div className="space-y-4">
                       <div className="flex items-center space-x-2">
                         <TrendingUp className="w-5 h-5 text-beveren-600" />
-                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Customer Statistics</h4>
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">{tl("Customer Statistics")}</h4>
                       </div>
 
                       {statsLoading ? (
                         <div className="flex items-center justify-center py-4">
                           <RefreshCw className="w-4 h-4 animate-spin text-gray-400" />
-                          <span className="ml-2 text-sm text-gray-500">Loading statistics...</span>
+                          <span className="ml-2 text-sm text-gray-500">{tl("Loading statistics...")}</span>
                         </div>
                       ) : customerStats ? (
                         <div className="space-y-3">
@@ -740,7 +707,7 @@ export default function InvoiceViewPage() {
                                   <Package className="w-4 h-4 text-white" />
                                 </div>
                                 <div>
-                                  <p className="text-xs text-beveren-700 dark:text-beveren-300 font-medium">Total Orders</p>
+                                  <p className="text-xs text-beveren-700 dark:text-beveren-300 font-medium">{tl("Total Orders")}</p>
                                   <p className="text-xs font-bold text-beveren-900 dark:text-beveren-100">
                                     {customerStats.total_orders}
                                   </p>
@@ -754,7 +721,7 @@ export default function InvoiceViewPage() {
                                   <DollarSign className="w-4 h-4 text-white" />
                                 </div>
                                 <div>
-                                  <p className="text-xs text-orange-700 dark:text-orange-300 font-medium">Total Spent</p>
+                                  <p className="text-xs text-orange-700 dark:text-orange-300 font-medium">{tl("Total Spent")}</p>
                                   <p className="text-xs font-small text-orange-900 dark:text-orange-100">
                                     {formatCurrency(customerStats.total_spent, invoice.currency)}
                                   </p>
@@ -767,9 +734,9 @@ export default function InvoiceViewPage() {
                             <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
                               <div className="flex items-center space-x-2">
                                 <Clock className="w-4 h-4 text-gray-500" />
-                                <span className="text-sm text-gray-600 dark:text-gray-400">Last Visit:</span>
+                                <span className="text-sm text-gray-600 dark:text-gray-400">{tl("Last Visit:")}</span>
                                 <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                  {new Date(customerStats.last_visit).toLocaleDateString()}
+                                  {formatLocalizedDate(customerStats.last_visit)}
                                 </span>
                               </div>
                             </div>
@@ -883,7 +850,6 @@ export default function InvoiceViewPage() {
         confirmButtonClass="bg-red-600 hover:bg-red-700 text-white"
       />
 
-      </div>
     </div>
   );
 }

@@ -2,24 +2,25 @@
   "name": "KLiK PoS",
   "short_name": "KLiK PoS",
   "description": "Modern Point of Sale System - KLiK PoS",
-  "start_url": "/",
+  "start_url": "/klik_pos/",
+  "scope": "/klik_pos/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2E7D32",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icon-192x192.png",
+      "src": "/assets/klik_pos/klik_spa/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/icon-512x512.png",
+      "src": "/assets/klik_pos/klik_spa/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
   ],
   "categories": ["business", "productivity"],
-  "lang": "en",
-  "dir": "auto"
+  "lang": "ar",
+  "dir": "rtl"
 }

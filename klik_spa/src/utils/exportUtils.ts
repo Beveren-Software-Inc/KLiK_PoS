@@ -1,6 +1,8 @@
 // exportUtils.ts
 // Utility functions for exporting data to CSV/Excel format
 
+import { formatDate, translateText } from "../i18n/runtime";
+
 export interface ExportableInvoice {
   name: string;
   customer: string;
@@ -16,20 +18,20 @@ export interface ExportableInvoice {
 
 export function exportInvoicesToCSV(invoices: ExportableInvoice[], filename?: string): void {
   if (!invoices || invoices.length === 0) {
-    throw new Error('No invoices to export');
+    throw new Error(translateText('No invoices to export'));
   }
 
   // Define CSV headers
   const headers = [
-    'Invoice Number',
-    'Customer',
-    'Posting Date',
-    'Due Date',
-    'Grand Total',
-    'Outstanding Amount',
-    'Status',
-    'Payment Method',
-    'Currency'
+    translateText('Invoice Number'),
+    translateText('Customer'),
+    translateText('Posting Date'),
+    translateText('Due Date'),
+    translateText('Grand Total'),
+    translateText('Outstanding Amount'),
+    translateText('Status'),
+    translateText('Payment Method'),
+    translateText('Currency')
   ];
 
   // Convert invoices to CSV rows
@@ -81,8 +83,7 @@ export function formatDateForExport(dateString: string): string {
   if (!dateString) return '';
 
   try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+    return formatDate(dateString, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'

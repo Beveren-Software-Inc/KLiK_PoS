@@ -87,7 +87,8 @@ module.exports = {
 			},
 			fontFamily: {
 				inter: ["Inter", "sans-serif"],
-				tajawal: ["Tajawal", "sans-serif"],
+				noto: ['"Noto Sans Arabic"', "sans-serif"],
+				sans: ['"Noto Sans Arabic"', "Inter", "sans-serif"],
 			},
 			backgroundImage: {
 				"grid-pattern":

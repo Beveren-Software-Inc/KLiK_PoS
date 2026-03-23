@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { formatCurrency } from "../utils/currency";
 import { usePOSDetails } from "../hooks/usePOSProfile";
@@ -13,10 +13,8 @@ import {
   Mail,
   Phone,
   MapPin,
-  Calendar,
   Edit,
   ArrowLeft,
-  Clock,
   AlertCircle,
 
 } from "lucide-react";
@@ -35,11 +33,15 @@ import { addDraftInvoiceToCart } from "../utils/draftInvoiceToCart";
 import { isToday, isThisWeek, isThisMonth, isThisYear } from "../utils/time";
 import AddCustomerModal from "../components/AddCustomerModal";
 import BottomNavigation from "../components/BottomNavigation";
+import MetricCard from "../components/ui/MetricCard";
+import PageHeader from "../components/ui/PageHeader";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { useI18n } from "../hooks/useI18n";
 
 export default function CustomerDetailsPage() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery("(max-width: 1024px)");
+  const { tl, formatDate: formatLocalizedDate } = useI18n();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
@@ -66,7 +68,7 @@ export default function CustomerDetailsPage() {
   const { posDetails } = usePOSDetails();
 
 
-  const filterInvoiceByDate = (invoiceDateStr: string) => {
+  const filterInvoiceByDate = useCallback((invoiceDateStr: string) => {
     if (dateFilter === "all") return true;
 
     if (dateFilter === "today") {
@@ -86,7 +88,7 @@ export default function CustomerDetailsPage() {
     }
 
     return true;
-  };
+  }, [dateFilter]);
   // Filter invoices for this customer
   const customerInvoices = useMemo(() => {
     if (isLoading || error || !customer) return [];
@@ -103,7 +105,7 @@ export default function CustomerDetailsPage() {
 
       return matchesSearch && matchesStatus && matchesDate;
     });
-  }, [invoices, searchQuery, statusFilter, dateFilter, isLoading, error, customer]);
+  }, [invoices, searchQuery, statusFilter, isLoading, error, customer, filterInvoiceByDate]);
 
   // Debug log for filtered results
   console.log('CustomerPageDetails: Filtered customer invoices:', {
@@ -183,7 +185,7 @@ export default function CustomerDetailsPage() {
   const handleEditInvoice = (invoice: SalesInvoice) => {
     // @ts-expect-error just ignore
     if (invoice.status !== "Draft") {
-      toast.error("Only draft invoices can be edited");
+      toast.error(tl("Only draft invoices can be edited"));
       return;
     }
     setDraftInvoiceToEdit(invoice);
@@ -201,7 +203,7 @@ export default function CustomerDetailsPage() {
       //eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error("Error going to cart:", error);
-      toast.error(error.message || "Failed to add items to cart");
+      toast.error(tl(error.message || "Failed to add items to cart"));
     }
   };
 
@@ -215,7 +217,7 @@ export default function CustomerDetailsPage() {
   const handleSubmitDirect = async (invoice: SalesInvoice) => {
     try {
       await submitDraftInvoice(invoice.id);
-      toast.success(`Draft invoice ${invoice.id} submitted successfully`);
+      toast.success(tl("Draft invoice {{id}} submitted successfully", { id: invoice.id }));
       setShowEditDraftDialog(false);
       setDraftInvoiceToEdit(null);
       // Refresh the invoices list
@@ -224,7 +226,7 @@ export default function CustomerDetailsPage() {
     } catch (error: any) {
       console.error("Error submitting draft invoice:", error);
       const errorMessage = extractErrorFromException(error, "Failed to submit draft invoice");
-      toast.error(errorMessage);
+      toast.error(tl(errorMessage));
     }
   };
 
@@ -250,10 +252,10 @@ export default function CustomerDetailsPage() {
       const result = await createSalesReturn(invoiceName);
 
       navigate(`/invoice/${result.return_invoice}`)
-      toast.success(`Invoice returned: ${result.return_invoice}`);
+      toast.success(tl("Invoice returned: {{id}}", { id: result.return_invoice }));
       //eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
-      toast.error(error.message || "Failed to return invoice");
+      toast.error(tl(error.message || "Failed to return invoice"));
     }
   };
 
@@ -284,10 +286,10 @@ export default function CustomerDetailsPage() {
   // Loading state
   if (isLoadingC) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-app-bg flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-beveren-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-300">Loading customer details...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-300">{tl("Loading customer details...")}</p>
         </div>
       </div>
     );
@@ -296,11 +298,11 @@ export default function CustomerDetailsPage() {
   // Error state - only show if there's actually an error AND no customer data
   if (errorC && !customer) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-app-bg flex items-center justify-center">
         <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-lg max-w-md">
-          <h3 className="text-lg font-medium text-red-800 dark:text-red-200">Error loading customer</h3>
+          <h3 className="text-lg font-medium text-red-800 dark:text-red-200">{tl("Error loading customer")}</h3>
           <p className="mt-2 text-sm text-red-700 dark:text-red-300">
-            {errorC?.message || "Failed to load customer details"}
+            {tl(errorC?.message || "Failed to load customer details")}
           </p>
           <button
             onClick={() => navigate(-1)}
@@ -316,11 +318,11 @@ export default function CustomerDetailsPage() {
   // If no customer data, show not found
   if (!customer) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-app-bg flex items-center justify-center">
         <div className="bg-yellow-50 dark:bg-yellow-900/20 p-6 rounded-lg max-w-md">
-          <h3 className="text-lg font-medium text-yellow-800 dark:text-yellow-200">Customer not found</h3>
+          <h3 className="text-lg font-medium text-yellow-800 dark:text-yellow-200">{tl("Customer not found")}</h3>
           <p className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
-            The requested customer could not be found.
+            {tl("The requested customer could not be found.")}
           </p>
           <button
             onClick={() => navigate(-1)}
@@ -354,7 +356,7 @@ export default function CustomerDetailsPage() {
                     {customer.customer_name || customer.name}
                   </h1>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Customer ID: {customer.name}
+                    {tl("Customer ID: {{id}}", { id: customer.name })}
                   </p>
                 </div>
               </div>
@@ -509,7 +511,7 @@ export default function CustomerDetailsPage() {
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Customer Invoices ({customerInvoices.length})
+                {tl("Customer Invoices ({{count}})", { count: customerInvoices.length })}
               </h3>
             </div>
             <div className="overflow-x-auto">
@@ -534,7 +536,7 @@ export default function CustomerDetailsPage() {
                   {customerInvoices.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                        No invoices found for this customer
+                        {tl("No invoices found for this customer")}
                       </td>
                     </tr>
                   ) : (
@@ -670,180 +672,112 @@ export default function CustomerDetailsPage() {
     );
   }
 
+  const desktopCustomerHeaderLeading = (
+    <button
+      onClick={() => navigate(-1)}
+      className="rounded-2xl p-2 text-app-muted transition-colors hover:bg-app-elevated hover:text-foreground"
+    >
+      <ArrowLeft className="w-5 h-5" />
+    </button>
+  );
+
+  const desktopCustomerHeaderActions = (
+    <button
+      onClick={() => {
+        console.log('Customer data being passed to modal:', customer);
+        setSelectedCustomer(customer);
+        setShowAddModal(true);
+      }}
+      className="app-button-primary flex items-center space-x-2"
+    >
+      <Edit className="w-4 h-4" />
+      <span>{tl("Update Customer")}</span>
+    </button>
+  );
+
   // Desktop layout
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex pb-12">
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Fixed Header */}
-        <div className="fixed top-0 left-20 right-0 z-50 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-          <div className="px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <button
-                  onClick={() => navigate(-1)}
-                  className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </button>
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                                          {/* @ts-expect-error just ignore */}
-                    {customer.customer_name || customer.name}
-                  </h1>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Customer ID: {customer.name}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  console.log('Customer data being passed to modal:', customer);
-                  setSelectedCustomer(customer);
-                  setShowAddModal(true);
-                }}
-                className="flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors"
-              >
-                <Edit className="w-4 h-4" />
-                <span>Update Customer</span>
-              </button>
-            </div>
-          </div>
-        </div>
+    <div className="min-h-screen bg-app-bg pb-14">
+      <PageHeader
+        title={customer.customer_name || customer.name}
+        description={tl("Customer ID: {{id}}", { id: customer.name })}
+        leading={desktopCustomerHeaderLeading}
+        actions={desktopCustomerHeaderActions}
+      />
 
-        <div className="flex-1 overflow-auto pt-20 ml-20">
-          <div className="px-6 py-8 max-w-none">
-            {/* Customer Info Card */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 mb-6">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="w-16 h-16 bg-beveren-600 rounded-full flex items-center justify-center">
-                    <User className="w-8 h-8 text-white" />
-                  </div>
-                  <div className="space-y-1">
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                                            {/* @ts-expect-error just ignore */}
-                      {customer.customer_name || customer.name}
-                    </h2>
-                    <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
-                      <div className="flex items-center space-x-1">
-                        <Mail className="w-4 h-4" />
-                        <span>{customer.email || "No email provided"}</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <Phone className="w-4 h-4" />
-                        <span>{customer.phone || "No phone provided"}</span>
-                      </div>
+      <div className="px-4 py-6 sm:px-6 max-w-none">
+        <div className="grid gap-6 xl:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
+          <div className="space-y-6">
+            <div className="app-panel rounded-[30px] p-6">
+              <div className="flex items-start gap-4">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-app-primary/15 text-app-primary">
+                  <User className="h-8 w-8" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-xl font-semibold text-foreground">{customer.customer_name || customer.name}</h2>
+                  <div className="mt-3 space-y-2 text-sm text-app-muted">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4" />
+                      <span>{customer.email || "No email provided"}</span>
                     </div>
-                    <div className="flex items-center space-x-1 text-sm text-gray-600 dark:text-gray-400">
-                      <MapPin className="w-4 h-4" />
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4" />
+                      <span>{customer.phone || "No phone provided"}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
                       <span>{customer.territory || "No territory specified"}</span>
                     </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      <span>Customer Group: {customer.customer_group}</span>
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      <span>Type: {customer.type}</span>
-                    </div>
+                    <div>{tl("Customer Group: {{group}}", { group: customer.customer_group || tl("Not set") })}</div>
+                    <div>{tl("Type: {{type}}", { type: customer.type || tl("Not set") })}</div>
+                    {customer.creation ? <div>{tl("Created: {{date}}", { date: formatLocalizedDate(customer.creation) })}</div> : null}
+                    {customer.modified ? <div>{tl("Updated: {{date}}", { date: formatLocalizedDate(customer.modified) })}</div> : null}
                   </div>
-                </div>
-                <div className="text-right space-y-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
-                      Active
-                    </span>
-                  </div>
-                                        {/* @ts-expect-error just ignore */}
-                  {customer.creation && (
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      <div className="flex items-center space-x-1">
-                        <Calendar className="w-4 h-4" />
-                                              {/* @ts-expect-error just ignore */}
-                        <span>Created: {new Date(customer.creation).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                  )}
-                                        {/* @ts-expect-error just ignore */}
-                  {customer.modified && (
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      <div className="flex items-center space-x-1">
-                        <Clock className="w-4 h-4" />
-                                            {/* @ts-expect-error just ignore */}
-                        <span>Updated: {new Date(customer.modified).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
 
-            {/* Metrics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Total Invoices</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {customerMetrics.totalInvoices}
-                    </p>
-                  </div>
-                  <FileText className="w-8 h-8 text-beveren-600" />
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {formatCurrency(customerMetrics.totalRevenue, posDetails?.currency || 'USD')}
-                    </p>
-                  </div>
-                  <DollarSign className="w-8 h-8 text-green-600" />
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Outstanding Balance</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {formatCurrency(customerMetrics.outstandingAmount, posDetails?.currency || 'USD')}
-                    </p>
-                  </div>
-                  <AlertCircle className={`w-8 h-8 ${customerMetrics.outstandingAmount > 0 ? 'text-red-600' : 'text-gray-400'}`} />
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Avg Order Value</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {formatCurrency(customerMetrics.avgOrderValue, posDetails?.currency || 'USD')}
-                    </p>
-                  </div>
-                  <TrendingUp className="w-8 h-8 text-blue-600" />
-                </div>
-              </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <MetricCard
+                title="Total Invoices"
+                value={customerMetrics.totalInvoices}
+                icon={<FileText className="h-5 w-5" />}
+              />
+              <MetricCard
+                title="Total Revenue"
+                value={formatCurrency(customerMetrics.totalRevenue, posDetails?.currency || 'USD')}
+                icon={<DollarSign className="h-5 w-5" />}
+              />
+              <MetricCard
+                title="Outstanding"
+                value={formatCurrency(customerMetrics.outstandingAmount, posDetails?.currency || 'USD')}
+                icon={<AlertCircle className="h-5 w-5" />}
+              />
+              <MetricCard
+                title="Avg Order Value"
+                value={formatCurrency(customerMetrics.avgOrderValue, posDetails?.currency || 'USD')}
+                icon={<TrendingUp className="h-5 w-5" />}
+              />
             </div>
+          </div>
 
-            {/* Filters */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 mb-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-6">
+            <div className="app-panel rounded-[30px] p-6">
+              <div className="grid gap-4 md:grid-cols-3">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-muted" />
                   <input
                     type="text"
                     placeholder="Search invoices..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="app-input w-full pl-10 pr-3 py-2"
                   />
                 </div>
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="app-select px-3 py-2"
                 >
                   <option value="all">All Status</option>
                   <option value="Draft">Draft</option>
@@ -857,7 +791,7 @@ export default function CustomerDetailsPage() {
                 <select
                   value={dateFilter}
                   onChange={(e) => setDateFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="app-select px-3 py-2"
                 >
                   <option value="all">All Time</option>
                   <option value="today">Today</option>
@@ -868,117 +802,72 @@ export default function CustomerDetailsPage() {
               </div>
             </div>
 
-            {/* Customer Invoices Table */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Customer Invoices ({customerInvoices.length})
+            <div className="app-panel overflow-hidden rounded-[30px]">
+              <div className="border-b border-app-border px-6 py-4">
+                <h3 className="text-lg font-semibold text-foreground">
+                  {tl("Customer Invoices ({{count}})", { count: customerInvoices.length })}
                 </h3>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
+                <table className="app-table min-w-full">
+                  <thead>
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Invoice
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Customer
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Cashier
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Payment
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Amount
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Status
-                      </th>
-                      {posDetails?.is_zatca_enabled && (
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          Zatca Status
-                        </th>
-                      )}
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Actions
-                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-app-muted">Invoice</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-app-muted">Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-app-muted">Amount</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-app-muted">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-app-muted">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                  <tbody>
                     {customerInvoices.length === 0 ? (
                       <tr>
-                        <td colSpan={posDetails?.is_zatca_enabled ? 8 : 7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                          No invoices found for this customer
+                        <td colSpan={5} className="px-6 py-8 text-center text-app-muted">
+                          {tl("No invoices found for this customer")}
                         </td>
                       </tr>
                     ) : (
                       customerInvoices.map((invoice) => (
-                        <tr key={invoice.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div>
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">{invoice.id}</div>
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
-                                {invoice.date} {invoice.time}
-                              </div>
-                            </div>
+                        <tr key={invoice.id} className="border-t border-app-border/60">
+                          <td className="px-6 py-4">
+                            <div className="font-medium text-foreground">{invoice.id}</div>
+                            <div className="text-xs text-app-muted">{invoice.customer}</div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900 dark:text-white">{invoice.customer}</div>
+                          <td className="px-6 py-4 text-sm text-app-muted">
+                            {invoice.date} {invoice.time}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                            {invoice.cashier}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm text-gray-900 dark:text-white">{invoice.paymentMethod}</span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                          <td className="px-6 py-4">
+                            <div className="font-medium text-foreground">
                               {formatCurrency(invoice.totalAmount, invoice.currency)}
                             </div>
-                            {invoice.giftCardDiscount > 0 && (
-                              <div className="text-xs text-orange-600 dark:text-green-400">
-                                -{formatCurrency(invoice.giftCardDiscount, invoice.currency)} gift card
-                              </div>
-                            )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-6 py-4">
                             <span className={getStatusBadge(invoice.status)}>{invoice.status}</span>
                           </td>
-                          {posDetails?.is_zatca_enabled && (
-                            <td className="px-6 py-4 whitespace-nowrap">
-                                                    {/* @ts-expect-error just ignore */}
-                              <span className={getStatusBadge(invoice.customZatcaSubmitStatus)}>{invoice.customZatcaSubmitStatus}</span>
-                            </td>
-                          )}
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex space-x-2">
+                          <td className="px-6 py-4">
+                            <div className="flex flex-wrap items-center gap-3 text-sm font-medium">
                               <button
                                 onClick={() => handleViewInvoice(invoice)}
-                                className="text-beveren-600 hover:text-beveren-900 dark:text-beveren-400 dark:hover:text-beveren-300"
+                                className="text-app-primary hover:opacity-90"
                               >
                                 View
                               </button>
-                                                    {/* @ts-expect-error just ignore */}
-                              {invoice.status === "Draft" && (
+                              {invoice.status === "Draft" ? (
                                 <button
                                   onClick={() => handleEditInvoice(invoice)}
-                                  className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                                  className="text-sky-700 hover:opacity-90 dark:text-sky-300"
                                 >
                                   Edit
                                 </button>
-                              )}
-                                                    {/* @ts-expect-error just ignore */}
-                              {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && !invoice.is_return && hasReturnableItems(invoice) && (
+                              ) : null}
+                              {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && !invoice.is_return && hasReturnableItems(invoice) ? (
                                 <button
                                   onClick={() => handleSingleReturnClick(invoice)}
-                                  className="text-orange-600 hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-300"
+                                  className="text-amber-700 hover:opacity-90 dark:text-amber-300"
                                 >
                                   Return
                                 </button>
-                              )}
+                              ) : null}
                             </div>
                           </td>
                         </tr>
@@ -988,40 +877,30 @@ export default function CustomerDetailsPage() {
                 </table>
               </div>
             </div>
-          </div>
 
-          {/* Load More Button for Customer Invoices */}
-          {hasMore && (
-            <div className="flex justify-center mt-6">
-              <button
-                onClick={loadMore}
-                disabled={isLoading}
-                className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                  isLoading
-                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                    : 'bg-beveren-600 text-white hover:bg-beveren-700'
-                }`}
-              >
-                {isLoading ? (
-                  <div className="flex items-center space-x-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Loading...</span>
-                  </div>
-                ) : (
-                  `Load More Customer Invoices (${totalLoaded} loaded)`
-                )}
-              </button>
-            </div>
-          )}
-
-          {/* Show message when all customer invoices are loaded */}
-          {!hasMore && totalLoaded > 0 && (
-            <div className="text-center mt-6 py-4">
-              <p className="text-gray-600 dark:text-gray-400">
+            {hasMore ? (
+              <div className="flex justify-center">
+                <button
+                  onClick={loadMore}
+                  disabled={isLoading}
+                  className={`rounded-2xl px-6 py-3 font-medium transition-colors ${
+                    isLoading
+                      ? 'bg-slate-500 text-slate-200 cursor-not-allowed'
+                      : 'bg-app-primary text-white hover:opacity-90'
+                  }`}
+                >
+                  {isLoading
+                    ? tl("Loading...")
+                    : tl("Load More Customer Invoices ({{count}} loaded)", { count: totalLoaded })}
+                </button>
+              </div>
+            ) : totalLoaded > 0 ? (
+              <div className="py-4 text-center text-app-muted">
                 All {totalLoaded} customer invoices loaded
-              </p>
-            </div>
-          )}
+              </div>
+            ) : null}
+          </div>
+        </div>
         </div>
 
         {/* Invoice View Modal */}
@@ -1064,7 +943,6 @@ export default function CustomerDetailsPage() {
           onGoToCart={handleGoToCart}
           onSubmitDirect={handleSubmitDirect}
         />
-      </div>
     </div>
   );
 }

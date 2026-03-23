@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FileText,
@@ -40,13 +40,16 @@ import { useAllPaymentModes } from "../hooks/usePaymentModes";
 
 import { addDraftInvoiceToCart } from "../utils/draftInvoiceToCart";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import PageHeader from "../components/ui/PageHeader";
 import { isToday, isThisWeek, isThisMonth, isThisYear } from "../utils/time";
 import { exportInvoicesToCSV, getExportFilename, type ExportableInvoice } from "../utils/exportUtils";
+import { useI18n } from "../hooks/useI18n";
 // import InvoiceViewPage from "./InvoiceViewPage";
 
 export default function InvoiceHistoryPage() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery("(max-width: 1024px)");
+  const { tl, translateValue } = useI18n();
   const [activeTab, setActiveTab] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState("all");
@@ -125,7 +128,7 @@ export default function InvoiceHistoryPage() {
     { id: "Cancelled", name: "Cancelled", icon: XCircle, color: "text-red-500" },
   ];
 
-  const filterInvoiceByDate = (invoiceDateStr: string) => {
+  const filterInvoiceByDate = useCallback((invoiceDateStr: string) => {
     if (dateFilter === "all") return true;
 
     if (dateFilter === "today") {
@@ -156,7 +159,7 @@ export default function InvoiceHistoryPage() {
     }
 
     return true;
-  };
+  }, [dateFilter]);
 
 
 const getStatusBadge = (status: string) => {
@@ -227,7 +230,7 @@ const getStatusBadge = (status: string) => {
     }
 
     return filtered;
-  }, [invoices, activeTab, dateFilter, paymentFilter, cashierFilter, isLoading, error]);
+  }, [invoices, activeTab, paymentFilter, cashierFilter, isLoading, error, filterInvoiceByDate]);
 
   const uniqueCashiers = useMemo(() => {
     return [...new Set(invoices.map(invoice => invoice.cashier).filter(Boolean))];
@@ -282,7 +285,7 @@ const getStatusBadge = (status: string) => {
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-beveren-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-300">Loading invoices...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-300">{tl("Loading invoices...")}</p>
         </div>
       </div>
     );
@@ -293,14 +296,14 @@ const getStatusBadge = (status: string) => {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-lg max-w-md">
-          <h3 className="text-lg font-medium text-red-800 dark:text-red-200">Error loading invoices</h3>
+          <h3 className="text-lg font-medium text-red-800 dark:text-red-200">{tl("Error loading invoices")}</h3>
            {/* @ts-expect-error just ignore */}
           <p className="mt-2 text-sm text-red-700 dark:text-red-300">{error.message}</p>
           <button
             onClick={() => window.location.reload()}
             className="mt-4 px-4 py-2 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-800"
           >
-            Retry
+            {tl("Retry")}
           </button>
         </div>
       </div>
@@ -315,7 +318,7 @@ const getStatusBadge = (status: string) => {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
           <input
             type="text"
-            placeholder="Search invoices..."
+            placeholder={tl("Search invoices...")}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
@@ -331,12 +334,12 @@ const getStatusBadge = (status: string) => {
           onChange={(e) => setDateFilter(e.target.value)}
           className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
         >
-          <option value="all">All Time</option>
-          <option value="today">Today</option>
-          <option value="yesterday">Yesterday</option>
-          <option value="week">This Week</option>
-          <option value="month">This Month</option>
-          <option value="year">This Year</option>
+          <option value="all">{tl("All Time")}</option>
+          <option value="today">{tl("Today")}</option>
+          <option value="yesterday">{tl("Yesterday")}</option>
+          <option value="week">{tl("This Week")}</option>
+          <option value="month">{tl("This Month")}</option>
+          <option value="year">{tl("This Year")}</option>
         </select>
         <select
           value={cashierFilter}
@@ -346,7 +349,7 @@ const getStatusBadge = (status: string) => {
             !isAdminUser ? 'opacity-50 cursor-not-allowed' : ''
           }`}
         >
-          <option value="all">All Cashiers</option>
+          <option value="all">{tl("All Cashiers")}</option>
           {uniqueCashiers.map((cashier) => (
             <option key={cashier} value={cashier}>
               {cashier}
@@ -354,17 +357,17 @@ const getStatusBadge = (status: string) => {
           ))}
         </select>
         {!isAdminUser && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Showing only your transactions</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{tl("Showing only your transactions")}</p>
         )}
         <select
           value={paymentFilter}
           onChange={(e) => setPaymentFilter(e.target.value)}
           className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
         >
-          <option value="all">All Payments</option>
+          <option value="all">{tl("All Payments")}</option>
           {modes.map((mode) => (
             <option key={mode.name} value={mode.name}>
-              {mode.name}
+              {translateValue(mode.name)}
             </option>
           ))}
         </select>
@@ -372,7 +375,7 @@ const getStatusBadge = (status: string) => {
         {hasMore && (
           <div className="mt-3 text-center">
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Search works on all invoices in the database. Load more invoices to see additional results.
+              {tl("Search works on all invoices in the database. Load more invoices to see additional results.")}
             </p>
           </div>
         )}
@@ -384,11 +387,11 @@ const getStatusBadge = (status: string) => {
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Total Invoices</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">{tl("Total Invoices")}</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">{filteredInvoices.length}</p>
             {hasMore && (
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Showing {totalLoaded} of {totalCount}
+                {tl("Showing {{loaded}} of {{total}}", { loaded: totalLoaded, total: totalCount })}
               </p>
             )}
           </div>
@@ -398,7 +401,7 @@ const getStatusBadge = (status: string) => {
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Total Amount</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">{tl("Total Amount")}</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
               {formatCurrency(filteredInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0), posDetails?.currency || 'USD')}
             </p>
@@ -409,7 +412,7 @@ const getStatusBadge = (status: string) => {
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Paid Amount</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">{tl("Paid Amount")}</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
               {formatCurrency(
                 filteredInvoices
@@ -425,7 +428,7 @@ const getStatusBadge = (status: string) => {
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Outstanding</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">{tl("Outstanding")}</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
               {formatCurrency(
                 filteredInvoices
@@ -445,7 +448,7 @@ const getStatusBadge = (status: string) => {
     <div className="w-full max-w-none bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
       <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-          {activeTab === "all" ? "All Invoices" : tabs.find(t => t.id === activeTab)?.name} ({filteredInvoices.length})
+          {translateValue(activeTab === "all" ? "All Invoices" : tabs.find(t => t.id === activeTab)?.name || "All Invoices")} ({filteredInvoices.length})
         </h3>
         <div className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
           <button
@@ -477,22 +480,22 @@ const getStatusBadge = (status: string) => {
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Invoice
+                  {tl("Invoice")}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Customer
+                  {tl("Customer")}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Cashier
+                  {tl("Cashier")}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Payment
+                  {tl("Payment")}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Amount
+                  {tl("Amount")}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Status
+                  {tl("Status")}
                 </th>
                 {posDetails?.is_zatca_enabled && (
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -500,7 +503,7 @@ const getStatusBadge = (status: string) => {
                   </th>
                 )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Actions
+                  {tl("Actions")}
                 </th>
               </tr>
             </thead>
@@ -523,7 +526,7 @@ const getStatusBadge = (status: string) => {
                     {invoice.cashier}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-900 dark:text-white">{invoice.paymentMethod}</span>
+                    <span className="text-sm text-gray-900 dark:text-white">{translateValue(invoice.paymentMethod)}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900 dark:text-white">
@@ -536,12 +539,12 @@ const getStatusBadge = (status: string) => {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={getStatusBadge(invoice.status)}>{invoice.status}</span>
+                    <span className={getStatusBadge(invoice.status)}>{translateValue(invoice.status)}</span>
                   </td>
                   {posDetails?.is_zatca_enabled && (
                     <td className="px-6 py-4 whitespace-nowrap">
                                   {/* @ts-expect-error just ignore */}
-                      <span className={getStatusBadge(invoice.custom_zatca_submit_status)}>{invoice.custom_zatca_submit_status}</span>
+                      <span className={getStatusBadge(invoice.custom_zatca_submit_status)}>{translateValue(invoice.custom_zatca_submit_status)}</span>
                     </td>
                   )}
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -551,7 +554,7 @@ const getStatusBadge = (status: string) => {
                         className="text-beveren-600 hover:text-beveren-900 flex items-center space-x-1"
                       >
                         <Eye className="w-4 h-4" />
-                        <span>View</span>
+                        <span>{tl("View")}</span>
                       </button>
                       {invoice.status === "Draft" && (
                         <button
@@ -559,7 +562,7 @@ const getStatusBadge = (status: string) => {
                           className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 flex items-center space-x-1"
                         >
                           <Edit className="w-4 h-4" />
-                          <span>Edit</span>
+                          <span>{tl("Edit")}</span>
                         </button>
                       )}
                       {/* @ts-expect-error just ignore */}
@@ -570,7 +573,7 @@ const getStatusBadge = (status: string) => {
                           className="text-orange-600 hover:text-orange-900 flex items-center space-x-1"
                         >
                           <RotateCcw className="w-4 h-4" />
-                          <span>Return</span>
+                          <span>{tl("Return")}</span>
                         </button>
                       )}
 
@@ -580,7 +583,7 @@ const getStatusBadge = (status: string) => {
                           className="text-red-600 hover:text-red-900 flex items-center space-x-1"
                         >
                           <FileMinus className="w-4 h-4" />
-                          <span>Delete</span>
+                          <span>{tl("Delete")}</span>
                         </button>
                       )}
                     </div>
@@ -599,23 +602,23 @@ const getStatusBadge = (status: string) => {
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="text-sm font-medium text-gray-900 dark:text-white">{invoice.id}</div>
-                <span className={getStatusBadge(invoice.status)}>{invoice.status}</span>
+                <span className={getStatusBadge(invoice.status)}>{translateValue(invoice.status)}</span>
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Customer:</span>
+                  <span className="text-gray-600 dark:text-gray-400">{tl("Customer")}:</span>
                   <span className="text-gray-900 dark:text-white">{invoice.customer}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Amount:</span>
+                  <span className="text-gray-600 dark:text-gray-400">{tl("Amount")}:</span>
                   <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(invoice.totalAmount, invoice.currency)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Date:</span>
+                  <span className="text-gray-600 dark:text-gray-400">{tl("Date")}:</span>
                   <span className="text-gray-900 dark:text-white">{invoice.date}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Cashier:</span>
+                  <span className="text-gray-600 dark:text-gray-400">{tl("Cashier")}:</span>
                   <span className="text-gray-900 dark:text-white">{invoice.cashier}</span>
                 </div>
               </div>
@@ -624,7 +627,7 @@ const getStatusBadge = (status: string) => {
                   onClick={() => handleViewInvoice(invoice)}
                   className="flex-1 text-xs px-3 py-2 bg-beveren-600 text-white rounded hover:bg-beveren-700 transition-colors"
                 >
-                  View
+                  {tl("View")}
                 </button>
                 {invoice.status === "Draft" && (
                   <button
@@ -632,7 +635,7 @@ const getStatusBadge = (status: string) => {
                     className="flex-1 text-xs px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center justify-center space-x-1"
                   >
                     <Edit className="w-3 h-3" />
-                    <span>Edit</span>
+                    <span>{tl("Edit")}</span>
                   </button>
                 )}
                   {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && hasReturnableItems(invoice) && (
@@ -640,7 +643,7 @@ const getStatusBadge = (status: string) => {
                     onClick={() => handleSingleReturnClick(invoice)}
                     className="flex-1 text-xs px-3 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors"
                   >
-                    Return
+                    {tl("Return")}
                   </button>
                 )}
               </div>
@@ -664,10 +667,10 @@ const getStatusBadge = (status: string) => {
             {isLoadingMore ? (
               <div className="flex items-center space-x-2">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>Loading...</span>
+                <span>{tl("Loading...")}</span>
               </div>
             ) : (
-              `Load More (${totalLoaded}/${totalCount})`
+              tl("Load More ({{loaded}}/{{total}})", { loaded: totalLoaded, total: totalCount })
             )}
           </button>
         </div>
@@ -678,8 +681,8 @@ const getStatusBadge = (status: string) => {
         <div className="text-center mt-8 py-4">
           <p className="text-gray-600 dark:text-gray-400">
             {filteredInvoices.length > 0
-              ? `Showing ${filteredInvoices.length} invoice${filteredInvoices.length !== 1 ? 's' : ''} (${totalLoaded} total loaded)`
-              : `All ${totalCount} invoices loaded`
+              ? tl("Showing {{count}} invoices ({{total}} total loaded)", { count: filteredInvoices.length, total: totalLoaded })
+              : tl("All {{count}} invoices loaded", { count: totalCount })
             }
           </p>
         </div>
@@ -722,7 +725,7 @@ const getStatusBadge = (status: string) => {
   // Delete invoice handlers
   const handleDeleteClick = (invoice: SalesInvoice) => {
     if (invoice.status !== "Draft") {
-      toast.error("Only draft invoices can be deleted");
+      toast.error(tl("Only draft invoices can be deleted"));
       return;
     }
     setInvoiceToDelete(invoice);
@@ -734,14 +737,14 @@ const getStatusBadge = (status: string) => {
 
     try {
       await deleteDraftInvoice(invoiceToDelete.id);
-      toast.success(`Draft invoice ${invoiceToDelete.id} deleted successfully`);
+      toast.success(tl("Draft invoice {{id}} deleted successfully", { id: invoiceToDelete.id }));
       setShowDeleteConfirm(false);
       setInvoiceToDelete(null);
       // Refresh the invoices list
       window.location.reload();
       //eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
-      toast.error(error.message || "Failed to delete invoice");
+      toast.error(tl(error.message || "Failed to delete invoice"));
     }
   };
 
@@ -753,7 +756,7 @@ const getStatusBadge = (status: string) => {
   // Edit draft invoice handlers
   const handleEditDraftClick = (invoice: SalesInvoice) => {
     if (invoice.status !== "Draft") {
-      toast.error("Only draft invoices can be edited");
+      toast.error(tl("Only draft invoices can be edited"));
       return;
     }
     setSelectedDraftInvoice(invoice);
@@ -773,14 +776,14 @@ const getStatusBadge = (status: string) => {
       //eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error("Error going to cart:", error);
-      toast.error(error.message || "Failed to add items to cart");
+      toast.error(tl(error.message || "Failed to add items to cart"));
     }
   };
 
   const handleSubmitDirect = async (invoice: SalesInvoice) => {
     try {
       await submitDraftInvoice(invoice.id);
-      toast.success(`Draft invoice ${invoice.id} submitted successfully`);
+      toast.success(tl("Draft invoice {{id}} submitted successfully", { id: invoice.id }));
       setShowEditOptions(false);
       setSelectedDraftInvoice(null);
       // Refresh the invoices list
@@ -789,7 +792,7 @@ const getStatusBadge = (status: string) => {
     } catch (error: any) {
       console.error("Error submitting draft invoice:", error);
       const errorMessage = extractErrorFromException(error, "Failed to submit draft invoice");
-      toast.error(errorMessage);
+      toast.error(tl(errorMessage));
     }
   };
 
@@ -808,10 +811,10 @@ const getStatusBadge = (status: string) => {
       const result = await createSalesReturn(invoiceName);
 
       navigate(`/invoice/${result.return_invoice}`)
-      toast.success(`Invoice returned: ${result.return_invoice}`);
+      toast.success(tl("Invoice returned: {{id}}", { id: result.return_invoice }));
       //eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
-      toast.error(error.message || "Failed to return invoice");
+      toast.error(tl(error.message || "Failed to return invoice"));
     }
   };
 
@@ -842,7 +845,7 @@ const getStatusBadge = (status: string) => {
 
   const handleCustomerSelect = (customer: string) => {
     if (!customer) {
-      toast.error("Invalid customer selection");
+      toast.error(tl("Invalid customer selection"));
       return;
     }
     setSelectedCustomer(customer);
@@ -866,7 +869,7 @@ const getStatusBadge = (status: string) => {
   const handleExportInvoices = () => {
     try {
       if (!filteredInvoices || filteredInvoices.length === 0) {
-        toast.error("No invoices to export");
+        toast.error(tl("No invoices to export"));
         return;
       }
 
@@ -898,11 +901,11 @@ const getStatusBadge = (status: string) => {
       // Export to CSV
       exportInvoicesToCSV(exportableInvoices, filename);
 
-      toast.success(`Exported ${exportableInvoices.length} invoices successfully`);
+      toast.success(tl("Exported {{count}} invoices successfully", { count: exportableInvoices.length }));
       //eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error('Export error:', error);
-      toast.error(`Failed to export invoices: ${error.message}`);
+      toast.error(tl("Failed to export invoices: {{error}}", { error: error.message }));
     }
   };
 
@@ -914,21 +917,21 @@ const getStatusBadge = (status: string) => {
         <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
           <div className="px-4 py-3">
             <div className="flex items-center justify-between">
-              <h1 className="text-lg font-bold text-gray-900 dark:text-white">Invoice History</h1>
+              <h1 className="text-lg font-bold text-gray-900 dark:text-white">{tl("Invoice History")}</h1>
               <div className="flex items-center space-x-2">
                                   <button
                     onClick={handleMultiReturnClick}
                     className="flex items-center space-x-2 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm"
                   >
                   <Users className="w-4 h-4" />
-                  <span>Multi Return</span>
+                  <span>{tl("Multi Return")}</span>
                 </button>
                 <button
                   onClick={handleExportInvoices}
                   className="flex items-center space-x-2 px-3 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors text-sm"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Export</span>
+                  <span>{tl("Export")}</span>
                 </button>
               </div>
             </div>
@@ -953,7 +956,7 @@ const getStatusBadge = (status: string) => {
                       }`}
                     >
                       <tab.icon className="w-4 h-4" />
-                      <span>{tab.name}</span>
+                      <span>{translateValue(tab.name)}</span>
                       <span className="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 rounded-full">
                         {getStatusCount(tab.id)}
                       </span>
@@ -984,7 +987,7 @@ const getStatusBadge = (status: string) => {
             <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-md max-h-[90vh] flex flex-col">
               <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Select Customer</h2>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{tl("Select Customer")}</h2>
                   <button
                     onClick={handleCloseCustomerSelection}
                     className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -995,7 +998,7 @@ const getStatusBadge = (status: string) => {
               </div>
               <div className="p-6 flex-1 overflow-hidden flex flex-col">
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  Choose a customer to process multi-invoice returns
+                  {tl("Choose a customer to process multi-invoice returns")}
                 </p>
 
                 {/* Search Bar */}
@@ -1003,7 +1006,7 @@ const getStatusBadge = (status: string) => {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                   <input
                     type="text"
-                    placeholder="Search customers by name or ID..."
+                    placeholder={tl("Search customers by name or ID...")}
                     value={customerSearchQuery}
                     onChange={(e) => setCustomerSearchQuery(e.target.value)}
                     className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
@@ -1021,20 +1024,20 @@ const getStatusBadge = (status: string) => {
                         className="w-full text-left p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                       >
                         <div className="font-medium text-gray-900 dark:text-white">
-                          {customer.customer_name || customer.name || 'Unknown Customer'}
+                          {customer.customer_name || customer.name || tl('Unknown Customer')}
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {customer.name || customer.customer_name || 'No ID'}
+                          {customer.name || customer.customer_name || tl('No ID')}
                         </div>
                       </button>
                     ))
                   ) : customerSearchQuery.trim() ? (
                     <div className="text-center py-8">
-                      <div className="text-gray-500 dark:text-gray-400">No customers found matching "{customerSearchQuery}"</div>
+                      <div className="text-gray-500 dark:text-gray-400">{tl('No customers found matching "{{query}}"', { query: customerSearchQuery })}</div>
                     </div>
                   ) : (
                     <div className="text-center py-8">
-                      <div className="text-gray-500 dark:text-gray-400">No customers found</div>
+                      <div className="text-gray-500 dark:text-gray-400">{tl("No customers found")}</div>
                     </div>
                   )}
                 </div>
@@ -1044,8 +1047,8 @@ const getStatusBadge = (status: string) => {
                   <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                     <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
                       {customerSearchQuery.trim()
-                        ? `${filteredCustomers.length} of ${customers?.length || 0} customers`
-                        : `${customers?.length || 0} customers total`
+                        ? tl("{{count}} of {{total}} customers", { count: filteredCustomers.length, total: customers?.length || 0 })
+                        : tl("{{count}} customers total", { count: customers?.length || 0 })
                       }
                     </div>
                   </div>
@@ -1061,7 +1064,6 @@ const getStatusBadge = (status: string) => {
           isOpen={showMultiReturn}
           onClose={() => setShowMultiReturn(false)}
           onSuccess={handleMultiReturnSuccess}
-          // @ts-expect-error just ignore
           customers={customers}
         />
 
@@ -1072,41 +1074,36 @@ const getStatusBadge = (status: string) => {
     );
   }
 
+  const desktopHeaderActions = (
+    <div className="flex items-center gap-3">
+      <button
+        onClick={handleMultiReturnClick}
+        className="flex items-center space-x-2 rounded-2xl bg-orange-600 px-4 py-2 text-white transition-colors hover:bg-orange-700"
+      >
+        <FileMinus className="w-4 h-4" />
+        <span>{tl("Multi-Invoice Return")}</span>
+      </button>
+      <button
+        onClick={handleExportInvoices}
+        className="app-button-primary flex items-center space-x-2"
+      >
+        <Download className="w-4 h-4" />
+        <span>{tl("Export")}</span>
+      </button>
+    </div>
+  );
+
 
 
   return (
+    <div className="min-h-screen bg-app-bg pb-14">
+      <PageHeader
+        title={tl("Invoice History")}
+        description={tl("Submitted, draft, return, and overdue invoices across the active profile.")}
+        actions={desktopHeaderActions}
+      />
 
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex pb-12">
-      <div className="flex-1 flex flex-col overflow-hidden ml-20">
-        {/* Header */}
-        <div className="fixed top-0 left-20 right-0 z-50 bg-beveren-50 dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-          <div className="px-4 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Invoice History</h1>
-              </div>
-              <div className="flex items-center space-x-3">
-                <button
-                  onClick={handleMultiReturnClick}
-                  className="flex items-center space-x-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
-                >
-                  <FileMinus className="w-4 h-4" />
-                  <span>Multi-Invoice Return</span>
-                </button>
-                <button
-                  onClick={handleExportInvoices}
-                  className="flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Export</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex-1 px-6 py-8 mt-16 max-w-none">
+      <div className="px-4 py-6 sm:px-6 max-w-none">
           {/* Status Tabs - Now full width like the table */}
           <div className="mb-8 w-full max-w-none">
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
@@ -1123,7 +1120,7 @@ const getStatusBadge = (status: string) => {
                       }`}
                     >
                       <tab.icon className="w-5 h-5" />
-                      <span>{tab.name}</span>
+                      <span>{translateValue(tab.name)}</span>
                       <span className="ml-2 px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 rounded-full">
                         {getStatusCount(tab.id)}
                       </span>
@@ -1159,7 +1156,7 @@ const getStatusBadge = (status: string) => {
             <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-md max-h-[90vh] flex flex-col">
               <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Select Customer</h2>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{tl("Select Customer")}</h2>
                   <button
                     onClick={handleCloseCustomerSelection}
                     className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -1170,7 +1167,7 @@ const getStatusBadge = (status: string) => {
               </div>
               <div className="p-6 flex-1 overflow-hidden flex flex-col">
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  Choose a customer to process multi-invoice returns
+                  {tl("Choose a customer to process multi-invoice returns")}
                 </p>
 
                 {/* Search Bar */}
@@ -1178,7 +1175,7 @@ const getStatusBadge = (status: string) => {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                   <input
                     type="text"
-                    placeholder="Search customers by name or ID..."
+                    placeholder={tl("Search customers by name or ID...")}
                     value={customerSearchQuery}
                     onChange={(e) => setCustomerSearchQuery(e.target.value)}
                     className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
@@ -1195,20 +1192,20 @@ const getStatusBadge = (status: string) => {
                         className="w-full text-left p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                       >
                         <div className="font-medium text-gray-900 dark:text-white">
-                          {customer.customer_name || customer.name || 'Unknown Customer'}
+                          {customer.customer_name || customer.name || tl('Unknown Customer')}
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {customer.name || customer.customer_name || 'No ID'}
+                          {customer.name || customer.customer_name || tl('No ID')}
                         </div>
                       </button>
                     ))
                   ) : customerSearchQuery.trim() ? (
                     <div className="text-center py-8">
-                      <div className="text-gray-500 dark:text-gray-400">No customers found matching "{customerSearchQuery}"</div>
+                      <div className="text-gray-500 dark:text-gray-400">{tl('No customers found matching "{{query}}"', { query: customerSearchQuery })}</div>
                     </div>
                   ) : (
                     <div className="text-center py-8">
-                      <div className="text-gray-500 dark:text-gray-400">No customers found</div>
+                      <div className="text-gray-500 dark:text-gray-400">{tl("No customers found")}</div>
                     </div>
                   )}
                 </div>
@@ -1235,7 +1232,6 @@ const getStatusBadge = (status: string) => {
           isOpen={showMultiReturn}
           onClose={() => setShowMultiReturn(false)}
           onSuccess={handleMultiReturnSuccess}
-          // @ts-expect-error just ignore
           customers={customers}
         />
 
@@ -1253,10 +1249,10 @@ const getStatusBadge = (status: string) => {
           isOpen={showDeleteConfirm}
           onClose={handleDeleteCancel}
           onConfirm={handleDeleteConfirm}
-          title="Delete Draft Invoice"
-          message={`Are you sure you want to delete draft invoice ${invoiceToDelete?.id}? This action cannot be undone.`}
-          confirmText="Delete"
-          cancelText="Cancel"
+          title={tl("Delete Draft Invoice")}
+          message={tl("Are you sure you want to delete draft invoice {{id}}? This action cannot be undone.", { id: invoiceToDelete?.id || "" })}
+          confirmText={tl("Delete")}
+          cancelText={tl("Cancel")}
           confirmButtonClass="bg-red-600 hover:bg-red-700 text-white"
         />
 
@@ -1271,7 +1267,7 @@ const getStatusBadge = (status: string) => {
               />
               <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Draft Invoice</h2>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{tl("Edit Draft Invoice")}</h2>
                   <button
                     onClick={handleCloseEditOptions}
                     className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -1280,12 +1276,12 @@ const getStatusBadge = (status: string) => {
                   </button>
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                  Invoice: {selectedDraftInvoice.id}
+                  {tl("Invoice: {{id}}", { id: selectedDraftInvoice.id })}
                 </p>
               </div>
               <div className="p-6">
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-                  What would you like to do with this draft invoice?
+                  {tl("What would you like to do with this draft invoice?")}
                 </p>
                 <div className="space-y-3">
                   <button
@@ -1293,7 +1289,7 @@ const getStatusBadge = (status: string) => {
                     className="w-full flex items-center justify-center space-x-3 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
                   >
                     <ShoppingCart className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    <span className="font-medium text-blue-900 dark:text-blue-100">Go to Cart</span>
+                    <span className="font-medium text-blue-900 dark:text-blue-100">{tl("Go to Cart")}</span>
                   </button>
                   {/* <button
                     onClick={handleGoToPayment}
@@ -1307,14 +1303,13 @@ const getStatusBadge = (status: string) => {
                     className="w-full flex items-center justify-center space-x-3 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
                   >
                     <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
-                    <span className="font-medium text-green-900 dark:text-green-100">Submit</span>
+                    <span className="font-medium text-green-900 dark:text-green-100">{tl("Submit")}</span>
                   </button>
                 </div>
               </div>
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }

@@ -17,11 +17,14 @@ import AddCustomerModal from "./AddCustomerModal"
 import type { Customer } from "../types/customer"
 
 import BottomNavigation from "./BottomNavigation"
+import PageHeader from "./ui/PageHeader"
 import { useMediaQuery } from "../hooks/useMediaQuery"
+import { useI18n } from "../hooks/useI18n"
 
 export default function CustomersPage() {
   const navigate = useNavigate()
   const isMobile = useMediaQuery("(max-width: 1024px)")
+  const { tl, formatCurrency: formatCurrencyValue, formatDate, isRTL } = useI18n()
   const [searchQuery, setSearchQuery] = useState("")
   const [showAddModal, setShowAddModal] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
@@ -79,7 +82,7 @@ export default function CustomersPage() {
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-beveren-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-300">Loading customers...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-300">{tl("Loading customers...")}</p>
         </div>
       </div>
     )
@@ -90,52 +93,18 @@ export default function CustomersPage() {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-lg max-w-md">
-          <h3 className="text-lg font-medium text-red-800 dark:text-red-200">Error loading customers</h3>
+          <h3 className="text-lg font-medium text-red-800 dark:text-red-200">{tl("Error loading customers")}</h3>
           <p className="mt-2 text-sm text-red-700 dark:text-red-300">{error.message}</p>
           <button
             onClick={() => window.location.reload()}
             className="mt-4 px-4 py-2 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-800"
           >
-            Retry
+            {tl("Retry")}
           </button>
         </div>
       </div>
     )
   }
-
-  const formatCurrency = (amount: number, currency?: string) => {
-    // Validate currency code and provide fallbacks
-    let validCurrency = 'USD'; // Default fallback
-
-    if (currency && currency.trim() && currency.length === 3) {
-      try {
-        // Test if the currency is valid by trying to create a NumberFormat
-        new Intl.NumberFormat('en-US', {
-          style: 'currency',
-          currency: currency
-        });
-        validCurrency = currency;
-      } catch {
-        console.warn(`Invalid currency code: ${currency}, falling back to AED`);
-        validCurrency = 'USD';
-      }
-    }
-
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: validCurrency
-    }).format(amount)
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    })
-  }
-
-
 
   const getInitials = (name: string) => {
     return name
@@ -197,13 +166,13 @@ export default function CustomersPage() {
         <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
           <div className="px-4 py-3">
             <div className="flex items-center justify-between">
-              <h1 className="text-lg font-bold text-gray-900 dark:text-white">Customers</h1>
+              <h1 className="text-lg font-bold text-gray-900 dark:text-white">{tl("Customers")}</h1>
               <button
                 onClick={() => setShowAddModal(true)}
-                className="bg-beveren-600 text-white px-4 py-2 rounded-lg hover:bg-beveren-700 transition-colors flex items-center space-x-2 text-sm"
+                className={`bg-beveren-600 text-white px-4 py-2 rounded-lg hover:bg-beveren-700 transition-colors flex items-center text-sm ${isRTL ? "space-x-reverse space-x-2 flex-row-reverse" : "space-x-2"}`}
               >
                 <Plus size={16} />
-                <span>Add</span>
+                <span>{tl("Add")}</span>
               </button>
             </div>
           </div>
@@ -218,8 +187,8 @@ export default function CustomersPage() {
                 <div className="flex items-center">
                   <Users className="text-orange-500" size={24} />
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Customers</p>
-                    <p className="text-2xl font-semibold text-gray-900 dark:text-white">{customers.length} of {globalTotals?.total_customers ?? totalCount ?? customers.length}</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{tl("Total Customers")}</p>
+                    <p className="text-2xl font-semibold text-gray-900 dark:text-white">{customers.length}/{globalTotals?.total_customers ?? totalCount ?? customers.length}</p>
                   </div>
                 </div>
               </div>
@@ -230,7 +199,7 @@ export default function CustomersPage() {
                     <span className="text-white text-xs font-bold">📦</span>
                   </div>
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Invoices</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{tl("Total Invoices")}</p>
                     <p className="text-2xl font-semibold text-gray-900 dark:text-white">{globalTotals?.total_invoices ?? stats.totalOrders}</p>
                   </div>
                 </div>
@@ -245,7 +214,7 @@ export default function CustomersPage() {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                   <input
                     type="text"
-                    placeholder="Search customers... (Press Enter to add new customer)"
+                    placeholder={tl("Search customers... (Press Enter to add new customer)")}
                     value={searchQuery}
                     onChange={handleSearchInput}
                     onKeyPress={handleSearchKeyPress}
@@ -269,22 +238,22 @@ export default function CustomersPage() {
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Customer
+                        {tl("Customer")}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Contact
+                        {tl("Contact")}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Orders & Spent
+                        {tl("Orders & Spent")}
                       </th>
                       {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         Status
                       </th> */}
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Last Visit
+                        {tl("Last Visit")}
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Actions
+                        {tl("Actions")}
                       </th>
                     </tr>
                   </thead>
@@ -307,7 +276,7 @@ export default function CustomersPage() {
                                 {customer.name}
                               </div>
                               <div className="text-sm text-gray-500 dark:text-gray-400">
-                                ID: {customer.id}
+                                {tl("Customer ID: {{id}}", { id: customer.id })}
                               </div>
                             </div>
                           </div>
@@ -329,10 +298,14 @@ export default function CustomersPage() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="space-y-1">
                             <div className="text-sm font-medium text-gray-900 dark:text-white">
-                              {customer.totalOrders} orders
+                              {customer.totalOrders > 0
+                                ? tl("{{count}} orders", { count: customer.totalOrders })
+                                : tl("No orders")}
                             </div>
                             <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {formatCurrency(customer.totalSpent, customer.defaultCurrency || customer.companyCurrency)}
+                              {customer.totalSpent > 0
+                                ? formatCurrencyValue(customer.totalSpent, customer.defaultCurrency || customer.companyCurrency)
+                                : tl("No purchases")}
                             </div>
                           </div>
                         </td>
@@ -345,7 +318,7 @@ export default function CustomersPage() {
                         </td> */}
 
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {customer.lastVisit ? formatDate(customer.lastVisit) : 'Never'}
+                          {customer.lastVisit ? formatDate(customer.lastVisit) : tl('Never')}
                         </td>
 
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -380,11 +353,11 @@ export default function CustomersPage() {
               {filteredCustomers.length === 0 && (
                 <div className="text-center py-12">
                   <Users className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No customers found</h3>
+                  <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">{tl("No customers found")}</h3>
                   <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     {searchQuery
-                      ? "Try adjusting your search criteria."
-                      : "Get started by adding your first customer."}
+                      ? tl("Try adjusting your search criteria.")
+                      : tl("Get started by adding your first customer.")}
                   </p>
                 </div>
               )}
@@ -394,7 +367,10 @@ export default function CustomersPage() {
                     onClick={loadMore}
                     className="px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors text-sm"
                   >
-                    Load More ({customers.length}/{totalCount})
+                    {tl("Load More ({{loaded}}/{{total}})", {
+                      loaded: customers.length,
+                      total: totalCount,
+                    })}
                   </button>
                 </div>
               )}
@@ -442,25 +418,23 @@ export default function CustomersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex pb-12">
-      {/* Fixed Header */}
-      <div className="fixed top-0 left-20 right-0 z-50 bg-beveren-50 dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Customers</h1>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="bg-beveren-600 text-white px-6 py-3 rounded-lg hover:bg-beveren-700 transition-colors flex items-center space-x-2"
-            >
-              <Plus size={20} />
-              <span>Add Customer</span>
-            </button>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-app-bg pb-14">
+      <PageHeader
+        title={tl("Customers")}
+        description={tl("Customer profiles, spending history, and quick creation from search.")}
+        actions={(
+          <button
+            onClick={() => setShowAddModal(true)}
+            className={`app-button-primary flex items-center ${isRTL ? "space-x-reverse space-x-2 flex-row-reverse" : "space-x-2"}`}
+          >
+            <Plus size={20} />
+            <span>{tl("Add Customer")}</span>
+          </button>
+        )}
+      />
 
       {/* Main Content */}
-      <div className="flex-1 px-6 py-8 mt-16 lg:ml-20 max-w-none">
+      <div className="px-4 py-6 sm:px-6 max-w-none">
 
         <div className="mx-auto w-full">
           {/* Stats Cards */}
@@ -469,8 +443,8 @@ export default function CustomersPage() {
                 <div className="flex items-center">
                   <Users className="text-orange-500" size={24} />
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Customers</p>
-                    <p className="text-2xl font-semibold text-gray-900 dark:text-white">{customers.length} of {totalCount || customers.length}</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{tl("Total Customers")}</p>
+                    <p className="text-2xl font-semibold text-gray-900 dark:text-white">{customers.length}/{totalCount || customers.length}</p>
                   </div>
                 </div>
               </div>
@@ -481,7 +455,7 @@ export default function CustomersPage() {
                   <span className="text-white text-xs font-bold">📦</span>
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Orders</p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{tl("Total Orders")}</p>
                   <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.totalOrders}</p>
                 </div>
               </div>
@@ -495,8 +469,8 @@ export default function CustomersPage() {
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                 <input
-                  type="text"
-                  placeholder="Search customers... (Press Enter to add new customer)"
+                    type="text"
+                    placeholder={tl("Search customers... (Press Enter to add new customer)")}
                   value={searchQuery}
                   onChange={handleSearchInput}
                   onKeyPress={handleSearchKeyPress}
@@ -528,22 +502,22 @@ export default function CustomersPage() {
                 <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Customer
+                      {tl("Customer")}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Contact
+                      {tl("Contact")}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Orders & Spent
+                      {tl("Orders & Spent")}
                     </th>
                     {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Status
                     </th> */}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Last Visit
+                      {tl("Last Visit")}
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Actions
+                      {tl("Actions")}
                     </th>
                   </tr>
                 </thead>
@@ -566,7 +540,7 @@ export default function CustomersPage() {
                               {customer.name}
                             </div>
                             <div className="text-sm text-gray-500 dark:text-gray-400">
-                              ID: {customer.id}
+                              {tl("Customer ID: {{id}}", { id: customer.id })}
                             </div>
                           </div>
                         </div>
@@ -587,14 +561,18 @@ export default function CustomersPage() {
 
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="space-y-1">
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {customer.totalOrders > 0 ? `${customer.totalOrders} orders` : 'No orders'}
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                              {customer.totalOrders > 0
+                                ? tl("{{count}} orders", { count: customer.totalOrders })
+                                : tl("No orders")}
+                            </div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                              {customer.totalSpent > 0
+                                ? formatCurrencyValue(customer.totalSpent, customer.defaultCurrency || customer.companyCurrency)
+                                : tl("No purchases")}
+                            </div>
                           </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {customer.totalSpent > 0 ? formatCurrency(customer.totalSpent, customer.defaultCurrency || customer.companyCurrency) : 'No purchases'}
-                          </div>
-                        </div>
-                      </td>
+                        </td>
 
                       {/* <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(customer.status)}`}>
@@ -604,7 +582,7 @@ export default function CustomersPage() {
                       </td> */}
 
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {customer.lastVisit ? formatDate(customer.lastVisit) : 'Never'}
+                        {customer.lastVisit ? formatDate(customer.lastVisit) : tl('Never')}
                       </td>
 
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

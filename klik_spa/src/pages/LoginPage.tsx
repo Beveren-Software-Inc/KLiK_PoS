@@ -2,6 +2,7 @@ import type React from "react"
 import { useState } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { useAuth } from "../hooks/useAuth"
+import { useI18n } from "../hooks/useI18n"
 
 export default function LoginPage() {
   const [username, setUsername] = useState("")
@@ -11,6 +12,7 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { login } = useAuth()
+  const { tl, isRTL } = useI18n()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -30,7 +32,7 @@ export default function LoginPage() {
         setError(getUserFriendlyErrorMessage(result.message))
       }
     } catch (err) {
-      setError("An unexpected error occurred. Please try again.")
+      setError(tl("An unexpected error occurred. Please try again."))
       console.error("Login error:", err)
     } finally {
       setLoading(false)
@@ -40,47 +42,47 @@ export default function LoginPage() {
   const getUserFriendlyErrorMessage = (message: string): string => {
     // Handle common HTTP error codes and convert to user-friendly messages
     if (message.includes('HTTP 401') || message.includes('401')) {
-      return "Invalid username or password. Please check your credentials and try again."
+      return tl("Invalid username or password. Please check your credentials and try again.")
     }
     if (message.includes('HTTP 403') || message.includes('403')) {
-      return "Access denied. Please contact your administrator."
+      return tl("Access denied. Please contact your administrator.")
     }
     if (message.includes('HTTP 404') || message.includes('404')) {
-      return "Login service not available. Please contact your administrator."
+      return tl("Login service not available. Please contact your administrator.")
     }
     if (message.includes('HTTP 500') || message.includes('500')) {
-      return "Server error. Please try again later or contact your administrator."
+      return tl("Server error. Please try again later or contact your administrator.")
     }
     if (message.includes('Network error') || message.includes('fetch')) {
-      return "Unable to connect to the server. Please check your internet connection."
+      return tl("Unable to connect to the server. Please check your internet connection.")
     }
     if (message.includes('timeout')) {
-      return "Connection timeout. Please try again."
+      return tl("Connection timeout. Please try again.")
     }
     if (message.includes('Invalid credentials') || message.includes('incorrect')) {
-      return "Invalid username or password. Please check your credentials and try again."
+      return tl("Invalid username or password. Please check your credentials and try again.")
     }
     if (message.includes('User not found')) {
-      return "User not found. Please check your username and try again."
+      return tl("User not found. Please check your username and try again.")
     }
     if (message.includes('Account disabled')) {
-      return "Your account has been disabled. Please contact your administrator."
+      return tl("Your account has been disabled. Please contact your administrator.")
     }
     if (message.includes('Too many attempts')) {
-      return "Too many login attempts. Please wait a few minutes before trying again."
+      return tl("Too many login attempts. Please wait a few minutes before trying again.")
     }
 
     // If it's already a user-friendly message, return as is
     if (message && !message.includes('HTTP') && !message.includes('Error:')) {
-      return message
+      return tl(message)
     }
 
     // Default fallback
-    return "Login failed. Please check your credentials and try again."
+    return tl("Login failed. Please check your credentials and try again.")
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-beveren-50 to-beveren-100 flex items-center justify-center p-4">
+    <div className={`min-h-screen bg-gradient-to-br from-beveren-50 to-beveren-100 flex items-center justify-center p-4 ${isRTL ? "rtl" : "ltr"}`}>
       {/* Background Pattern */}
       <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
 
@@ -104,7 +106,7 @@ export default function LoginPage() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full px-4 py-2.5 border-2 border-beveren-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-beveren-500 focus:border-transparent transition-all duration-200 bg-beveren-50/50"
-                  placeholder="Username or Email"
+                  placeholder={tl("Username or Email")}
                   required
                 />
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3">
@@ -126,7 +128,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-4 py-2.5 border-2 border-beveren-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-beveren-500 focus:border-transparent transition-all duration-200 bg-beveren-50/50"
-                  placeholder="Password"
+                  placeholder={tl("Password")}
                   required
                 />
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3">
@@ -156,10 +158,10 @@ export default function LoginPage() {
               {loading ? (
                 <div className="flex items-center justify-center">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  <span className="ml-2">Signing In...</span>
+                  <span className="ml-2">{tl("Signing In...")}</span>
                 </div>
               ) : (
-                "Sign In"
+                tl("Sign In")
               )}
             </button>
           </form>
@@ -168,7 +170,7 @@ export default function LoginPage() {
         {/* Footer */}
         <div className="text-center mt-6">
           <p className="text-sm text-beveren-600">
-            Powered by{" "}
+            {tl("Powered by")}{" "}
             <a href="https://beverensoftware.com" target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline">
               Beveren Software
             </a>

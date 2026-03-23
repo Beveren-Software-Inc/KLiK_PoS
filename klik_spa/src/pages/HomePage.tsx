@@ -1,10 +1,12 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { useI18n } from '../hooks/useI18n'
 
 export default function HomePage() {
   const navigate = useNavigate()
   const { isAuthenticated, loading } = useAuth()
+  const { tl } = useI18n()
 
   useEffect(() => {
 
@@ -23,7 +25,7 @@ export default function HomePage() {
       <div className="text-center">
         <div className="text-2xl font-bold text-beveren-700 mb-4">KLiK PoS</div>
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-beveren-700 mx-auto"></div>
-        <p className="text-beveren-600 mt-4">Loading...</p>
+        <p className="text-beveren-600 mt-4">{tl("Loading...")}</p>
       </div>
     </div>
   )

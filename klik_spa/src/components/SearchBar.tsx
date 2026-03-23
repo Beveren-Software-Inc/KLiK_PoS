@@ -1,7 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { Scan } from "lucide-react"
+import { Scan, Search as SearchIcon } from "lucide-react"
+import { useI18n } from "../hooks/useI18n"
+import { cn } from "../lib/utils"
 
 interface SearchBarProps {
   searchQuery: string
@@ -19,12 +21,13 @@ export default function SearchBar({
   isMobile = false
 }: SearchBarProps) {
   const [isFocused, setIsFocused] = useState(false)
+  const { isRTL, tl } = useI18n()
 
   const getPlaceholder = () => {
     if (isMobile) {
-      return "Search menu..."
+      return tl("Search menu...")
     }
-    return "Search by product, category, item code, barcode, batch or serial..."
+    return tl("Search by product, category, item code, barcode, batch or serial...")
   }
 
   return (
@@ -36,34 +39,32 @@ export default function SearchBar({
           onChange={(e) => onSearchChange(e.target.value)}
           onKeyPress={onSearchKeyPress}
           placeholder={getPlaceholder()}
-          className={`flex-1 px-4 py-3 pl-12 pr-12 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-beveren-500 focus:border-transparent transition-all duration-200 ${
+          className={cn(
+            "app-input flex-1 rounded-2xl py-3 text-sm shadow-[0_20px_40px_rgba(3,14,31,0.24)] transition-all duration-200 sm:text-base",
+            isRTL ? "pr-12 pl-16 text-right" : "pl-12 pr-16 text-left",
             isFocused ? "shadow-lg" : "shadow-sm"
-          }`}
+          )}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
         />
-        <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
-          <svg
-            className="w-5 h-5 text-gray-400 dark:text-gray-500"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
+        <div
+          className={cn(
+            "absolute top-1/2 -translate-y-1/2 text-app-muted",
+            isRTL ? "right-4" : "left-4",
+          )}
+        >
+          <SearchIcon className="h-5 w-5" />
         </div>
 
         {/* Scanner Button - Integrated into search bar */}
         {onScanBarcode && (
           <button
             onClick={onScanBarcode}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 p-2 text-gray-400 hover:text-beveren-600 dark:hover:text-beveren-400 transition-colors focus:outline-none focus:ring-2 focus:ring-beveren-500 focus:ring-offset-2 rounded-lg"
-            title="Scan Barcode"
+            className={cn(
+              "app-touch-icon absolute top-1/2 -translate-y-1/2 rounded-xl p-2 text-app-muted transition-colors hover:bg-app-elevated hover:text-foreground focus:outline-none focus:ring-2 focus:ring-app-primary active:scale-[0.98]",
+              isRTL ? "left-3" : "right-3",
+            )}
+            title={tl("Scan Barcode")}
           >
             <Scan size={20} />
           </button>
@@ -73,7 +74,10 @@ export default function SearchBar({
         {searchQuery && !onScanBarcode && (
           <button
             onClick={() => onSearchChange("")}
-            className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className={cn(
+              "app-touch-icon absolute top-1/2 -translate-y-1/2 rounded-lg p-1 text-app-muted transition-colors hover:text-foreground active:scale-[0.98]",
+              isRTL ? "left-4" : "right-4",
+            )}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

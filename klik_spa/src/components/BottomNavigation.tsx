@@ -1,74 +1,47 @@
-import { Receipt, FileText, Grid3X3, BarChart3, Users } from "lucide-react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { useUserInfo } from "../hooks/useUserInfo"
+import { useI18n } from "../hooks/useI18n"
+import { APP_NAV_ITEMS, isNavItemActive } from "../config/navigation"
+import { cn } from "../lib/utils"
+import AppIcon from "./ui/AppIcon"
 
 export default function BottomNavigation() {
   const navigate = useNavigate()
   const location = useLocation()
   const { userInfo } = useUserInfo()
+  const { language } = useI18n()
 
   const canAccessSalesDashboard = userInfo?.is_admin_user ?? false
 
-   const menuItems = [
-    { icon: Grid3X3, path: "/pos", label: "POS" },
-     { icon: Receipt, path: "/invoice", label: "Invoice" },
-     { icon: Users, path: "/customers", label: "Customers" },
-    { icon: BarChart3, path: "/dashboard", label: "Dashboard", requiresSalesDashboard: true },
-    { icon: FileText, path: "/closing_shift", label: "Closing" },
+  const menuItems = APP_NAV_ITEMS.filter((item) => !item.adminOnly || canAccessSalesDashboard)
 
-  ]
-
-  const isActive = (path: string) => {
-    if (path === "/pos") {
-      return location.pathname === "/" || location.pathname === "/pos"
-    }
-    return location.pathname.startsWith(path)
-  }
-
-  const handleNav = (item: (typeof menuItems)[0]) => {
-    if (item.requiresSalesDashboard && !canAccessSalesDashboard) return
+  const handleNav = (item: (typeof menuItems)[number]) => {
     navigate(item.path)
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 z-50 safe-area-pb">
+    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-app-border bg-app-surface/95 safe-area-pb backdrop-blur-xl">
       <div className="flex items-center justify-around py-2 px-4">
         {menuItems.map((item, index) => {
-          const disabled = item.requiresSalesDashboard && !canAccessSalesDashboard
+          const active = isNavItemActive(location.pathname, item.path)
           return (
           <button
             key={index}
             onClick={() => handleNav(item)}
-            disabled={disabled}
-            title={disabled ? "Sales Dashboard (Sales Manager, System Manager or Administrator only)" : item.label}
-            className={`flex flex-col items-center justify-center min-w-0 flex-1 py-2 px-1 transition-colors ${
-              disabled
-                ? "opacity-50 cursor-not-allowed text-gray-400 dark:text-gray-500"
-                : (isActive(item.path)
-                ? "text-beveren-600 dark:text-beveren-400"
-                : "text-gray-400 dark:text-gray-500")
-            }`}
+            title={item.label[language === "ar" ? "ar" : "en"]}
+            className={cn(
+              "flex min-w-0 flex-1 flex-col items-center justify-center rounded-2xl py-2 px-1 transition-colors",
+              active ? "text-app-primary" : "text-app-muted",
+            )}
           >
-            <item.icon
-              size={20}
-              className={`mb-1 ${
-                disabled
-                  ? "text-gray-400 dark:text-gray-500"
-                  : (isActive(item.path)
-                  ? "text-beveren-600 dark:text-beveren-400"
-                  : "text-gray-400 dark:text-gray-500")
-              }`}
-            />
+            <AppIcon name={item.icon} className="mb-1 size-[22px]" />
             <span
-              className={`text-xs font-medium truncate ${
-                disabled
-                  ? "text-gray-400 dark:text-gray-500"
-                  : (isActive(item.path)
-                  ? "text-beveren-600 dark:text-beveren-400"
-                  : "text-gray-400 dark:text-gray-500")
-              }`}
+              className={cn(
+                "text-xs font-medium truncate",
+                active ? "text-app-primary" : "text-app-muted",
+              )}
             >
-              {item.label}
+              {item.label[language === "ar" ? "ar" : "en"]}
             </span>
           </button>
         )})}

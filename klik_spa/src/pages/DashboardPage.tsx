@@ -22,15 +22,18 @@ import {
 import type { SalesInvoice } from "../../types"
 
 import BottomNavigation from "../components/BottomNavigation"
+import PageHeader from "../components/ui/PageHeader"
 import { useMediaQuery } from "../hooks/useMediaQuery"
 import { usePOSDetails } from "../hooks/usePOSProfile"
 import { useAllPaymentModes } from "../hooks/usePaymentModes"
 import { useSalesInvoices } from "../hooks/useSalesInvoices"
 import { useUserInfo } from "../hooks/useUserInfo"
+import { useI18n } from "../hooks/useI18n"
 
 export default function DashboardPage() {
   const navigate = useNavigate()
   const isMobile = useMediaQuery("(max-width: 1024px)")
+  const { tl, translateValue } = useI18n()
   const { posDetails } = usePOSDetails()
 
   // Only fetch submitted invoices for dashboard (exclude Draft and Cancelled)
@@ -89,7 +92,7 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-beveren-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-300">Loading dashboard...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-300">{tl("Loading dashboard...")}</p>
         </div>
       </div>
     );
@@ -344,14 +347,14 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
         <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
           <div className="px-4 py-3">
             <div className="flex items-center justify-between">
-              <h1 className="text-lg font-bold text-gray-900 dark:text-white">Sales Dashboard</h1>
+              <h1 className="text-lg font-bold text-gray-900 dark:text-white">{tl("Sales Dashboard")}</h1>
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => setShowFilters(!showFilters)}
                   className="flex items-center space-x-2 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   <Filter className="w-4 h-4" />
-                  <span className="text-sm">Filters</span>
+                  <span className="text-sm">{tl("Filters")}</span>
                 </button>
                 {/* <button className="flex items-center space-x-2 px-3 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors">
                   <RefreshCw className="w-4 h-4" />
@@ -367,23 +370,23 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
           {/* Enhanced Filters */}
           {showFilters && (
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Dashboard Filters</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{tl("Dashboard Filters")}</h3>
               <div className="grid grid-cols-1 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Time Range</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{tl("Time Range")}</label>
                   <select
                     value={timeRange}
                     onChange={(e) => setTimeRange(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
-                    <option value="">Current POS Session</option>
-                    <option value="today">Today</option>
-                    <option value="week">This Week</option>
-                    <option value="month">This Month</option>
+                    <option value="">{tl("Current POS Session")}</option>
+                    <option value="today">{tl("Today")}</option>
+                    <option value="week">{tl("This Week")}</option>
+                    <option value="month">{tl("This Month")}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cashier</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{tl("Cashier")}</label>
                   <select
                     value={cashierFilter}
                     onChange={(e) => setCashierFilter(e.target.value)}
@@ -392,7 +395,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                       !isAdminUser ? 'opacity-50 cursor-not-allowed' : ''
                     }`}
                   >
-                    <option value="all">All Cashiers</option>
+                    <option value="all">{tl("All Cashiers")}</option>
                     {uniqueCashiers.map((cashier: string) => (
                       <option key={cashier} value={cashier}>
                         {cashier}
@@ -401,22 +404,22 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                   </select>
                   {!isAdminUser && (
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Showing only your transactions
+                      {tl("Showing only your transactions")}
                     </p>
                   )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Payment Method
+                    {tl("Payment Method")}
                   </label>
                   <select
                     value={paymentFilter}
                     onChange={(e) => setPaymentFilter(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
-                    <option value="all">All Methods</option>
-                    <option value="Cash">Cash</option>
-                    <option value="Debit Card">Debit Card</option>
+                    <option value="all">{tl("All Methods")}</option>
+                    <option value="Cash">{tl("Cash")}</option>
+                    <option value="Debit Card">{tl("Debit Card")}</option>
                   </select>
                 </div>
                 <div className="flex items-end">
@@ -428,7 +431,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                     }}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
-                    Reset Filters
+                    {tl("Reset Filters")}
                   </button>
                 </div>
               </div>
@@ -440,14 +443,14 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{tl("Total Revenue")}</p>
                   <p className="text-xl font-bold text-gray-900 dark:text-white">
                     {formatCurrency(filteredStats.totalRevenue, posDetails?.currency || 'USD')}
                   </p>
                   <div className="flex items-center mt-2">
                     <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
                     <span className="text-sm text-orange-600 dark:text-orange-400">+12.5%</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">vs last period</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">{tl("vs last period")}</span>
                   </div>
                 </div>
                 <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center">
@@ -459,14 +462,14 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Transactions</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{tl("Transactions")}</p>
                   <p className="text-xl font-bold text-gray-900 dark:text-white">
                     {filteredStats.totalTransactions}
                   </p>
                   <div className="flex items-center mt-2">
                     <TrendingUp className="w-4 h-4 text-blue-500 mr-1" />
                     <span className="text-sm text-blue-600 dark:text-blue-400">+8.2%</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">vs last period</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">{tl("vs last period")}</span>
                   </div>
                 </div>
                 <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
@@ -478,14 +481,14 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Avg Order Value</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{tl("Avg Order Value")}</p>
                   <p className="text-xl font-bold text-gray-900 dark:text-white">
                     {formatCurrency(filteredStats.averageOrderValue, posDetails?.currency || 'USD')}
                   </p>
                   <div className="flex items-center mt-2">
                     <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
                     <span className="text-sm text-orange-600 dark:text-orange-400">+3.8%</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">vs last period</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">{tl("vs last period")}</span>
                   </div>
                 </div>
                 <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center">
@@ -497,14 +500,14 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Items Sold</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{tl("Items Sold")}</p>
                   <p className="text-xl font-bold text-gray-900 dark:text-white">
                     {filteredStats.totalItems}
                   </p>
                   <div className="flex items-center mt-2">
                     <TrendingDown className="w-4 h-4 text-red-500 mr-1" />
                     <span className="text-sm text-red-600 dark:text-red-400">-2.1%</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">vs last period</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">{tl("vs last period")}</span>
                   </div>
                 </div>
                 <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center">
@@ -520,7 +523,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
             {timeRange === "today" && salesByHourData.length > 0 && (
               <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Sales by Hour (Today)</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{tl("Sales by Hour (Today)")}</h3>
                   <div className="flex items-center space-x-3">
                     {/* Graph Type Toggle */}
                     <div className="flex items-center space-x-1">
@@ -610,7 +613,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                 </div>
                 <div className="mt-3 text-center">
                   <div className="text-sm text-gray-600 dark:text-gray-400">
-                    Total Revenue: <span className="font-semibold text-beveren-600 dark:text-beveren-400">
+                    {tl("Total Revenue:")} <span className="font-semibold text-beveren-600 dark:text-beveren-400">
                       {formatCurrency(salesByHourData.reduce((sum, item) => sum + item.sales, 0), posDetails?.currency || 'USD')}
                     </span>
                   </div>
@@ -621,7 +624,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
             {/* Payment Methods Chart */}
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Payment Methods</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{tl("Payment Methods")}</h3>
                 <PieChart className="w-5 h-5 text-gray-400" />
               </div>
               <div className="space-y-4">
@@ -632,14 +635,14 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                     <div key={method.method} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                       <div className="flex items-center space-x-3">
                         <div className={`w-4 h-4 ${color} rounded`}></div>
-                        <span className="text-sm text-gray-700 dark:text-gray-300">{method.method}</span>
+                        <span className="text-sm text-gray-700 dark:text-gray-300">{translateValue(method.method)}</span>
                       </div>
                       <div className="text-right">
                         <div className="font-semibold text-gray-900 dark:text-white">
                           {formatCurrency(method.amount, posDetails?.currency || 'USD')}
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {method.percentage.toFixed(1)}% • {method.transactions} txns
+                          {method.percentage.toFixed(1)}% • {tl("{{count}} txns", { count: method.transactions })}
                         </div>
                       </div>
                     </div>
@@ -647,7 +650,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                 })}
                 {paymentMethodsData.length === 0 && (
                   <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    No payment data available for selected period
+                    {tl("No payment data available for selected period")}
                   </div>
                 )}
               </div>
@@ -763,7 +766,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
             {/* Top Cashier */}
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Top Performer</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{tl("Top Performer")}</h3>
                 <Users className="w-5 h-5 text-beveren-600" />
               </div>
               {topPerformer ? (
@@ -781,18 +784,20 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                   </div>
                   <h4 className="font-semibold text-gray-900 dark:text-white">{topPerformer.name}</h4>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                    {topPerformer.transactions} transactions
+                    {tl("{{count}} transactions", { count: topPerformer.transactions })}
                   </p>
                   <p className="text-lg font-bold text-beveren-600 dark:text-beveren-400">
                     {formatCurrency(topPerformer.sales, posDetails?.currency || 'USD')}
                   </p>
                   <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                    {filteredStats.totalRevenue > 0 ? ((topPerformer.sales / filteredStats.totalRevenue) * 100).toFixed(1) : 0}% of total sales
+                    {tl("{{percent}}% of total sales", {
+                      percent: filteredStats.totalRevenue > 0 ? ((topPerformer.sales / filteredStats.totalRevenue) * 100).toFixed(1) : 0,
+                    })}
                   </div>
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  No sales data available for selected period
+                  {tl("No sales data available for selected period")}
                 </div>
               )}
             </div>
@@ -836,8 +841,8 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
             {/* Top Products */}
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Top Selling Products</h3>
-                <button className="text-sm text-beveren-600 dark:text-beveren-400 hover:underline">View All</button>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{tl("Top Selling Products")}</h3>
+                <button className="text-sm text-beveren-600 dark:text-beveren-400 hover:underline">{tl("View All")}</button>
               </div>
               <div className="space-y-3">
                 {topProducts.map((product, index) => (
@@ -852,21 +857,21 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                       <div>
                         <div className="font-medium text-gray-900 dark:text-white">{product.name}</div>
                         <div className="text-sm text-gray-500 dark:text-gray-400 capitalize">
-                          {product.sales} sold
+                          {tl("{{count}} sold", { count: product.sales })}
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="font-semibold text-gray-900 dark:text-white">{formatCurrency(product.revenue, posDetails?.currency || 'USD')}</div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {formatCurrency(product.sales > 0 ? (product.revenue / product.sales) : 0, posDetails?.currency || 'USD')} avg
+                        {formatCurrency(product.sales > 0 ? (product.revenue / product.sales) : 0, posDetails?.currency || 'USD')} {tl("avg")}
                       </div>
                     </div>
                   </div>
                 ))}
                 {topProducts.length === 0 && (
                   <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    No product data available for selected period
+                    {tl("No product data available for selected period")}
                   </div>
                 )}
               </div>
@@ -875,12 +880,12 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
             {/* Recent Transactions */}
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Transactions</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{tl("Recent Transactions")}</h3>
                 <button
                   onClick={() => navigate("/closing_shift")}
                   className="text-sm text-beveren-600 dark:text-beveren-400 hover:underline"
                 >
-                  View All Reports
+                  {tl("View All Reports")}
                 </button>
               </div>
               <div className="space-y-3">
@@ -917,14 +922,14 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                               : "text-yellow-600 dark:text-yellow-400"
                         }`}
                       >
-                        {transaction.status}
+                        {translateValue(transaction.status)}
                       </div>
                     </div>
                   </div>
                 ))}
                 {recentTransactions.length === 0 && (
                   <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    No transactions available for selected period
+                    {tl("No transactions available for selected period")}
                   </div>
                 )}
               </div>
@@ -939,59 +944,42 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex pb-12">
+    <div className="min-h-screen bg-app-bg pb-14">
+      <PageHeader
+        title={tl("Sales Dashboard")}
+        description={tl("Role-gated performance, cashier, and payment analytics.")}
+        actions={(
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="app-button-secondary flex items-center space-x-2"
+          >
+            <Filter className="w-4 h-4" />
+            <span>{tl("Filters")}</span>
+          </button>
+        )}
+      />
 
-      <div className="flex-1 flex flex-col overflow-hidden ml-20">
-      {/* Header */}
-      <div className="fixed top-0 left-20 right-0 z-50 bg-beveren-50 dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Sales Dashboard</h1>
-            </div>
-            <div className="flex items-center space-x-2 sm:space-x-3">
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center space-x-2 px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              >
-                <Filter className="w-4 h-4" />
-                <span className="hidden sm:inline">Filters</span>
-              </button>
-              {/* <button className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors">
-                <RefreshCw className="w-4 h-4" />
-                <span className="hidden sm:inline">Refresh</span>
-              </button> */}
-              {/* <button className="hidden sm:flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-orange-700 transition-colors">
-                <Download className="w-4 h-4" />
-                <span>Export</span>
-              </button> */}
-            </div>
-          </div>
-        </div>
-      </div>
-
-        <div className="flex-1 px-6 py-8 mt-16">
+      <div className="px-4 py-6 sm:px-6">
         {/* Enhanced Filters */}
         {showFilters && (
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 mb-6 sm:mb-8">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Dashboard Filters</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{tl("Dashboard Filters")}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Time Range</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{tl("Time Range")}</label>
                 <select
                   value={timeRange}
                   onChange={(e) => setTimeRange(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
-                  <option value="">Current POS Session</option>
-                  <option value="today">Today</option>
-                  <option value="week">This Week</option>
-                  <option value="month">This Month</option>
+                  <option value="">{tl("Current POS Session")}</option>
+                  <option value="today">{tl("Today")}</option>
+                  <option value="week">{tl("This Week")}</option>
+                  <option value="month">{tl("This Month")}</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cashier</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{tl("Cashier")}</label>
                 <select
                   value={cashierFilter}
                   onChange={(e) => setCashierFilter(e.target.value)}
@@ -1000,7 +988,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                     !isAdminUser ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 >
-                  <option value="all">All Cashiers</option>
+                  <option value="all">{tl("All Cashiers")}</option>
                   {uniqueCashiers.map((cashier: string) => (
                     <option key={cashier} value={cashier}>
                       {cashier}
@@ -1009,22 +997,22 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                 </select>
                 {!isAdminUser && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Showing only your transactions
+                    {tl("Showing only your transactions")}
                   </p>
                 )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Payment Method
+                  {tl("Payment Method")}
                 </label>
                 <select
                   value={paymentFilter}
                   onChange={(e) => setPaymentFilter(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
-                  <option value="all">All Methods</option>
-                  <option value="Cash">Cash</option>
-                  <option value="Debit Card">Debit Card</option>
+                  <option value="all">{tl("All Methods")}</option>
+                  <option value="Cash">{tl("Cash")}</option>
+                  <option value="Debit Card">{tl("Debit Card")}</option>
                 </select>
               </div>
               <div className="flex items-end">
@@ -1036,7 +1024,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                   }}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
-                  Reset Filters
+                  {tl("Reset Filters")}
                 </button>
               </div>
             </div>
@@ -1048,14 +1036,14 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{tl("Total Revenue")}</p>
                 <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                   {formatCurrency(filteredStats.totalRevenue, posDetails?.currency || 'USD')}
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
                   <span className="text-sm text-orange-600 dark:text-orange-400">+12.5%</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-1 hidden sm:inline">vs last period</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-1 hidden sm:inline">{tl("vs last period")}</span>
                 </div>
               </div>
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center">
@@ -1067,14 +1055,14 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Transactions</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{tl("Transactions")}</p>
                 <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                   {filteredStats.totalTransactions}
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
                   <span className="text-sm text-orange-600 dark:text-blue-400">+8.2%</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-1 hidden sm:inline">vs last period</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-1 hidden sm:inline">{tl("vs last period")}</span>
                 </div>
               </div>
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
@@ -1086,14 +1074,14 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Avg Order Value</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{tl("Avg Order Value")}</p>
                 <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                   {formatCurrency(filteredStats.averageOrderValue, posDetails?.currency || 'USD')}
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
                   <span className="text-sm text-orange-600 dark:text-orange-400">+3.8%</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-1 hidden sm:inline">vs last period</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-1 hidden sm:inline">{tl("vs last period")}</span>
                 </div>
               </div>
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center">
@@ -1105,14 +1093,14 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Items Sold</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{tl("Items Sold")}</p>
                 <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                   {filteredStats.totalItems}
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingDown className="w-4 h-4 text-red-500 mr-1" />
                   <span className="text-sm text-red-600 dark:text-red-400">-2.1%</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-1 hidden sm:inline">vs last period</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-1 hidden sm:inline">{tl("vs last period")}</span>
                 </div>
               </div>
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center">
@@ -1128,7 +1116,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
           {timeRange === "today" && salesByHourData.length > 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Sales by Hour (Today)</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{tl("Sales by Hour (Today)")}</h3>
                 <div className="flex items-center space-x-4">
                   {/* Graph Type Toggle */}
                   <div className="flex items-center space-x-2">
@@ -1218,7 +1206,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
               </div>
               <div className="mt-4 text-center">
                 <div className="text-sm text-gray-600 dark:text-gray-400">
-                  Total Revenue: <span className="font-semibold text-beveren-600 dark:text-beveren-400">
+                  {tl("Total Revenue:")} <span className="font-semibold text-beveren-600 dark:text-beveren-400">
                     {formatCurrency(salesByHourData.reduce((sum, item) => sum + item.sales, 0), posDetails?.currency || 'USD')}
                   </span>
                 </div>
@@ -1229,7 +1217,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
           {/* Enhanced Payment Methods Chart */}
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Payment Methods</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{tl("Payment Methods")}</h3>
               <PieChart className="w-5 h-5 text-gray-400" />
             </div>
             <div className="space-y-4">
@@ -1240,14 +1228,14 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                   <div key={method.method} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                     <div className="flex items-center space-x-3">
                       <div className={`w-4 h-4 ${color} rounded`}></div>
-                      <span className="text-sm text-gray-700 dark:text-gray-300">{method.method}</span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{translateValue(method.method)}</span>
                     </div>
                     <div className="text-right">
                       <div className="font-semibold text-gray-900 dark:text-white">
                         {formatCurrency(method.amount, posDetails?.currency || 'USD')}
                       </div>
                       <div className="text-sm text-gray-500 dark:text-gray-400">
-                        {method.percentage.toFixed(1)}% • {method.transactions} txns
+                        {method.percentage.toFixed(1)}% • {tl("{{count}} txns", { count: method.transactions })}
                       </div>
                     </div>
                   </div>
@@ -1255,7 +1243,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
               })}
               {paymentMethodsData.length === 0 && (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  No payment data available for selected period
+                  {tl("No payment data available for selected period")}
                 </div>
               )}
             </div>
@@ -1339,7 +1327,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
           {/* Enhanced Top Cashier */}
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Top Performer</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{tl("Top Performer")}</h3>
               <Users className="w-5 h-5 text-beveren-600" />
             </div>
             {topPerformer ? (
@@ -1357,18 +1345,20 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                 </div>
                 <h4 className="font-semibold text-gray-900 dark:text-white">{topPerformer.name}</h4>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                  {topPerformer.transactions} transactions
+                  {tl("{{count}} transactions", { count: topPerformer.transactions })}
                 </p>
                 <p className="text-lg font-bold text-beveren-600 dark:text-beveren-400">
                   {formatCurrency(topPerformer.sales, posDetails?.currency || 'USD')}
                 </p>
                 <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                  {filteredStats.totalRevenue > 0 ? ((topPerformer.sales / filteredStats.totalRevenue) * 100).toFixed(1) : 0}% of total sales
+                  {tl("{{percent}}% of total sales", {
+                    percent: filteredStats.totalRevenue > 0 ? ((topPerformer.sales / filteredStats.totalRevenue) * 100).toFixed(1) : 0,
+                  })}
                 </div>
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                No sales data available for selected period
+                {tl("No sales data available for selected period")}
               </div>
             )}
           </div>
@@ -1381,8 +1371,8 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
           {/* Enhanced Top Products */}
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Top Selling Products</h3>
-              <button className="text-sm text-beveren-600 dark:text-beveren-400 hover:underline">View All</button>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{tl("Top Selling Products")}</h3>
+              <button className="text-sm text-beveren-600 dark:text-beveren-400 hover:underline">{tl("View All")}</button>
             </div>
             <div className="space-y-4">
               {topProducts.map((product, index) => (
@@ -1397,21 +1387,21 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                     <div>
                       <div className="font-medium text-gray-900 dark:text-white">{product.name}</div>
                       <div className="text-sm text-gray-500 dark:text-gray-400 capitalize">
-                        {product.sales} sold
+                        {tl("{{count}} sold", { count: product.sales })}
                       </div>
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="font-semibold text-gray-900 dark:text-white">{formatCurrency(product.revenue, posDetails?.currency || 'USD')}</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {formatCurrency(product.sales > 0 ? (product.revenue / product.sales) : 0, posDetails?.currency || 'USD')} avg
+                      {formatCurrency(product.sales > 0 ? (product.revenue / product.sales) : 0, posDetails?.currency || 'USD')} {tl("avg")}
                     </div>
                   </div>
                 </div>
               ))}
               {topProducts.length === 0 && (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  No product data available for selected period
+                  {tl("No product data available for selected period")}
                 </div>
               )}
             </div>
@@ -1420,12 +1410,12 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
           {/* Enhanced Recent Transactions */}
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Transactions</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{tl("Recent Transactions")}</h3>
               <button
                 onClick={() => navigate("/closing_shift")}
                 className="text-sm text-beveren-600 dark:text-beveren-400 hover:underline"
               >
-                View All Reports
+                {tl("View All Reports")}
               </button>
             </div>
             <div className="space-y-4">
@@ -1462,20 +1452,19 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                             : "text-yellow-600 dark:text-yellow-400"
                       }`}
                     >
-                      {transaction.status}
+                      {translateValue(transaction.status)}
                     </div>
                   </div>
                 </div>
               ))}
               {recentTransactions.length === 0 && (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  No transactions available for selected period
+                  {tl("No transactions available for selected period")}
                 </div>
               )}
             </div>
           </div>
         </div>
-      </div>
       </div>
     </div>
   )

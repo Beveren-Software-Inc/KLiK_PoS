@@ -1,152 +1,164 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react"
+import { useAuth } from "./useAuth"
+import erpnextAPI from "../services/erpnext-api"
+import { hasTranslation, translations, type Language, type TranslationKey } from "../i18n/translations"
+import {
+  applyLanguageToDocument,
+  getLocaleForLanguage,
+  normalizeLanguage,
+  persistLanguagePreference,
+  resolveInitialLanguage,
+} from "../i18n/utils"
+
+type TranslationParams = Record<string, string | number | null | undefined>
 
 interface I18nContextType {
-  language: string
+  language: Language
+  locale: string
   setLanguage: (lang: string) => void
-  t: (key: string) => string
+  t: (key: TranslationKey, params?: TranslationParams) => string
+  tl: (key: string, params?: TranslationParams) => string
   isRTL: boolean
+  formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string
+  formatCurrency: (value: number, currency?: string, options?: Intl.NumberFormatOptions) => string
+  formatDate: (value: string | number | Date, options?: Intl.DateTimeFormatOptions) => string
+  formatTime: (value: string | number | Date, options?: Intl.DateTimeFormatOptions) => string
+  formatDateTime: (value: string | number | Date, options?: Intl.DateTimeFormatOptions) => string
+  translateValue: (value: string) => string
 }
 
 const I18nContext = createContext<I18nContextType | undefined>(undefined)
 
-const translations = {
-  en: {
-    // Login
-    LOGIN_TITLE: "Login",
-    USERNAME: "Username",
-    PASSWORD: "Password",
-    LOGIN_BUTTON: "Login",
-    LOGGING_IN: "Logging in...",
-    INVALID_CREDENTIALS: "Invalid credentials",
-    LOGIN_ERROR: "Login error",
+function interpolate(template: string, params?: TranslationParams) {
+  if (!params) {
+    return template
+  }
 
-    // Navigation
-    PROFILE: "Profile",
-    LOGOUT: "Logout",
-    PAYMENT_TITLE: "Payment",
+  return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key: string) => String(params[key] ?? ""))
+}
 
-    // POS
-    SEARCH_PLACEHOLDER: "Search products",
-    CART: "Cart",
-    CART_EMPTY: "Your cart is empty",
-    SUBTOTAL: "Subtotal",
-    VAT: "VAT",
-    TOTAL: "Total",
-    PROMO_CODE_PLACEHOLDER: "Enter promo code",
-    PROCEED_TO_CHECKOUT: "Proceed to Checkout",
-    BACK_TO_CART: "Back to Cart",
-
-    // Payment
-    INVOICE_SUMMARY: "Invoice Summary",
-    INVOICE_ID: "Invoice ID",
-    DATE_TIME: "Date & Time",
-    SCAN_TO_VERIFY: "Scan to Verify",
-    PAYMENT_METHODS: "Payment Methods",
-    CASH: "Cash",
-    CARD: "Card",
-    DIGITAL_WALLET: "Digital Wallet",
-    AMOUNT_RECEIVED: "Amount Received",
-    CHANGE: "Change",
-    INSERT_OR_TAP_CARD: "Insert or Tap Card",
-    SCAN_WITH_STC_PAY: "Scan with STC Pay",
-    CONFIRM_PAYMENT: "Confirm Payment",
-
-    // Offline
-    OFFLINE_MESSAGE: "You are offline. New orders will sync when you're back online.",
-
-    // Errors
-    INVOICE_NOT_FOUND: "Invoice not found",
-  },
-  ar: {
-    // Login
-    LOGIN_TITLE: "تسجيل الدخول",
-    USERNAME: "اسم المستخدم",
-    PASSWORD: "كلمة المرور",
-    LOGIN_BUTTON: "دخول",
-    LOGGING_IN: "جاري تسجيل الدخول...",
-    INVALID_CREDENTIALS: "بيانات الاعتماد غير صحيحة",
-    LOGIN_ERROR: "خطأ في تسجيل الدخول",
-
-    // Navigation
-    PROFILE: "الملف الشخصي",
-    LOGOUT: "تسجيل الخروج",
-    PAYMENT_TITLE: "الدفع",
-
-    // POS
-    SEARCH_PLACEHOLDER: "ابحث عن منتج",
-    CART: "السلة",
-    CART_EMPTY: "سلتك فارغة",
-    SUBTOTAL: "المجموع الفرعي",
-    VAT: "ضريبة القيمة المضافة",
-    TOTAL: "الإجمالي",
-    PROMO_CODE_PLACEHOLDER: "أدخل رمز العرض",
-    PROCEED_TO_CHECKOUT: "إتمام الدفع",
-    BACK_TO_CART: "العودة للسلة",
-
-    // Payment
-    INVOICE_SUMMARY: "ملخص الفاتورة",
-    INVOICE_ID: "رقم الفاتورة",
-    DATE_TIME: "التاريخ والوقت",
-    SCAN_TO_VERIFY: "امسح للتدقيق",
-    PAYMENT_METHODS: "طرق الدفع",
-    CASH: "نقد",
-    CARD: "بطاقة",
-    DIGITAL_WALLET: "المحفظة الرقمية",
-    AMOUNT_RECEIVED: "المبلغ المستلم",
-    CHANGE: "الباقي",
-    INSERT_OR_TAP_CARD: "أدخل أو اضغط البطاقة",
-    SCAN_WITH_STC_PAY: "امسح عبر STC Pay",
-    CONFIRM_PAYMENT: "تأكيد الدفع",
-
-    // Offline
-    OFFLINE_MESSAGE: "أنت غير متصل. سيتم مزامنة الطلبات عند عودتك للإنترنت.",
-
-    // Errors
-    INVOICE_NOT_FOUND: "الفاتورة غير موجودة",
-  },
+function toDate(value: string | number | Date) {
+  return value instanceof Date ? value : new Date(value)
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguage] = useState("en")
-  const [mounted, setMounted] = useState(false)
+  const { user } = useAuth()
+  const [language, setLanguageState] = useState<Language>(() => resolveInitialLanguage())
+
+  const locale = useMemo(() => getLocaleForLanguage(language), [language])
+  const isRTL = language === "ar"
+
+  const translate = (key: string, params?: TranslationParams): string => {
+    const bucket = translations[language] ?? translations.ar
+    const fallback = translations.en
+    const template =
+      (hasTranslation(key) ? bucket[key] : undefined) ??
+      (hasTranslation(key) ? fallback[key] : undefined) ??
+      key
+
+    return interpolate(template, params)
+  }
+
+  const formatNumber = (value: number, options: Intl.NumberFormatOptions = {}) =>
+    new Intl.NumberFormat(locale, options).format(value)
+
+  const formatCurrency = (
+    value: number,
+    currency: string = "SAR",
+    options: Intl.NumberFormatOptions = {},
+  ) =>
+    new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency,
+      currencyDisplay: "narrowSymbol",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+      ...options,
+    }).format(value)
+
+  const formatDate = (value: string | number | Date, options: Intl.DateTimeFormatOptions = {}) =>
+    new Intl.DateTimeFormat(locale, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      ...options,
+    }).format(toDate(value))
+
+  const formatTime = (value: string | number | Date, options: Intl.DateTimeFormatOptions = {}) =>
+    new Intl.DateTimeFormat(locale, {
+      hour: "2-digit",
+      minute: "2-digit",
+      ...options,
+    }).format(toDate(value))
+
+  const formatDateTime = (
+    value: string | number | Date,
+    options: Intl.DateTimeFormatOptions = {},
+  ) =>
+    new Intl.DateTimeFormat(locale, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      ...options,
+    }).format(toDate(value))
 
   useEffect(() => {
-    setMounted(true)
+    const initialLanguage = resolveInitialLanguage()
+    setLanguageState(initialLanguage)
+    persistLanguagePreference(initialLanguage)
   }, [])
 
   useEffect(() => {
-    if (!mounted) return
+    persistLanguagePreference(language)
+  }, [language])
 
-    const savedLang = localStorage.getItem("language") || "en"
-    setLanguage(savedLang)
-
-    // Set document direction
-    document.documentElement.dir = savedLang === "ar" ? "rtl" : "ltr"
-    document.documentElement.lang = savedLang
-  }, [mounted])
+  useEffect(() => {
+    applyLanguageToDocument(language)
+  }, [language])
 
   const handleSetLanguage = (lang: string) => {
-    if (!mounted) return
+    const nextLanguage = normalizeLanguage(lang)
 
-    setLanguage(lang)
-    localStorage.setItem("language", lang)
-    document.documentElement.dir = lang === "ar" ? "rtl" : "ltr"
-    document.documentElement.lang = lang
+    if (nextLanguage === language) {
+      return
+    }
+
+    setLanguageState(nextLanguage)
+
+    if (user?.name) {
+      void erpnextAPI.setLanguage(nextLanguage).catch((error) => {
+        console.warn("Failed to persist language preference:", error)
+      })
+    }
   }
 
-  const t = (key: string): string => {
-    return translations[language as keyof typeof translations]?.[key as keyof typeof translations.en] || key
+  const value: I18nContextType = {
+    language,
+    locale,
+    setLanguage: handleSetLanguage,
+    t: (key, params) => translate(key, params),
+    tl: translate,
+    isRTL,
+    formatNumber,
+    formatCurrency,
+    formatDate,
+    formatTime,
+    formatDateTime,
+    translateValue: (value) => translate(value),
   }
 
-  const isRTL = language === "ar"
-
-  return (
-    <I18nContext.Provider value={{ language, setLanguage: handleSetLanguage, t, isRTL }}>
-      {children}
-    </I18nContext.Provider>
-  )
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

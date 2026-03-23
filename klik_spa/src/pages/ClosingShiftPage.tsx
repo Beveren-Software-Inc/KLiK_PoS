@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   CreditCard,
@@ -24,13 +24,16 @@ import BottomNavigation from "../components/BottomNavigation";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { deleteDraftInvoice } from "../services/salesInvoice";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import PageHeader from "../components/ui/PageHeader";
 import { formatCurrency } from "../utils/currency";
 import { isToday, isThisWeek, isThisMonth, isThisYear } from "../utils/time";
 import { clearAllCache } from "../utils/clearCache";
+import { useI18n } from "../hooks/useI18n";
 
 export default function ClosingShiftPage() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery("(max-width: 1024px)");
+  const { tl, translateValue } = useI18n();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
@@ -38,7 +41,7 @@ export default function ClosingShiftPage() {
   const [selectedInvoice] = useState<SalesInvoice | null>(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
-  const [closingAmounts, setClosingAmounts] = useState({});
+  const [closingAmounts, setClosingAmounts] = useState<Record<string, number>>({});
 
   // Draft Invoice Edit states
   // const [showEditOptions, setShowEditOptions] = useState(false);
@@ -60,7 +63,7 @@ export default function ClosingShiftPage() {
 
   const hideExpectedAmount = posDetails?.custom_hide_expected_amount || false;
 
-  const filterInvoiceByDate = (invoiceDateStr: string) => {
+  const filterInvoiceByDate = useCallback((invoiceDateStr: string) => {
     if (dateFilter === "all") return true;
     if (dateFilter === "today") {
       return isToday(invoiceDateStr);
@@ -90,7 +93,7 @@ export default function ClosingShiftPage() {
     }
 
     return true;
-  };
+  }, [dateFilter]);
 
   const getStatusBadge = (status: string) => {
     const baseClasses = "px-2 py-1 rounded-full text-xs font-medium";
@@ -99,34 +102,34 @@ export default function ClosingShiftPage() {
     switch (normalized) {
       // Payment statuses
       case "paid":
-        return `${baseClasses} bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400`;
+        return `${baseClasses} border border-emerald-100 bg-emerald-50 text-emerald-700`;
       case "unpaid":
-        return `${baseClasses} bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400`;
+        return `${baseClasses} border border-amber-100 bg-amber-50 text-amber-700`;
       case "partly paid":
-        return `${baseClasses} bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400`;
+        return `${baseClasses} border border-orange-100 bg-orange-50 text-orange-700`;
       case "overdue":
-        return `${baseClasses} bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400`;
+        return `${baseClasses} border border-rose-100 bg-rose-50 text-rose-700`;
       case "draft":
-        return `${baseClasses} bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400`;
+        return `${baseClasses} border border-slate-200 bg-slate-100 text-slate-700`;
       case "return":
-        return `${baseClasses} bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400`;
+        return `${baseClasses} border border-fuchsia-100 bg-fuchsia-50 text-fuchsia-700`;
       case "cancelled":
-        return `${baseClasses} bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400`;
+        return `${baseClasses} border border-rose-100 bg-rose-50 text-rose-700`;
 
       // ZATCA submission statuses
       case "pending":
-        return `${baseClasses} bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400`;
+        return `${baseClasses} border border-amber-100 bg-amber-50 text-amber-700`;
       case "reported":
-        return `${baseClasses} bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400`;
+        return `${baseClasses} border border-sky-100 bg-sky-50 text-sky-700`;
       case "not reported":
-        return `${baseClasses} bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400`;
+        return `${baseClasses} border border-slate-200 bg-slate-100 text-slate-700`;
       case "cleared":
-        return `${baseClasses} bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400`;
+        return `${baseClasses} border border-emerald-100 bg-emerald-50 text-emerald-700`;
       case "not cleared":
-        return `${baseClasses} bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400`;
+        return `${baseClasses} border border-rose-100 bg-rose-50 text-rose-700`;
 
       default:
-        return `${baseClasses} bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400`; // Neutral fallback
+        return `${baseClasses} border border-slate-200 bg-slate-100 text-slate-700`; // Neutral fallback
     }
   };
 
@@ -154,7 +157,7 @@ export default function ClosingShiftPage() {
       return matchesSearch && matchesPayment && matchesStatus && matchesDate && matchesPOSProfile && matchesOpeningEntry;
     });
 
-  }, [invoices, searchQuery, statusFilter, dateFilter, paymentFilter, isLoading, error, posDetails]);
+  }, [invoices, searchQuery, statusFilter, paymentFilter, isLoading, error, posDetails, filterInvoiceByDate]);
 
 
   // Payment Stats Calculation - Calculate from filtered invoices
@@ -225,7 +228,7 @@ export default function ClosingShiftPage() {
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-beveren-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-300">Loading invoices and payment modes...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-300">{tl("Loading invoices and payment modes...")}</p>
         </div>
       </div>
     );
@@ -236,14 +239,14 @@ export default function ClosingShiftPage() {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-lg max-w-md">
-          <h3 className="text-lg font-medium text-red-800 dark:text-red-200">Error loading data</h3>
+          <h3 className="text-lg font-medium text-red-800 dark:text-red-200">{tl("Error loading data")}</h3>
                                 {/* @ts-expect-error just ignore */}
-          <p className="mt-2 text-sm text-red-700 dark:text-red-300">Invoices: {error.message}</p>
+          <p className="mt-2 text-sm text-red-700 dark:text-red-300">{tl("Invoices: {{error}}", { error: error.message })}</p>
           <button
             onClick={() => window.location.reload()}
             className="mt-4 px-4 py-2 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-800"
           >
-            Retry
+            {tl("Retry")}
           </button>
         </div>
       </div>
@@ -260,7 +263,7 @@ export default function ClosingShiftPage() {
   // Delete invoice handlers
   const handleDeleteClick = (invoice: SalesInvoice) => {
     if (invoice.status !== "Draft") {
-      toast.error("Only draft invoices can be deleted");
+      toast.error(tl("Only draft invoices can be deleted"));
       return;
     }
     setInvoiceToDelete(invoice);
@@ -272,14 +275,14 @@ export default function ClosingShiftPage() {
 
     try {
       await deleteDraftInvoice(invoiceToDelete.id);
-      toast.success(`Draft invoice ${invoiceToDelete.id} deleted successfully`);
+      toast.success(tl("Draft invoice {{id}} deleted successfully", { id: invoiceToDelete.id }));
       setShowDeleteConfirm(false);
       setInvoiceToDelete(null);
       // Refresh the invoices list
       window.location.reload();
       //eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
-      toast.error(error.message || "Failed to delete invoice");
+      toast.error(tl(error.message || "Failed to delete invoice"));
     }
   };
 
@@ -296,10 +299,10 @@ export default function ClosingShiftPage() {
   const handleReturnClick = async (invoiceName: string) => {
     try {
       const result = await createSalesReturn(invoiceName);
-      toast.success(`Invoice returned: ${result.return_invoice}`);
+      toast.success(tl("Invoice returned: {{id}}", { id: result.return_invoice }));
       //eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
-      toast.error(error.message || "Failed to return invoice");
+      toast.error(tl(error.message || "Failed to return invoice"));
     }
   };
 
@@ -396,13 +399,13 @@ export default function ClosingShiftPage() {
         <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
           <div className="px-4 py-3">
             <div className="flex items-center justify-between">
-              <h1 className="text-lg font-bold text-gray-900 dark:text-white">Closing Shift</h1>
+              <h1 className="text-lg font-bold text-gray-900 dark:text-white">{tl("Closing Shift")}</h1>
               <button
                 onClick={() => setShowCloseModal(true)}
                 className="flex items-center space-x-2 px-3 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors text-sm"
               >
                 <MonitorX className="w-4 h-4" />
-                <span>Close</span>
+                <span>{tl("Close")}</span>
               </button>
             </div>
           </div>
@@ -419,10 +422,10 @@ export default function ClosingShiftPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                    No Opening Entry Found
+                    {tl("No Opening Entry Found")}
                   </h3>
                   <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                    You can still close the shift, but payment summary will not be available.
+                    {tl("You can still close the shift, but payment summary will not be available.")}
                   </p>
                 </div>
               </div>
@@ -437,7 +440,7 @@ export default function ClosingShiftPage() {
                 <div key={stat.name} className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
                   <div className="flex items-center justify-between mb-4">
                                           {/* @ts-expect-error just ignore */}
-                    <h3 className="font-semibold text-gray-900 dark:text-white">{stat.name}</h3>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">{translateValue(stat.name)}</h3>
                                           {/* @ts-expect-error just ignore */}
                     {stat.name.toLowerCase().includes('cash') ? (
                       <div className="text-2xl">💵</div>
@@ -455,7 +458,9 @@ export default function ClosingShiftPage() {
                     </div> */}
                     <div className="text-sm text-gray-600 dark:text-gray-400">
                                             {/* @ts-expect-error just ignore */}
-                      {total > 0 ? ((stat.amount / total) * 100).toFixed(1) : 0}% of total
+                      {tl("{{percent}}% of total", {
+                        percent: total > 0 ? ((stat.amount / total) * 100).toFixed(1) : 0,
+                      })}
                     </div>
                   </div>
                 </div>
@@ -470,7 +475,7 @@ export default function ClosingShiftPage() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                 <input
                   type="text"
-                  placeholder="Search..."
+                  placeholder={tl("Search...")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
@@ -482,12 +487,12 @@ export default function ClosingShiftPage() {
 
                 className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
-                <option value="all">All Time</option>
-                <option value="today">Today</option>
-                <option value="yesterday">Yesterday</option>
-                <option value="week">This Week</option>
-                <option value="month">This Month</option>
-                <option value="year">This Year</option>
+                <option value="all">{tl("All Time")}</option>
+                <option value="today">{tl("Today")}</option>
+                <option value="yesterday">{tl("Yesterday")}</option>
+                <option value="week">{tl("This Week")}</option>
+                <option value="month">{tl("This Month")}</option>
+                <option value="year">{tl("This Year")}</option>
               </select>
 
               <select
@@ -495,15 +500,15 @@ export default function ClosingShiftPage() {
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
-                <option value="all">All Status</option>
-                <option value="Draft">Draft</option>
-                <option value="Unpaid">Unpaid</option>
-                <option value="Partly Paid">Partly Paid</option>
-                <option value="Paid">Paid</option>
-                <option value="Overdue">Overdue</option>
-                <option value="Return">Return</option>
-                <option value="Credit Note Issued">Credit Note Issued</option>
-                <option value="Cancelled">Cancelled</option>
+                <option value="all">{tl("All Status")}</option>
+                <option value="Draft">{tl("Draft")}</option>
+                <option value="Unpaid">{tl("Unpaid")}</option>
+                <option value="Partly Paid">{tl("Partly Paid")}</option>
+                <option value="Paid">{tl("Paid")}</option>
+                <option value="Overdue">{tl("Overdue")}</option>
+                <option value="Return">{tl("Return")}</option>
+                <option value="Credit Note Issued">{tl("Credit Note Issued")}</option>
+                <option value="Cancelled">{tl("Cancelled")}</option>
               </select>
 
               <select
@@ -511,10 +516,10 @@ export default function ClosingShiftPage() {
                 onChange={(e) => setPaymentFilter(e.target.value)}
                 className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
-                <option value="all">All Payments</option>
+                <option value="all">{tl("All Payments")}</option>
                 {modes.map((mode) => (
                   <option key={mode.name} value={mode.name}>
-                    {mode.name}
+                    {translateValue(mode.name)}
                   </option>
                 ))}
               </select>
@@ -525,7 +530,7 @@ export default function ClosingShiftPage() {
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="px-4 py-4 border-b border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                All Invoices ({filteredInvoices.length})
+                {tl("All Invoices")} ({filteredInvoices.length})
               </h3>
             </div>
             <div className="overflow-x-auto">
@@ -533,24 +538,24 @@ export default function ClosingShiftPage() {
                 <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Invoice
+                      {tl("Invoice")}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Customer
+                      {tl("Customer")}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Amount
+                      {tl("Amount")}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Status
+                      {tl("Status")}
                     </th>
                     {posDetails?.is_zatca_enabled && (
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Zatca Status
+                        {tl("Zatca Status")}
                       </th>
                     )}
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Actions
+                      {tl("Actions")}
                     </th>
                   </tr>
                 </thead>
@@ -568,7 +573,7 @@ export default function ClosingShiftPage() {
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-white">{invoice.customer}</div>
                         {invoice.giftCardCode && (
-                          <div className="text-xs text-purple-600 dark:text-purple-400">Gift: {invoice.giftCardCode}</div>
+                          <div className="text-xs text-purple-600 dark:text-purple-400">{tl("Gift: {{code}}", { code: invoice.giftCardCode })}</div>
                         )}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
@@ -577,16 +582,16 @@ export default function ClosingShiftPage() {
                         </div>
                         {invoice.giftCardDiscount > 0 && (
                           <div className="text-xs text-green-600 dark:text-green-400">
-                            -{formatCurrency(invoice.giftCardDiscount, invoice.currency)} gift
+                            -{formatCurrency(invoice.giftCardDiscount, invoice.currency)} {tl("gift card")}
                           </div>
                         )}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
-                        <span className={getStatusBadge(invoice.status)}>{invoice.status}</span>
+                        <span className={getStatusBadge(invoice.status)}>{translateValue(invoice.status)}</span>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                                               {/* @ts-expect-error just ignore */}
-                        <span className={getStatusBadge(invoice.custom_zatca_submit_status)}>{invoice.custom_zatca_submit_status}</span>
+                        <span className={getStatusBadge(invoice.custom_zatca_submit_status)}>{translateValue(invoice.custom_zatca_submit_status)}</span>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex space-x-2">
@@ -595,7 +600,7 @@ export default function ClosingShiftPage() {
                             className="text-beveren-600 hover:text-beveren-900 flex items-center space-x-1"
                           >
                             <Eye className="w-4 h-4" />
-                            <span>View</span>
+                            <span>{tl("View")}</span>
                           </button>
                           {/* {invoice.status === "Draft" && (
                             <button
@@ -612,7 +617,7 @@ export default function ClosingShiftPage() {
                               className="text-red-600 hover:text-red-900 flex items-center space-x-1"
                             >
                               <MonitorX className="w-4 h-4" />
-                              <span>Delete</span>
+                              <span>{tl("Delete")}</span>
                             </button>
                           )}
                                                 {/* @ts-expect-error just ignore */}
@@ -622,7 +627,7 @@ export default function ClosingShiftPage() {
                               className="text-orange-600 hover:text-orange-900 flex items-center space-x-1"
                             >
                               <RotateCcw className="w-4 h-4" />
-                              <span>Return</span>
+                              <span>{tl("Return")}</span>
                             </button>
                           )}
                         </div>
@@ -640,7 +645,7 @@ export default function ClosingShiftPage() {
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
             <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-lg mx-4">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Close Shift</h2>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">{tl("Close Shift")}</h2>
                 <button
                   onClick={() => setShowCloseModal(false)}
                   className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -666,7 +671,7 @@ export default function ClosingShiftPage() {
 
                     <div className="flex flex-col space-y-2">
                       <div className="text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">Opening: </span>
+                        <span className="text-gray-600 dark:text-gray-400">{tl("Opening:")}</span>
                         <span className="font-medium text-gray-900 dark:text-white">
                                                 {/* @ts-expect-error just ignore */}
                           {formatCurrency(stat.openingAmount, posDetails?.currency || 'USD')}
@@ -677,7 +682,7 @@ export default function ClosingShiftPage() {
                         <input
                           type="number"
                           step="0.01"
-                          placeholder="Closing amount"
+                          placeholder={tl("Closing amount")}
                                 // @ts-expect-error just ignore for now
                           value={closingAmounts[stat.name] || ''}
                           // @ts-expect-error just ignore for now
@@ -695,7 +700,7 @@ export default function ClosingShiftPage() {
                   onClick={() => setShowCloseModal(false)}
                   className="px-4 py-2 text-red-600 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-500 font-medium"
                 >
-                  Cancel
+                  {tl("Cancel")}
                 </button>
                 <button
                   onClick={handleFinalClose}
@@ -706,7 +711,7 @@ export default function ClosingShiftPage() {
                       : 'bg-beveren-600 text-white hover:bg-beveren-700'
                   }`}
                 >
-                  {isCreating ? 'Closing...' : 'Close Shift'}
+                  {isCreating ? tl('Closing...') : tl('Close Shift')}
                 </button>
               </div>
             </div>
@@ -728,41 +733,38 @@ export default function ClosingShiftPage() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex pb-12">
-      <div className="flex-1 flex flex-col overflow-hidden ml-20">
-        {/* Header */}
-        <div className="fixed top-0 left-20 right-0 z-50 bg-beveren-50 dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-          <div className="px-4 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Closing Shift</h1>
-              </div>
-              <button
-                onClick={() => setShowCloseModal(true)}
-                className="flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors"
-              >
-                <MonitorX className="w-4 h-4" />
-                <span>Close</span>
-              </button>
-            </div>
-          </div>
-        </div>
+  const desktopClosingHeaderActions = (
+    <button
+      onClick={() => setShowCloseModal(true)}
+      className="flex items-center space-x-2 rounded-2xl bg-app-primary px-4 py-2 text-white transition-colors hover:opacity-90"
+    >
+      <MonitorX className="w-4 h-4" />
+      <span>{tl("Close")}</span>
+    </button>
+  );
 
-        <div className="flex-1 px-6 py-8 mt-16 space-y-6">
+  return (
+    <div className="min-h-screen bg-gray-50 pb-14 text-slate-900 dark:bg-gray-900 dark:text-white">
+      <PageHeader
+        title={tl("Closing Shift")}
+        description={tl("Reconcile session payments and close the current POS opening.")}
+        actions={desktopClosingHeaderActions}
+      />
+
+      <div className="px-4 py-6 sm:px-6 space-y-6">
           {/* Warning if no opening entry */}
           {hasNoOpeningEntry && (
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+            <div className="rounded-3xl border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/20">
               <div className="flex items-center">
-                <div className="text-yellow-600 dark:text-yellow-400 mr-3">
+                <div className="mr-3 text-yellow-600">
                   <AlertCircle className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                    No Opening Entry Found
+                    {tl("No Opening Entry Found")}
                   </h3>
-                  <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                    You can still close the shift, but payment summary will not be available.
+                  <p className="mt-1 text-sm text-yellow-700 dark:text-yellow-300">
+                    {tl("You can still close the shift, but payment summary will not be available.")}
                   </p>
                 </div>
               </div>
@@ -775,11 +777,10 @@ export default function ClosingShiftPage() {
               {/* Payment Method Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {Object.values(paymentStats).map((stat) => (
-                  // @ts-expect-error just ignore for now
-                  <div key={stat.name} className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+                  <div key={stat.name} className="rounded-[28px] border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
                     <div className="flex items-center justify-between mb-4">
                                             {/* @ts-expect-error just ignore */}
-                      <h3 className="font-semibold text-gray-900 dark:text-white">{stat.name}</h3>
+                      <h3 className="font-semibold text-slate-900 dark:text-white">{translateValue(stat.name)}</h3>
                                             {/* @ts-expect-error just ignore */}
                       {stat.name.toLowerCase().includes('cash') ? (
                         <div className="text-2xl">💵</div>
@@ -788,7 +789,7 @@ export default function ClosingShiftPage() {
                       )}
                     </div>
                     <div className="space-y-2">
-                      <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                      <div className="text-2xl font-bold text-slate-900 dark:text-white">
                                               {/* @ts-expect-error just ignore */}
                         {formatCurrency(stat.amount, posDetails?.currency || 'USD')}
                       </div>
@@ -797,7 +798,9 @@ export default function ClosingShiftPage() {
                       </div> */}
                       <div className="text-sm text-gray-600 dark:text-gray-400">
                                               {/* @ts-expect-error just ignore */}
-                        {total > 0 ? ((stat.amount / total) * 100).toFixed(1) : 0}% of total
+                        {tl("{{percent}}% of total", {
+                          percent: total > 0 ? ((stat.amount / total) * 100).toFixed(1) : 0,
+                        })}
                       </div>
                     </div>
                   </div>
@@ -807,58 +810,56 @@ export default function ClosingShiftPage() {
           )}
 
           {/* Filters */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+          <div className="rounded-[28px] border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
             <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                 <input
                   type="text"
-                  placeholder="Search..."
+                  placeholder={tl("Search...")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 />
               </div>
               <select
                     value={dateFilter}
                     onChange={(e) => setDateFilter(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                   >
-                    <option value="all">All Time</option>
-                    <option value="today">Today</option>
-                    <option value="yesterday">Yesterday</option>
-                    <option value="week">This Week</option>
-                    <option value="month">This Month</option>
-                    <option value="year">This Year</option>
+                    <option value="all">{tl("All Time")}</option>
+                    <option value="today">{tl("Today")}</option>
+                    <option value="yesterday">{tl("Yesterday")}</option>
+                    <option value="week">{tl("This Week")}</option>
+                    <option value="month">{tl("This Month")}</option>
+                    <option value="year">{tl("This Year")}</option>
                   </select>
 
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               >
-                <option value="all">All Status</option>
-                <option value="Draft">Draft</option>
-                <option value="Unpaid">Unpaid</option>
-                <option value="Partly Paid">Partly Paid</option>
-                <option value="Paid">Paid</option>
-                <option value="Overdue">Overdue</option>
-                <option value="Return">Return</option>
-                <option value="Credit Note Issued">Credit Note Issued</option>
-
-                <option value="Cancelled">Cancelled</option>
+                <option value="all">{tl("All Status")}</option>
+                <option value="Draft">{tl("Draft")}</option>
+                <option value="Unpaid">{tl("Unpaid")}</option>
+                <option value="Partly Paid">{tl("Partly Paid")}</option>
+                <option value="Paid">{tl("Paid")}</option>
+                <option value="Overdue">{tl("Overdue")}</option>
+                <option value="Return">{tl("Return")}</option>
+                <option value="Credit Note Issued">{tl("Credit Note Issued")}</option>
+                <option value="Cancelled">{tl("Cancelled")}</option>
               </select>
 
               <select
                 value={paymentFilter}
                 onChange={(e) => setPaymentFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               >
-                <option value="all">All Payments</option>
+                <option value="all">{tl("All Payments")}</option>
                 {modes.map((mode) => (
                   <option key={mode.name} value={mode.name}>
-
-                    {mode.name}
+                    {translateValue(mode.name)}
                   </option>
                 ))}
               </select>
@@ -866,10 +867,10 @@ export default function ClosingShiftPage() {
           </div>
 
           {/* Invoices Table */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                All Invoices ({filteredInvoices.length})
+          <div className="overflow-hidden rounded-[28px] border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+            <div className="border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                {tl("All Invoices")} ({filteredInvoices.length})
               </h3>
             </div>
             <div className="overflow-x-auto">
@@ -877,30 +878,30 @@ export default function ClosingShiftPage() {
                 <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Invoice
+                      {tl("Invoice")}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Customer
+                      {tl("Customer")}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Cashier
+                      {tl("Cashier")}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Payment
+                      {tl("Payment")}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Amount
+                      {tl("Amount")}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Status
+                      {tl("Status")}
                     </th>
                     {posDetails?.is_zatca_enabled && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Zatca Status
+                        {tl("Zatca Status")}
                       </th>
                     )}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Actions
+                      {tl("Actions")}
                     </th>
                   </tr>
                 </thead>
@@ -917,13 +918,17 @@ export default function ClosingShiftPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-white">{invoice.customer}</div>
-
+                        {invoice.giftCardCode && (
+                          <div className="text-xs text-purple-600 dark:text-purple-400">
+                            {tl("Gift: {{code}}", { code: invoice.giftCardCode })}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                         {invoice.cashier}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-900 dark:text-white">{invoice.paymentMethod}</span>
+                        <span className="text-sm text-gray-900 dark:text-white">{translateValue(invoice.paymentMethod)}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">
@@ -931,17 +936,17 @@ export default function ClosingShiftPage() {
                         </div>
                         {invoice.giftCardDiscount > 0 && (
                           <div className="text-xs text-green-600 dark:text-green-400">
-                            -{formatCurrency(invoice.giftCardDiscount, invoice.currency)} gift card
+                            -{formatCurrency(invoice.giftCardDiscount, invoice.currency)} {tl("gift card")}
                           </div>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={getStatusBadge(invoice.status)}>{invoice.status}</span>
+                        <span className={getStatusBadge(invoice.status)}>{translateValue(invoice.status)}</span>
                       </td>
                       {posDetails?.is_zatca_enabled && (
                         <td className="px-6 py-4 whitespace-nowrap">
                                                 {/* @ts-expect-error just ignore */}
-                          <span className={getStatusBadge(invoice.custom_zatca_submit_status)}>{invoice.custom_zatca_submit_status}</span>
+                          <span className={getStatusBadge(invoice.custom_zatca_submit_status)}>{translateValue(invoice.custom_zatca_submit_status)}</span>
                         </td>
                       )}
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -951,7 +956,7 @@ export default function ClosingShiftPage() {
                             className="text-beveren-600 hover:text-beveren-900 flex items-center space-x-1"
                           >
                             <Eye className="w-4 h-4" />
-                            <span>View</span>
+                            <span>{tl("View")}</span>
                           </button>
 
                           {invoice.status === "Draft" && (
@@ -960,7 +965,7 @@ export default function ClosingShiftPage() {
                               className="text-red-600 hover:text-red-900 flex items-center space-x-1"
                             >
                               <MonitorX className="w-4 h-4" />
-                              <span>Delete</span>
+                              <span>{tl("Delete")}</span>
                             </button>
                           )}
                                                 {/* @ts-expect-error just ignore */}
@@ -970,7 +975,7 @@ export default function ClosingShiftPage() {
                               className="text-orange-600 hover:text-orange-900 flex items-center space-x-1"
                             >
                               <RotateCcw className="w-4 h-4" />
-                              <span>Return</span>
+                              <span>{tl("Return")}</span>
                             </button>
                           )}
                         </div>
@@ -988,7 +993,7 @@ export default function ClosingShiftPage() {
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
             <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-lg mx-4">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Close Shift</h2>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">{tl("Close Shift")}</h2>
                 <button
                   onClick={() => setShowCloseModal(false)}
                   className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -999,7 +1004,6 @@ export default function ClosingShiftPage() {
 
               <div className="space-y-4">
                 {Object.values(paymentStats).map((stat) => (
-                  // @ts-expect-error just ignore for now
                   <div key={stat.name} className="flex items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                     <div className="flex items-center space-x-3 flex-shrink-0">
                       {/* @ts-expect-error just ignore */}
@@ -1010,12 +1014,12 @@ export default function ClosingShiftPage() {
                       )}
                                             {/* @ts-expect-error just ignore */}
 
-                      <span className="font-medium text-gray-900 dark:text-white">{stat.name}</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{translateValue(stat.name)}</span>
                     </div>
 
                     <div className="flex items-center space-x-4">
                       <div className="text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">Opening: </span>
+                        <span className="text-gray-600 dark:text-gray-400">{tl("Opening:")}</span>
                         <span className="font-medium text-gray-900 dark:text-white">
                                                 {/* @ts-expect-error just ignore */}
 
@@ -1027,7 +1031,7 @@ export default function ClosingShiftPage() {
                         <input
                           type="number"
                           step="0.01"
-                          placeholder="Closing amount"
+                          placeholder={tl("Closing amount")}
                                 // @ts-expect-error just ignore for now
                           value={closingAmounts[stat.name] || ''}
                           // @ts-expect-error just ignore for now
@@ -1045,7 +1049,7 @@ export default function ClosingShiftPage() {
                   onClick={() => setShowCloseModal(false)}
                   className="px-4 py-2 text-red-600 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-500 font-medium"
                 >
-                  Cancel
+                  {tl("Cancel")}
                 </button>
                 <button
                   onClick={handleFinalClose}
@@ -1056,7 +1060,7 @@ export default function ClosingShiftPage() {
                       : 'bg-beveren-600 text-white hover:bg-beveren-700'
                   }`}
                 >
-                  {isCreating ? 'Closing...' : 'Close Shift'}
+                  {isCreating ? tl('Closing...') : tl('Close Shift')}
                 </button>
               </div>
             </div>
@@ -1085,13 +1089,12 @@ export default function ClosingShiftPage() {
           isOpen={showDeleteConfirm}
           onClose={handleDeleteCancel}
           onConfirm={handleDeleteConfirm}
-          title="Delete Draft Invoice"
-          message={`Are you sure you want to delete draft invoice ${invoiceToDelete?.id}? This action cannot be undone.`}
-          confirmText="Delete"
-          cancelText="Cancel"
+          title={tl("Delete Draft Invoice")}
+          message={tl("Are you sure you want to delete draft invoice {{id}}? This action cannot be undone.", { id: invoiceToDelete?.id || "" })}
+          confirmText={tl("Delete")}
+          cancelText={tl("Cancel")}
           confirmButtonClass="bg-red-600 hover:bg-red-700 text-white"
         />
-      </div>
     </div>
   );
 }

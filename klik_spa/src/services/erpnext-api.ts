@@ -38,6 +38,7 @@ interface UserProfile {
   role?: string;
   role_profile_name?: string;
   user_image?: string;
+  language?: string;
   [key: string]: unknown;
 }
 
@@ -511,6 +512,30 @@ class ERPNextAPI {
     } catch (error) {
       console.error(`Update ${doctype} document error:`, error);
       throw error;
+    }
+  }
+
+  async setLanguage(language: string): Promise<boolean> {
+    try {
+      const payload = new URLSearchParams({ language });
+      const response = await this.makeAPICall(`${this.config.baseUrl}/api/method/klik_pos.api.user.set_language`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        },
+        body: payload.toString(),
+      });
+
+      if (!response.ok) {
+        return false;
+      }
+
+      const data = await response.json();
+      return !!data.message?.success;
+    } catch (error) {
+      console.error("Set language error:", error);
+      return false;
     }
   }
 

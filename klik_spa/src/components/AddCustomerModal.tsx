@@ -294,9 +294,10 @@ export default function AddCustomerModal({
       if (!formData.address.street.trim()) {
         newErrors.street = "Street address is required for company";
       }
-      if (!formData.address.buildingNumber.trim()) {
+      const normalizedBuildingNumber = normalizeBuildingNumber(formData.address.buildingNumber);
+      if (!normalizedBuildingNumber) {
         newErrors.buildingNumber = "Building number is required for company";
-      } else if (formData.address.buildingNumber.trim().length !== 4) {
+      } else if (!/^\d{4}$/.test(normalizedBuildingNumber)) {
         newErrors.buildingNumber = "Building number must be exactly 4 digits";
       }
       if (!formData.address.city.trim()) {
@@ -333,12 +334,22 @@ export default function AddCustomerModal({
     setIsSubmitting(true);
 
     try {
+      const normalizedAddress = {
+        ...formData.address,
+        street: formData.address.street.trim(),
+        buildingNumber: normalizeBuildingNumber(formData.address.buildingNumber),
+        city: formData.address.city.trim(),
+        state: formData.address.state.trim(),
+        zipCode: formData.address.zipCode.trim(),
+        country: formData.address.country.trim(),
+      };
+
       const customerData = {
         name: formData.name,
         customer_type: formData.customer_type === "individual" ? "Individual" : "Company",
         email: formData.email,
         phone: formData.phone,
-        address: formData.address,
+        address: normalizedAddress,
         preferredPaymentMethod: formData.preferredPaymentMethod,
         customer_group: formData.customer_group,
         territory: formData.territory,
@@ -365,7 +376,7 @@ export default function AddCustomerModal({
           type: formData.customer_type,
           email: formData.email,
           phone: formData.phone,
-          address: formData.address,
+          address: normalizedAddress,
           preferredPaymentMethod: formData.preferredPaymentMethod,
           customer_group: formData.customer_group,
           territory: formData.territory,
@@ -421,6 +432,8 @@ export default function AddCustomerModal({
   ];
 
   const availableCustomerTypes = getAvailableCustomerTypes();
+  const normalizeBuildingNumber = (value: string): string =>
+    value.replace(/\D/g, "").slice(0, 4);
 
   // Check if customer can be saved
   const canSaveCustomer = (): boolean => {
@@ -448,8 +461,7 @@ export default function AddCustomerModal({
       // Address fields are only required when ZATCA is enabled
       const hasAddressFields = !posDetails?.is_zatca_enabled || (
         formData.address.street.trim() !== "" &&
-        formData.address.buildingNumber.trim() !== "" &&
-        formData.address.buildingNumber.trim().length === 4 &&
+        /^\d{4}$/.test(normalizeBuildingNumber(formData.address.buildingNumber)) &&
         formData.address.city.trim() !== "" &&
         formData.address.state.trim() !== "" &&
         formData.address.zipCode.trim() !== ""
@@ -1151,16 +1163,14 @@ export default function AddCustomerModal({
                       id="buildingNumber"
                       value={formData.address.buildingNumber}
                       onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, ''); // Only allow digits
-                        if (value.length <= 4) {
-                          setFormData((prev) => ({
-                            ...prev,
-                            address: {
-                              ...prev.address,
-                              buildingNumber: value,
-                            },
-                          }));
-                        }
+                        const value = normalizeBuildingNumber(e.target.value);
+                        setFormData((prev) => ({
+                          ...prev,
+                          address: {
+                            ...prev.address,
+                            buildingNumber: value,
+                          },
+                        }));
                       }}
                       className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 dark:bg-gray-700 dark:text-white ${
                         errors.buildingNumber ? "border-red-500" : "border-gray-300 dark:border-gray-600"

@@ -4,24 +4,29 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { useProducts } from "../hooks/useProducts"
 import { usePOSDetails } from "../hooks/usePOSProfile"
 
-import MenuGrid from "./MenuGrid"
 import OrderSummary from "./OrderSummary"
 import MobilePOSLayout from "./MobilePOSLayout"
 import LoadingSpinner from "./LoadingSpinner"
 import BarcodeScannerModal from "./BarcodeScanner"
 import { useBarcodeScanner } from "../hooks/useBarcodeScanner"
+import CategoryTabs from "./CategoryTabs"
+import ProductGrid from "./ProductGrid"
+import POSHeader from "./POSHeader"
 import type { MenuItem, GiftCoupon } from "../../types"
 import { useMediaQuery } from "../hooks/useMediaQuery"
 import { useCartStore } from "../stores/cartStore"
 import { toast } from "react-toastify"
+import { useI18n } from "../hooks/useI18n"
 
 export default function RetailPOSLayout() {
+  const { tl } = useI18n()
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [localSearchQuery, setLocalSearchQuery] = useState("")
   const [appliedCoupons, setAppliedCoupons] = useState<GiftCoupon[]>([])
   const [showScanner, setShowScanner] = useState(false)
   const [pinnedItemId, setPinnedItemId] = useState<string | null>(null)
   const [identifierItemId, setIdentifierItemId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
 
   // Debounce timer ref for search
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null)
@@ -50,6 +55,17 @@ export default function RetailPOSLayout() {
   const hideUnavailableItems = posDetails?.hide_unavailable_items || false
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const scalePrefix = (posDetails as any)?.custom_scale_barcodes_start_with || ""
+
+  useEffect(() => {
+    if (posDetails?.custom_default_view === "List View") {
+      setViewMode("list")
+      return
+    }
+
+    if (posDetails?.custom_default_view === "Grid View") {
+      setViewMode("grid")
+    }
+  }, [posDetails?.custom_default_view])
 
   // Use media query to detect mobile/tablet screens
   const isMobile = useMediaQuery("(max-width: 1024px)")
@@ -256,7 +272,7 @@ export default function RetailPOSLayout() {
 
         // Enforce presence of single check digit (total 13 digits) for scale barcodes
         if (raw.length !== 13) {
-          toast.error('Scale barcode must be 13 digits including check digit')
+          toast.error(tl('Scale barcode must be 13 digits including check digit'))
           return
         }
 
@@ -274,7 +290,7 @@ export default function RetailPOSLayout() {
         }
         const expectedCheck = computeEAN13(body12)
         if (expectedCheck !== providedCheck) {
-          toast.error('Invalid scale barcode check digit')
+          toast.error(tl('Invalid scale barcode check digit'))
           return
         }
 
@@ -480,9 +496,9 @@ export default function RetailPOSLayout() {
 
   // Show scanner-only mode indicator (desktop only)
   const scannerOnlyIndicator = useScannerOnly && !isMobile && (
-    <div className="fixed top-4 right-4 z-50 bg-blue-600/90 text-white px-3 py-1.5 rounded-lg shadow-lg backdrop-blur-sm">
+    <div className="fixed right-6 top-6 z-50 rounded-2xl border border-app-primary/20 bg-app-surface/90 px-4 py-2 text-foreground shadow-[0_18px_40px_rgba(0,0,0,0.28)] backdrop-blur-xl">
       <div className="flex items-center space-x-2">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="h-4 w-4 text-app-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V6a1 1 0 00-1-1H5a1 1 0 00-1 1v1a1 1 0 001 1zm12 0h2a1 1 0 001-1V6a1 1 0 00-1-1h-2a1 1 0 00-1 1v1a1 1 0 001 1z" />
         </svg>
         <span className="text-sm font-medium">Scanner Only</span>
@@ -527,13 +543,13 @@ export default function RetailPOSLayout() {
               />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Failed to Load Products</h2>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">{tl("Failed to Load Products")}</h2>
           <p className="text-gray-600 mb-4">{getUserFriendlyError(error)}</p>
           <button
             onClick={refetch}
-            className="bg-beveren-600 text-white px-6 py-2 rounded-lg hover:bg-beveren-700 transition-colors"
+            className="app-touch-target rounded-lg bg-beveren-600 px-6 py-2 text-white transition-colors hover:bg-beveren-700 active:scale-[0.99]"
           >
-            Try Again
+            {tl("Try Again")}
           </button>
         </div>
       </div>
@@ -571,38 +587,63 @@ export default function RetailPOSLayout() {
   return (
     <>
       {scannerOnlyIndicator}
-      <div className="flex h-screen bg-gray-50 dark:bg-gray-900 pb-8">
-        {/* Menu Section - Takes remaining space minus cart width */}
-        <div className="flex-1 overflow-hidden ml-20">
-          <MenuGrid
-            items={filteredItems}
-            selectedCategory={selectedCategory}
-            onCategoryChange={setSelectedCategory}
-            searchQuery={localSearchQuery}
-            onSearchChange={handleSearchInput}
-            onSearchKeyPress={handleSearchKeyPress}
-            onAddToCart={handleAddToCart}
-            onScanBarcode={() => setShowScanner(true)}
-            scannerOnly={useScannerOnly}
-            hasMore={hasMore && !serverSearchQuery}
-            isLoadingMore={isLoadingMore}
-            onLoadMore={loadMoreProducts}
-            totalCount={totalCount}
-            isSearching={isSearching}
-          />
-        </div>
+      <div className="min-h-screen bg-app-bg pb-14">
+        <div className="flex min-h-[calc(100vh-6rem)] flex-col gap-6 px-4 py-4 sm:px-6 xl:flex-row">
+          <div className="w-full overflow-hidden rounded-[34px] bg-white shadow-[0_28px_80px_rgba(0,0,0,0.28)] xl:w-[min(36vw,520px)] xl:min-w-[400px]">
+            <OrderSummary
+              cartItems={cartItems}
+              onUpdateQuantity={handleUpdateQuantity}
+              onRemoveItem={handleRemoveItem}
+              onClearCart={handleClearCart}
+              appliedCoupons={appliedCoupons}
+              onApplyCoupon={handleApplyCoupon}
+              onRemoveCoupon={handleRemoveCoupon}
+            />
+          </div>
 
-        {/* Order Summary - 35% width on medium and large screens */}
-        <div className="w-[35%] min-w-[420px] max-w-[600px] bg-white shadow-lg overflow-y-auto">
-          <OrderSummary
-            cartItems={cartItems}
-            onUpdateQuantity={handleUpdateQuantity}
-            onRemoveItem={handleRemoveItem}
-            onClearCart={handleClearCart}
-            appliedCoupons={appliedCoupons}
-            onApplyCoupon={handleApplyCoupon}
-            onRemoveCoupon={handleRemoveCoupon}
-          />
+          <div className="app-panel flex min-h-[calc(100vh-6rem)] flex-1 flex-col overflow-hidden rounded-[34px]">
+            <POSHeader
+              searchQuery={localSearchQuery}
+              onSearchChange={handleSearchInput}
+              onSearchKeyPress={handleSearchKeyPress}
+              onScanBarcode={() => setShowScanner(true)}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+            />
+
+            <div className="border-b border-app-border px-4 py-4 sm:px-6">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <CategoryTabs
+                  selectedCategory={selectedCategory}
+                  onCategoryChange={setSelectedCategory}
+                />
+
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-app-border bg-app-elevated px-4 py-3 text-sm text-app-muted">
+                  <span>
+                    {serverSearchQuery
+                      ? tl('Searching for "{{query}}"', { query: serverSearchQuery })
+                      : tl("Catalog ready")}
+                  </span>
+                  <span className="rounded-full border border-app-border bg-app-surface px-3 py-1 text-xs font-medium text-foreground">
+                    {filteredItems.length}/{totalCount || filteredItems.length}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto">
+              <ProductGrid
+                items={filteredItems}
+                onAddToCart={handleAddToCart}
+                scannerOnly={useScannerOnly}
+                viewMode={viewMode}
+                hasMore={hasMore && !serverSearchQuery}
+                isLoadingMore={isLoadingMore}
+                onLoadMore={loadMoreProducts}
+                totalCount={totalCount}
+              />
+            </div>
+          </div>
         </div>
       </div>
 

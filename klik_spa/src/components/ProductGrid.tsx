@@ -1,9 +1,11 @@
 "use client"
 
-import { useEffect, useRef, useCallback } from "react"
+import { useEffect, useRef, useCallback, useMemo } from "react"
 import ProductCard from "./ProductCard"
 import ProductLineView from "./ProductLineView"
 import type { MenuItem } from "../../types"
+import { useCartStore } from "../stores/cartStore"
+import { useI18n } from "../hooks/useI18n"
 
 interface ProductGridProps {
   items: MenuItem[]
@@ -29,7 +31,13 @@ export default function ProductGrid({
   onLoadMore,
   totalCount = 0,
 }: ProductGridProps) {
+  const { tl } = useI18n()
   const loadMoreRef = useRef<HTMLDivElement>(null)
+  const cartItems = useCartStore((state) => state.cartItems)
+  const cartQuantities = useMemo(
+    () => new Map(cartItems.map((cartItem) => [cartItem.id, cartItem.quantity])),
+    [cartItems],
+  )
 
   // Intersection Observer for infinite scroll
   const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
@@ -47,15 +55,17 @@ export default function ProductGrid({
     }
 
     const observer = new IntersectionObserver(handleObserver, option)
+    const node = loadMoreRef.current
 
-    if (loadMoreRef.current) {
-      observer.observe(loadMoreRef.current)
+    if (node) {
+      observer.observe(node)
     }
 
     return () => {
-      if (loadMoreRef.current) {
-        observer.unobserve(loadMoreRef.current)
+      if (node) {
+        observer.unobserve(node)
       }
+      observer.disconnect()
     }
   }, [handleObserver])
 
@@ -63,7 +73,13 @@ export default function ProductGrid({
   if (viewMode === 'list') {
     return (
       <div className="flex flex-col">
-        <ProductLineView items={items} onAddToCart={onAddToCart} isMobile={isMobile} scannerOnly={scannerOnly} />
+        <ProductLineView
+          items={items}
+          onAddToCart={onAddToCart}
+          isMobile={isMobile}
+          scannerOnly={scannerOnly}
+          cartQuantities={cartQuantities}
+        />
 
         {/* Load more trigger and indicator */}
         {onLoadMore && (
@@ -71,17 +87,17 @@ export default function ProductGrid({
             {isLoadingMore && (
               <div className="flex items-center space-x-2">
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-beveren-600"></div>
-                <span className="text-gray-500 dark:text-gray-400 text-sm">Loading more items...</span>
+                <span className="text-sm text-app-muted">{tl("Loading more items...")}</span>
               </div>
             )}
             {!isLoadingMore && hasMore && (
-              <span className="text-gray-400 dark:text-gray-500 text-sm">
-                Showing {items.length} of {totalCount} items
+              <span className="text-sm text-app-muted">
+                {tl("Showing {{loaded}} of {{total}} items", { loaded: items.length, total: totalCount })}
               </span>
             )}
             {!hasMore && items.length > 0 && (
-              <span className="text-gray-400 dark:text-gray-500 text-sm">
-                All {items.length} items loaded
+              <span className="text-sm text-app-muted">
+                {tl("All {{count}} items loaded", { count: items.length })}
               </span>
             )}
           </div>
@@ -96,15 +112,15 @@ export default function ProductGrid({
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="text-6xl mb-4">🔍</div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No items found</h3>
-          <p className="text-gray-500 dark:text-gray-400">Try adjusting your search or filters</p>
+          <h3 className="mb-2 text-lg font-semibold text-foreground">{tl("No items found")}</h3>
+          <p className="text-app-muted">{tl("Try adjusting your search or filters")}</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className={`${isMobile ? "p-4" : "p-6"} bg-gray-50 dark:bg-gray-900`}>
+    <div className={`${isMobile ? "p-4" : "p-6"} bg-transparent`}>
       <div
         className={`grid gap-4 ${
           isMobile
@@ -113,7 +129,14 @@ export default function ProductGrid({
         }`}
       >
         {items.map((item) => (
-          <ProductCard key={item.id} item={item} onAddToCart={onAddToCart} isMobile={isMobile} scannerOnly={scannerOnly} />
+          <ProductCard
+            key={item.id}
+            item={item}
+            onAddToCart={onAddToCart}
+            isMobile={isMobile}
+            scannerOnly={scannerOnly}
+            cartQuantity={cartQuantities.get(item.id) ?? 0}
+          />
         ))}
       </div>
 
@@ -122,18 +145,18 @@ export default function ProductGrid({
         <div ref={loadMoreRef} className="py-6 flex justify-center">
           {isLoadingMore && (
             <div className="flex items-center space-x-2">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-beveren-600"></div>
-              <span className="text-gray-500 dark:text-gray-400 text-sm">Loading more items...</span>
+              <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-app-primary"></div>
+              <span className="text-sm text-app-muted">{tl("Loading more items...")}</span>
             </div>
           )}
           {!isLoadingMore && hasMore && (
-            <span className="text-gray-400 dark:text-gray-500 text-sm">
-              Showing {items.length} of {totalCount} items • Scroll for more
+            <span className="text-sm text-app-muted">
+              {tl("Showing {{loaded}} of {{total}} items", { loaded: items.length, total: totalCount })} • {tl("Scroll for more")}
             </span>
           )}
           {!hasMore && items.length > 0 && totalCount > 0 && (
-            <span className="text-gray-400 dark:text-gray-500 text-sm">
-              All {items.length} items loaded
+            <span className="text-sm text-app-muted">
+              {tl("All {{count}} items loaded", { count: items.length })}
             </span>
           )}
         </div>

@@ -136,7 +136,7 @@ export default function MobilePOSLayout({
             </div>
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="w-8 h-8 bg-beveren-600 rounded-full flex items-center justify-center hover:bg-beveren-700 transition-colors focus:outline-none focus:ring-2 focus:ring-beveren-300 cursor-pointer"
+              className="app-touch-icon flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-beveren-600 transition-colors hover:bg-beveren-700 focus:outline-none focus:ring-2 focus:ring-beveren-300 active:scale-[0.98]"
               aria-label="User menu"
               type="button"
             >
@@ -170,7 +170,7 @@ export default function MobilePOSLayout({
                   <Link
                     to="/settings"
                     onClick={() => setShowUserMenu(false)}
-                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    className="app-touch-target flex w-full items-center px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 active:scale-[0.99] dark:text-gray-300 dark:hover:bg-gray-700"
                   >
                     <Settings size={14} className="mr-3 text-gray-500 dark:text-gray-400" />
                     <span>Settings</span>
@@ -181,7 +181,7 @@ export default function MobilePOSLayout({
                       toggleTheme()
                       setShowUserMenu(false)
                     }}
-                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    className="app-touch-target flex w-full items-center px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 active:scale-[0.99] dark:text-gray-300 dark:hover:bg-gray-700"
                     type="button"
                   >
                     {theme === 'dark' ? (
@@ -197,7 +197,7 @@ export default function MobilePOSLayout({
                       await clearCacheAndReload()
                       setShowUserMenu(false)
                     }}
-                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    className="app-touch-target flex w-full items-center px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 active:scale-[0.99] dark:text-gray-300 dark:hover:bg-gray-700"
                     type="button"
                   >
                     <RefreshCw size={14} className="mr-3 text-gray-500 dark:text-gray-400" />
@@ -211,7 +211,7 @@ export default function MobilePOSLayout({
                       handleLogout()
                       setShowUserMenu(false)
                     }}
-                    className="flex items-center w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                    className="app-touch-target flex w-full items-center px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 active:scale-[0.99] dark:text-red-400 dark:hover:bg-red-900/20"
                     type="button"
                   >
                     <LogOut size={14} className="mr-3" />
@@ -238,7 +238,7 @@ export default function MobilePOSLayout({
               {onScanBarcode && (
                 <button
                   onClick={onScanBarcode}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1.5 text-gray-400 hover:text-beveren-600 dark:hover:text-beveren-400 transition-colors focus:outline-none focus:ring-2 focus:ring-beveren-500 focus:ring-offset-2 rounded-lg"
+                  className="app-touch-icon absolute right-3 top-1/2 transform -translate-y-1/2 rounded-lg p-1.5 text-gray-400 transition-colors hover:text-beveren-600 focus:outline-none focus:ring-2 focus:ring-beveren-500 focus:ring-offset-2 active:scale-[0.98] dark:hover:text-beveren-400"
                   title="Scan Barcode"
                 >
                   <Scan className="w-4 h-4" />
@@ -250,7 +250,7 @@ export default function MobilePOSLayout({
             <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
               <button
                 onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-md transition-colors ${
+                className={`app-touch-icon rounded-md p-2 transition-colors active:scale-[0.98] ${
                   viewMode === 'grid'
                     ? 'bg-white dark:bg-gray-600 text-beveren-600 dark:text-beveren-400 shadow-sm'
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
@@ -261,7 +261,7 @@ export default function MobilePOSLayout({
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-2 rounded-md transition-colors ${
+                className={`app-touch-icon rounded-md p-2 transition-colors active:scale-[0.98] ${
                   viewMode === 'list'
                     ? 'bg-white dark:bg-gray-600 text-beveren-600 dark:text-beveren-400 shadow-sm'
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
@@ -315,7 +315,7 @@ export default function MobilePOSLayout({
       {totalItems > 0 && (
         <button
           onClick={() => navigate('/cart')}
-          className="fixed bottom-20 right-6 bg-beveren-600 text-white rounded-full p-4 shadow-lg hover:bg-beveren-700 transition-colors z-30"
+          className="app-touch-icon fixed bottom-20 right-6 z-30 rounded-full bg-beveren-600 p-4 text-white shadow-lg transition-colors hover:bg-beveren-700 active:scale-[0.98]"
         >
           <div className="relative">
             <ShoppingCart className="w-6 h-6" />
@@ -335,7 +335,7 @@ export default function MobilePOSLayout({
             <div className="text-lg font-bold text-beveren-600 dark:text-beveren-400">{formatCurrency(totalAmount, posDetails?.currency || 'USD')}</div>
             <button
               onClick={() => navigate('/cart')}
-              className="bg-beveren-600 text-white px-6 py-2 rounded-lg hover:bg-beveren-700 transition-colors font-medium"
+              className="app-touch-target rounded-lg bg-beveren-600 px-6 py-2 font-medium text-white transition-colors hover:bg-beveren-700 active:scale-[0.99]"
             >
               View Cart
             </button>

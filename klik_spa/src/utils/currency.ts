@@ -2,6 +2,8 @@
  * Currency utility functions for formatting and symbol mapping
  */
 
+import { formatCurrency as formatLocalizedCurrency, formatNumber, getCurrentLanguage } from "../i18n/runtime";
+
 // Common currency symbols mapping
 const CURRENCY_SYMBOLS: Record<string, string> = {
   'USD': '$',
@@ -120,10 +122,9 @@ export const getCurrencySymbol = (currency: string): string => {
  * @returns Formatted string (e.g., "SAR 100.00", "$50.00")
  */
 export const formatCurrency = (amount: number, currency?: string): string => {
-  if (!amount && amount !== 0) return '0.00';
+  if (!amount && amount !== 0) return formatNumber(0, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const symbol = getCurrencySymbol(currency || 'USD');
-  return `${symbol} ${amount.toFixed(2)}`;
+  return formatLocalizedCurrency(amount, currency || 'USD', undefined, getCurrentLanguage());
 };
 
 /**
@@ -133,8 +134,17 @@ export const formatCurrency = (amount: number, currency?: string): string => {
  * @returns Formatted string (e.g., "SAR100.00", "$50.00")
  */
 export const formatCurrencyCompact = (amount: number, currency?: string): string => {
-  if (!amount && amount !== 0) return '0.00';
+  if (!amount && amount !== 0) return formatNumber(0, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const symbol = getCurrencySymbol(currency || 'USD');
-  return `${symbol}${amount.toFixed(2)}`;
+  try {
+    return formatLocalizedCurrency(
+      amount,
+      currency || 'USD',
+      { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+      getCurrentLanguage(),
+    ).replace(/\s+/g, "");
+  } catch {
+    const symbol = getCurrencySymbol(currency || 'USD');
+    return `${symbol}${amount.toFixed(2)}`;
+  }
 };

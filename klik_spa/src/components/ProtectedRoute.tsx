@@ -2,10 +2,12 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import POSOpeningEntryGuard from './POSOpeningEntryGuard';
+import { useI18n } from '../hooks/useI18n';
 
 const ProtectedRoute = ({ element }: { element: React.ReactElement }) => {
   const { isAuthenticated, loading } = useAuth();
   const location = useLocation();
+  const { tl } = useI18n();
 
   if (loading) {
     // Show loading spinner while checking authentication
@@ -14,7 +16,7 @@ const ProtectedRoute = ({ element }: { element: React.ReactElement }) => {
         <div className="text-center">
           <div className="text-2xl font-bold text-beveren-700 mb-4">KLiK PoS</div>
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-beveren-700 mx-auto"></div>
-          <p className="text-beveren-600 mt-4">Verifying access...</p>
+          <p className="text-beveren-600 mt-4">{tl("Verifying access...")}</p>
         </div>
       </div>
     );

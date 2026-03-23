@@ -60,19 +60,19 @@ export default function MobilePaymentPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex h-screen flex-col bg-app-bg">
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+      <div className="sticky top-0 z-20 border-b border-app-border bg-app-surface">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center space-x-3">
             <button
               onClick={handleClose}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="rounded-xl p-2 transition-colors hover:bg-app-elevated"
             >
-              <ArrowLeft className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+              <ArrowLeft className="w-6 h-6 text-app-muted" />
             </button>
             <img src="/assets/klik_pos/klik_spa/bev_logo.jpeg" alt="KLiK PoS" className="w-8 h-8 rounded-full object-cover" />
-            <span className="font-bold text-xl text-gray-900 dark:text-white">Payment</span>
+            <span className="text-xl font-bold text-foreground">Payment</span>
           </div>
         </div>
       </div>

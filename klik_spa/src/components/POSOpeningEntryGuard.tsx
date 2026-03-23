@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { usePOSOpeningStatus } from '../hooks/usePOSOpeningEntry';
 import POSOpeningModal from './PosOpeningEntryDialog';
@@ -27,7 +27,7 @@ export default function POSOpeningEntryGuard({
   children,
   excludePaths = ['/settings', '/login']
 }: POSOpeningEntryGuardProps) {
-  const { isRTL } = useI18n();
+  const { isRTL, tl } = useI18n();
   const location = useLocation();
   const [showOpeningModal, setShowOpeningModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -44,10 +44,10 @@ export default function POSOpeningEntryGuard({
   } = usePOSOpeningStatus();
 
   // Check if current path should be excluded
-  const shouldExclude = () => {
+  const shouldExclude = useCallback(() => {
     const currentPath = location.pathname;
     return excludePaths.some(path => currentPath.includes(path));
-  };
+  }, [excludePaths, location.pathname]);
 
   // Fetch current user
   useEffect(() => {
@@ -65,7 +65,7 @@ export default function POSOpeningEntryGuard({
             name: userProfile.name,
             email: userProfile.email || userProfile.name,
             full_name: userProfile.full_name || userProfile.first_name + ' ' + (userProfile.last_name || ''),
-            role: userProfile.role_profile_name || 'User',
+            role: userProfile.role_profile_name || tl('Guest User'),
             user_image: userProfile.user_image
           });
         } else {
@@ -76,22 +76,22 @@ export default function POSOpeningEntryGuard({
               name: basicUser as string,
               email: basicUser as string,
               full_name: basicUser as string,
-              role: 'User'
+              role: tl('Guest User')
             });
           } else {
-            setUserError('No user session found');
+            setUserError(tl('No user session found'));
           }
         }
       } catch (error) {
         console.error('Error fetching current user:', error);
-        setUserError((error as Error).message || 'Failed to fetch user');
+        setUserError((error as Error).message || tl('Failed to fetch user'));
       } finally {
         setUserLoading(false);
       }
     };
 
     fetchCurrentUser();
-  }, []);
+  }, [tl]);
 
   // Refetch opening entry status when route changes (silently in background)
   // This ensures we check for opening entry on every navigation without blocking UI
@@ -105,7 +105,7 @@ export default function POSOpeningEntryGuard({
     if (hasOpenEntry !== null && isInitialized) {
       refetch();
     }
-  }, [location.pathname, refetch, hasOpenEntry, isInitialized]);
+  }, [location.pathname, refetch, hasOpenEntry, isInitialized, shouldExclude]);
 
   // This helps detect if opening entry was closed from ERPNext while user was away
   useEffect(() => {
@@ -163,7 +163,7 @@ export default function POSOpeningEntryGuard({
       setShowOpeningModal(true);
       setIsInitialized(true);
     }
-  }, [hasOpenEntry, statusLoading, statusError, userLoading, userError, location.pathname]);
+  }, [hasOpenEntry, statusLoading, statusError, userLoading, userError, location.pathname, shouldExclude]);
 
   // Handle successful opening entry creation
   const handleOpeningSuccess = () => {
@@ -191,8 +191,8 @@ export default function POSOpeningEntryGuard({
       <div className={`min-h-screen bg-gray-50 ${isRTL ? "rtl" : "ltr"} flex items-center justify-center`}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-beveren-600 mx-auto mb-4"></div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Initializing POS</h2>
-          <p className="text-gray-600">Checking your POS session status...</p>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">{tl("Initializing POS")}</h2>
+          <p className="text-gray-600">{tl("Checking your POS session status...")}</p>
         </div>
       </div>
     );
@@ -211,7 +211,7 @@ export default function POSOpeningEntryGuard({
           isOpen={showOpeningModal}
           onClose={handleOpeningClose}
           onSuccess={handleOpeningSuccess}
-          currentUser={currentUser?.name || 'Unknown User'}
+          currentUser={currentUser?.name || tl("Guest User")}
         />
       </>
     );

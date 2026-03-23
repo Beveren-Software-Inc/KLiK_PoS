@@ -48,6 +48,9 @@ def get_sales_invoices(limit=100, start=0, search="", skip_opening_entry_filter=
 		submitted_only: If True, only return submitted invoices (docstatus=1). Use for Sales Dashboard; excludes Draft and Cancelled.
 	"""
 	try:
+		limit = int(limit)
+		start = int(start)
+
 		# Convert string to boolean if needed (Frappe passes query params as strings)
 		if isinstance(skip_opening_entry_filter, str):
 			skip_opening_entry_filter = skip_opening_entry_filter.lower() in ("true", "1", "yes")
@@ -80,7 +83,11 @@ def get_sales_invoices(limit=100, start=0, search="", skip_opening_entry_filter=
 		)
 
 		count_rows = frappe.get_all(
-			"Sales Invoice", filters=filters, or_filters=or_filters, fields=["count(name) as total"]
+			"Sales Invoice",
+			filters=filters,
+			or_filters=or_filters,
+			fields=[{"COUNT": "name", "as": "total"}],
+			limit=1,
 		)
 		total_count = count_rows[0].total if count_rows else 0
 

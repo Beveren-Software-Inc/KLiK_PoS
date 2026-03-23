@@ -7,6 +7,21 @@ from frappe import _
 from klik_pos.klik_pos.utils import get_current_pos_profile
 
 
+def normalize_customer_type(*values):
+	for value in values:
+		if value:
+			normalized = str(value).strip().lower()
+			if normalized in {"company", "individual"}:
+				return normalized
+	return "individual"
+
+
+def normalize_building_number(value):
+	if value is None:
+		return ""
+	return "".join(char for char in str(value).strip() if char.isdigit())
+
+
 @frappe.whitelist(allow_guest=True)
 def get_customers(limit: int = 100, start: int = 0, search: str = ""):
 	"""
@@ -412,7 +427,9 @@ def create_or_update_customer(customer_data):
 		customer_name = customer_data.get("name")
 		email = customer_data.get("email")
 		phone = customer_data.get("phone")
-		cust_type = customer_data.get("customer_type", customer_data.get("type", "individual")).lower()
+		cust_type = normalize_customer_type(
+			customer_data.get("customer_type"), customer_data.get("type")
+		)
 		country = customer_data.get("address", {}).get("country", "Kenya")
 		name_arabic = customer_data.get("name_arabic", "")
 		address = customer_data.get("address", {})
@@ -474,11 +491,10 @@ def create_or_update_customer(customer_data):
 def get_or_create_customer(name, email, phone, country, name_arabic="", data=None):
 	"""Create or update a Customer (Individual or Company)."""
 	try:
-		cust_type = (
-			"Company"
-			if data and (data.get("customer_type") == "company" or data.get("type") == "company")
-			else "Individual"
-		)
+		cust_type = normalize_customer_type(
+			data.get("customer_type") if data else None,
+			data.get("type") if data else None,
+		).title()
 
 		# Get customer_group and territory from data, with defaults
 		customer_group = data.get("customer_group", "All Customer Groups") if data else "All Customer Groups"
@@ -626,7 +642,7 @@ def create_or_update_address(customer_id, customer_name, address_data, country):
 		"address_title": address_title,
 		"address_type": address_data.get("addressType", "Billing"),
 		"address_line1": address_data.get("street", ""),
-		"address_line2": address_data.get("buildingNumber", ""),
+		"address_line2": normalize_building_number(address_data.get("buildingNumber")),
 		"city": address_data.get("city", ""),
 		"state": address_data.get("state", ""),
 		"county": address_data.get("city", ""),
@@ -678,6 +694,8 @@ def update_customer(customer_id, customer_data):
 		# Update customer fields
 		for key, value in customer_data.items():
 			if key not in ["email", "phone", "address"]:
+				if key == "customer_type":
+					value = normalize_customer_type(value).title()
 				setattr(customer, key, value)
 
 		customer.ignore_version = True

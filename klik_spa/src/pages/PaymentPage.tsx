@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useParams } from "react-router-dom"
 import { useI18n } from "../hooks/useI18n"
-import NavBar from "../components/NavBar"
 import PaymentMethodCard from "../components/PaymentMethodCard"
 import QRCodeDisplay from "../components/QRCodeDisplay"
+import PageHeader from "../components/ui/PageHeader"
 
 interface InvoiceData {
   invoiceId: string
@@ -30,11 +30,7 @@ export default function PaymentScreen() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadInvoiceData()
-  }, [invoiceId])
-
-  const loadInvoiceData = async () => {
+  const loadInvoiceData = useCallback(async () => {
     try {
       // Simulate ERPNext API call
       const mockData: InvoiceData = {
@@ -61,7 +57,11 @@ export default function PaymentScreen() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [invoiceId])
+
+  useEffect(() => {
+    loadInvoiceData()
+  }, [loadInvoiceData])
 
   const handlePaymentMethodSelect = (method: string) => {
     setSelectedPaymentMethod(method)
@@ -97,12 +97,15 @@ export default function PaymentScreen() {
   }
 
   return (
-    <div className={`min-h-screen bg-gray-50 ${isRTL ? "rtl" : "ltr"}`}>
-      <NavBar />
+    <div className={`min-h-screen bg-app-bg pb-14 ${isRTL ? "rtl" : "ltr"}`}>
+      <PageHeader
+        title={t("PAYMENT_METHODS")}
+        description={`${t("INVOICE_ID")}: ${invoiceData.invoiceId}`}
+      />
 
-      <div className="max-w-4xl mx-auto p-4">
+      <div className="mx-auto max-w-4xl px-4 py-6">
         {/* Invoice Summary */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+        <div className="app-panel rounded-[28px] p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4">{t("INVOICE_SUMMARY")}</h2>
 
           <div className="mb-4">
@@ -149,7 +152,7 @@ export default function PaymentScreen() {
         </div>
 
         {/* Payment Methods */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+        <div className="app-panel rounded-[28px] p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4">{t("PAYMENT_METHODS")}</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -184,12 +187,12 @@ export default function PaymentScreen() {
 
         {/* Action Buttons */}
         <div className="flex flex-col md:flex-row gap-4">
-          <button className="text-green-700 hover:text-green-800 font-medium">{t("BACK_TO_CART")}</button>
+          <button className="font-medium text-app-primary hover:opacity-90">{t("BACK_TO_CART")}</button>
 
           <button
             onClick={handleConfirmPayment}
             disabled={!selectedPaymentMethod}
-            className="flex-1 bg-green-700 text-white py-3 px-6 rounded-md hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="app-button-primary flex-1 py-3 px-6 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {t("CONFIRM_PAYMENT")}
           </button>

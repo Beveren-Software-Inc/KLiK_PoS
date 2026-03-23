@@ -1,5 +1,4 @@
 import React, { useEffect } from "react";
-import { Outlet } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
 import { ThemeProvider } from "./hooks/useTheme";
 import { I18nProvider } from "./hooks/useI18n";
@@ -8,10 +7,26 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { setupGlobalErrorHandling } from "./utils/apiUtils";
-import Footer from "./components/Footer";
-import RetailSidebar from "./components/RetailSidebar";
+import AppLayout from "./components/layout/AppLayout";
+import { useI18n } from "./hooks/useI18n";
 
 const queryClient = new QueryClient();
+
+function AppContent() {
+  const { isRTL, tl } = useI18n();
+
+  return (
+    <ProductProvider>
+      <AppLayout />
+      <ToastContainer
+        position="top-center"
+        autoClose={3000}
+        rtl={isRTL}
+        ariaLabel={tl("Notifications")}
+      />
+    </ProductProvider>
+  );
+}
 
 function App() {
   useEffect(() => {
@@ -24,12 +39,7 @@ function App() {
       <AuthProvider>
         <ThemeProvider>
           <I18nProvider>
-            <ProductProvider>
-              <RetailSidebar />
-              <Outlet />
-              <Footer />
-              <ToastContainer position="top-center" autoClose={3000} aria-label="Notification" />
-            </ProductProvider>
+            <AppContent />
           </I18nProvider>
         </ThemeProvider>
       </AuthProvider>

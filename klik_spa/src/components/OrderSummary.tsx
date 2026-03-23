@@ -25,6 +25,7 @@ import { usePOSDetails } from "../hooks/usePOSProfile";
 import { useCustomerStatistics } from "../hooks/useCustomerStatistics";
 import { useCustomerPermission } from "../hooks/useCustomerPermission";
 import { useCartStore } from "../stores/cartStore";
+import { useI18n } from "../hooks/useI18n";
 
 
 interface OrderSummaryProps {
@@ -106,6 +107,17 @@ interface UOMSelectFieldProps {
   selectedCustomer?: { id: string } | null;
 }
 
+interface UOMPriceOption {
+  uom: string;
+  price?: number;
+}
+
+interface UOMResponse {
+  message?: {
+    uoms?: UOMPriceOption[];
+  };
+}
+
 const UOMSelectField = ({ item, onUOMChange, isMobile, selectedCustomer }: UOMSelectFieldProps) => {
   const [availableUOMs, setAvailableUOMs] = useState<string[]>(['Nos']);
   const [selectedUOM, setSelectedUOM] = useState<string>(item.uom || 'Nos'); //Mania: Local state for selected UOM
@@ -127,11 +139,11 @@ const UOMSelectField = ({ item, onUOMChange, isMobile, selectedCustomer }: UOMSe
           });
 
           if (response.ok) {
-            const data = await response.json();
+            const data = await response.json() as UOMResponse;
+            const uomOptions = Array.isArray(data?.message?.uoms) ? data.message.uoms : [];
 
-            if (data?.message?.uoms) {
-              //eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const uoms = data.message.uoms.map((uom: any) => uom.uom);
+            if (uomOptions.length > 0) {
+              const uoms = uomOptions.map((uom) => uom.uom);
               setAvailableUOMs(uoms);
             } else {
               setAvailableUOMs(['Nos']);
@@ -183,17 +195,17 @@ const UOMSelectField = ({ item, onUOMChange, isMobile, selectedCustomer }: UOMSe
         });
 
         if (response.ok) {
-          const data = await response.json();
+          const data = await response.json() as UOMResponse;
+          const uomOptions = Array.isArray(data?.message?.uoms) ? data.message.uoms : [];
           // console.log(`📦 API Response:`, data.message);
 
-          if (data?.message?.uoms) {
-            //eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const selectedUOMData = data.message.uoms.find((uom: any) => uom.uom === newUOM);
+          if (uomOptions.length > 0) {
+            const selectedUOMData = uomOptions.find((uom) => uom.uom === newUOM);
             if (selectedUOMData && selectedUOMData.price !== undefined) {
               console.log(`✅ Found UOM data for ${newUOM}:`, selectedUOMData);
               onUOMChange(item.id, newUOM, selectedUOMData.price);
             } else {
-              console.warn(`⚠️ UOM data not found for ${newUOM}. Available UOMs:`, data.message.uoms.map((u: any) => u.uom));
+              console.warn(`⚠️ UOM data not found for ${newUOM}. Available UOMs:`, uomOptions.map((uom) => uom.uom));
               // Fallback: try to calculate price using fetch_item_price API
               try {
                 const itemCode = item.item_code || item.id;
@@ -427,6 +439,7 @@ export default function OrderSummary({
   onRemoveCoupon,
   isMobile = false,
 }: OrderSummaryProps) {
+  const { tl } = useI18n();
   // const [showCouponPopover, setShowCouponPopover] = useState(false);
   const { selectedCustomer, setSelectedCustomer, updateUOM, updatePricesForCustomer } = useCartStore();
 
@@ -687,7 +700,7 @@ export default function OrderSummary({
 
   const validateCustomer = () => {
     if (!selectedCustomer) {
-      toast.error("Kindly choose customer");
+      toast.error(tl("Kindly choose customer"));
       return false;
     }
     return true;
@@ -830,7 +843,7 @@ export default function OrderSummary({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleHoldOrder = async (orderData: any) => {
     if (!selectedCustomer) {
-      toast.error("Kindly select a customer");
+      toast.error(tl("Kindly select a customer"));
       return;
     }
 
@@ -842,15 +855,15 @@ export default function OrderSummary({
 
       if (result && result.success) {
         handleClearCart();
-        toast.success("Draft invoice created and order held successfully!");
+        toast.success(tl("Draft invoice created and order held successfully!"));
       } else {
-        toast.error("Failed to create draft invoice");
+        toast.error(tl("Failed to create draft invoice"));
       }
       //eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error("Error creating draft invoice:", error);
       const errorMessage = extractErrorFromException(error, "Failed to create draft invoice");
-      toast.error(errorMessage);
+      toast.error(tl(errorMessage));
     }
   };
 
@@ -1155,12 +1168,12 @@ export default function OrderSummary({
         <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
           {/* Customer Search */}
           <div className="relative">
-            <div className="flex items-center">
+            <div className="flex items-center gap-3">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
                   type="text"
-                  placeholder="Search customers... (name, email, or phone)"
+                  placeholder={tl("Search customers... (name, email, or phone)")}
                   value={customerSearchQuery}
                   onChange={(e) => {
                     setCustomerSearchQuery(e.target.value);
@@ -1178,7 +1191,7 @@ export default function OrderSummary({
                       <button
                         key={customer.id}
                         onClick={() => handleCustomerSelect(customer)}
-                        className="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
+                        className="app-touch-target w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
                       >
                         <div className="flex items-center space-x-2">
                           {getCustomerTypeIcon(customer)}
@@ -1204,8 +1217,8 @@ export default function OrderSummary({
 
               <button
                 onClick={() => setShowAddCustomerModal(true)}
-                className="ml-2 p-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors"
-                title="Add New Customer"
+                className="app-touch-icon rounded-lg bg-beveren-600 p-2 text-white transition-colors hover:bg-beveren-700 active:scale-[0.98]"
+                title={tl("Add New Customer")}
               >
                 <UserPlus size={16} />
               </button>
@@ -1248,10 +1261,10 @@ export default function OrderSummary({
                           <span className="mx-2">•</span>
                         )}
                         {(customerStats?.total_orders || 0) > 0 && (
-                          <span>{customerStats?.total_orders || 0} orders</span>
+                          <span>{tl("{{count}} orders", { count: customerStats?.total_orders || 0 })}</span>
                         )}
                         {(!selectedCustomer.phone || selectedCustomer.phone === "N/A" || selectedCustomer.phone.trim() === "") && (customerStats?.total_orders || 0) === 0 && (
-                          <span className="text-gray-400 italic">No additional info</span>
+                          <span className="text-gray-400 italic">{tl("No additional info")}</span>
                         )}
                       </div>
                     </div>
@@ -1262,7 +1275,7 @@ export default function OrderSummary({
                       setCustomerSearchQuery("");
                       setUserRemovedDefaultCustomer(true);
                     }}
-                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    className="app-touch-icon-compact rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 active:scale-[0.98]"
                   >
                     <X size={14} />
                   </button>
@@ -1277,12 +1290,12 @@ export default function OrderSummary({
 
       {isMobile && (
         <div className="flex-shrink-0 p-4 border-b border-gray-100 dark:border-gray-700">
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Search customers... (name, email, or phone)"
+                placeholder={tl("Search customers... (name, email, or phone)")}
                 value={customerSearchQuery}
                 onChange={(e) => {
                   setCustomerSearchQuery(e.target.value);
@@ -1300,7 +1313,7 @@ export default function OrderSummary({
                     <button
                       key={customer.id}
                       onClick={() => handleCustomerSelect(customer)}
-                      className="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
+                      className="app-touch-target w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
                     >
                       <div className="flex items-center space-x-2">
                         {getCustomerTypeIcon(customer)}
@@ -1325,7 +1338,7 @@ export default function OrderSummary({
             </div>
             <button
               onClick={() => setShowAddCustomerModal(true)}
-              className="p-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors"
+              className="app-touch-icon rounded-lg bg-beveren-600 p-2 text-white transition-colors hover:bg-beveren-700 active:scale-[0.98]"
             >
               <UserPlus size={16} />
             </button>
@@ -1367,10 +1380,10 @@ export default function OrderSummary({
                         <span className="mx-2">•</span>
                       )}
                       {(customerStats?.total_orders || 0) > 0 && (
-                        <span>{customerStats?.total_orders || 0} orders</span>
+                        <span>{tl("{{count}} orders", { count: customerStats?.total_orders || 0 })}</span>
                       )}
                       {(!selectedCustomer.phone || selectedCustomer.phone === "N/A" || selectedCustomer.phone.trim() === "") && (customerStats?.total_orders || 0) === 0 && (
-                        <span className="text-gray-400 italic">No additional info</span>
+                        <span className="text-gray-400 italic">{tl("No additional info")}</span>
                       )}
                     </div>
                   </div>
@@ -1381,7 +1394,7 @@ export default function OrderSummary({
                     setCustomerSearchQuery("");
                     setUserRemovedDefaultCustomer(true);
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="app-touch-icon-compact rounded-full text-gray-400 hover:text-gray-600 active:scale-[0.98]"
                 >
                   <X size={14} />
                 </button>
@@ -1399,15 +1412,15 @@ export default function OrderSummary({
             : "flex-1 overflow-y-auto p-6 cart-scroll"
         }`}
       >
-        <div className="space-y-4">
+        <div className={isMobile ? "space-y-2.5" : "space-y-2"}>
           {cartItems.length === 0 ? (
             <div className="text-center py-8">
               <div className="text-6xl mb-4">🛒</div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Your cart is empty
+                {tl("Your cart is empty")}
               </h3>
               <p className="text-gray-500 dark:text-gray-400">
-                Add some items to get started!
+                {tl("Add some items to get started!")}
               </p>
             </div>
           ) : (
@@ -1428,27 +1441,29 @@ export default function OrderSummary({
                   key={item.id}
                   className={`${
                     isMobile
-                      ? "bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden"
-                      : ""
+                      ? "overflow-hidden rounded-xl border border-app-border/70 bg-app-elevated/55 shadow-[0_10px_28px_rgba(17,26,34,0.08)]"
+                      : "overflow-hidden rounded-2xl border border-app-border/80 bg-app-elevated/35 shadow-[0_12px_30px_rgba(17,26,34,0.07)]"
                   }`}
                 >
                   {/* Main item row */}
                   <div
-                    className={`flex items-center ${isMobile ? "p-3" : "py-2"}`}
+                    className={`flex items-center ${
+                      isMobile ? "gap-2 p-2" : "gap-2 px-3 py-2"
+                    }`}
                   >
                     {/* Expand/Collapse Arrow */}
-                    <div className="flex-shrink-0 mr-2">
+                    <div className="flex-shrink-0">
                       <button
                         onClick={() => toggleItemExpansion(item.id)}
                         className={`${
-                          isMobile ? "w-5 h-5" : "w-5 h-5"
-                        } rounded-full bg-gray-100 dark:bg-gray-600 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-500 transition-all duration-200`}
+                          isMobile ? "h-5 w-5" : "h-5 w-5"
+                        } app-touch-icon-compact flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-600 transition-all duration-200 hover:bg-gray-200 dark:hover:bg-gray-500 active:scale-[0.96]`}
                         title="Show/Hide Details"
                       >
                         <svg
                           className={`${
-                            isMobile ? "w-3 h-3" : "w-4 h-4"
-                          } text-beveren-500 dark:text-gray-400 transform transition-transform duration-200 ${
+                            isMobile ? "h-3 w-3" : "h-3.5 w-3.5"
+                          } transform text-beveren-500 transition-transform duration-200 dark:text-gray-400 ${
                             expandedItems.has(item.id) ? "rotate-90" : ""
                           }`}
                           fill="none"
@@ -1472,70 +1487,54 @@ export default function OrderSummary({
                           src={item.image}
                           alt={item.name}
                           className={`${
-                            isMobile ? "w-16 h-16" : "w-12 h-12"
-                          } rounded-lg object-cover`}
+                            isMobile ? "h-14 w-14" : "h-10 w-10"
+                          } rounded-xl object-cover`}
                           crossOrigin="anonymous"
                         />
                       </div>
                     )}
 
                     {/* Product Info */}
-                    <div className="flex-1 min-w-0 px-3">
+                    <div className="min-w-0 flex-1">
                       <h4
                         className={`font-semibold text-gray-900 dark:text-white ${
-                          isMobile ? "text-base" : "text-sm"
+                          isMobile ? "text-sm" : "text-[13px]"
                         } truncate`}
                       >
                         {item.name}
                       </h4>
                       <p
-                        className={`text-gray-500 dark:text-gray-400 capitalize font-medium ${
-                          isMobile ? "text-sm" : "text-xs"
+                        className={`mt-0.5 text-gray-500 dark:text-gray-400 capitalize font-medium ${
+                          isMobile ? "text-xs" : "text-[11px]"
                         }`}
                       >
                         {item.category}
                       </p>
-                      <div className={`${isMobile ? "text-base" : "text-sm"}`}>
-                        {discountedPrice < item.price ? (
-                          <div className="flex items-center space-x-2">
-                            <span className="text-gray-400 line-through text-xs">
-                              {currency_symbol}
-                              {item.price.toFixed(2)}
-                            </span>
-
-                            <span className="text-beveren-600 dark:text-beveren-400 font-semibold">
-                              {currency_symbol}
-                              {discountedPrice.toFixed(2)}
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="text-beveren-600 dark:text-beveren-400 font-semibold">
-                            {currency_symbol}
-                            {item.price.toFixed(2)}
-                          </div>
-                        )}
-                      </div>
                     </div>
 
                     {/* Quantity Controls - Fixed Width Container */}
-                    <div className="flex-shrink-0 flex items-center ml-10 space-x-1 min-w-[70px] justify-center">
+                    <div
+                      className={`flex min-w-[64px] flex-shrink-0 items-center justify-center rounded-xl border border-app-border/70 bg-white/80 ${
+                        isMobile ? "px-1 py-1" : "px-1.5 py-1"
+                      } dark:bg-gray-800/70`}
+                    >
                       <button
                         onClick={() =>
                           onUpdateQuantity(item.id, item.quantity - 1)
                         }
                         className={`${
-                          isMobile ? "w-8 h-8" : "w-5 h-5"
-                        } rounded-full bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors`}
+                          isMobile ? "h-7 w-7" : "h-6 w-6"
+                        } app-touch-icon-compact flex items-center justify-center rounded-full border border-gray-200 bg-gray-100 transition-colors hover:bg-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600 active:scale-[0.96]`}
                       >
                         <Minus
-                          size={isMobile ? 16 : 14}
+                          size={isMobile ? 14 : 12}
                           className="text-gray-600 dark:text-gray-400"
                         />
                       </button>
                       <span
                         className={`${
-                          isMobile ? "w-10" : "w-8"
-                        } text-center font-semibold text-gray-900 dark:text-white text-sm`}
+                          isMobile ? "w-8" : "w-7"
+                        } text-center text-sm font-semibold text-gray-900 dark:text-white`}
                       >
                         {item.quantity}
                       </span>
@@ -1544,15 +1543,15 @@ export default function OrderSummary({
                           onUpdateQuantity(item.id, item.quantity + 1)
                         }
                         className={`${
-                          isMobile ? "w-8 h-8" : "w-7 h-7"
-                        } rounded-full bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors`}
+                          isMobile ? "h-7 w-7" : "h-6 w-6"
+                        } app-touch-icon-compact flex items-center justify-center rounded-full border border-blue-200 bg-blue-50 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 active:scale-[0.96]`}
                       >
-                        <Plus size={isMobile ? 16 : 14} className="text-blue-600 dark:text-blue-400" />
+                        <Plus size={isMobile ? 14 : 12} className="text-blue-600 dark:text-blue-400" />
                       </button>
                     </div>
 
                     {/* Total Price - Fixed Width */}
-                    <div className="flex-shrink-0 text-right min-w-[80px] px-2">
+                    <div className="min-w-[72px] flex-shrink-0 text-right">
                       {discountedTotal < originalTotal ? (
                         <div>
                           <p className="text-gray-400 line-through text-xs">
@@ -1561,7 +1560,7 @@ export default function OrderSummary({
                           </p>
                           <p
                             className={`text-beveren-600 dark:text-beveren-400 font-semibold ${
-                              isMobile ? "text-base" : "text-sm"
+                              isMobile ? "text-sm" : "text-[13px]"
                             }`}
                           >
                             {currency_symbol}
@@ -1571,7 +1570,7 @@ export default function OrderSummary({
                       ) : (
                         <p
                           className={`text-beveren-600 dark:text-beveren-400 font-semibold ${
-                            isMobile ? "text-base" : "text-sm"
+                            isMobile ? "text-sm" : "text-[13px]"
                           }`}
                         >
                           {currency_symbol}
@@ -1581,7 +1580,7 @@ export default function OrderSummary({
                     </div>
 
                     {/* Remove Button */}
-                    <div className="flex-shrink-0 ml-2">
+                    <div className="flex-shrink-0">
                       <button
                         onClick={() =>
                           onRemoveItem
@@ -1589,11 +1588,11 @@ export default function OrderSummary({
                             : onUpdateQuantity(item.id, 0)
                         }
                         className={`${
-                          isMobile ? "w-8 h-8" : "w-6 h-6"
-                        } rounded-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-200 dark:hover:border-red-800 hover:text-red-600 dark:hover:text-red-400 transition-colors`}
+                          isMobile ? "h-7 w-7" : "h-6 w-6"
+                        } app-touch-icon-compact flex items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-500 dark:hover:border-red-800 dark:hover:bg-red-900/20 dark:hover:text-red-400 active:scale-[0.96]`}
                         title="Remove item"
                       >
-                        <X size={isMobile ? 16 : 12} />
+                        <X size={isMobile ? 14 : 12} />
                       </button>
                     </div>
                   </div>
@@ -1601,9 +1600,9 @@ export default function OrderSummary({
                   {/* Expanded Details Section */}
                   {expandedItems.has(item.id) && (
                     <div
-                      className={`border-t border-gray-200 dark:border-gray-600 ${
-                        isMobile ? "px-3 pb-3" : "px-6 py-3 ml-7"
-                      } bg-gray-25 dark:bg-gray-750`}
+                      className={`border-t border-gray-200 bg-white/70 dark:border-gray-600 dark:bg-gray-800/65 ${
+                        isMobile ? "px-3 pb-3 pt-2" : "px-4 py-3"
+                      }`}
                     >
                       <div className="w-full">
                         {/* Row 1: Quantity | UOM */}
@@ -1776,13 +1775,13 @@ export default function OrderSummary({
 
                 handleHoldOrder(orderData);
               }}
-              className="px-3 py-2 border border-beveren-600 text-beveren-600 dark:text-beveren-400 rounded-lg font-medium hover:bg-beveren-600 hover:text-white transition-colors text-sm"
+              className="app-touch-target rounded-lg border border-beveren-600 px-3 py-2 text-sm font-medium text-beveren-600 transition-colors hover:bg-beveren-600 hover:text-white active:scale-[0.99] dark:text-beveren-400"
             >
               Hold
             </button>
             <button
               onClick={handleClearCart}
-              className="px-3 py-2 border border-red-500 text-red-600 dark:text-red-400 rounded-lg font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm"
+              className="app-touch-target rounded-lg border border-red-500 px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 active:scale-[0.99] dark:text-red-400 dark:hover:bg-red-900/20"
             >
               Clear Cart
             </button>
@@ -1796,7 +1795,7 @@ export default function OrderSummary({
               if (!validateCustomer()) return;
               setShowPaymentDialog(true);
             }}
-            className={`w-full bg-beveren-600 text-white rounded-xl font-semibold hover:bg-beveren-700 transition-colors ${
+            className={`app-touch-target w-full rounded-xl bg-beveren-600 font-semibold text-white transition-colors hover:bg-beveren-700 active:scale-[0.99] ${
               isMobile ? "py-3 text-base" : "py-2 text-sm"
             }`}
           >

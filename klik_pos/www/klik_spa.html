@@ -1,18 +1,49 @@
 <!doctype html>
-<html lang="en">
+<html dir="rtl" lang="ar">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/assets/klik_pos/klik_spa/favicon.png" />
     <link rel="icon" type="image/x-icon" href="/assets/klik_pos/klik_spa/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (() => {
+        try {
+          const savedTheme = localStorage.getItem("theme");
+          const readCookie = (name) => {
+            const prefix = `${name}=`;
+            return document.cookie
+              .split(";")
+              .map((part) => part.trim())
+              .find((part) => part.startsWith(prefix))
+              ?.slice(prefix.length) || null;
+          };
+          const userLang = readCookie("user_lang");
+          const preferredLanguage = readCookie("preferred_language");
+          const storedLanguage = localStorage.getItem("language");
+          const isGuest = readCookie("user_id") === "Guest" || readCookie("system_user") === "no";
+          const savedLanguage =
+            (userLang && !(isGuest && userLang === "en" && !preferredLanguage && !storedLanguage) && userLang) ||
+            preferredLanguage ||
+            storedLanguage ||
+            "ar";
+          document.documentElement.classList.toggle("dark", savedTheme ? savedTheme === "dark" : true);
+          document.documentElement.setAttribute("dir", savedLanguage === "ar" ? "rtl" : "ltr");
+          document.documentElement.setAttribute("lang", savedLanguage);
+        } catch {
+          document.documentElement.classList.add("dark");
+          document.documentElement.setAttribute("dir", "rtl");
+          document.documentElement.setAttribute("lang", "ar");
+        }
+      })();
+    </script>
     <title>KLiK PoS</title>
-    <meta name="description" content="Modern Point of Sale System - KLiK PoS" />
-    <link rel="manifest" href="/assets/klik_pos/klik_spa/manifest.json" />
-    <meta name="theme-color" content="#316294" />
+    <meta name="description" content="KLiK PoS with the Printhub Cloud design system" />
+    <link rel="manifest" href="/assets/klik_pos/klik_spa/manifest.json?v={{ frappe.utils.now_datetime().strftime('%Y%m%d%H%M%S') }}" />
+    <meta name="theme-color" content="#137fec" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Tajawal:wght@400;500;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+Arabic:wght@300;400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
     <!-- <meta name="csrf-token" content="{{ frappe.session.csrf_token }}"> -->
@@ -20,8 +51,8 @@
     <!-- <link rel="stylesheet" href="http://127.0.0.1:8000/assets/frappe/css/printview.css">
 <link rel="stylesheet" href="http://127.0.0.1:8000/assets/css/printview.css"> -->
 
-    <script type="module" crossorigin src="/assets/klik_pos/klik_spa/assets/index-Bif01Pww.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/klik_pos/klik_spa/assets/index-DLd5z6s3.css">
+    <script type="module" crossorigin src="/assets/klik_pos/klik_spa/assets/index-D0RAZTYt.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/klik_pos/klik_spa/assets/index-Ca7kKtWg.css">
   </head>
   <body>
     <div id="root"></div>

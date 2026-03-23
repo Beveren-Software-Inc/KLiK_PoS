@@ -11,7 +11,7 @@ export function useSalesInvoices(
   const [invoices, setInvoices] = useState<SalesInvoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalLoaded, setTotalLoaded] = useState(0);
@@ -70,9 +70,9 @@ export function useSalesInvoices(
         throw new Error(resData.message?.error || resData.error || "Failed to fetch invoices");
       }
 
-      const rawInvoices = resData.message.data;
+      const rawInvoices = Array.isArray(resData.message.data) ? resData.message.data : [];
       const newInvoicesCount = rawInvoices.length;
-      const totalCountFromAPI = resData.message.total_count || 0;
+      const totalCountFromAPI = Number(resData.message.total_count) || 0;
 
       // Check if we have more invoices to load
       setHasMore(newInvoicesCount === LIMIT);
@@ -162,7 +162,8 @@ export function useSalesInvoices(
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
-      setError(err.message || "Unknown error occurred");
+      const normalizedError = err instanceof Error ? err : new Error(err?.message || "Unknown error occurred");
+      setError(normalizedError);
     } finally {
       setIsLoading(false);
       setIsLoadingMore(false);

@@ -1,5 +1,6 @@
 import frappe
 from frappe import _
+from frappe.utils.translations import set_user_lang
 
 
 @frappe.whitelist()
@@ -73,4 +74,28 @@ def get_current_user_info():
 
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Error getting current user info")
+		return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist()
+def set_language(language: str):
+	"""
+	Persist language preference for the current session and user.
+	"""
+	try:
+		language = (language or "").strip().lower()
+		if language not in {"ar", "en"}:
+			frappe.throw(_("Unsupported language"))
+
+		frappe.local.lang = language
+		frappe.local.cookie_manager.set_cookie("preferred_language", language, deduplicate=True)
+		frappe.local.cookie_manager.set_cookie("user_lang", language, deduplicate=True)
+
+		if frappe.session.user and frappe.session.user != "Guest":
+			frappe.db.set_value("User", frappe.session.user, "language", language, update_modified=False)
+			set_user_lang(frappe.session.user, language)
+
+		return {"success": True, "language": language}
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Error setting language")
 		return {"success": False, "error": str(e)}

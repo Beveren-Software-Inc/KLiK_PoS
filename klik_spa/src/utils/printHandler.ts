@@ -1,4 +1,5 @@
 import { toast } from "react-toastify";
+import { translateText } from "../i18n/runtime";
 
 interface Invoice {
   name?: string;
@@ -11,13 +12,13 @@ export function handlePrintInvoice(invoiceData: Invoice | null) {
   console.log('Print function called with:', invoiceData);
 
   if (!invoiceData) {
-    toast.error("No invoice data available for printing");
+    toast.error(translateText("No invoice data available for printing"));
     return;
   }
 
   const printElement = document.querySelector('.print-preview-container');
   if (!printElement) {
-    toast.error("Print preview not found");
+    toast.error(translateText("Print preview not found"));
     return;
   }
 
