@@ -1257,7 +1257,8 @@ def _prepare_erpnext_items(cart_items, context):
 	"""Convert cart items to ERPNext pricing rule format."""
 	erpnext_items = []
 
-	for item in cart_items:
+	# for item in cart_items:
+	for idx, item in enumerate(cart_items):
 		item_code = item.get("id") or item.get("item_code")
 		if not item_code:
 			continue
@@ -1346,7 +1347,8 @@ def _prepare_erpnext_items(cart_items, context):
 
 		erpnext_item = {
 			"doctype": "Sales Invoice Item",
-			"name": "",
+			"name": str(idx),
+			"idx": idx + 1,
 			"item_code": item_code,
 			"item_group": item_doc.item_group,
 			"brand": item_doc.brand or "",
@@ -1393,8 +1395,24 @@ def _apply_pricing_rules(erpnext_items, context):
 
 	args = frappe._dict(args_dict)
 
+	mock_doc = frappe._dict({
+        "doctype": "Sales Invoice",
+        "name": "POS-TEMP",
+        "company": context["company"],
+        "currency": context["currency"],
+        "transaction_date": frappe.utils.today(),
+        "posting_date": frappe.utils.today(),
+        "transaction_type": "selling",
+        "customer": context.get("customer") or "",
+        "customer_group": context.get("customer_group") or "",
+        "territory": context.get("territory") or "",
+        "price_list": context.get("price_list") or "Standard Selling",
+        "conversion_rate": 1.0,
+        "items": [frappe._dict(item) for item in erpnext_items],
+    })
+
 	try:
-		results = apply_pricing_rule(args, doc=None)
+		results = apply_pricing_rule(args, doc=mock_doc)
 	except Exception as e:
 		import traceback
 
