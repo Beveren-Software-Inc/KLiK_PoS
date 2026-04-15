@@ -929,7 +929,7 @@ export default function PaymentDialog({
           ...item,
           id: item.item_code || item.id,        // ← override the generated id
           item_code: item.item_code || item.id,  // ← keep item_code correct too
-          price: (item as any).discountedPrice || item.price,
+          price: item.price || (item as any).discountedPrice,
           batchNumber: itemDiscounts[item.id]?.batchNumber || null,
           serialNumber: itemDiscounts[item.id]?.serialNumber || null,
           uom: item.uom || 'Nos',
