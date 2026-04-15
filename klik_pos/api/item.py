@@ -1160,7 +1160,7 @@ def get_serial_nos_for_item(item_code: str):
 		pos_doc = get_current_pos_profile()
 		warehouse = getattr(pos_doc, "warehouse", None)
 
-		filters = {"item_code": item_code, "status": ["in", ["Active", "Available"]]}
+		filters = {"item_code": item_code, "status": "Active"}
 		if warehouse:
 			filters["warehouse"] = warehouse
 
