@@ -1035,7 +1035,8 @@ def _prepare_item_data(item, item_data_map, pos_profile):
 	item_data = {
 		"item_code": item_code,
 		"qty": item.get("quantity"),
-		"rate": item.get("price"),
+		# "rate": item.get("price"),
+		"rate": item.get("original_price") or item.get("price"),
 		"income_account": income_account,
 		"expense_account": expense_account,
 		"warehouse": pos_profile.warehouse,
