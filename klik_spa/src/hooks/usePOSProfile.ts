@@ -117,6 +117,7 @@ export type POSDetails = {
   write_off_account?: string;
   write_off_cost_center?: string;
   custom_delivery_required?: number;
+  allow_discount_change?: boolean;
   // extend with any other server-provided fields as needed
   [key: string]: unknown;
 }
