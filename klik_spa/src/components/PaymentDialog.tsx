@@ -497,6 +497,12 @@ export default function PaymentDialog({
   }, [isOpen, modes, calculations.grandTotal, isB2B, isB2C]);
 
   useEffect(() => {
+    // For customer payment flows (B2C and B2B & B2C), allow paid amount above grand total
+    // so cashier can capture cash received and system can show change.
+    // Keep clamp logic only for strict B2B invoicing flow.
+    if (!isB2B) {
+      return;
+    }
 
     if (modes.length > 0 && Object.keys(paymentAmounts).length > 0) {
       const defaultMode = modes.find((mode) => mode.default === 1);
