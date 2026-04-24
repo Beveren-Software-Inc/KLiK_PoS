@@ -3398,7 +3398,14 @@ export default function OrderSummary({
                                 )
                               }
                               placeholder="0.00"
-                              className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+                              readOnly={!posDetails?.allow_discount_change}
+                              disabled={!posDetails?.allow_discount_change}
+                              // className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+                              className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                                ${!posDetails?.allow_discount_change 
+                                  ? "opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-700" 
+                                  : ""
+                                }`}
                             />
                           </div>
                           <div>
@@ -3419,7 +3426,14 @@ export default function OrderSummary({
                                 )
                               }
                               placeholder="0.0"
-                              className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+                              // className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+                              readOnly={!posDetails?.allow_discount_change}  // ✅
+                              disabled={!posDetails?.allow_discount_change}  // ✅
+                              className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                                ${!posDetails?.allow_discount_change 
+                                  ? "opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-700" 
+                                  : ""
+                                }`}
                             />
                           </div>
                         </div>
