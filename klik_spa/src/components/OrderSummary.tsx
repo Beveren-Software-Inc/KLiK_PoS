@@ -1834,6 +1834,7 @@ import type { CartItem, GiftCoupon } from "../../types";
 import type { Customer } from "../types/customer";
 import PaymentDialog from "./PaymentDialog";
 import AddCustomerModal from "./AddCustomerModal";
+import BarcodeScannerModal from "./BarcodeScanner";
 import { createDraftSalesInvoice } from "../services/salesInvoice";
 import { useCustomers } from "../hooks/useCustomers";
 import { useProducts } from "../hooks/useProducts";
@@ -2273,6 +2274,12 @@ export default function OrderSummary({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { posDetails, loading: _posLoading } = usePOSDetails();
   const { checkCustomerPermission } = useCustomerPermission();
+  const [showReductionAuthModal, setShowReductionAuthModal] = useState(false);
+  const [showReductionScanner, setShowReductionScanner] = useState(false);
+  const [reductionPasswordInput, setReductionPasswordInput] = useState("");
+  const [isVerifyingReduction, setIsVerifyingReduction] = useState(false);
+  const [reductionAuthError, setReductionAuthError] = useState("");
+  const [pendingReduction, setPendingReduction] = useState<{ id: string; quantity: number } | null>(null);
 
   // Get customer statistics for the selected customer
   const { statistics: customerStats } = useCustomerStatistics(selectedCustomer?.id || null);
@@ -2284,6 +2291,74 @@ export default function OrderSummary({
   }>({});
 
   const currency_symbol = posDetails?.currency_symbol;
+  const limitItemReduction = Boolean(posDetails?.custom_limit_item_reduction);
+
+  const verifyReductionPassword = async (password: string): Promise<boolean> => {
+    try {
+      const response = await fetch("/api/method/klik_pos.api.pos_profile.verify_item_reduction_password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "X-Frappe-CSRF-Token": (window as { csrf_token?: string }).csrf_token || "",
+        },
+        credentials: "include",
+        body: JSON.stringify({ password }),
+      });
+      const result = await response.json();
+      const payload = result?.message || result;
+      return Boolean(payload?.success);
+    } catch (error) {
+      console.error("Reduction password verification failed:", error);
+      return false;
+    }
+  };
+
+  const resetReductionAuthState = () => {
+    setShowReductionAuthModal(false);
+    setShowReductionScanner(false);
+    setReductionPasswordInput("");
+    setReductionAuthError("");
+    setIsVerifyingReduction(false);
+    setPendingReduction(null);
+  };
+
+  const requestQuantityChange = (id: string, quantity: number) => {
+    const cartItem = cartItems.find((ci) => ci.id === id);
+    const currentQty = cartItem?.quantity ?? 0;
+    const isReduction = quantity < currentQty;
+
+    if (!limitItemReduction || !isReduction) {
+      onUpdateQuantity(id, quantity);
+      return;
+    }
+
+    setPendingReduction({ id, quantity });
+    setReductionPasswordInput("");
+    setReductionAuthError("");
+    setShowReductionAuthModal(true);
+  };
+
+  const confirmReduction = async () => {
+    if (!pendingReduction) return;
+    if (!reductionPasswordInput.trim()) {
+      setReductionAuthError("Password is required");
+      return;
+    }
+
+    setIsVerifyingReduction(true);
+    setReductionAuthError("");
+
+    const ok = await verifyReductionPassword(reductionPasswordInput.trim());
+    if (!ok) {
+      setReductionAuthError("Invalid authorization password");
+      setIsVerifyingReduction(false);
+      return;
+    }
+
+    onUpdateQuantity(pendingReduction.id, pendingReduction.quantity);
+    resetReductionAuthState();
+  };
 
   // UOM change handler
   const handleUOMChange = useCallback((itemId: string, selectedUOM: string, newPrice: number) => {
@@ -3274,7 +3349,7 @@ export default function OrderSummary({
                     <div className="flex-shrink-0 flex items-center ml-10 space-x-1 min-w-[70px] justify-center">
                       <button
                         onClick={() =>
-                          onUpdateQuantity(item.id, item.quantity - 1)
+                          requestQuantityChange(item.id, item.quantity - 1)
                         }
                         className={`${
                           isMobile ? "w-8 h-8" : "w-5 h-5"
@@ -3294,7 +3369,7 @@ export default function OrderSummary({
                       </span>
                       <button
                         onClick={() =>
-                          onUpdateQuantity(item.id, item.quantity + 1)
+                          requestQuantityChange(item.id, item.quantity + 1)
                         }
                         className={`${
                           isMobile ? "w-8 h-8" : "w-7 h-7"
@@ -3336,11 +3411,7 @@ export default function OrderSummary({
                     {/* Remove Button */}
                     <div className="flex-shrink-0 ml-2">
                       <button
-                        onClick={() =>
-                          onRemoveItem
-                            ? onRemoveItem(item.id)
-                            : onUpdateQuantity(item.id, 0)
-                        }
+                        onClick={() => requestQuantityChange(item.id, 0)}
                         className={`${
                           isMobile ? "w-8 h-8" : "w-6 h-6"
                         } rounded-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-200 dark:hover:border-red-800 hover:text-red-600 dark:hover:text-red-400 transition-colors`}
@@ -3367,7 +3438,7 @@ export default function OrderSummary({
                             </label>
                             <QuantityInput
                               item={item}
-                              onUpdateQuantity={onUpdateQuantity}
+                              onUpdateQuantity={requestQuantityChange}
                               isMobile={isMobile}
                             />
                           </div>
@@ -3586,6 +3657,68 @@ export default function OrderSummary({
           </button>
         </div>
       )}
+
+      {showReductionAuthModal && (
+        <div className="fixed inset-0 z-[70] bg-black/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-5">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              Manager Authorization Required
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+              Quantity reduction is restricted. Enter or scan authorization password.
+            </p>
+
+            <div className="space-y-3">
+              <input
+                type="password"
+                value={reductionPasswordInput}
+                onChange={(e) => setReductionPasswordInput(e.target.value)}
+                placeholder="Enter password"
+                autoComplete="off"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-beveren-500"
+              />
+
+              {reductionAuthError && (
+                <p className="text-sm text-red-600 dark:text-red-400">{reductionAuthError}</p>
+              )}
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowReductionScanner(true)}
+                  className="flex-1 px-3 py-2 rounded-lg border border-beveren-500 text-beveren-600 dark:text-beveren-400 hover:bg-beveren-50 dark:hover:bg-beveren-900/20"
+                >
+                  Scan QR
+                </button>
+                <button
+                  type="button"
+                  onClick={resetReductionAuthState}
+                  className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmReduction}
+                  disabled={isVerifyingReduction}
+                  className="flex-1 px-3 py-2 rounded-lg bg-beveren-600 text-white hover:bg-beveren-700 disabled:opacity-60"
+                >
+                  {isVerifyingReduction ? "Verifying..." : "Authorize"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <BarcodeScannerModal
+        isOpen={showReductionScanner}
+        onClose={() => setShowReductionScanner(false)}
+        onBarcodeDetected={(code) => {
+          setReductionPasswordInput(code);
+          setShowReductionScanner(false);
+        }}
+      />
 
       {/* Add Customer Modal */}
       {showAddCustomerModal && (

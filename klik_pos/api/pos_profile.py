@@ -1,5 +1,6 @@
 import frappe
 from frappe import _
+from frappe.utils import cint
 
 from klik_pos.api.sales_invoice import get_current_pos_opening_entry
 from klik_pos.klik_pos.utils import get_current_pos_profile
@@ -176,9 +177,37 @@ def get_pos_details():
 		"custom_allow_write_off": pos.custom_allow_write_off or 0,
 		"custom_ignore_write_off_on_partial_returns": pos.custom_ignore_write_off_on_partial_returns or 1.0,
 		"custom_delivery_required": int(getattr(pos, "custom_delivery_required", 0) or 0),
+		"custom_limit_item_reduction": int(getattr(pos, "custom_limit_item_reduction", 0) or 0),
 		"allow_discount_change": pos.allow_discount_change or 0
 	}
 	return details
+
+
+@frappe.whitelist()
+def verify_item_reduction_password(password=None):
+	"""Validate manager password used to authorize cart item quantity reduction."""
+	try:
+		pos = get_current_pos_profile()
+		if not cint(getattr(pos, "custom_limit_item_reduction", 0)):
+			return {"success": True, "message": _("Item reduction password check is not enabled.")}
+
+		if not password:
+			return {"success": False, "message": _("Password is required.")}
+
+		stored_password = pos.get_password("custom_item_reduction_password")
+		if not stored_password:
+			return {
+				"success": False,
+				"message": _("Item reduction password is not configured in POS Profile."),
+			}
+
+		return {
+			"success": password == stored_password,
+			"message": _("Authorized") if password == stored_password else _("Invalid password."),
+		}
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Item reduction password verification error")
+		return {"success": False, "message": str(e)}
 
 
 def is_zatca_enabled():
