@@ -1031,12 +1031,32 @@ def _prepare_item_data(item, item_data_map, pos_profile):
 	expense_account = get_expense_accounts(item_code)
 	_validate_item_accounts(item_code, income_account, expense_account)
 
+	discounted_price = item.get("discountedPrice")
+	original_price   = item.get("price")
+
+	if discounted_price is not None and flt(discounted_price) != flt(original_price):
+        # Discount was applied in the POS UI — send the final rate directly.
+        # Also tell ERPNext to ignore its own pricing rules for this line so
+        # they don't recalculate and override our explicit rate.
+		final_rate = flt(discounted_price)
+		ignore_pricing_rule = 1
+	else:
+        # No POS discount — let ERPNext use the price list rate as-is.
+		final_rate = flt(original_price)
+		ignore_pricing_rule = 0	
+
 	# Build base item data
 	item_data = {
 		"item_code": item_code,
 		"qty": item.get("quantity"),
+		"rate": final_rate,
+        "price_list_rate": flt(original_price),   # keep original for reference
+        "ignore_pricing_rule": ignore_pricing_rule,
 		# "rate": item.get("price"),
-		"rate": item.get("original_price") or item.get("price"),
+		# "rate": item.get("original_price") or item.get("price"),
+		# "rate": item.get("discountedPrice") or item.get("price"),
+		"discount_percentage": flt(item.get("discountPercentage", 0)),
+    	"discount_amount": flt(item.get("discountAmount", 0)),
 		"income_account": income_account,
 		"expense_account": expense_account,
 		"warehouse": pos_profile.warehouse,
