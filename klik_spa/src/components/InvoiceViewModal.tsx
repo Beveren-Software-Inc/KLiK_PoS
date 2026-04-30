@@ -15,6 +15,7 @@ import type { SalesInvoice } from "../../types";
 import { useInvoiceDetails } from "../hooks/useInvoiceDetails";
 import { createSalesReturn } from "../services/salesInvoice";
 import { toast } from "react-toastify";
+import { usePOSProfileStore } from "../stores/posProfileStore";
 
 interface InvoiceViewModalProps {
   invoice: SalesInvoice | null;
@@ -30,6 +31,9 @@ export default function InvoiceViewModal({
   onClose,
   onCancel,
 }: InvoiceViewModalProps) {
+  const { posDetails } = usePOSProfileStore();
+  const canProcessReturns = ![0, "0", false].includes(posDetails?.custom_allow_return as 0 | "0" | false);
+
   // Call hooks unconditionally (Rules of Hooks)
   const {
     invoice: fullInvoice,
@@ -60,6 +64,11 @@ export default function InvoiceViewModal({
   };
 
   const handleReturnClick = async (invoiceName: string) => {
+    if (!canProcessReturns) {
+      toast.error("Returns are disabled for this POS Profile");
+      return;
+    }
+
     try {
       const result = await createSalesReturn(invoiceName);
       console.log(result);
@@ -252,7 +261,7 @@ export default function InvoiceViewModal({
 
                 {/* Actions */}
                 <div className="space-y-3">
-                  {displayInvoice.status === "Paid" && (
+                  {canProcessReturns && displayInvoice.status === "Paid" && (
                     <ActionButton
                       onClick={() => handleReturnClick(displayInvoice.name)}
                       icon={<RefreshCw />}

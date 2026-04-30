@@ -26,6 +26,32 @@ export async function sendEmails(data: any) {
   return result.message;
 }
 
+export async function getAvailableOutgoingAccounts() {
+  const csrfToken = window.csrf_token;
+
+  const response = await fetch(
+    "/api/method/klik_pos.api.email.get_available_outgoing_accounts",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Frappe-CSRF-Token": csrfToken,
+      },
+      credentials: "include",
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok || !result.message || result.message.status !== "success") {
+    const serverMsg = result._server_messages
+      ? JSON.parse(result._server_messages)[0]
+      : "Failed to get available outgoing accounts";
+    throw new Error(serverMsg);
+  }
+
+  return result.message;
+}
 
 // Extend Window interface to include csrf_token
 declare global {
@@ -43,6 +69,32 @@ interface WhatsAppData {
   template_parameters?: string[];
 }
 
+export async function getWhatsAppSetup() {
+  const csrfToken = window.csrf_token;
+
+  const response = await fetch(
+    "/api/method/klik_pos.api.whatsapp.get_whatsapp_setup",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Frappe-CSRF-Token": csrfToken,
+      },
+      credentials: "include",
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok || !result.message || result.message.status !== "success") {
+    const serverMsg = result._server_messages
+      ? JSON.parse(result._server_messages)[0]
+      : "Failed to get WhatsApp setup";
+    throw new Error(serverMsg);
+  }
+
+  return result.message;
+}
 
 // New function specifically for simple text messages
 export async function sendWhatsAppMessage(data: WhatsAppData) {
@@ -104,6 +156,34 @@ export async function sendTemplateWhatsApp(mobile: string, templateName: string,
     const serverMsg = result._server_messages
       ? JSON.parse(result._server_messages)[0]
       : 'Failed to send WhatsApp message';
+    throw new Error(serverMsg);
+  }
+
+  return result.message;
+}
+
+// Check if SMS gateway is configured
+export async function getSMSGateway() {
+  const csrfToken = window.csrf_token;
+
+  const response = await fetch(
+    "/api/method/klik_pos.api.sms.get_sms_gateway_settings",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Frappe-CSRF-Token": csrfToken,
+      },
+      credentials: "include",
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok || !result.message || result.message.status !== "success") {
+    const serverMsg = result._server_messages
+      ? JSON.parse(result._server_messages)[0]
+      : "Failed to get SMS gateway settings";
     throw new Error(serverMsg);
   }
 

@@ -1,4 +1,3 @@
-
 interface CurrentUser {
   name?: string;
   email?: string;
@@ -7,13 +6,14 @@ interface CurrentUser {
   user_image?: string;
 }
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useI18n } from "../hooks/useI18n"
 import { usePOSOpeningStatus } from '../hooks/usePOSOpeningEntry'
 import RetailPOSLayout from "../components/RetailPOSLayout"
 import POSOpeningModal from '../components/PosOpeningEntryDialog'
 import erpnextAPI from '../services/erpnext-api'
 import { loadCachedItemsToCart, hasCachedDraftInvoiceItems } from '../utils/draftInvoiceCache'
+import { usePOSProfileStore } from '../stores/posProfileStore'
 
 export default function MainPOSScreen() {
   const { isRTL } = useI18n()
@@ -23,9 +23,11 @@ export default function MainPOSScreen() {
   const [userLoading, setUserLoading] = useState(true)
   const [userError, setUserError] = useState<string | null>(null)
   const [cacheLoaded, setCacheLoaded] = useState(false)
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const isMountedRef = useRef(true)
 
+  const { refreshAll, isAuthenticated, setAuthenticated } = usePOSProfileStore()
 
-  // Check POS opening status
   const {
     hasOpenEntry,
     isLoading: statusLoading,
@@ -33,8 +35,76 @@ export default function MainPOSScreen() {
     refetch
   } = usePOSOpeningStatus()
 
+  const silentRefresh = useCallback(async () => {
+    if (!isMountedRef.current) return
+    try {
+      await refreshAll()
+      await refetch()
+    } catch (error) {
+      console.error('MainPOSScreen silent refresh failed:', error)
+    }
+  }, [refreshAll, refetch])
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && posReady && isAuthenticated && isMountedRef.current) {
+        if (refreshTimeoutRef.current) {
+          clearTimeout(refreshTimeoutRef.current)
+        }
+        refreshTimeoutRef.current = setTimeout(() => {
+          silentRefresh()
+        }, 500)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [posReady, silentRefresh, isAuthenticated])
+
+  useEffect(() => {
+    const handleFocus = () => {
+      if (posReady && isAuthenticated && isMountedRef.current) {
+        if (refreshTimeoutRef.current) {
+          clearTimeout(refreshTimeoutRef.current)
+        }
+        refreshTimeoutRef.current = setTimeout(() => {
+          silentRefresh()
+        }, 500)
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [posReady, silentRefresh, isAuthenticated])
+
+  useEffect(() => {
+    const handleOnline = () => {
+      if (isAuthenticated && posReady && isMountedRef.current) {
+        silentRefresh()
+      }
+    }
+
+    window.addEventListener('online', handleOnline)
+    return () => window.removeEventListener('online', handleOnline)
+  }, [silentRefresh, isAuthenticated, posReady])
+
   useEffect(() => {
     const fetchCurrentUser = async () => {
+      if (!isMountedRef.current) return
       try {
         setUserLoading(true)
         setUserError(null)
@@ -42,6 +112,8 @@ export default function MainPOSScreen() {
         erpnextAPI.initializeSession()
 
         const userProfile = await erpnextAPI.getCurrentUserProfile()
+
+        if (!isMountedRef.current) return
 
         if (userProfile) {
           setCurrentUser({
@@ -51,9 +123,10 @@ export default function MainPOSScreen() {
             role: userProfile.role_profile_name || 'User',
             user_image: userProfile.user_image
           })
+          setAuthenticated(true)
         } else {
-          // Fallback to basic user info
           const basicUser = await erpnextAPI.getCurrentUser()
+          if (!isMountedRef.current) return
           if (basicUser) {
             setCurrentUser({
               name: basicUser as string,
@@ -61,77 +134,72 @@ export default function MainPOSScreen() {
               full_name: basicUser as string,
               role: 'User'
             })
+            setAuthenticated(true)
           } else {
-            // No user found, might need to login
             setUserError('No user session found')
+            setAuthenticated(false)
           }
         }
       } catch (error) {
+        if (!isMountedRef.current) return
         console.error('Error fetching current user:', error)
         setUserError((error as Error).message || 'Failed to fetch user')
+        setAuthenticated(false)
       } finally {
-        setUserLoading(false)
+        if (isMountedRef.current) {
+          setUserLoading(false)
+        }
       }
     }
 
     fetchCurrentUser()
-  }, [])
+  }, [setAuthenticated])
 
-  // Load cached draft invoice items when POS becomes ready
   useEffect(() => {
-    if (posReady && !cacheLoaded) {
-      // Add a small delay to ensure everything is loaded
+    if (posReady && !cacheLoaded && isMountedRef.current) {
       setTimeout(async () => {
-        const hasCached = hasCachedDraftInvoiceItems();
-
+        if (!isMountedRef.current) return
+        const hasCached = hasCachedDraftInvoiceItems()
         if (hasCached) {
-          console.log('Loading cached draft invoice items to cart');
-          await loadCachedItemsToCart();
-
+          console.log('Loading cached draft invoice items to cart')
+          await loadCachedItemsToCart()
         }
-
-        // Mark cache as loaded to prevent multiple executions
-        setCacheLoaded(true);
-      }, 1000); // 1 second delay
+        if (isMountedRef.current) {
+          setCacheLoaded(true)
+        }
+      }, 1000)
     }
-  }, [posReady, cacheLoaded]);
+  }, [posReady, cacheLoaded])
 
-  // Check opening entry status when component mounts
-  // Note: The POSOpeningEntryGuard handles showing the modal and blocking access
-  // This just sets posReady state for this component
   useEffect(() => {
-    if (!statusLoading && !statusError) {
+    if (!statusLoading && !statusError && isMountedRef.current) {
       if (hasOpenEntry === true) {
         setPosReady(true)
         setShowOpeningModal(false)
       } else if (hasOpenEntry === false) {
-        // Guard will handle showing modal and blocking access
         setPosReady(false)
         setShowOpeningModal(false)
       }
-    } else if (statusError) {
+    } else if (statusError && isMountedRef.current) {
       console.error('Error checking POS opening status:', statusError)
-      // Guard will handle showing modal and blocking access
       setPosReady(false)
       setShowOpeningModal(false)
     }
   }, [hasOpenEntry, statusLoading, statusError])
 
-  // Handle successful opening entry creation
   const handleOpeningSuccess = () => {
     setShowOpeningModal(false)
     setPosReady(true)
-    // Reset cache loaded flag when opening new POS session
     setCacheLoaded(false)
     refetch()
+    silentRefresh()
   }
 
   const handleOpeningClose = () => {
     setShowOpeningModal(false)
   }
 
-  // Show loading screen while checking status
-  if (statusLoading || userLoading) {
+  if ((statusLoading || userLoading) && !posReady) {
     return (
       <div className={`min-h-screen bg-gray-50 ${isRTL ? "rtl" : "ltr"} flex items-center justify-center`}>
         <div className="text-center">
@@ -156,11 +224,8 @@ export default function MainPOSScreen() {
 
   return (
     <div className={`min-h-screen bg-gray-50 ${isRTL ? "rtl" : "ltr"} pb-12`}>
-
-      {/* Show POS Layout only when ready */}
       {posReady && <RetailPOSLayout />}
 
-      {/* Show a placeholder or message when POS is not ready */}
       {!posReady && !showOpeningModal && (
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
@@ -176,7 +241,6 @@ export default function MainPOSScreen() {
         </div>
       )}
 
-      {/* POS Opening Modal */}
       <POSOpeningModal
         isOpen={showOpeningModal}
         onClose={handleOpeningClose}

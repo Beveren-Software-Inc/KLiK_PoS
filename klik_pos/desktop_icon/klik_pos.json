@@ -1,0 +1,21 @@
+{
+ "app": "klik_pos",
+ "bg_color": "blue",
+ "creation": "2026-04-10 13:55:10.088973",
+ "docstatus": 0,
+ "doctype": "Desktop Icon",
+ "hidden": 0,
+ "icon_type": "App",
+ "idx": 0,
+ "label": "KLiK PoS",
+ "link": "/klik_pos",
+ "link_type": "External",
+ "logo_url": "/assets/klik_pos/klik_spa/bev_logo.jpeg",
+ "modified": "2026-04-16 09:43:59.584916",
+ "modified_by": "Administrator",
+ "name": "KLiK PoS",
+ "owner": "Administrator",
+ "restrict_removal": 0,
+ "roles": [],
+ "standard": 1
+}

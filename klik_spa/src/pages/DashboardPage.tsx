@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { formatCurrency } from "../utils/currency"
+import { formatCurrencyWithSymbol } from "../utils/currency"
 import {
 
   TrendingUp,
@@ -23,7 +23,7 @@ import type { SalesInvoice } from "../../types"
 
 import BottomNavigation from "../components/BottomNavigation"
 import { useMediaQuery } from "../hooks/useMediaQuery"
-import { usePOSDetails } from "../hooks/usePOSProfile"
+import { usePOSProfileStore } from "../stores/posProfileStore";
 import { useAllPaymentModes } from "../hooks/usePaymentModes"
 import { useSalesInvoices } from "../hooks/useSalesInvoices"
 import { useUserInfo } from "../hooks/useUserInfo"
@@ -31,7 +31,7 @@ import { useUserInfo } from "../hooks/useUserInfo"
 export default function DashboardPage() {
   const navigate = useNavigate()
   const isMobile = useMediaQuery("(max-width: 1024px)")
-  const { posDetails } = usePOSDetails()
+  const { posDetails } = usePOSProfileStore()
 
   // Only fetch submitted invoices for dashboard (exclude Draft and Cancelled)
   const { invoices, isLoading: invoicesLoading } = useSalesInvoices("", false, undefined, true)
@@ -442,7 +442,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</p>
                   <p className="text-xl font-bold text-gray-900 dark:text-white">
-                    {formatCurrency(filteredStats.totalRevenue, posDetails?.currency || 'USD')}
+                    {formatCurrencyWithSymbol(filteredStats.totalRevenue, posDetails?.currency || 'USD')}
                   </p>
                   <div className="flex items-center mt-2">
                     <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
@@ -480,7 +480,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Avg Order Value</p>
                   <p className="text-xl font-bold text-gray-900 dark:text-white">
-                    {formatCurrency(filteredStats.averageOrderValue, posDetails?.currency || 'USD')}
+                    {formatCurrencyWithSymbol(filteredStats.averageOrderValue, posDetails?.currency || 'USD')}
                   </p>
                   <div className="flex items-center mt-2">
                     <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
@@ -569,7 +569,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                                 height: `${height}px`,
                                 minHeight: "4px",
                               }}
-                              title={`${item.hour}: ${formatCurrency(item.sales, posDetails?.currency || 'USD')}`}
+                              title={`${item.hour}: ${formatCurrencyWithSymbol(item.sales, posDetails?.currency || 'USD')}`}
                             ></div>
                           ) : (
                             <div className="relative w-full h-full">
@@ -598,7 +598,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                             </div>
                           )}
                           <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                            {formatCurrency(item.sales, posDetails?.currency || 'USD')}
+                            {formatCurrencyWithSymbol(item.sales, posDetails?.currency || 'USD')}
                           </div>
                         </div>
                         <span className="text-xs text-gray-500 dark:text-gray-400 mt-2 transform -rotate-45 origin-top-left">
@@ -611,7 +611,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                 <div className="mt-3 text-center">
                   <div className="text-sm text-gray-600 dark:text-gray-400">
                     Total Revenue: <span className="font-semibold text-beveren-600 dark:text-beveren-400">
-                      {formatCurrency(salesByHourData.reduce((sum, item) => sum + item.sales, 0), posDetails?.currency || 'USD')}
+                      {formatCurrencyWithSymbol(salesByHourData.reduce((sum, item) => sum + item.sales, 0), posDetails?.currency || 'USD')}
                     </span>
                   </div>
                 </div>
@@ -636,7 +636,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                       </div>
                       <div className="text-right">
                         <div className="font-semibold text-gray-900 dark:text-white">
-                          {formatCurrency(method.amount, posDetails?.currency || 'USD')}
+                          {formatCurrencyWithSymbol(method.amount, posDetails?.currency || 'USD')}
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                           {method.percentage.toFixed(1)}% • {method.transactions} txns
@@ -736,7 +736,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                 <div className="flex justify-between p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                   <span className="text-sm text-gray-600 dark:text-gray-400">Total Redeemed</span>
                   <span className="font-semibold text-gray-900 dark:text-white">
-                    {formatCurrency(stats.giftCardUsage.totalRedeemed, posDetails?.currency || 'USD')}
+                    {formatCurrencyWithSymbol(stats.giftCardUsage.totalRedeemed, posDetails?.currency || 'USD')}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -748,7 +748,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600 dark:text-gray-400">Avg Discount</span>
                   <span className="font-semibold text-orange-600 dark:text-orange-400">
-                    {formatCurrency(stats.giftCardUsage.averageDiscount, posDetails?.currency || 'USD')}
+                    {formatCurrencyWithSymbol(stats.giftCardUsage.averageDiscount, posDetails?.currency || 'USD')}
                   </span>
                 </div>
                 <div className="pt-2 border-t border-gray-200 dark:border-gray-600">
@@ -784,7 +784,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                     {topPerformer.transactions} transactions
                   </p>
                   <p className="text-lg font-bold text-beveren-600 dark:text-beveren-400">
-                    {formatCurrency(topPerformer.sales, posDetails?.currency || 'USD')}
+                    {formatCurrencyWithSymbol(topPerformer.sales, posDetails?.currency || 'USD')}
                   </p>
                   <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
                     {filteredStats.totalRevenue > 0 ? ((topPerformer.sales / filteredStats.totalRevenue) * 100).toFixed(1) : 0}% of total sales
@@ -813,10 +813,10 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                           height: `${(item.sales / Math.max(...stats.salesByDay.map((s: { day: string; sales: number }) => s.sales))) * 60}px`,
                           minHeight: "4px",
                         }}
-                        title={`${item.day}: ${formatCurrency(item.sales, posDetails?.currency || 'USD')}`}
+                        title={`${item.day}: ${formatCurrencyWithSymbol(item.sales, posDetails?.currency || 'USD')}`}
                       ></div>
                       <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-700 text-white text-xs px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                        {formatCurrency(item.sales, posDetails?.currency || 'USD')}
+                        {formatCurrencyWithSymbol(item.sales, posDetails?.currency || 'USD')}
                       </div>
                     </div>
                     <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">{item.day}</span>
@@ -857,9 +857,9 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-semibold text-gray-900 dark:text-white">{formatCurrency(product.revenue, posDetails?.currency || 'USD')}</div>
+                      <div className="font-semibold text-gray-900 dark:text-white">{formatCurrencyWithSymbol(product.revenue, posDetails?.currency || 'USD')}</div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {formatCurrency(product.sales > 0 ? (product.revenue / product.sales) : 0, posDetails?.currency || 'USD')} avg
+                        {formatCurrencyWithSymbol(product.sales > 0 ? (product.revenue / product.sales) : 0, posDetails?.currency || 'USD')} avg
                       </div>
                     </div>
                   </div>
@@ -906,7 +906,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                     </div>
                     <div className="text-right">
                       <div className="font-semibold text-gray-900 dark:text-white">
-                        {formatCurrency(transaction.totalAmount, transaction.currency || posDetails?.currency || 'USD')}
+                        {formatCurrencyWithSymbol(transaction.totalAmount, transaction.currency || posDetails?.currency || 'USD')}
                       </div>
                       <div
                         className={`text-xs ${
@@ -1050,7 +1050,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</p>
                 <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                  {formatCurrency(filteredStats.totalRevenue, posDetails?.currency || 'USD')}
+                  {formatCurrencyWithSymbol(filteredStats.totalRevenue, posDetails?.currency || 'USD')}
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
@@ -1088,7 +1088,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Avg Order Value</p>
                 <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                  {formatCurrency(filteredStats.averageOrderValue, posDetails?.currency || 'USD')}
+                  {formatCurrencyWithSymbol(filteredStats.averageOrderValue, posDetails?.currency || 'USD')}
                 </p>
                 <div className="flex items-center mt-2">
                   <TrendingUp className="w-4 h-4 text-orange-500 mr-1" />
@@ -1177,7 +1177,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                               height: `${height}px`,
                               minHeight: "4px",
                             }}
-                            title={`${item.hour}: ${formatCurrency(item.sales, posDetails?.currency || 'USD')}`}
+                            title={`${item.hour}: ${formatCurrencyWithSymbol(item.sales, posDetails?.currency || 'USD')}`}
                           ></div>
                         ) : (
                           <div className="relative w-full h-full">
@@ -1206,7 +1206,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                           </div>
                         )}
                         <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                          {formatCurrency(item.sales, posDetails?.currency || 'USD')}
+                          {formatCurrencyWithSymbol(item.sales, posDetails?.currency || 'USD')}
                         </div>
                       </div>
                       <span className="text-xs text-gray-500 dark:text-gray-400 mt-2 transform -rotate-45 origin-top-left">
@@ -1219,7 +1219,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
               <div className="mt-4 text-center">
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                   Total Revenue: <span className="font-semibold text-beveren-600 dark:text-beveren-400">
-                    {formatCurrency(salesByHourData.reduce((sum, item) => sum + item.sales, 0), posDetails?.currency || 'USD')}
+                    {formatCurrencyWithSymbol(salesByHourData.reduce((sum, item) => sum + item.sales, 0), posDetails?.currency || 'USD')}
                   </span>
                 </div>
               </div>
@@ -1244,7 +1244,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                     </div>
                     <div className="text-right">
                       <div className="font-semibold text-gray-900 dark:text-white">
-                        {formatCurrency(method.amount, posDetails?.currency || 'USD')}
+                        {formatCurrencyWithSymbol(method.amount, posDetails?.currency || 'USD')}
                       </div>
                       <div className="text-sm text-gray-500 dark:text-gray-400">
                         {method.percentage.toFixed(1)}% • {method.transactions} txns
@@ -1360,7 +1360,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                   {topPerformer.transactions} transactions
                 </p>
                 <p className="text-lg font-bold text-beveren-600 dark:text-beveren-400">
-                  {formatCurrency(topPerformer.sales, posDetails?.currency || 'USD')}
+                  {formatCurrencyWithSymbol(topPerformer.sales, posDetails?.currency || 'USD')}
                 </p>
                 <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
                   {filteredStats.totalRevenue > 0 ? ((topPerformer.sales / filteredStats.totalRevenue) * 100).toFixed(1) : 0}% of total sales
@@ -1402,9 +1402,9 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-semibold text-gray-900 dark:text-white">{formatCurrency(product.revenue, posDetails?.currency || 'USD')}</div>
+                    <div className="font-semibold text-gray-900 dark:text-white">{formatCurrencyWithSymbol(product.revenue, posDetails?.currency || 'USD')}</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {formatCurrency(product.sales > 0 ? (product.revenue / product.sales) : 0, posDetails?.currency || 'USD')} avg
+                      {formatCurrencyWithSymbol(product.sales > 0 ? (product.revenue / product.sales) : 0, posDetails?.currency || 'USD')} avg
                     </div>
                   </div>
                 </div>
@@ -1451,7 +1451,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
                   </div>
                   <div className="text-right">
                     <div className="font-semibold text-gray-900 dark:text-white">
-                      {formatCurrency(transaction.totalAmount, transaction.currency || posDetails?.currency || 'USD')}
+                      {formatCurrencyWithSymbol(transaction.totalAmount, transaction.currency || posDetails?.currency || 'USD')}
                     </div>
                     <div
                       className={`text-xs ${

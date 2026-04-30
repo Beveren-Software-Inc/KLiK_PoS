@@ -13,6 +13,7 @@ interface CustomerData {
   customer_type: string;
   email: string;
   phone: string;
+  taxId?: string;
   name_arabic?: string;
   address: CustomerAddress;
   preferredPaymentMethod?: string;

@@ -169,7 +169,7 @@ export default function SettingsPage() {
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Store Name</label>
           <input
             type="text"
-            defaultValue="Beveren Store"
+            defaultValue="Store"
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
           />
         </div>

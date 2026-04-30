@@ -18,13 +18,13 @@ import { toast } from "react-toastify";
 import { createSalesReturn } from "../services/salesInvoice";
 import { useAllPaymentModes } from "../hooks/usePaymentModes";
 
-import { usePOSDetails } from "../hooks/usePOSProfile";
+import { usePOSProfileStore } from "../stores/posProfileStore";
 import { useCreatePOSClosingEntry } from "../services/closingEntry";
 import BottomNavigation from "../components/BottomNavigation";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { deleteDraftInvoice } from "../services/salesInvoice";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
-import { formatCurrency } from "../utils/currency";
+import { formatCurrencyWithSymbol } from "../utils/currency";
 import { isToday, isThisWeek, isThisMonth, isThisYear } from "../utils/time";
 import { clearAllCache } from "../utils/clearCache";
 
@@ -55,7 +55,8 @@ export default function ClosingShiftPage() {
 
   const { invoices, isLoading,  error,  } = useSalesInvoices();
   const { modes, isLoading: modesLoading, error: modesError } = useAllPaymentModes()
-  const { posDetails } = usePOSDetails();
+  const { posDetails } = usePOSProfileStore();
+  const canProcessReturns = ![0, "0", false].includes(posDetails?.custom_allow_return as 0 | "0" | false);
 
 
   const hideExpectedAmount = posDetails?.custom_hide_expected_amount || false;
@@ -294,6 +295,11 @@ export default function ClosingShiftPage() {
   };
 
   const handleReturnClick = async (invoiceName: string) => {
+    if (!canProcessReturns) {
+      toast.error("Returns are disabled for this POS Profile");
+      return;
+    }
+
     try {
       const result = await createSalesReturn(invoiceName);
       toast.success(`Invoice returned: ${result.return_invoice}`);
@@ -327,6 +333,11 @@ export default function ClosingShiftPage() {
 
   // Single Invoice Return handlers
   const handleSingleReturnClick = (invoice: SalesInvoice) => {
+    if (!canProcessReturns) {
+      toast.error("Returns are disabled for this POS Profile");
+      return;
+    }
+
     setSelectedInvoiceForReturn(invoice);
     setShowSingleReturn(true);
   };
@@ -448,7 +459,7 @@ export default function ClosingShiftPage() {
                   <div className="space-y-2">
                     <div className="text-2xl font-bold text-gray-900 dark:text-white">
                                             {/* @ts-expect-error just ignore */}
-                      {formatCurrency(stat.amount, posDetails?.currency || 'USD')}
+                      {formatCurrencyWithSymbol(stat.amount, posDetails?.currency || 'USD')}
                     </div>
                     {/* <div className="text-sm text-gray-600 dark:text-gray-400">
                       {stat.transactions} transactions
@@ -573,11 +584,11 @@ export default function ClosingShiftPage() {
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {formatCurrency(invoice.totalAmount, invoice.currency)}
+                          {formatCurrencyWithSymbol(invoice.totalAmount, invoice.currency)}
                         </div>
                         {invoice.giftCardDiscount > 0 && (
                           <div className="text-xs text-green-600 dark:text-green-400">
-                            -{formatCurrency(invoice.giftCardDiscount, invoice.currency)} gift
+                            -{formatCurrencyWithSymbol(invoice.giftCardDiscount, invoice.currency)} gift
                           </div>
                         )}
                       </td>
@@ -616,7 +627,7 @@ export default function ClosingShiftPage() {
                             </button>
                           )}
                                                 {/* @ts-expect-error just ignore */}
-                          {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && !invoice.is_return && hasReturnableItems(invoice) && (
+                          {canProcessReturns && ["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && !invoice.is_return && hasReturnableItems(invoice) && (
                             <button
                               onClick={() => handleSingleReturnClick(invoice)}
                               className="text-orange-600 hover:text-orange-900 flex items-center space-x-1"
@@ -669,7 +680,7 @@ export default function ClosingShiftPage() {
                         <span className="text-gray-600 dark:text-gray-400">Opening: </span>
                         <span className="font-medium text-gray-900 dark:text-white">
                                                 {/* @ts-expect-error just ignore */}
-                          {formatCurrency(stat.openingAmount, posDetails?.currency || 'USD')}
+                          {formatCurrencyWithSymbol(stat.openingAmount, posDetails?.currency || 'USD')}
                         </span>
                       </div>
 
@@ -790,7 +801,7 @@ export default function ClosingShiftPage() {
                     <div className="space-y-2">
                       <div className="text-2xl font-bold text-gray-900 dark:text-white">
                                               {/* @ts-expect-error just ignore */}
-                        {formatCurrency(stat.amount, posDetails?.currency || 'USD')}
+                        {formatCurrencyWithSymbol(stat.amount, posDetails?.currency || 'USD')}
                       </div>
                       {/* <div className="text-sm text-gray-600 dark:text-gray-400">
                         {stat.transactions} transactions
@@ -927,11 +938,11 @@ export default function ClosingShiftPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {formatCurrency(invoice.totalAmount, invoice.currency)}
+                          {formatCurrencyWithSymbol(invoice.totalAmount, invoice.currency)}
                         </div>
                         {invoice.giftCardDiscount > 0 && (
                           <div className="text-xs text-green-600 dark:text-green-400">
-                            -{formatCurrency(invoice.giftCardDiscount, invoice.currency)} gift card
+                            -{formatCurrencyWithSymbol(invoice.giftCardDiscount, invoice.currency)} gift card
                           </div>
                         )}
                       </td>
@@ -964,7 +975,7 @@ export default function ClosingShiftPage() {
                             </button>
                           )}
                                                 {/* @ts-expect-error just ignore */}
-                          {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && !invoice.is_return && hasReturnableItems(invoice) && (
+                          {canProcessReturns && ["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && !invoice.is_return && hasReturnableItems(invoice) && (
                             <button
                               onClick={() => handleSingleReturnClick(invoice)}
                               className="text-orange-600 hover:text-orange-900 flex items-center space-x-1"
@@ -997,7 +1008,7 @@ export default function ClosingShiftPage() {
                 </button>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-4 max-h-64 overflow-y-auto pr-1">
                 {Object.values(paymentStats).map((stat) => (
                   // @ts-expect-error just ignore for now
                   <div key={stat.name} className="flex items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
@@ -1019,7 +1030,7 @@ export default function ClosingShiftPage() {
                         <span className="font-medium text-gray-900 dark:text-white">
                                                 {/* @ts-expect-error just ignore */}
 
-                          {formatCurrency(stat.openingAmount, posDetails?.currency || 'USD')}
+                          {formatCurrencyWithSymbol(stat.openingAmount, posDetails?.currency || 'USD')}
                         </span>
                       </div>
 

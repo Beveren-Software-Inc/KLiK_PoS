@@ -1,17 +1,30 @@
 import { toast } from "react-toastify";
+import { markInvoiceAsPrinted } from "../services/salesInvoice";
 
 interface Invoice {
   name?: string;
   id?: string;
   pos_profile: string;
+  custom_is_printed?: boolean | number;
   [key: string]: unknown;
 }
 
-export function handlePrintInvoice(invoiceData: Invoice | null) {
+interface PrintOptions {
+  preventReprint?: boolean;
+  onAfterMark?: () => void;
+}
+
+export function handlePrintInvoice(invoiceData: Invoice | null, options: PrintOptions = {}) {
   console.log('Print function called with:', invoiceData);
 
   if (!invoiceData) {
     toast.error("No invoice data available for printing");
+    return;
+  }
+
+  const isAlreadyPrinted = Boolean(invoiceData.custom_is_printed);
+  if (isAlreadyPrinted && options.preventReprint) {
+    toast.error("Reprinting is not allowed for this invoice");
     return;
   }
 
@@ -43,11 +56,26 @@ export function handlePrintInvoice(invoiceData: Invoice | null) {
     left: 0;
     width: 100%;
     height: 100%;
-    background: white;
+    background: rgba(0, 0, 0, 0.5);
     z-index: 9999;
-    padding: 20px;
     overflow: auto;
+    display: flex;
+    justify-content: center;
   `;
+
+  const printContent = document.createElement('div');
+  printContent.innerHTML = printOverlay.innerHTML;
+  printOverlay.innerHTML = '';
+  printContent.style.cssText = `
+    background: white;
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    height: fit-content;
+    min-height: 100%;
+  `;
+  printOverlay.appendChild(printContent);
 
   // Hide the original page content
   document.body.style.cssText = `
@@ -72,15 +100,16 @@ export function handlePrintInvoice(invoiceData: Invoice | null) {
       body * {
         visibility: hidden;
       }
-      .print-overlay, .print-overlay * {
+      .print-overlay .print-content, .print-overlay .print-content * {
         visibility: visible;
       }
-      .print-overlay {
+      .print-overlay .print-content {
         position: absolute !important;
         left: 0 !important;
         top: 0 !important;
         width: 100% !important;
-        height: 100% !important;
+        max-width: 100% !important;
+        padding: 0 !important;
       }
     }
     @page {
@@ -89,6 +118,7 @@ export function handlePrintInvoice(invoiceData: Invoice | null) {
     }
   `;
   printOverlay.className = 'print-overlay';
+  printContent.className = 'print-content';
   document.head.appendChild(printStyles);
 
   console.log('Print overlay created and added');
@@ -117,13 +147,31 @@ export function handlePrintInvoice(invoiceData: Invoice | null) {
     console.log('Page restored successfully');
   };
 
+  let restored = false;
+  const restoreOnce = () => {
+    if (!restored) {
+      restored = true;
+      restorePage();
+    }
+  };
+
   const handleAfterPrint = () => {
     console.log('After print event fired');
-    restorePage();
+    restoreOnce();
     window.removeEventListener('afterprint', handleAfterPrint);
   };
 
   window.addEventListener('afterprint', handleAfterPrint);
+
+  // Mark invoice as printed before triggering the dialog
+  if (invoiceData.name) {
+    markInvoiceAsPrinted(invoiceData.name)
+      .then(() => options.onAfterMark?.())
+      .catch((err) => {
+        console.error("Error marking invoice as printed:", err);
+        toast.error("Failed to mark invoice as printed");
+      });
+  }
 
   console.log('Triggering print...');
   // Trigger print
@@ -132,7 +180,7 @@ export function handlePrintInvoice(invoiceData: Invoice | null) {
   // Fallback: restore after a delay if afterprint event doesn't fire
   setTimeout(() => {
     console.log('Fallback timeout triggered');
-    restorePage();
+    restoreOnce();
     window.removeEventListener('afterprint', handleAfterPrint);
   }, 2000);
 }

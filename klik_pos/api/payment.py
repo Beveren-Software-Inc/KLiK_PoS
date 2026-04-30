@@ -18,7 +18,8 @@ def get_payment_modes():
 		payment_modes = frappe.get_all(
 			"POS Payment Method",
 			filters={"parent": pos_doc.name},
-			fields=["mode_of_payment", "default", "allow_in_returns"],
+			fields=["mode_of_payment", "default", "allow_in_returns", "idx"],
+			order_by="idx asc",
 		)
 
 		for mode in payment_modes:

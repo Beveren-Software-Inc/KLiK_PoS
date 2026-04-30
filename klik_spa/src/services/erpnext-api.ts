@@ -279,20 +279,29 @@ class ERPNextAPI {
     }
   }
 
-  async logout(): Promise<void> {
-    try {
-      await fetch(`${this.config.baseUrl}/api/method/logout`, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        credentials: 'include'
-      });
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      this.sessionId = null;
-      localStorage.removeItem('erpnext_sid');
+async logout(): Promise<void> {
+  try {
+    let headers: Record<string, string> = {
+      "X-Frappe-Site-Name": window.location.hostname,
+    };
+
+    if ((window as any).csrf_token) {
+      headers["X-Frappe-CSRF-Token"] = (window as any).csrf_token;
     }
+
+    await fetch(`${this.config.baseUrl}/api/method/logout`, {
+      method: "POST",
+      headers,
+      credentials: "include",
+    });
+
+  } catch (error) {
+    console.error("Logout error:", error);
+  } finally {
+    this.sessionId = null;
+    localStorage.removeItem("erpnext_sid");
   }
+}
 
   async getCurrentUser(): Promise<unknown> {
     try {

@@ -13,11 +13,13 @@ import {
 
 } from "lucide-react"
 import { useCustomers } from "../hooks/useCustomers" // Import the hook
-import AddCustomerModal from "./AddCustomerModal"
+import AddCustomerModal from "./customer/AddCustomerModal"
 import type { Customer } from "../types/customer"
 
 import BottomNavigation from "./BottomNavigation"
 import { useMediaQuery } from "../hooks/useMediaQuery"
+import { usePOSProfileStore } from "../stores/posProfileStore";
+import { formatCurrencyWithSymbol } from "../utils/currency"
 
 export default function CustomersPage() {
   const navigate = useNavigate()
@@ -27,6 +29,18 @@ export default function CustomersPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [prefilledData, setPrefilledData] = useState<{name?: string, email?: string, phone?: string}>({})
   const [globalTotals, setGlobalTotals] = useState<{ total_customers: number; total_invoices: number } | null>(null)
+  const [canManageCustomers, setCanManageCustomers] = useState(false)
+  const { posDetails } = usePOSProfileStore()
+
+  useEffect(() => {
+    if (posDetails && posDetails?.custom_allow_to_create_and_edit_customers !== 1) {
+      console.warn("User does not have permission to create or edit customers. Hiding add/edit functionality.");
+      navigate("/pos"); // Redirect to POS page if user tries to access customers without permission
+      return;
+    }
+    setCanManageCustomers(posDetails?.custom_allow_to_create_and_edit_customers === 1)
+  }, [posDetails])
+
 
   // Use the customers hook with search to fetch from server when searching
   const { customers, isLoading, error, totalCount, loadMore } = useCustomers(searchQuery)
@@ -103,29 +117,6 @@ export default function CustomersPage() {
     )
   }
 
-  const formatCurrency = (amount: number, currency?: string) => {
-    // Validate currency code and provide fallbacks
-    let validCurrency = 'USD'; // Default fallback
-
-    if (currency && currency.trim() && currency.length === 3) {
-      try {
-        // Test if the currency is valid by trying to create a NumberFormat
-        new Intl.NumberFormat('en-US', {
-          style: 'currency',
-          currency: currency
-        });
-        validCurrency = currency;
-      } catch {
-        console.warn(`Invalid currency code: ${currency}, falling back to AED`);
-        validCurrency = 'USD';
-      }
-    }
-
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: validCurrency
-    }).format(amount)
-  }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -153,7 +144,7 @@ export default function CustomersPage() {
 
   // Function to handle Enter key press for new customer creation
   const handleSearchKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && searchQuery.trim()) {
+    if (e.key === 'Enter' && searchQuery.trim() && canManageCustomers) {
       e.preventDefault()
 
       // Check if customer exists in filtered results
@@ -198,13 +189,15 @@ export default function CustomersPage() {
           <div className="px-4 py-3">
             <div className="flex items-center justify-between">
               <h1 className="text-lg font-bold text-gray-900 dark:text-white">Customers</h1>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="bg-beveren-600 text-white px-4 py-2 rounded-lg hover:bg-beveren-700 transition-colors flex items-center space-x-2 text-sm"
-              >
-                <Plus size={16} />
-                <span>Add</span>
-              </button>
+              {canManageCustomers && (
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="bg-beveren-600 text-white px-4 py-2 rounded-lg hover:bg-beveren-700 transition-colors flex items-center space-x-2 text-sm"
+                >
+                  <Plus size={16} />
+                  <span>Add</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -332,7 +325,7 @@ export default function CustomersPage() {
                               {customer.totalOrders} orders
                             </div>
                             <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {formatCurrency(customer.totalSpent, customer.defaultCurrency || customer.companyCurrency)}
+                              {formatCurrencyWithSymbol(customer.totalSpent, customer.defaultCurrency || customer.companyCurrency)}
                             </div>
                           </div>
                         </td>
@@ -359,16 +352,18 @@ export default function CustomersPage() {
                             >
                               <Eye size={16} />
                             </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setSelectedCustomer(customer)
-                                setShowAddModal(true)
-                              }}
-                              className="text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                            >
-                              <Edit size={16} />
-                            </button>
+                            {canManageCustomers && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setSelectedCustomer(customer)
+                                  setShowAddModal(true)
+                                }}
+                                className="text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                              >
+                                <Edit size={16} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -448,13 +443,15 @@ export default function CustomersPage() {
         <div className="px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Customers</h1>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="bg-beveren-600 text-white px-6 py-3 rounded-lg hover:bg-beveren-700 transition-colors flex items-center space-x-2"
-            >
-              <Plus size={20} />
-              <span>Add Customer</span>
-            </button>
+            {canManageCustomers && (
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="bg-beveren-600 text-white px-6 py-3 rounded-lg hover:bg-beveren-700 transition-colors flex items-center space-x-2"
+              >
+                <Plus size={20} />
+                <span>Add Customer</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -591,7 +588,7 @@ export default function CustomersPage() {
                             {customer.totalOrders > 0 ? `${customer.totalOrders} orders` : 'No orders'}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {customer.totalSpent > 0 ? formatCurrency(customer.totalSpent, customer.defaultCurrency || customer.companyCurrency) : 'No purchases'}
+                            {customer.totalSpent > 0 ? formatCurrencyWithSymbol(customer.totalSpent, customer.defaultCurrency || customer.companyCurrency) : 'No purchases'}
                           </div>
                         </div>
                       </td>
@@ -618,16 +615,18 @@ export default function CustomersPage() {
                           >
                             <Eye size={16} />
                           </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setSelectedCustomer(customer)
-                              setShowAddModal(true)
-                            }}
-                            className="text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                          >
-                            <Edit size={16} />
-                          </button>
+                          {canManageCustomers && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedCustomer(customer)
+                                setShowAddModal(true)
+                              }}
+                              className="text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                            >
+                              <Edit size={16} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

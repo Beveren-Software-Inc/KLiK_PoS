@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import { useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import {
   ArrowLeft,
@@ -21,8 +21,9 @@ import {
   Briefcase
 } from "lucide-react"
 import { useCustomerDetails } from "../hooks/useCustomers"
-import AddCustomerModal from "./AddCustomerModal"
+import AddCustomerModal from "./customer/AddCustomerModal"
 import type { Customer } from "../types/customer"
+import { formatCurrencyWithSymbol } from "../utils/currency"
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -89,13 +90,6 @@ export default function CustomerDetailPage() {
       .map(word => word.charAt(0).toUpperCase())
       .join("")
       .substring(0, 2)
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-AE', {
-      style: 'currency',
-      currency: 'AED'
-    }).format(amount)
   }
 
   const formatDate = (dateString: string) => {
@@ -346,7 +340,7 @@ export default function CustomerDetailPage() {
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Orders</p>
                 </div>
                 <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
-                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(customer.totalSpent)}</p>
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrencyWithSymbol(customer.totalSpent)}</p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Spent</p>
                 </div>
                 <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">

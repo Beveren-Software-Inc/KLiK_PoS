@@ -13,7 +13,7 @@ export async function getItemPriceForCustomer(itemCode: string, customerId?: str
   try {
     const customerParam = customerId ? `&customer=${customerId}` : '';
     const uomParam = uom ? `&uom=${encodeURIComponent(uom)}` : '';
-    const response = await fetch(`/api/method/klik_pos.api.item.get_item_price_for_customer?item_code=${itemCode}${customerParam}${uomParam}`, {
+    const response = await fetch(`/api/method/klik_pos.api.item.item_price.get_item_price_for_customer?item_code=${itemCode}${customerParam}${uomParam}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include'
@@ -77,7 +77,7 @@ export async function applyPricingRulesToCart(
 ): Promise<PricingRuleResult[]> {
   try {
     const customerParam = customerId ? `&customer=${customerId}` : '';
-    const response = await fetch(`/api/method/klik_pos.api.item.apply_pricing_rules_to_cart?cart_items=${encodeURIComponent(JSON.stringify(cartItems))}${customerParam}`, {
+    const response = await fetch(`/api/method/klik_pos.api.item.pricing_rules.apply_pricing_rules_to_cart?cart_items=${encodeURIComponent(JSON.stringify(cartItems))}${customerParam}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include'

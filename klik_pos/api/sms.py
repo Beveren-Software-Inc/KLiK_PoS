@@ -27,7 +27,7 @@ def send_invoice_sms(**kwargs):
 
 		# Get POS print format
 		pos_profile = get_current_pos_profile()
-		print_format = pos_profile.custom_pos_printformat or "Standard"
+		print_format = pos_profile.print_format or pos_profile.print_format or "Standard"
 
 		# Format invoice amount
 		invoice_amount = fmt_money(doc.rounded_total or doc.grand_total, currency=doc.currency)
@@ -103,25 +103,25 @@ def send_sms_message(**kwargs):
 
 
 @frappe.whitelist()
-def get_sms_settings():
+def get_sms_gateway_settings():
 	"""
-	Get SMS settings from ERPNext to check if SMS is configured.
+	Get SMS gateway from ERPNext to check if SMS is configured.
 	"""
 	try:
-		# Check if SMS settings exist
-		sms_settings = frappe.get_single("SMS Settings")
+		# Check if SMS gateway is configured in ERPNext
+		sms_gateway = frappe.db.get_single_value("SMS Settings", "sms_gateway_url")
 
 		return {
 			"status": "success",
-			"enabled": sms_settings.enabled if sms_settings else False,
-			"gateway": sms_settings.sms_gateway_url if sms_settings else None,
-			"message": "SMS settings retrieved successfully",
+			"enabled": bool(sms_gateway),
+			"gateway": sms_gateway,
+			"message": "SMS gateway retrieved successfully",
 		}
 
 	except Exception as e:
-		frappe.log_error(frappe.get_traceback(), "Get SMS Settings Failed")
+		frappe.log_error(frappe.get_traceback(), "Get SMS Gateway Failed")
 		return {
 			"status": "error",
 			"enabled": False,
-			"message": f"Failed to get SMS settings: {e!s}",
+			"message": f"Failed to get SMS gateway: {e!s}",
 		}

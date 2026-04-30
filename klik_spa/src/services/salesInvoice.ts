@@ -49,6 +49,53 @@ export async function createSalesInvoice(data: any) {
   return result.message;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function validateCheckoutInvoice(data: any) {
+  const csrfToken = window.csrf_token;
+
+  const response = await fetch('/api/method/klik_pos.api.sales_invoice.validate_checkout_invoice', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Frappe-CSRF-Token': csrfToken
+    },
+    body: JSON.stringify({ data }),
+    credentials: 'include'
+  });
+
+  const result = await response.json();
+
+  if (!response.ok || !result.message || result.message.success === false) {
+    const errorMessage = extractErrorMessage(result, 'Checkout validation failed');
+    throw new Error(errorMessage);
+  }
+
+  return result.message;
+}
+
+export async function retryQueuedInvoice(invoiceId: string) {
+  const csrfToken = window.csrf_token;
+
+  const response = await fetch('/api/method/klik_pos.api.sales_invoice.retry_failed_sales_invoice', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Frappe-CSRF-Token': csrfToken
+    },
+    body: JSON.stringify({ invoice_name: invoiceId }),
+    credentials: 'include'
+  });
+
+  const result = await response.json();
+
+  if (!response.ok || !result.message || result.message.success === false) {
+    const errorMessage = extractErrorMessage(result, result.message?.message || 'Failed to retry queued invoice');
+    throw new Error(errorMessage);
+  }
+
+  return result.message;
+}
+
 export async function createSalesReturn(invoiceName: string) {
   const csrfToken = window.csrf_token;
 
@@ -157,6 +204,28 @@ export async function getDraftInvoiceItems(invoiceId: string) {
   } else {
     throw new Error(result.message.error || 'Failed to fetch draft invoice items');
   }
+}
+
+export async function markInvoiceAsPrinted(invoiceName: string) {
+  const csrfToken = window.csrf_token;
+
+  const response = await fetch('/api/method/klik_pos.api.sales_invoice.mark_invoice_as_printed', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Frappe-CSRF-Token': csrfToken,
+    },
+    body: JSON.stringify({ invoice_name: invoiceName }),
+    credentials: 'include',
+  });
+
+  const result = await response.json();
+
+  if (!response.ok || !result.message || result.message.success === false) {
+    throw new Error(result.message?.error || 'Failed to mark invoice as printed');
+  }
+
+  return result.message;
 }
 
 export async function submitDraftInvoice(invoiceId: string) {

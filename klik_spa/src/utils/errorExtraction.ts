@@ -37,6 +37,22 @@ function cleanHtmlFromErrorMessage(message: string): string {
 export function extractErrorMessage(result: unknown, defaultMessage: string = 'Operation failed'): string {
   let errorMessage = defaultMessage;
 
+  if (result && typeof result === 'object' && 'message' in result) {
+    const messageValue = (result as { message?: unknown }).message;
+    if (messageValue && typeof messageValue === 'object') {
+      const nestedMessage = (messageValue as { message?: unknown; error?: unknown }).message;
+      const nestedError = (messageValue as { message?: unknown; error?: unknown }).error;
+
+      if (typeof nestedMessage === 'string' && nestedMessage.trim()) {
+        errorMessage = nestedMessage;
+      } else if (typeof nestedError === 'string' && nestedError.trim()) {
+        errorMessage = nestedError;
+      }
+    } else if (typeof messageValue === 'string' && messageValue.trim()) {
+      errorMessage = messageValue;
+    }
+  }
+
   // Check if result is an object with _server_messages property
   if (result && typeof result === 'object' && '_server_messages' in result) {
     const serverMessagesValue = (result as { _server_messages?: unknown })._server_messages;

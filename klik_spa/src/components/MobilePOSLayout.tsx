@@ -4,8 +4,8 @@ import { useI18n } from "../hooks/useI18n"
 import { useAuth } from "../hooks/useAuth"
 import { useTheme } from "../hooks/useTheme"
 import { useCartStore } from "../stores/cartStore"
-import { formatCurrency } from "../utils/currency"
-import { usePOSDetails } from "../hooks/usePOSProfile"
+import { formatCurrencyWithSymbol } from "../utils/currency"
+import { usePOSProfileStore } from "../stores/posProfileStore";
 import { ShoppingCart, Search, Settings, LogOut, Moon, Sun, Scan, Grid3X3, List, Store, RefreshCw } from "lucide-react"
 import { clearCacheAndReload } from "../utils/clearCache"
 import CategoryTabs from "./CategoryTabs"
@@ -46,7 +46,7 @@ export default function MobilePOSLayout({
   const { t } = useI18n()
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
-  const { posDetails, loading: posLoading } = usePOSDetails()
+  const { posDetails, loading: posLoading } = usePOSProfileStore()
   const { cartItems, addToCart } = useCartStore()
   const navigate = useNavigate()
   const [showUserMenu, setShowUserMenu] = useState(false)
@@ -332,7 +332,7 @@ export default function MobilePOSLayout({
         <div className="fixed bottom-16 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-4 py-3 z-40">
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-600 dark:text-gray-400">{totalItems} items</div>
-            <div className="text-lg font-bold text-beveren-600 dark:text-beveren-400">{formatCurrency(totalAmount, posDetails?.currency || 'USD')}</div>
+            <div className="text-lg font-bold text-beveren-600 dark:text-beveren-400">{formatCurrencyWithSymbol(totalAmount, posDetails?.currency || 'USD')}</div>
             <button
               onClick={() => navigate('/cart')}
               className="bg-beveren-600 text-white px-6 py-2 rounded-lg hover:bg-beveren-700 transition-colors font-medium"

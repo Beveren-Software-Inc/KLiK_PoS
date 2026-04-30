@@ -71,7 +71,7 @@ class BackgroundSyncService {
     this.notifyListeners();
 
     try {
-      const response = await fetch('/api/method/klik_pos.api.item.get_stock_updates');
+      const response = await fetch('/api/method/klik_pos.api.item.item_stock.get_stock_updates');
       const resData = await response.json();
 
       if (resData?.message && typeof resData.message === 'object') {

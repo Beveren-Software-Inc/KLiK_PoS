@@ -1,8 +1,6 @@
-
-// import { useFrappeGetDocList } from "frappe-react-sdk";
 import type { MenuItem } from "../../types";
 import { useEffect, useState } from "react";
-import { useProducts as useProductsContext } from "../providers/ProductProvider";
+import { useProduct } from "../providers/ProductProvider";
 
 interface UseProductsReturn {
   products: MenuItem[];
@@ -26,23 +24,23 @@ interface UseProductsReturn {
   searchQuery: string;
 }
 
-type Batch = {
+interface Batch {
   batch_id: string;
   qty: number;
-};
+}
 
-type UseBatchReturn = {
+interface UseBatchReturn {
   batches: Batch[];
   isLoading: boolean;
   error: string | null;
   refetch: () => void;
   count: number;
   updateBatchQuantities: (itemCode: string) => Promise<void>;
-};
+}
 
-// Re-export the context hook for backward compatibility
 export function useProducts(): UseProductsReturn {
-  const context = useProductsContext();
+  const context = useProduct();
+  
   return {
     products: context.products,
     isLoading: context.isLoading,
@@ -66,30 +64,37 @@ export function useProducts(): UseProductsReturn {
   };
 }
 
-
 export function useBatchData(itemCode: string, warehouse: string): UseBatchReturn {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const fetchBatches = async () => {
+    if (!itemCode || !warehouse) return;
+    
     setIsLoading(true);
+    setErrorMessage(null);
+    
     try {
       const response = await fetch(
         `/api/method/klik_pos.api.batch.get_batch_nos_with_qty?item_code=${encodeURIComponent(itemCode)}&warehouse=${encodeURIComponent(warehouse)}`
       );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
       const resData = await response.json();
 
       if (resData?.message && Array.isArray(resData.message)) {
         setBatches(resData.message);
       } else {
-        throw new Error("Invalid response format");
+        setBatches([]);
       }
-
-      //eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error fetching batch data:", error);
-      setErrorMessage(error.message || "Unknown error occurred");
+      setErrorMessage(error instanceof Error ? error.message : "Unknown error occurred");
+      setBatches([]);
     } finally {
       setIsLoading(false);
     }
@@ -101,22 +106,24 @@ export function useBatchData(itemCode: string, warehouse: string): UseBatchRetur
     }
   }, [itemCode, warehouse]);
 
-  // Function to update batch quantities for a specific item
   const updateBatchQuantities = async (targetItemCode: string): Promise<void> => {
-    if (targetItemCode !== itemCode) return; // Only update if it's the same item
-
+    if (targetItemCode !== itemCode) return;
+    
     try {
       const response = await fetch(
-        `/api/method/klik_pos.api.item.get_batch_nos_with_qty?item_code=${encodeURIComponent(targetItemCode)}`
+        `/api/method/klik_pos.api.item.item_details.get_batch_nos_with_qty?item_code=${encodeURIComponent(targetItemCode)}`
       );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
       const resData = await response.json();
 
       if (resData?.message && Array.isArray(resData.message)) {
         setBatches(resData.message);
-        console.log(`Updated batch quantities for ${targetItemCode}:`, resData.message);
       }
-      //eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error updating batch quantities:", error);
     }
   };

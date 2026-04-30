@@ -2,7 +2,7 @@
 
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft } from "lucide-react"
-import OrderSummary from "./OrderSummary"
+import OrderSummary from "./order/OrderSummary"
 import BottomNavigation from "./BottomNavigation"
 import { useCartStore } from "../stores/cartStore"
 

@@ -22,82 +22,54 @@ app_license = "mit"
 # ]
 
 
-fixtures = [
-	{
-		"doctype": "Custom Field",
-		"filters": [
-			[
-				"name",
-				"in",
-				(
-					"POS Profile-custom_klik_pos_settings",
-					"POS Profile-custom_business_type",
-					"POS Profile-custom_pos_printformat",
-					"POS Profile-custom_column_break_7pdsa",
-					"Sales Invoice-custom_roundoff_account",
-					"Sales Invoice-custom_base_roundoff_amount",
-					"Sales Invoice-custom_column_break_vtq6c",
-					"Sales Invoice-custom_roundoff_amount",
-					"Sales Invoice-custom_roundoff",
-					"POS Profile-custom_allow_credit_sales",
-					"POS Profile-custom_hide_expected_amount",
-					"POS Profile-custom_allow_return",
-					"POS Profile-custom_use_scanner_fully",
-					"POS Profile-custom_whatsapp_template",
-					"Sales Invoice-custom_pos_opening_entry",
-					"POS Profile-custom_email_template",
-					"POS Profile-custom_default_view",
-					"POS Profile-custom_enable_whatsapp",
-					"POS Profile-custom_enable_sms",
-					"POS Profile-custom_scale_barcodes_start_with",
-					"POS Profile-custom_ignore_write_off_on_partial_returns",
-					"POS Profile-custom_allow_write_off",
-					"POS Closing Entry-custom_sales_invoice",
-					"POS Profile-custom_delivery_required",
-					"Sales Invoice-custom_delivery",
-					"Sales Invoice-custom_column_break_hnemi",
-					"Sales Invoice-custom_delivery_personnel",
-					"Sales Invoice-custom_delivery_personnel_name",
-					"POS Profile-custom_autofetch_batchserial_",
-                    "POS Profile-custom_clear_draft_invoices",
-				),
-			]
-		],
-	},
-]
-
 add_to_apps_screen = [
-	{
-		"name": "klik_pos",
-		"logo": "/assets/klik_pos/klik_spa/bev_logo.jpeg",
-		"title": "KLiK PoS",
-		"route": "/klik_pos",
-	}
+    {
+        "name": "klik_pos",
+        "logo": "/assets/klik_pos/klik_spa/bev_logo.jpeg",
+        "title": "KLiK PoS",
+        "route": "/klik_pos",
+    }
 ]
 
 doc_events = {
-	"Sales Invoice": {
-		"validate": [
-			"klik_pos.api.sales_invoice.set_base_roundoff_amount",
-			"klik_pos.api.sales_invoice.set_grand_total_with_roundoff",
-		],
-		# "before_save": [
-		# 	"klik_pos.api.sales_invoice.sync_return_payments_before_save",
-		# ],
-	},
-	"POS Opening Entry": {
-		"validate": [
-			"klik_pos.api.pos_entry.validate_opening_entry",
-		],
-	},
+    "Sales Invoice": {
+        "validate": [
+            "klik_pos.api.sales_invoice.set_base_roundoff_amount",
+            "klik_pos.api.sales_invoice.set_grand_total_with_roundoff",
+        ],
+        "before_submit": "klik_pos.overrides.sales_invoice.validate_sales_person_on_submit",
+        # "before_save": [
+        # 	"klik_pos.api.sales_invoice.sync_return_payments_before_save",
+        # ],
+    },
+    "POS Opening Entry": {
+        "validate": [
+            "klik_pos.api.pos_entry.validate_opening_entry",
+        ],
+    },
+    "Sales Person": {
+        "before_save": "klik_pos.overrides.sales_person.validate_unique_pos_pin"
+    },
 }
 
-override_doctype_class = {
-	"Sales Invoice": "klik_pos.api.sales_invoice.CustomSalesInvoice",
+extend_doctype_class = {
+    "Sales Invoice": "klik_pos.api.sales_invoice.CustomSalesInvoice",
+    "POS Opening Entry": "klik_pos.overrides.pos_opening_entry.CustomPOSOpeningEntry",
 }
 
 # Migration hooks
-before_migrate = ["klik_pos.setup.pos_opening_entry_links.ensure_pos_opening_entry_links"]
+before_migrate = [
+    "klik_pos.setup.install.ensure_stock_reservation_is_enabled",
+    "klik_pos.setup.install.ensure_sales_invoice_reserve_stock_field",
+    "klik_pos.setup.pos_opening_entry_links.ensure_pos_opening_entry_links"
+]
+
+fixtures = [
+	{
+		"doctype": "Property Setter",
+		"filters": [[ "module", "=", "KLiK PoS", ]],
+	},
+]
 # Includes in <head>
 # ------------------
 
@@ -120,7 +92,12 @@ before_migrate = ["klik_pos.setup.pos_opening_entry_links.ensure_pos_opening_ent
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-doctype_js = {"Sales Invoice": "public/js/sales_invoice.js", "Company": "public/js/company.js"}
+doctype_js = {
+    "Sales Invoice": "public/js/sales_invoice.js",
+    "Company": "public/js/company.js",
+    "Sales Person": "public/js/sales_person.js",
+    "POS Profile": "public/js/pos_profile.js",
+}
 # Add a button to Company to create random customers (client-side will call the whitelisted method)
 doctype_js.update({"Company": "public/js/company.js"})
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -161,7 +138,7 @@ doctype_js.update({"Company": "public/js/company.js"})
 # Installation
 # ------------
 
-# before_install = "klik_pos.install.before_install"
+before_install = "klik_pos.setup.install.before_install"
 # after_install = "klik_pos.install.after_install"
 
 # Uninstallation
@@ -323,6 +300,6 @@ doctype_js.update({"Company": "public/js/company.js"})
 
 
 website_route_rules = [
-	{"from_route": "/klik_pos/<path:app_path>", "to_route": "klik_spa"},
-	{"from_route": "/klik_pos", "to_route": "klik_spa"},
+    {"from_route": "/klik_pos/<path:app_path>", "to_route": "klik_spa"},
+    {"from_route": "/klik_pos", "to_route": "klik_spa"},
 ]

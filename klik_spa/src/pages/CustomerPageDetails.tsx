@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { formatCurrency } from "../utils/currency";
-import { usePOSDetails } from "../hooks/usePOSProfile";
+import { formatCurrencyWithSymbol } from "../utils/currency";
+import { usePOSProfileStore } from "../stores/posProfileStore";
 import {
   FileText,
   DollarSign,
@@ -33,7 +33,7 @@ import { useCustomerDetails } from "../hooks/useCustomers";
 import EditDraftInvoiceDialog from "../components/EditDraftInvoiceDialog";
 import { addDraftInvoiceToCart } from "../utils/draftInvoiceToCart";
 import { isToday, isThisWeek, isThisMonth, isThisYear } from "../utils/time";
-import AddCustomerModal from "../components/AddCustomerModal";
+import AddCustomerModal from "../components/customer/AddCustomerModal";
 import BottomNavigation from "../components/BottomNavigation";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 
@@ -63,7 +63,7 @@ export default function CustomerDetailsPage() {
   // @ts-expect-error just ignore
   const { customer, isLoadingC, errorC } = useCustomerDetails(customerId);
   const { invoices, isLoading, error, hasMore, totalLoaded, loadMore } = useCustomerInvoices(customer?.name || "");
-  const { posDetails } = usePOSDetails();
+  const { posDetails } = usePOSProfileStore();
 
 
   const filterInvoiceByDate = (invoiceDateStr: string) => {
@@ -358,17 +358,19 @@ export default function CustomerDetailsPage() {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => {
-                  console.log('Customer data being passed to modal:', customer);
-                  setSelectedCustomer(customer);
-                  setShowAddModal(true);
-                }}
-                className="flex items-center space-x-2 px-3 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors text-sm"
-              >
-                <Edit className="w-4 h-4" />
-                <span>Edit</span>
-              </button>
+              {posDetails && posDetails?.custom_allow_to_create_and_edit_customers === 1 && (
+                <button
+                  onClick={() => {
+                    console.log('Customer data being passed to modal:', customer);
+                    setSelectedCustomer(customer);
+                    setShowAddModal(true);
+                  }}
+                  className="flex items-center space-x-2 px-3 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors text-sm"
+                >
+                  <Edit className="w-4 h-4" />
+                  <span>Edit</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -400,6 +402,14 @@ export default function CustomerDetailsPage() {
                       <MapPin className="w-3 h-3" />
                       <span>{customer.territory || "No territory specified"}</span>
                     </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      <span>Tax ID: {customer.taxId || "No tax ID provided"}</span>
+                    </div>
+                    {customer.is_walkin == 1 && (
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        <span>Walk-in Customer</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -430,7 +440,7 @@ export default function CustomerDetailsPage() {
                 <div>
                   <p className="text-xs text-gray-600 dark:text-gray-400">Total Revenue</p>
                   <p className="text-lg font-bold text-gray-900 dark:text-white">
-                    {formatCurrency(customerMetrics.totalRevenue, posDetails?.currency || 'USD')}
+                    {formatCurrencyWithSymbol(customerMetrics.totalRevenue, posDetails?.currency || 'USD')}
                   </p>
                 </div>
                 <DollarSign className="w-6 h-6 text-green-600" />
@@ -442,7 +452,7 @@ export default function CustomerDetailsPage() {
                 <div>
                   <p className="text-xs text-gray-600 dark:text-gray-400">Outstanding</p>
                   <p className="text-lg font-bold text-gray-900 dark:text-white">
-                    {formatCurrency(customerMetrics.outstandingAmount, posDetails?.currency || 'USD')}
+                    {formatCurrencyWithSymbol(customerMetrics.outstandingAmount, posDetails?.currency || 'USD')}
                   </p>
                 </div>
                 <AlertCircle className={`w-6 h-6 ${customerMetrics.outstandingAmount > 0 ? 'text-red-600' : 'text-gray-400'}`} />
@@ -454,7 +464,7 @@ export default function CustomerDetailsPage() {
                 <div>
                   <p className="text-xs text-gray-600 dark:text-gray-400">Avg Order</p>
                   <p className="text-lg font-bold text-gray-900 dark:text-white">
-                    {formatCurrency(customerMetrics.avgOrderValue, posDetails?.currency || 'USD')}
+                    {formatCurrencyWithSymbol(customerMetrics.avgOrderValue, posDetails?.currency || 'USD')}
                   </p>
                 </div>
                 <TrendingUp className="w-6 h-6 text-blue-600" />
@@ -550,7 +560,7 @@ export default function CustomerDetailsPage() {
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {formatCurrency(invoice.totalAmount, invoice.currency)}
+                            {formatCurrencyWithSymbol(invoice.totalAmount, invoice.currency)}
                           </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
@@ -695,17 +705,19 @@ export default function CustomerDetailsPage() {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => {
-                  console.log('Customer data being passed to modal:', customer);
-                  setSelectedCustomer(customer);
-                  setShowAddModal(true);
-                }}
-                className="flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors"
-              >
-                <Edit className="w-4 h-4" />
-                <span>Update Customer</span>
-              </button>
+              {posDetails && posDetails?.custom_allow_to_create_and_edit_customers === 1 && (
+                <button
+                  onClick={() => {
+                    console.log('Customer data being passed to modal:', customer);
+                    setSelectedCustomer(customer);
+                    setShowAddModal(true);
+                  }}
+                  className="flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors"
+                >
+                  <Edit className="w-4 h-4" />
+                  <span>Update Customer</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -742,8 +754,16 @@ export default function CustomerDetailsPage() {
                       <span>Customer Group: {customer.customer_group}</span>
                     </div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">
+                      <span>Tax ID: {customer.taxId || "No tax ID provided"}</span>
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
                       <span>Type: {customer.type}</span>
                     </div>
+                    {customer.is_walkin == 1 && (
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        <span>Walk-in Customer</span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="text-right space-y-1">
@@ -795,7 +815,7 @@ export default function CustomerDetailsPage() {
                   <div>
                     <p className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {formatCurrency(customerMetrics.totalRevenue, posDetails?.currency || 'USD')}
+                      {formatCurrencyWithSymbol(customerMetrics.totalRevenue, posDetails?.currency || 'USD')}
                     </p>
                   </div>
                   <DollarSign className="w-8 h-8 text-green-600" />
@@ -807,7 +827,7 @@ export default function CustomerDetailsPage() {
                   <div>
                     <p className="text-sm text-gray-600 dark:text-gray-400">Outstanding Balance</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {formatCurrency(customerMetrics.outstandingAmount, posDetails?.currency || 'USD')}
+                      {formatCurrencyWithSymbol(customerMetrics.outstandingAmount, posDetails?.currency || 'USD')}
                     </p>
                   </div>
                   <AlertCircle className={`w-8 h-8 ${customerMetrics.outstandingAmount > 0 ? 'text-red-600' : 'text-gray-400'}`} />
@@ -819,7 +839,7 @@ export default function CustomerDetailsPage() {
                   <div>
                     <p className="text-sm text-gray-600 dark:text-gray-400">Avg Order Value</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {formatCurrency(customerMetrics.avgOrderValue, posDetails?.currency || 'USD')}
+                      {formatCurrencyWithSymbol(customerMetrics.avgOrderValue, posDetails?.currency || 'USD')}
                     </p>
                   </div>
                   <TrendingUp className="w-8 h-8 text-blue-600" />
@@ -936,11 +956,11 @@ export default function CustomerDetailsPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900 dark:text-white">
-                              {formatCurrency(invoice.totalAmount, invoice.currency)}
+                              {formatCurrencyWithSymbol(invoice.totalAmount, invoice.currency)}
                             </div>
                             {invoice.giftCardDiscount > 0 && (
                               <div className="text-xs text-orange-600 dark:text-green-400">
-                                -{formatCurrency(invoice.giftCardDiscount, invoice.currency)} gift card
+                                -{formatCurrencyWithSymbol(invoice.giftCardDiscount, invoice.currency)} gift card
                               </div>
                             )}
                           </td>

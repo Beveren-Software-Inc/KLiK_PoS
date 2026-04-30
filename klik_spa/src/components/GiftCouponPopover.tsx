@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Tag, X, Check, Gift } from "lucide-react"
 import type { GiftCoupon } from "../../types"
-import { usePOSDetails } from "../hooks/usePOSProfile"
+import { usePOSProfileStore } from "../stores/posProfileStore";
 
 // Empty coupons array - replace with real data when available
 const availableCoupons: GiftCoupon[] = []
@@ -28,7 +28,7 @@ export default function GiftCouponPopover({
   const [giftCardCode, setGiftCardCode] = useState("")
   const [error, setError] = useState("")
   const popoverRef = useRef<HTMLDivElement>(null)
-    const { posDetails, loading: posLoading } = usePOSDetails();
+    const { posDetails, loading: posLoading } = usePOSProfileStore();
 const currency = posDetails?.currency
 const currency_symbol = posDetails?.currency_symbol
 

@@ -2,7 +2,7 @@
 
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft } from "lucide-react"
-import AddCustomerModal from "./AddCustomerModal"
+import AddCustomerModal from "./customer/AddCustomerModal"
 import BottomNavigation from "./BottomNavigation"
 import type { Customer } from "../types/customer"
 

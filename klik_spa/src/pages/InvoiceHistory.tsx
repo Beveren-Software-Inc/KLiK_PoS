@@ -27,22 +27,33 @@ import BottomNavigation from "../components/BottomNavigation";
 import MultiInvoiceReturn from "../components/MultiInvoiceReturn";
 import SingleInvoiceReturn from "../components/SingleInvoiceReturn";
 import { useMediaQuery } from "../hooks/useMediaQuery";
-import { formatCurrency } from "../utils/currency";
+import { formatCurrencyWithSymbol } from "../utils/currency";
 import type { SalesInvoice } from "../../types";
 import { useSalesInvoices } from "../hooks/useSalesInvoices";
 import { useCustomers } from "../hooks/useCustomers";
 import { useUserInfo } from "../hooks/useUserInfo";
-import { usePOSDetails } from "../hooks/usePOSProfile";
+import { usePOSProfileStore } from "../stores/posProfileStore";
 import { toast } from "react-toastify";
 import { extractErrorFromException } from "../utils/errorExtraction";
-import { createSalesReturn, deleteDraftInvoice, submitDraftInvoice } from "../services/salesInvoice";
+import { createSalesReturn, submitDraftInvoice, retryQueuedInvoice } from "../services/salesInvoice";
 import { useAllPaymentModes } from "../hooks/usePaymentModes";
 
 import { addDraftInvoiceToCart } from "../utils/draftInvoiceToCart";
-import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { isToday, isThisWeek, isThisMonth, isThisYear } from "../utils/time";
 import { exportInvoicesToCSV, getExportFilename, type ExportableInvoice } from "../utils/exportUtils";
 // import InvoiceViewPage from "./InvoiceViewPage";
+
+const INVOICE_HISTORY_VIEW_MODE_KEY = "invoice-history-view-mode";
+
+const getInitialViewMode = (): "cards" | "list" => {
+  if (typeof window === "undefined") {
+    return "list";
+  }
+
+  return window.localStorage.getItem(INVOICE_HISTORY_VIEW_MODE_KEY) === "cards"
+    ? "cards"
+    : "list";
+};
 
 export default function InvoiceHistoryPage() {
   const navigate = useNavigate();
@@ -52,7 +63,7 @@ export default function InvoiceHistoryPage() {
   const [dateFilter, setDateFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState("all");
   const [cashierFilter, setCashierFilter] = useState("all");
-  const [viewMode, setViewMode] = useState<"cards" | "list">("list");
+  const [viewMode, setViewMode] = useState<"cards" | "list">(getInitialViewMode);
   const [selectedInvoice] = useState<SalesInvoice | null>(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
@@ -66,22 +77,18 @@ export default function InvoiceHistoryPage() {
   // Single Invoice Return states
   const [showSingleReturn, setShowSingleReturn] = useState(false);
   const [selectedInvoiceForReturn, setSelectedInvoiceForReturn] = useState<SalesInvoice | null>(null);
-
-  // Delete confirmation states
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [invoiceToDelete, setInvoiceToDelete] = useState<SalesInvoice | null>(null);
-
   // Original edit options states
   const [showEditOptions, setShowEditOptions] = useState(false);
   const [selectedDraftInvoice, setSelectedDraftInvoice] = useState<SalesInvoice | null>(null);
 
   // Skip opening entry filter for Invoice History - show all invoices for cashier regardless of opening entry
   // Pass cashier filter to API so it filters on server side (more efficient)
-  const { invoices, isLoading, isLoadingMore, error, hasMore, totalLoaded, totalCount, loadMore } = useSalesInvoices(searchTerm, true, cashierFilter);
+  const { invoices, isLoading, isLoadingMore, error, hasMore, totalLoaded, totalCount, loadMore, refetch } = useSalesInvoices(searchTerm, true, cashierFilter);
   const { modes } = useAllPaymentModes();
   const { customers } = useCustomers();
-  const { posDetails } = usePOSDetails();
+  const { posDetails } = usePOSProfileStore();
   const { userInfo, isLoading: userInfoLoading } = useUserInfo();
+  const canProcessReturns = ![0, "0", false].includes(posDetails?.custom_allow_return as 0 | "0" | false);
 
   // Role-based filtering
   const isAdminUser = userInfo?.is_admin_user || false;
@@ -93,6 +100,10 @@ export default function InvoiceHistoryPage() {
       setCashierFilter(currentUserCashier);
     }
   }, [isAdminUser, currentUserCashier, cashierFilter]);
+
+  useEffect(() => {
+    window.localStorage.setItem(INVOICE_HISTORY_VIEW_MODE_KEY, viewMode);
+  }, [viewMode]);
 
   // Keyboard event handler for Escape key
   useEffect(() => {
@@ -116,6 +127,7 @@ export default function InvoiceHistoryPage() {
 
   const tabs = [
     { id: "all", name: "All Invoices", icon: FileText, color: "text-gray-600" },
+    { id: "queue_failed", name: "Failed Queue", icon: AlertTriangle, color: "text-rose-600" },
     { id: "Draft", name: "Draft", icon: FilePlus, color: "text-gray-500" },
     { id: "Unpaid", name: "Unpaid", icon: Clock, color: "text-yellow-600" },
     { id: "Partly Paid", name: "Partly Paid", icon: AlertTriangle, color: "text-orange-600" },
@@ -207,8 +219,14 @@ const getStatusBadge = (status: string) => {
       // Server-side search is handled by the API, so we only apply client-side filters
       // Normalize status comparison to handle case and whitespace differences
       const invoiceStatus = (invoice.status || "").trim();
+      const queueStatus = ((invoice as SalesInvoice & { queueStatus?: string }).queueStatus || "").trim();
       const tabStatus = (activeTab || "").trim();
-      const matchesStatus = activeTab === "all" || invoiceStatus === tabStatus;
+      const matchesStatus =
+        activeTab === "all"
+          ? true
+          : activeTab === "queue_failed"
+            ? queueStatus.toLowerCase() === "failed"
+            : invoiceStatus === tabStatus;
       const matchesPayment = paymentFilter === "all" || invoice.paymentMethod === paymentFilter;
       const matchesCashier = cashierFilter === "all" || invoice.cashier === cashierFilter;
       const matchesDate = filterInvoiceByDate(invoice.date);
@@ -268,6 +286,12 @@ const getStatusBadge = (status: string) => {
     // Then count by status - normalize comparison
     if (status === "all") {
       return invoicesFilteredByOtherFilters.length;
+    }
+    if (status === "queue_failed") {
+      return invoicesFilteredByOtherFilters.filter(invoice => {
+        const queueStatus = ((invoice as SalesInvoice & { queueStatus?: string }).queueStatus || "").trim();
+        return queueStatus.toLowerCase() === "failed";
+      }).length;
     }
     const normalizedStatus = (status || "").trim();
     return invoicesFilteredByOtherFilters.filter(invoice => {
@@ -400,7 +424,7 @@ const getStatusBadge = (status: string) => {
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Total Amount</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
-              {formatCurrency(filteredInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0), posDetails?.currency || 'USD')}
+              {formatCurrencyWithSymbol(filteredInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0), posDetails?.currency || 'USD')}
             </p>
           </div>
           <DollarSign className="w-8 h-8 text-orange-600" />
@@ -411,7 +435,7 @@ const getStatusBadge = (status: string) => {
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Paid Amount</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
-              {formatCurrency(
+              {formatCurrencyWithSymbol(
                 filteredInvoices
                   .filter(inv => inv.status === "Paid")
                   .reduce((sum, inv) => sum + inv.totalAmount, 0),
@@ -427,7 +451,7 @@ const getStatusBadge = (status: string) => {
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Outstanding</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
-              {formatCurrency(
+              {formatCurrencyWithSymbol(
                 filteredInvoices
                   .filter(inv => ["Unpaid", "Partly Paid", "Overdue"].includes(inv.status))
                   .reduce((sum, inv) => sum + inv.totalAmount, 0),
@@ -527,11 +551,11 @@ const getStatusBadge = (status: string) => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      {formatCurrency(invoice.totalAmount, invoice.currency)}
+                      {formatCurrencyWithSymbol(invoice.totalAmount, invoice.currency)}
                     </div>
                     {invoice.giftCardDiscount > 0 && (
                       <div className="text-xs text-orange-600 dark:text-green-400">
-                        -{formatCurrency(invoice.giftCardDiscount, invoice.currency)} gift card
+                        -{formatCurrencyWithSymbol(invoice.giftCardDiscount, invoice.currency)} gift card
                       </div>
                     )}
                   </td>
@@ -563,7 +587,7 @@ const getStatusBadge = (status: string) => {
                         </button>
                       )}
                       {/* @ts-expect-error just ignore */}
-                      {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && !invoice.is_return && hasReturnableItems(invoice) && (
+                      {canProcessReturns && ["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && !invoice.is_return && hasReturnableItems(invoice) && (
 
                         <button
                           onClick={() => handleSingleReturnClick(invoice)}
@@ -574,15 +598,17 @@ const getStatusBadge = (status: string) => {
                         </button>
                       )}
 
-                      {invoice.status === "Draft" && (
+                      {/* @ts-expect-error just ignore */}
+                      {((invoice as SalesInvoice & { queueStatus?: string }).queueStatus || "").toLowerCase() === "failed" && (
                         <button
-                          onClick={() => handleDeleteClick(invoice)}
-                          className="text-red-600 hover:text-red-900 flex items-center space-x-1"
+                          onClick={() => handleRetryQueue(invoice)}
+                          className="text-blue-600 hover:text-blue-900 flex items-center space-x-1"
                         >
-                          <FileMinus className="w-4 h-4" />
-                          <span>Delete</span>
+                          <RefreshCw className="w-4 h-4" />
+                          <span>Retry</span>
                         </button>
                       )}
+
                     </div>
                   </td>
                 </tr>
@@ -608,7 +634,7 @@ const getStatusBadge = (status: string) => {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-400">Amount:</span>
-                  <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(invoice.totalAmount, invoice.currency)}</span>
+                  <span className="font-medium text-gray-900 dark:text-white">{formatCurrencyWithSymbol(invoice.totalAmount, invoice.currency)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-400">Date:</span>
@@ -617,6 +643,10 @@ const getStatusBadge = (status: string) => {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-400">Cashier:</span>
                   <span className="text-gray-900 dark:text-white">{invoice.cashier}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">POS Profile:</span>
+                  <span className="text-gray-900 dark:text-white">{invoice.posProfile}</span>
                 </div>
               </div>
               <div className="mt-4 flex space-x-2">
@@ -635,12 +665,22 @@ const getStatusBadge = (status: string) => {
                     <span>Edit</span>
                   </button>
                 )}
-                  {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && hasReturnableItems(invoice) && (
+                  {canProcessReturns && ["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && hasReturnableItems(invoice) && (
                   <button
                     onClick={() => handleSingleReturnClick(invoice)}
                     className="flex-1 text-xs px-3 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors"
                   >
                     Return
+                  </button>
+                )}
+                {/* @ts-expect-error just ignore */}
+                {((invoice as SalesInvoice & { queueStatus?: string }).queueStatus || "").toLowerCase() === "failed" && (
+                  <button
+                    onClick={() => handleRetryQueue(invoice)}
+                    className="flex-1 text-xs px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center justify-center space-x-1"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Retry</span>
                   </button>
                 )}
               </div>
@@ -717,39 +757,6 @@ const getStatusBadge = (status: string) => {
     return hasReturnable;
   };
 
-
-
-  // Delete invoice handlers
-  const handleDeleteClick = (invoice: SalesInvoice) => {
-    if (invoice.status !== "Draft") {
-      toast.error("Only draft invoices can be deleted");
-      return;
-    }
-    setInvoiceToDelete(invoice);
-    setShowDeleteConfirm(true);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!invoiceToDelete) return;
-
-    try {
-      await deleteDraftInvoice(invoiceToDelete.id);
-      toast.success(`Draft invoice ${invoiceToDelete.id} deleted successfully`);
-      setShowDeleteConfirm(false);
-      setInvoiceToDelete(null);
-      // Refresh the invoices list
-      window.location.reload();
-      //eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-      toast.error(error.message || "Failed to delete invoice");
-    }
-  };
-
-  const handleDeleteCancel = () => {
-    setShowDeleteConfirm(false);
-    setInvoiceToDelete(null);
-  };
-
   // Edit draft invoice handlers
   const handleEditDraftClick = (invoice: SalesInvoice) => {
     if (invoice.status !== "Draft") {
@@ -804,6 +811,11 @@ const getStatusBadge = (status: string) => {
   };
 
   const handleReturnClick = async (invoiceName: string) => {
+    if (!canProcessReturns) {
+      toast.error("Returns are disabled for this POS Profile");
+      return;
+    }
+
     try {
       const result = await createSalesReturn(invoiceName);
 
@@ -815,6 +827,17 @@ const getStatusBadge = (status: string) => {
     }
   };
 
+  const handleRetryQueue = async (invoice: SalesInvoice) => {
+    try {
+      await retryQueuedInvoice(invoice.id);
+      toast.success(`Queued invoice ${invoice.id} sent back to the background worker`);
+      window.location.reload();
+      //eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      toast.error(error.message || "Failed to retry queued invoice");
+    }
+  };
+
   const handleCancel = (invoiceId: string) => {
     console.log("Cancelling invoice:", invoiceId);
     setShowInvoiceModal(false);
@@ -822,12 +845,22 @@ const getStatusBadge = (status: string) => {
 
       // Multi-Invoice Return handlers
     const handleMultiReturnClick = () => {
+      if (!canProcessReturns) {
+        toast.error("Returns are disabled for this POS Profile");
+        return;
+      }
+
       setSelectedCustomer("");
       setShowMultiReturn(true);
     };
 
     // Single Invoice Return handlers
     const handleSingleReturnClick = (invoice: SalesInvoice) => {
+      if (!canProcessReturns) {
+        toast.error("Returns are disabled for this POS Profile");
+        return;
+      }
+
       setSelectedInvoiceForReturn(invoice);
       setShowSingleReturn(true);
     };
@@ -835,8 +868,7 @@ const getStatusBadge = (status: string) => {
     const handleSingleReturnSuccess = () => {
       setShowSingleReturn(false);
       setSelectedInvoiceForReturn(null);
-      // Refresh the invoices list
-      window.location.reload();
+      refetch();
     };
 
 
@@ -916,13 +948,13 @@ const getStatusBadge = (status: string) => {
             <div className="flex items-center justify-between">
               <h1 className="text-lg font-bold text-gray-900 dark:text-white">Invoice History</h1>
               <div className="flex items-center space-x-2">
-                                  <button
+                {canProcessReturns && <button
                     onClick={handleMultiReturnClick}
                     className="flex items-center space-x-2 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm"
                   >
                   <Users className="w-4 h-4" />
                   <span>Multi Return</span>
-                </button>
+                </button>}
                 <button
                   onClick={handleExportInvoices}
                   className="flex items-center space-x-2 px-3 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors text-sm"
@@ -1087,13 +1119,13 @@ const getStatusBadge = (status: string) => {
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Invoice History</h1>
               </div>
               <div className="flex items-center space-x-3">
-                <button
+                {canProcessReturns && <button
                   onClick={handleMultiReturnClick}
                   className="flex items-center space-x-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
                 >
                   <FileMinus className="w-4 h-4" />
                   <span>Multi-Invoice Return</span>
-                </button>
+                </button>}
                 <button
                   onClick={handleExportInvoices}
                   className="flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors"
@@ -1247,19 +1279,6 @@ const getStatusBadge = (status: string) => {
           onClose={() => setShowSingleReturn(false)}
           onSuccess={handleSingleReturnSuccess}
         />
-
-        {/* Delete Confirmation Dialog */}
-        <ConfirmDialog
-          isOpen={showDeleteConfirm}
-          onClose={handleDeleteCancel}
-          onConfirm={handleDeleteConfirm}
-          title="Delete Draft Invoice"
-          message={`Are you sure you want to delete draft invoice ${invoiceToDelete?.id}? This action cannot be undone.`}
-          confirmText="Delete"
-          cancelText="Cancel"
-          confirmButtonClass="bg-red-600 hover:bg-red-700 text-white"
-        />
-
         {/* Original Draft Invoice Edit Options Modal */}
         {showEditOptions && selectedDraftInvoice && (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">

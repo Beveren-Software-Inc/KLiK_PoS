@@ -1,0 +1,18 @@
+[
+ {
+  "default_value": null,
+  "doc_type": "Stock Reservation Entry",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "voucher_type",
+  "is_system_generated": 0,
+  "modified": "2026-04-17 17:02:21.248871",
+  "module": "KLiK PoS",
+  "name": "Stock Reservation Entry-voucher_type-options",
+  "property": "options",
+  "property_type": "Text",
+  "row_name": null,
+  "value": "\nSales Order\nWork Order\nSubcontracting Inward Order\nProduction Plan\nSubcontracting Order\nSales Invoice"
+ }
+]

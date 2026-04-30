@@ -1,8 +1,6 @@
-
 "use client";
 
-import { itemGroupIconMap } from "../utils/iconMap";
-import { useItemGroups } from "../hooks/useItemGroups";
+import { useProductStore } from "../stores/productStore";
 
 interface CategoryTabsProps {
   selectedCategory: string;
@@ -15,54 +13,63 @@ export default function CategoryTabs({
   onCategoryChange,
   isMobile = false,
 }: CategoryTabsProps) {
-  // const { isRTL } = useI18n();
+  const itemGroups = useProductStore((state) => state.itemGroups);
+  const isLoading = useProductStore((state) => state.isLoading);
+  const isSearching = useProductStore((state) => state.isSearching);
+  const searchProducts = useProductStore((state) => state.searchProducts);
+  const searchQuery = useProductStore((state) => state.searchQuery);
 
- const {
-  itemGroups,
-  isLoading: isValidating,
-  error,
-  total_item_count,
-} = useItemGroups();
+  const isValidating = isLoading && !isSearching;
 
-
-  if (isValidating) return <div>Loading categories...</div>;
-
-  if (error) {
-    console.error("❌ Error fetching item groups:", error);
-
+  if (isValidating) {
     return (
-      <div className="text-red-600">
-        <p>Error loading categories:</p>
-        <pre className="text-xs bg-red-100 p-2 rounded">{error}</pre>
+      <div className="flex space-x-2 overflow-x-auto py-2 scrollbar-hide">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div
+            key={i}
+            className="px-3 py-2 rounded-xl bg-gray-200 dark:bg-gray-700 animate-pulse min-w-[80px]"
+          />
+        ))}
       </div>
     );
   }
 
-  if (!itemGroups || itemGroups.length === 0) {
-    return <div>No item groups found.</div>;
-  }
+  const allItemsCount = itemGroups.reduce((sum, group) => sum + (group.total_count || group.count || 0), 0);
 
   const categories = [
     {
       id: "all",
       name: "All Items",
-      icon: itemGroupIconMap["All Items"] ?? "📦",
-      count: total_item_count
+      count: allItemsCount,
     },
     ...itemGroups.map((group) => ({
       id: group.id,
       name: group.name,
-      icon: itemGroupIconMap[group.name] ?? "📦",
-      count: group.count ?? 1,
+      count: group.total_count || group.count || 0,
     })),
   ];
+
+  const handleCategoryClick = (categoryId: string) => {
+    onCategoryChange(categoryId);
+    if (searchQuery) {
+      searchProducts(searchQuery);
+    }
+  };
+
+  if (categories.length === 1 && categories[0].id === "all" && categories[0].count === 0) {
+    return (
+      <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+        No categories available
+      </div>
+    );
+  }
 
   return (
     <div className="flex space-x-2 overflow-x-auto py-2 scrollbar-hide">
       {categories.map((category) => (
         <button
           key={category.id}
-          onClick={() => onCategoryChange(category.id)}
+          onClick={() => handleCategoryClick(category.id)}
           className={`flex items-center justify-center px-3 py-2 rounded-xl whitespace-nowrap transition-all duration-200 flex-shrink-0 min-w-fit ${
             selectedCategory === category.id
               ? "bg-beveren-50 dark:bg-beveren-900/20 text-beveren-700 dark:text-beveren-300 border border-beveren-200 dark:border-beveren-800 shadow-sm"

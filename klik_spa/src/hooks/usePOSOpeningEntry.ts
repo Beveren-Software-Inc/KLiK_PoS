@@ -1,40 +1,42 @@
+import { useEffect, useCallback } from 'react';
+import { usePOSProfileStore } from '../stores/posProfileStore';
 
+interface UsePOSOpeningStatusReturn {
+  hasOpenEntry: boolean | null;
+  isLoading: boolean;
+  error: string | null;
+  refetch: () => Promise<void>;
+  reset: () => void;
+}
 
-import { useEffect, useState, useCallback } from "react";
-
-// HOOK 1: Check if POS Opening Entry Exists
-export function usePOSOpeningStatus() {
-  const [hasOpenEntry, setHasOpenEntry] = useState<boolean | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchStatus = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const res = await fetch("/api/method/klik_pos.api.pos_entry.open_pos");
-      const data = await res.json();
-      if (typeof data.message === "boolean") {
-        setHasOpenEntry(data.message);
-      } else {
-        throw new Error("Unexpected response");
-      }
-      //eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      console.error("Error checking POS Opening Entry:", err);
-      setError(err.message || "Failed to check opening entry status");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+export function usePOSOpeningStatus(): UsePOSOpeningStatusReturn {
+  const {
+    hasOpenEntry,
+    isCheckingOpening: isLoading,
+    openingError: error,
+    fetchPOSOpeningStatus,
+    resetOpeningStatus,
+  } = usePOSProfileStore();
 
   useEffect(() => {
-    fetchStatus();
-  }, [fetchStatus]);
+    if (hasOpenEntry === null && !isLoading) {
+      fetchPOSOpeningStatus();
+    }
+  }, [hasOpenEntry, isLoading, fetchPOSOpeningStatus]);
+
+  const refetch = useCallback(async () => {
+    await fetchPOSOpeningStatus(true);
+  }, [fetchPOSOpeningStatus]);
+
+  const reset = useCallback(() => {
+    resetOpeningStatus();
+  }, [resetOpeningStatus]);
 
   return {
     hasOpenEntry,
     isLoading,
     error,
-    refetch: fetchStatus,
+    refetch,
+    reset,
   };
 }

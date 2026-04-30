@@ -11,7 +11,7 @@ interface UOMsAndPrices {
 
 export async function getItemUOMsAndPrices(itemCode: string): Promise<UOMsAndPrices> {
   try {
-    const response = await fetch(`/api/method/klik_pos.api.item.get_item_uoms_and_prices?item_code=${itemCode}`, {
+    const response = await fetch(`/api/method/klik_pos.api.item.item_details.get_item_uoms_and_prices?item_code=${itemCode}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

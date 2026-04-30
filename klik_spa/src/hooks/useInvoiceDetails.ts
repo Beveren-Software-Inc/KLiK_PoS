@@ -1,10 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { SalesInvoice } from "../../types";
 
 export function useInvoiceDetails(invoiceId: string | null) {
   const [invoice, setInvoice] = useState<SalesInvoice | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fetchCount, setFetchCount] = useState(0);
+
+  const refetch = useCallback(() => {
+    setFetchCount((c) => c + 1);
+  }, []);
 
   useEffect(() => {
     if (!invoiceId) return;
@@ -54,7 +59,7 @@ export function useInvoiceDetails(invoiceId: string | null) {
     };
 
     fetchInvoice();
-  }, [invoiceId]);
+  }, [invoiceId, fetchCount]);
 
-  return { invoice, isLoading, error };
+  return { invoice, isLoading, error, refetch };
 }

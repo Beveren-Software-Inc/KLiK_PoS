@@ -90,7 +90,7 @@ def send_invoice_whatsapp(**kwargs):
 
 		# Get POS print format
 		pos_profile = get_current_pos_profile()
-		print_format = pos_profile.custom_pos_printformat or "Standard"
+		print_format = pos_profile.print_format or pos_profile.print_format or "Standard"
 
 		# Format invoice amount
 		invoice_amount = fmt_money(doc.rounded_total or doc.grand_total, currency=doc.currency)
@@ -184,6 +184,23 @@ def deliver_invoice_via_whatsapp_doc(invoice_name, mobile_no=None, message=None)
 		message=message,
 		customer_name=customer_name,
 	)
+
+
+@frappe.whitelist()
+def get_whatsapp_setup():
+	"""
+	Return WhatsApp Setup configuration status.
+	"""
+	try:
+		setup = frappe.get_single("WhatsApp Setup")
+		return {
+			"status": "success",
+			"enabled": bool(setup.enabled),
+			"is_configured": bool(setup.enabled and setup.token and setup.url and setup.version and setup.phone_id),
+		}
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get WhatsApp Setup Failed")
+		frappe.throw(f"Failed to get WhatsApp setup: {e!s}")
 
 
 @frappe.whitelist()

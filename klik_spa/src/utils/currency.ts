@@ -107,34 +107,27 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
  * @returns Currency symbol (e.g., '$', 'ر.س', '€')
  */
 export const getCurrencySymbol = (currency: string): string => {
-  if (!currency) return '$';
+  if (!/^[A-Za-z]{3}$/.test(currency)) {
+    return currency;
+  }
 
   const symbol = CURRENCY_SYMBOLS[currency.toUpperCase()];
   return symbol || currency; // Return currency code if symbol not found
 };
 
+
 /**
- * Format amount with currency symbol
+ * Format amount with a pre-rendered currency symbol and thousands separators.
  * @param amount - Amount to format
- * @param currency - Currency code
- * @returns Formatted string (e.g., "SAR 100.00", "$50.00")
+ * @param currencySymbol - Currency symbol to prefix
+ * @returns Formatted string (e.g., "KES 9,900.00")
  */
-export const formatCurrency = (amount: number, currency?: string): string => {
-  if (!amount && amount !== 0) return '0.00';
+export const formatCurrencyWithSymbol = (amount: number, currencySymbol?: string): string => {
+  const safeAmount = Number(amount || 0);
+  const symbol = currencySymbol;
 
-  const symbol = getCurrencySymbol(currency || 'USD');
-  return `${symbol} ${amount.toFixed(2)}`;
-};
-
-/**
- * Format amount with currency symbol (compact version)
- * @param amount
- * @param currency
- * @returns Formatted string (e.g., "SAR100.00", "$50.00")
- */
-export const formatCurrencyCompact = (amount: number, currency?: string): string => {
-  if (!amount && amount !== 0) return '0.00';
-
-  const symbol = getCurrencySymbol(currency || 'USD');
-  return `${symbol}${amount.toFixed(2)}`;
+  return `${symbol} ${safeAmount.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 };

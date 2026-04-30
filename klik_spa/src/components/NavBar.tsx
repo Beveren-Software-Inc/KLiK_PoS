@@ -3,14 +3,14 @@ import { Link } from "react-router-dom"
 import { useI18n } from "../hooks/useI18n"
 import { useAuth } from "../hooks/useAuth"
 import { useTheme } from "../hooks/useTheme"
-import { usePOSDetails } from "../hooks/usePOSProfile"
+import { usePOSProfileStore } from "../stores/posProfileStore";
 import { Search, Settings, LogOut, Moon, Sun, Store } from "lucide-react"
 
 export default function NavBar() {
   const { language, setLanguage } = useI18n()
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
-  const { posDetails } = usePOSDetails()
+  const { posDetails } = usePOSProfileStore()
   const [showUserMenu, setShowUserMenu] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 

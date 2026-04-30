@@ -4,3 +4,4 @@
 
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
+klik_pos.patches.v16_0.set_default_view_from_hide_images

@@ -9,8 +9,8 @@ import {
   Plus
 } from "lucide-react";
 import { toast } from "react-toastify";
-import { formatCurrency, getCurrencySymbol } from "../utils/currency";
-import { usePOSDetails } from "../hooks/usePOSProfile";
+import { formatCurrencyWithSymbol, getCurrencySymbol } from "../utils/currency";
+import { usePOSProfileStore } from "../stores/posProfileStore";
 import { usePaymentModes } from "../hooks/usePaymentModes";
 import { createPartialReturn, getReturnedQty, type ReturnItem } from "../services/returnService";
 import { getInvoiceDetails } from "../services/salesInvoice";
@@ -37,7 +37,7 @@ export default function SingleInvoiceReturn({
   const [originalInvoicePaidAmount, setOriginalInvoicePaidAmount] = useState<number>(0);
 
   // Currency from invoice or POS profile
-  const { posDetails } = usePOSDetails();
+  const { posDetails } = usePOSProfileStore();
   const currency = (invoice && (invoice.currency || invoice.company_currency)) || posDetails?.currency || 'USD';
   const currencySymbol = getCurrencySymbol(currency);
 
@@ -307,27 +307,27 @@ export default function SingleInvoiceReturn({
                     <div className="text-xs font-medium text-gray-700 dark:text-gray-300">
                       <div className="flex justify-between items-center">
                         <span>Total Return Amount:</span>
-                        <span>{formatCurrency(totalReturnAmount, currency)}</span>
+                        <span>{formatCurrencyWithSymbol(totalReturnAmount, currency)}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span>Paid Amount:</span>
-                        <span>{formatCurrency(returnAmount, currency)}</span>
+                        <span>{formatCurrencyWithSymbol(returnAmount, currency)}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-orange-600 dark:text-red-400 font-semibold">Write-off:</span>
                         <span className="text-orange-600 dark:text-red-400 font-semibold">
-                          {formatCurrency(totalReturnAmount - returnAmount, currency)}
+                          {formatCurrencyWithSymbol(totalReturnAmount - returnAmount, currency)}
                         </span>
                       </div>
                     </div>
                   ) : (
                     <div className="text-lg font-bold text-black-600 dark:text-orange-400">
-                      {formatCurrency(totalReturnAmount, currency)}
+                      {formatCurrencyWithSymbol(totalReturnAmount, currency)}
                     </div>
                   )}
                   {originalInvoicePaidAmount > 0 && totalReturnAmount === returnAmount && (
                     <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Customer Paid: {formatCurrency(originalInvoicePaidAmount, currency)}
+                      Customer Paid: {formatCurrencyWithSymbol(originalInvoicePaidAmount, currency)}
                     </div>
                   )}
                 </div>
@@ -434,10 +434,10 @@ export default function SingleInvoiceReturn({
                             </div>
                           </td>
                           <td className="px-4 py-4 text-right text-sm text-gray-900 dark:text-white">
-                            {formatCurrency(item.rate, currency)}
+                            {formatCurrencyWithSymbol(item.rate, currency)}
                           </td>
                           <td className="px-4 py-4 text-right text-sm font-medium text-gray-900 dark:text-white">
-                            {formatCurrency((item.return_qty || 0) * item.rate, currency)}
+                            {formatCurrencyWithSymbol((item.return_qty || 0) * item.rate, currency)}
                           </td>
                         </tr>
                       ))}

@@ -2,7 +2,7 @@ export interface Customer {
   id: string
   type: 'individual' | 'company' | 'walk-in'
   name: string
-  customer_name: string
+  customerName?: string
   email: string
   phone: string
   address: {
@@ -14,18 +14,16 @@ export interface Customer {
     zipCode: string
     country: string
   }
-  // Individual customer fields
   dateOfBirth?: string
   gender?: 'male' | 'female' | 'other'
-  // Company customer fields
   companyName?: string
   contactPerson?: string
   taxId?: string
+  isWalkin?: number
   industry?: string
   employeeCount?: string
   registrationScheme?: string
   registrationNumber?: string
-  // Common fields
   loyaltyPoints: number
   totalSpent: number
   totalOrders: number
@@ -36,9 +34,50 @@ export interface Customer {
   createdAt: string
   lastVisit?: string
   avatar?: string
-  // Additional fields for ERPNext integration
   defaultCurrency?: string
   companyCurrency?: string
-  customer_group?: string
+  customerGroup?: string
   territory?: string
+  emailId?: string | null
+  mobileNo?: string | null
+  customerType?: string
+  customerPrimaryContact?: any
+  customerPrimaryAddress?: any
+  contactData?: {
+    firstName?: string
+    lastName?: string
+    emailId?: string
+    phone?: string
+    mobileNo?: string
+  } | null
+  addressData?: {
+    addressLine1?: string
+    addressLine2?: string
+    city?: string
+    state?: string
+    pincode?: string
+    country?: string
+  } | null
+  customerAddress?: any
+  addressDisplay?: string | null
+  shippingAddressName?: string | null
+  shippingAddress?: string | null
+  taxCategory?: string | null
+  contactPersonName?: string | null
+  contactDisplay?: string | null
+  contactEmail?: string | null
+  contactMobile?: string | null
+  contactPhone?: string | null
+  contactDesignation?: string | null
+  contactDepartment?: string | null
+  taxWithholdingCategory?: string | null
+  taxWithholdingGroup?: string | null
+  language?: string
+  priceListCurrency?: string
+  sellingPriceList?: string
+  paymentTermsTemplate?: string | null
+  currencyCode?: string | null
+  salesTeam?: any[]
+  vatNumber?: string
+  paymentMethod?: string
 }

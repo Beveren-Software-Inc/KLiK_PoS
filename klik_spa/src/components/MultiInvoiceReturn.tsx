@@ -24,9 +24,9 @@ import {
 interface InvoiceWithPaidAmount extends InvoiceForReturn {
   paid_amount?: number;
 }
-import { formatCurrency, getCurrencySymbol } from "../utils/currency";
+import { formatCurrencyWithSymbol, getCurrencySymbol } from "../utils/currency";
 import { useCustomers } from "../hooks/useCustomers";
-import { usePOSDetails } from "../hooks/usePOSProfile";
+import { usePOSProfileStore } from "../stores/posProfileStore";
 import { usePaymentModes } from "../hooks/usePaymentModes";
 
 interface MultiInvoiceReturnProps {
@@ -63,7 +63,7 @@ export default function MultiInvoiceReturn({
 
   // Use the customers hook with search to fetch from server when searching
   const { customers: searchableCustomers, isLoading: customersLoading } = useCustomers(customerSearchQuery);
-  const { posDetails } = usePOSDetails();
+  const { posDetails } = usePOSProfileStore();
   const { modes: paymentModes } = usePaymentModes(typeof posDetails?.name === 'string' ? posDetails.name : '');
   const currency = posDetails?.currency || 'USD';
   const currencySymbol = getCurrencySymbol(currency);
@@ -971,7 +971,7 @@ export default function MultiInvoiceReturn({
                 <div className="text-right">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Return Amount</p>
                   <p className="text-xl font-bold text-beveren-600 dark:text-beveren-400">
-                    {formatCurrency(totalReturnAmount, currency)}
+                    {formatCurrencyWithSymbol(totalReturnAmount, currency)}
                   </p>
                 </div>
               </div>
@@ -1036,7 +1036,7 @@ export default function MultiInvoiceReturn({
                           </h4>
                           <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
                             <span>{invoice.posting_date}</span>
-                            <span>{formatCurrency(invoice.grand_total, currency)}</span>
+                            <span>{formatCurrencyWithSymbol(invoice.grand_total, currency)}</span>
                             <span className="capitalize">{invoice.status}</span>
                           </div>
                         </div>
@@ -1146,7 +1146,7 @@ export default function MultiInvoiceReturn({
                               </div>
                             </td>
                             <td className="px-4 py-3 text-right text-sm font-medium text-gray-900 dark:text-white">
-                              {formatCurrency(((item.return_qty || 0) * item.rate), currency)}
+                              {formatCurrencyWithSymbol(((item.return_qty || 0) * item.rate), currency)}
                             </td>
                           </tr>
                         ))}

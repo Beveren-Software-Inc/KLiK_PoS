@@ -1,70 +1,52 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-// import { useI18n } from "../hooks/useI18n"
-import { useProducts } from "../hooks/useProducts"
-import { usePOSDetails } from "../hooks/usePOSProfile"
-
-import MenuGrid from "./MenuGrid"
-import OrderSummary from "./OrderSummary"
-import MobilePOSLayout from "./MobilePOSLayout"
-import LoadingSpinner from "./LoadingSpinner"
-import type { MenuItem, CartItem, GiftCoupon } from "../../types"
-import { useMediaQuery } from "../hooks/useMediaQuery"
-import { toast } from "react-toastify"
+import { useState, useEffect } from "react";
+import { useProducts } from "../hooks/useProducts";
+import { usePOSProfileStore } from "../stores/posProfileStore";
+import MenuGrid from "./MenuGrid";
+import OrderSummary from "./order/OrderSummary";
+import MobilePOSLayout from "./MobilePOSLayout";
+import LoadingSpinner from "./LoadingSpinner";
+import type { MenuItem, CartItem, GiftCoupon } from "../../types";
+import { useMediaQuery } from "../hooks/useMediaQuery";
+import { toast } from "react-toastify";
 
 export default function RetailPOSLayout() {
-  // const { t } = useI18n()
-  const [selectedCategory, setSelectedCategory] = useState("all")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [cartItems, setCartItems] = useState<CartItem[]>([])
-  const [appliedCoupons, setAppliedCoupons] = useState<GiftCoupon[]>([])
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [appliedCoupons, setAppliedCoupons] = useState<GiftCoupon[]>([]);
 
-  // Use professional data management
-  const { products: menuItems, isLoading: loading, error, refetch } = useProducts()
+  const { products: menuItems, isLoading: loading, error, refetch } = useProducts();
+  const { posDetails } = usePOSProfileStore();
+  const useScannerOnly = posDetails?.custom_use_scanner_fully || false;
+  const isMobile = useMediaQuery("(max-width: 1024px)");
 
-  // Get POS details including scanner-only setting
-  const { posDetails } = usePOSDetails()
-  const useScannerOnly = posDetails?.custom_use_scanner_fully || false
-
-  // Use media query to detect mobile/tablet screens
-  const isMobile = useMediaQuery("(max-width: 1024px)")
-
-  const handleAddToCart = (item: MenuItem) => {
-    // Don't add if item is not available
-    if (item.available <= 0) return
-
-    // If scanner-only mode is enabled, prevent adding items by clicking
-    if (useScannerOnly) {
-      console.log('Scanner-only mode enabled. Items can only be added via barcode scanning.')
-      return
+  useEffect(() => {
+    if (error) {
+      console.error("POS Error:", error);
     }
+  }, [error]);
 
-    addItemToCart(item)
-  }
-
-  // Separate function for adding items to cart (used by both click and barcode)
   const addItemToCart = (item: MenuItem) => {
-    const existingItem = cartItems.find((cartItem) => cartItem.id === item.id)
+    const existingItem = cartItems.find((cartItem) => cartItem.id === item.id);
 
-    // Check if item has available quantity
     if (item.available <= 0) {
-      toast.error(`${item.name} is out of stock`)
-      return
+      toast.error(`${item.name} is out of stock`);
+      return;
     }
 
     if (existingItem) {
-      // Check if adding one more would exceed available stock
       if (existingItem.quantity >= item.available) {
-          toast.error(`Only ${item.available} ${item.uom || 'units'} of ${item.name} available`)
-        return
+        toast.error(`Only ${item.available} ${item.uom || "units"} of ${item.name} available`);
+        return;
       }
 
       setCartItems(
         cartItems.map((cartItem) =>
-          cartItem.id === item.id ? { ...cartItem, quantity: cartItem.quantity + 1 } : cartItem,
-        ),
-      )
+          cartItem.id === item.id ? { ...cartItem, quantity: cartItem.quantity + 1 } : cartItem
+        )
+      );
     } else {
       setCartItems([
         ...cartItems,
@@ -77,70 +59,66 @@ export default function RetailPOSLayout() {
           quantity: 1,
           available: item.available,
           uom: item.uom,
-          item_code: item.id, // item.id is the item_code from the API
+          item_code: item.id,
         },
-      ])
+      ]);
     }
+  };
 
-    // Show success message for barcode scanning
+  const handleAddToCart = (item: MenuItem) => {
+    if (item.available <= 0) return;
     if (useScannerOnly) {
-      console.log(`✅ Added ${item.name} to cart via barcode scanning`)
+      toast.info("Scanner-only mode: Use barcode scanner to add items");
+      return;
     }
-  }
+    addItemToCart(item);
+  };
 
   const handleUpdateQuantity = (id: string, quantity: number) => {
     if (quantity <= 0) {
-      setCartItems(cartItems.filter((item) => item.id !== id))
+      setCartItems(cartItems.filter((item) => item.id !== id));
     } else {
-      const item = cartItems.find((cartItem) => cartItem.id === id)
+      const item = cartItems.find((cartItem) => cartItem.id === id);
       if (item && item.available !== undefined && quantity > item.available) {
-        toast.error(`Only ${item.available} ${item.uom || 'units'} of ${item.name} available`)
-        return
+        toast.error(`Only ${item.available} ${item.uom || "units"} of ${item.name} available`);
+        return;
       }
-
-      setCartItems(cartItems.map((item) => (item.id === id ? { ...item, quantity } : item)))
+      setCartItems(cartItems.map((item) => (item.id === id ? { ...item, quantity } : item)));
     }
-  }
+  };
 
   const handleRemoveItem = (id: string) => {
-    setCartItems(cartItems.filter((item) => item.id !== id))
-  }
+    setCartItems(cartItems.filter((item) => item.id !== id));
+  };
 
   const handleClearCart = () => {
-    setCartItems([])
-  }
+    setCartItems([]);
+  };
 
   const handleApplyCoupon = (coupon: GiftCoupon) => {
-    // Check if coupon is already applied
     if (!appliedCoupons.some((c) => c.code === coupon.code)) {
-      setAppliedCoupons([...appliedCoupons, coupon])
+      setAppliedCoupons([...appliedCoupons, coupon]);
     }
-  }
+  };
 
   const handleRemoveCoupon = (couponCode: string) => {
-    setAppliedCoupons(appliedCoupons.filter((coupon) => coupon.code !== couponCode))
-  }
+    setAppliedCoupons(appliedCoupons.filter((coupon) => coupon.code !== couponCode));
+  };
 
   const filteredItems = menuItems.filter((item) => {
-    // Category filter
-    const matchesCategory = selectedCategory === "all" || item.category === selectedCategory
-
-    // Search filter - search by name, category, item_code, or any text content
+    const matchesCategory = selectedCategory === "all" || item.category === selectedCategory;
     const matchesSearch =
       searchQuery === "" ||
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.id.toLowerCase().includes(searchQuery.toLowerCase()) // item.id is the item_code
+      item.id.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
-    return matchesCategory && matchesSearch
-  })
-
-  // Show loading state
   if (loading) {
-    return <LoadingSpinner message="Loading products..." />
+    return <LoadingSpinner message="Loading products..." />;
   }
 
-  // Show scanner-only mode indicator (desktop only)
   const scannerOnlyIndicator = useScannerOnly && !isMobile && (
     <div className="fixed z-50 bg-blue-600/90 text-white px-3 py-1.5 rounded-lg shadow-lg backdrop-blur-sm top-20 right-4">
       <div className="flex items-center space-x-2">
@@ -150,10 +128,9 @@ export default function RetailPOSLayout() {
         <span className="text-sm font-medium">Scanner Only</span>
       </div>
     </div>
-  )
+  );
 
-  // Show error state with retry option
-  if (error) {
+  if (error && filteredItems.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center p-8">
@@ -177,10 +154,9 @@ export default function RetailPOSLayout() {
           </button>
         </div>
       </div>
-    )
+    );
   }
 
-  // Render mobile layout for screens smaller than 1024px
   if (isMobile) {
     return (
       <MobilePOSLayout
@@ -190,41 +166,38 @@ export default function RetailPOSLayout() {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         scannerOnly={useScannerOnly}
+        onAddToCart={handleAddToCart}
       />
-    )
+    );
   }
 
-  // Desktop layout for larger screens
   return (
     <>
       {scannerOnlyIndicator}
       <div className="flex h-screen bg-gray-50 pb-8">
-      {/* Menu Section - Takes remaining space minus cart width */}
-      <div className="flex-1 overflow-hidden lg:ml-20">
-        <MenuGrid
-          items={filteredItems}
-          selectedCategory={selectedCategory}
-          onCategoryChange={setSelectedCategory}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          onAddToCart={handleAddToCart}
-          scannerOnly={useScannerOnly}
-        />
+        <div className="flex-1 overflow-hidden lg:ml-20">
+          <MenuGrid
+            items={filteredItems}
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onAddToCart={handleAddToCart}
+            scannerOnly={useScannerOnly}
+          />
+        </div>
+        <div className="w-[35%] min-w-[420px] max-w-[600px] bg-white shadow-lg overflow-y-auto">
+          <OrderSummary
+            cartItems={cartItems}
+            onUpdateQuantity={handleUpdateQuantity}
+            onRemoveItem={handleRemoveItem}
+            onClearCart={handleClearCart}
+            appliedCoupons={appliedCoupons}
+            onApplyCoupon={handleApplyCoupon}
+            onRemoveCoupon={handleRemoveCoupon}
+          />
+        </div>
       </div>
-
-      {/* Order Summary - 35% width on medium and large screens */}
-      <div className="w-[35%] min-w-[420px] max-w-[600px] bg-white shadow-lg overflow-y-auto">
-        <OrderSummary
-          cartItems={cartItems}
-          onUpdateQuantity={handleUpdateQuantity}
-          onRemoveItem={handleRemoveItem}
-          onClearCart={handleClearCart}
-          appliedCoupons={appliedCoupons}
-          onApplyCoupon={handleApplyCoupon}
-          onRemoveCoupon={handleRemoveCoupon}
-        />
-      </div>
-    </div>
     </>
-  )
+  );
 }

@@ -1068,7 +1068,7 @@ def generate_and_attach_invoice_pdf(invoice_name, print_format="Standard", lang=
 	"""
 	pos_profile = get_current_pos_profile()
 	if pos_profile:
-		print_format = pos_profile.custom_pos_printformat
+		print_format = pos_profile.print_format
 	try:
 		# Generate PDF content
 		pdf_content = frappe.get_print("Sales Invoice", invoice_name, print_format, as_pdf=True)

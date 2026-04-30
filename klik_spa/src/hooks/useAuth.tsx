@@ -1,6 +1,7 @@
 import type React from "react"
 import { useState, useEffect, createContext, useContext } from "react"
 import erpnextAPI from "../services/erpnext-api"
+import { usePOSProfileStore } from "../stores/posProfileStore"
 
 interface User {
   name: string
@@ -43,80 +44,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
+  const { setAuthenticated, refreshAll, clearCache } = usePOSProfileStore.getState()
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
   useEffect(() => {
-    if (!mounted) return
+    if (!mounted) return;
 
-    // Initialize ERPNext API session
-    erpnextAPI.initializeSession()
+    const syncAuthSession = async () => {
+      erpnextAPI.initializeSession();
 
-    // Check if user is already logged in
-    const token = localStorage.getItem("erpnext_token")
-    const userData = localStorage.getItem("user_data")
-
-
-    if (token && userData) {
       try {
-        const parsedUser = JSON.parse(userData)
+        const freshUserData = await erpnextAPI.getCurrentUserProfile();
 
-        // First, set the user from cached data to avoid login redirect
-        setUser(parsedUser)
+        if (freshUserData && freshUserData.name && freshUserData.name !== "Guest") {
+          const updatedUser = {
+            name: freshUserData.name,
+            email: freshUserData.email || freshUserData.name,
+            full_name: freshUserData.full_name || `${freshUserData.first_name || ""} ${freshUserData.last_name || ""}`.trim(),
+            role: freshUserData.role_profile_name || freshUserData.role || "User",
+            first_name: freshUserData.first_name,
+            last_name: freshUserData.last_name,
+            user_image: freshUserData.user_image
+          };
 
-        const refreshUserData = async () => {
-          try {
-            // First validate the session
-            const isSessionValid = await erpnextAPI.validateSession()
-            if (!isSessionValid) {
-              console.warn("Session is invalid, clearing auth data")
-              localStorage.removeItem("erpnext_token")
-              localStorage.removeItem("user_data")
-              localStorage.removeItem("erpnext_sid")
-              setUser(null)
-              return
-            }
-
-            const freshUserData = await erpnextAPI.getCurrentUserProfile()
-            if (freshUserData) {
-              const updatedUser = {
-                name: freshUserData.name || parsedUser.name,
-                email: freshUserData.email || freshUserData.name || parsedUser.email,
-                full_name: freshUserData.full_name || freshUserData.first_name + ' ' + (freshUserData.last_name || '') || parsedUser.full_name,
-                role: freshUserData.role_profile_name || freshUserData.role || parsedUser.role || "User",
-                first_name: freshUserData.first_name,
-                last_name: freshUserData.last_name,
-                user_image: freshUserData.user_image
-              }
-
-              setUser(updatedUser)
-              localStorage.setItem("user_data", JSON.stringify(updatedUser))
-            }
-          } catch (error) {
-            console.warn("Failed to refresh user data, using cached data:", error)
-            // Don't clear the user data if refresh fails - keep using cached data
-          }
+          setUser(updatedUser);
+          localStorage.setItem("erpnext_token", "authenticated");
+          localStorage.setItem("user_data", JSON.stringify(updatedUser));
+          
+          setAuthenticated(true);
+          await refreshAll();
+        } else {
+          setUser(null);
+          localStorage.removeItem("erpnext_token");
+          localStorage.removeItem("user_data");
+          localStorage.removeItem("erpnext_sid");
+          
+          setAuthenticated(false);
+          clearCache();
         }
-
-        // Run refresh in background without blocking authentication
-        refreshUserData()
       } catch (error) {
-        console.error("Error parsing user data:", error)
-        localStorage.removeItem("erpnext_token")
-        localStorage.removeItem("user_data")
-        localStorage.removeItem("erpnext_sid")
+        console.error("Session sync failed:", error);
+        setAuthenticated(false);
+      } finally {
+        setLoading(false);
       }
-    }
-    setLoading(false)
-  }, [mounted])
+    };
+
+    syncAuthSession();
+  }, [mounted, setAuthenticated, refreshAll, clearCache]);
 
   const login = async (username: string, password: string, otp?: string, tmpId?: string) => {
     try {
       setLoading(true)
 
-      // Use the real ERPNext API
       const result = await erpnextAPI.login(username, password, otp, tmpId)
 
       if (result.requires_otp) {
@@ -130,7 +113,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (result.success && result.user) {
-        console.log("Login successful:", result.user)
         const userData = {
           name: result.user.name || username,
           email: result.user.email || username,
@@ -141,6 +123,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(userData)
         localStorage.setItem("erpnext_token", "authenticated")
         localStorage.setItem("user_data", JSON.stringify(userData))
+        
+        setAuthenticated(true)
+        await refreshAll()
 
         return { success: true, message: result.message }
       } else {
@@ -160,9 +145,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("erpnext_token")
     localStorage.removeItem("user_data")
     localStorage.removeItem("erpnext_sid")
+    
+    setAuthenticated(false)
+    clearCache()
   }
 
-  // Method to check if session is still valid
   const checkSession = async () => {
     if (!user) return false
 
@@ -195,7 +182,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     </AuthContext.Provider>
   )
 }
-// eslint-disable-next-line react-refresh/only-export-components
+
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext)
   if (context === undefined) {

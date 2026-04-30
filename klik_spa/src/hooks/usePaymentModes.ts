@@ -9,6 +9,9 @@ interface PaymentMode {
   custom_currency?: string;
   name?: string;
   openingAmount?: number;
+  color?: string;
+  icon?: React.ReactNode;
+  idx?: number;
 }
 
 export function usePaymentModes(posProfile: string) {
@@ -32,6 +35,7 @@ export function usePaymentModes(posProfile: string) {
         }
 
         const modesData = data.message.data || [];
+        
         setModes(modesData);
         setError(null);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

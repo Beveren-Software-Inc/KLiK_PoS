@@ -2,7 +2,7 @@
 
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft } from "lucide-react"
-import PaymentDialog from "./PaymentDialog"
+import PaymentDialog from "./dialog/PaymentDialog"
 import BottomNavigation from "./BottomNavigation"
 import { useCartStore } from "../stores/cartStore"
 import { useProducts } from "../hooks/useProducts"
