@@ -82,6 +82,8 @@ export default function InvoiceHistoryPage() {
   const { customers } = useCustomers();
   const { posDetails } = usePOSDetails();
   const { userInfo, isLoading: userInfoLoading } = useUserInfo();
+  const canAccessInvoiceHistory =
+    userInfo?.roles?.includes("Administrator") || userInfo?.roles?.includes("System Manager") || false;
 
   // Role-based filtering
   const isAdminUser = userInfo?.is_admin_user || false;
@@ -93,6 +95,15 @@ export default function InvoiceHistoryPage() {
       setCashierFilter(currentUserCashier);
     }
   }, [isAdminUser, currentUserCashier, cashierFilter]);
+
+  // Restrict Invoice History access to System Manager / Administrator only.
+  useEffect(() => {
+    if (userInfoLoading) return;
+    if (!canAccessInvoiceHistory) {
+      toast.error("Only System Manager or Administrator can access Invoice History");
+      navigate("/pos");
+    }
+  }, [userInfoLoading, canAccessInvoiceHistory, navigate]);
 
   // Keyboard event handler for Escape key
   useEffect(() => {

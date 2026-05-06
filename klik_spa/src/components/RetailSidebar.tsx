@@ -9,10 +9,12 @@ export default function RetailSidebar() {
   const { userInfo } = useUserInfo()
 
   const canAccessSalesDashboard = userInfo?.is_admin_user ?? false
+  const canAccessInvoiceHistory =
+    userInfo?.roles?.includes("Administrator") || userInfo?.roles?.includes("System Manager") || false
 
   const menuItems = [
     { icon: Grid3X3, path: "/pos", label: "POS" },
-     { icon: Receipt, path: "/invoice", label: "InvoiceHistory" },
+     { icon: Receipt, path: "/invoice", label: "InvoiceHistory", requiresInvoiceHistoryAccess: true },
      { icon: Users, path: "/customers", label: "Customers" },
     { icon: BarChart3, path: "/dashboard", label: "Dashboard", requiresSalesDashboard: true },
     { icon: MonitorX, path: "/closing_shift", label: "Closing Shift" },
@@ -28,6 +30,7 @@ export default function RetailSidebar() {
 
   const handleNav = (item: (typeof menuItems)[0]) => {
     if (item.requiresSalesDashboard && !canAccessSalesDashboard) return
+    if (item.requiresInvoiceHistoryAccess && !canAccessInvoiceHistory) return
     navigate(item.path)
   }
 
@@ -48,13 +51,21 @@ export default function RetailSidebar() {
       {/* Menu Items - Flexible space */}
       <div className="flex-1 flex flex-col items-center py-6 space-y-4">
         {menuItems.map((item, index) => {
-          const disabled = item.requiresSalesDashboard && !canAccessSalesDashboard
+          const disabled =
+            (item.requiresSalesDashboard && !canAccessSalesDashboard) ||
+            (item.requiresInvoiceHistoryAccess && !canAccessInvoiceHistory)
           return (
           <button
             key={index}
             onClick={() => handleNav(item)}
             disabled={disabled}
-            title={disabled ? "Sales Dashboard (Sales Manager, System Manager or Administrator only)" : item.label}
+            title={
+              item.requiresInvoiceHistoryAccess && !canAccessInvoiceHistory
+                ? "Invoice History (System Manager or Administrator only)"
+                : disabled
+                  ? "Sales Dashboard (Sales Manager, System Manager or Administrator only)"
+                  : item.label
+            }
             className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-150 ${
               disabled
                 ? "opacity-50 cursor-not-allowed text-gray-400 dark:text-gray-600"

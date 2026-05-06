@@ -882,6 +882,12 @@ export default function PaymentDialog({
     // For B2B, no payment validation required - can be partial or zero payment
     setIsProcessingPayment(true);
 
+    // Calculate change and net amount to send to backend.
+    // Keep accounting behavior unchanged by continuing to send grandTotal as amountPaid for B2C.
+    const changeAmount = isB2B
+      ? 0
+      : roundCurrency(Math.max(0, subtractCurrency(totalPaidAmount, calculations.grandTotal)));
+
     // Calculate net amount to send to backend (amount paid minus change for B2C)
     const netAmountToSend = isB2B ? totalPaidAmount : calculations.grandTotal;
 
@@ -950,6 +956,7 @@ export default function PaymentDialog({
       taxType: calculations.isInclusive ? "inclusive" : "exclusive",
       couponDiscount: calculations.couponDiscount,
       roundOffAmount,
+      customChange: changeAmount,
       grandTotal: calculations.grandTotal,
       amountPaid: netAmountToSend, // Send net amount (grand total for B2C, total paid for B2B)
       outstandingAmount: outstandingAmount,

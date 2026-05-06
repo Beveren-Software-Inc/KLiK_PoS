@@ -62,6 +62,7 @@ fixtures = [
                     "POS Profile-custom_clear_draft_invoices",
                     "POS Profile-custom_limit_item_reduction",
                     "POS Profile-custom_item_reduction_password",
+                    "Sales Invoice-custom_change",
 				),
 			]
 		],

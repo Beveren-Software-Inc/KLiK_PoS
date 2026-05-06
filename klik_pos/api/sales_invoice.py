@@ -54,6 +54,16 @@ def get_sales_invoices(limit=100, start=0, search="", skip_opening_entry_filter=
 		if isinstance(submitted_only, str):
 			submitted_only = submitted_only.lower() in ("true", "1", "yes")
 
+		# Invoice History mode (skip_opening_entry_filter=True) is restricted
+		# to System Manager and Administrator only.
+		if skip_opening_entry_filter:
+			user_roles = frappe.get_roles()
+			if "Administrator" not in user_roles and "System Manager" not in user_roles:
+				return {
+					"success": False,
+					"error": _("Only System Manager or Administrator can access invoice history."),
+				}
+
 		# Get user IDs for cashier filter if cashier_name is provided
 		cashier_user_ids = None
 		if cashier_name and cashier_name != "all":
@@ -504,6 +514,7 @@ def _get_address_and_customer_info(invoice):
 
 @frappe.whitelist()
 def create_and_submit_invoice(data):
+	
 	try:
 		import time
 
@@ -522,6 +533,7 @@ def create_and_submit_invoice(data):
 			business_type,
 			roundoff_amount,
 			delivery_personnel,
+			custom_change,
 		) = parse_invoice_data(data)
 
 		# Validate required fields
@@ -541,8 +553,9 @@ def create_and_submit_invoice(data):
 			roundoff_amount,
 			include_payments=True,
 			delivery_personnel=delivery_personnel,
+			custom_change=custom_change,
 		)
-
+		
 		doc.base_paid_amount = amount_paid
 		doc.paid_amount = amount_paid
 		doc.outstanding_amount = 0
@@ -620,6 +633,7 @@ def create_draft_invoice(data):
 			business_type,
 			roundoff_amount,
 			delivery_personnel,
+			custom_change,
 		) = parse_invoice_data(data)
 		doc = build_sales_invoice_doc(
 			customer,
@@ -631,6 +645,7 @@ def create_draft_invoice(data):
 			roundoff_amount,
 			include_payments=True,
 			delivery_personnel=delivery_personnel,
+			custom_change=custom_change,
 		)
 		doc.insert(ignore_permissions=True)
 
@@ -656,6 +671,8 @@ def parse_invoice_data(data):
 
 	# Extract round-off data from frontend
 	roundoff_amount = data.get("roundOffAmount", 0.0)
+	# Accept both camelCase and snake_case payload styles.
+	custom_change = flt(data.get("customChange") or data.get("custom_change") or 0.0)
 
 	# Only get round-off account if round-off amount is not zero
 	if roundoff_amount != 0:
@@ -666,6 +683,20 @@ def parse_invoice_data(data):
 
 	if data.get("paymentMethods"):
 		mode_of_payment = data.get("paymentMethods")
+
+	# Fallback: derive visible change from payment rows if frontend didn't send it.
+	# This mirrors POS UI behavior (change = total paid - grand total/net amount sent as amountPaid).
+	if custom_change <= 0 and isinstance(mode_of_payment, list) and mode_of_payment:
+		try:
+			total_payments = 0.0
+			for payment in mode_of_payment:
+				if not isinstance(payment, dict):
+					continue
+				total_payments += flt(payment.get("amount", 0.0))
+			custom_change = flt(max(0.0, total_payments - flt(amount_paid)))
+		except Exception:
+			# Non-fatal: keep as 0 if malformed data.
+			custom_change = 0.0
 
 	if data.get("SalesTaxCharges"):
 		sales_and_tax_charges = data.get("SalesTaxCharges")
@@ -685,6 +716,7 @@ def parse_invoice_data(data):
 		business_type,
 		roundoff_amount,
 		delivery_personnel,
+		custom_change,
 	)
 
 
@@ -698,6 +730,7 @@ def build_sales_invoice_doc(
 	roundoff_amount=0.0,
 	include_payments=False,
 	delivery_personnel=None,
+	custom_change=0.0,
 ):
 	"""Main function to build a sales invoice document."""
 	doc = frappe.new_doc("Sales Invoice")
@@ -724,6 +757,7 @@ def build_sales_invoice_doc(
 
 	# Handle round-off
 	_set_roundoff_fields(doc, roundoff_amount)
+	_set_custom_change_field(doc, custom_change)
 
 	# Set taxes and charges
 	_set_taxes_and_charges(doc, sales_and_tax_charges, pos_profile)
@@ -843,42 +877,42 @@ def _validate_and_autofetch_batch_and_serial(items, pos_profile):
 				)
 
 def _autofetch_batch_fifo(item_code, warehouse, qty):
-    from frappe.utils import nowdate
-    today = nowdate()
+	from frappe.utils import nowdate
+	today = nowdate()
 
-    # Pick oldest batch that actually has sufficient stock in the warehouse
-    batches = frappe.db.sql("""
-        SELECT 
-            sle.batch_no,
-            SUM(sle.actual_qty) as available_qty,
-            b.expiry_date,
-            b.creation
-        FROM `tabStock Ledger Entry` sle
-        INNER JOIN `tabBatch` b ON b.name = sle.batch_no
-        WHERE 
-            sle.item_code = %(item_code)s
-            AND sle.warehouse = %(warehouse)s
-            AND sle.is_cancelled = 0
-            AND b.disabled = 0
-            AND (b.expiry_date IS NULL OR b.expiry_date >= %(today)s)
-        GROUP BY sle.batch_no
-        HAVING available_qty >= %(qty)s
-        ORDER BY b.expiry_date ASC, b.creation ASC
-        LIMIT 1
-    """, {
-        "item_code": item_code,
-        "warehouse": warehouse,
-        "qty": qty,
-        "today": today
-    }, as_dict=True)
+	# Pick oldest batch that actually has sufficient stock in the warehouse
+	batches = frappe.db.sql("""
+		SELECT 
+			sle.batch_no,
+			SUM(sle.actual_qty) as available_qty,
+			b.expiry_date,
+			b.creation
+		FROM `tabStock Ledger Entry` sle
+		INNER JOIN `tabBatch` b ON b.name = sle.batch_no
+		WHERE 
+			sle.item_code = %(item_code)s
+			AND sle.warehouse = %(warehouse)s
+			AND sle.is_cancelled = 0
+			AND b.disabled = 0
+			AND (b.expiry_date IS NULL OR b.expiry_date >= %(today)s)
+		GROUP BY sle.batch_no
+		HAVING available_qty >= %(qty)s
+		ORDER BY b.expiry_date ASC, b.creation ASC
+		LIMIT 1
+	""", {
+		"item_code": item_code,
+		"warehouse": warehouse,
+		"qty": qty,
+		"today": today
+	}, as_dict=True)
 
-    if not batches:
-        frappe.throw(
-            f"No batch with sufficient stock found for item {item_code} "
-            f"in warehouse {warehouse}. Required: {qty}"
-        )
+	if not batches:
+		frappe.throw(
+			f"No batch with sufficient stock found for item {item_code} "
+			f"in warehouse {warehouse}. Required: {qty}"
+		)
 
-    return batches[0].batch_no
+	return batches[0].batch_no
 # def _autofetch_batch_fifo(item_code, warehouse, qty):
 # 	"""
 # 	Simple FIFO-based batch selector.
@@ -964,6 +998,21 @@ def _set_roundoff_fields(doc, roundoff_amount):
 		doc.custom_roundoff_amount = flt(abs(roundoff_amount))
 		doc.custom_roundoff_account = get_writeoff_account()
 		doc.custom_base_roundoff_amount = flt(abs(roundoff_amount) * conversion_rate)
+
+
+def _set_custom_change_field(doc, custom_change):
+	"""Persist cashier change amount without impacting accounting logic."""
+	change_amount = flt(custom_change)
+	if change_amount <= 0:
+		return
+
+	try:
+		sales_invoice_meta = frappe.get_meta("Sales Invoice")
+		if any(df.fieldname == "custom_change" for df in sales_invoice_meta.fields):
+			doc.custom_change = change_amount
+	except Exception:
+		# Non-fatal: invoice flow must continue even if the custom field is unavailable.
+		pass
 
 
 def _set_taxes_and_charges(doc, sales_and_tax_charges, pos_profile):
