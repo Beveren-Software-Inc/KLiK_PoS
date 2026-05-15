@@ -1,5 +1,5 @@
 import { formatCurrencyWithSymbol } from "../../utils/currency";
-import type { BackendTaxPreview, Calculations, PaymentAmount } from "./types";
+import type { Calculations, PaymentAmount } from "./types";
 import type { CartItem } from "../../../types";
 import DisplayPrintPreview from "../../utils/invoicePrint";
 
@@ -11,13 +11,16 @@ interface InvoicePreviewProps {
   selectedCustomer: any;
   cartItems: CartItem[];
   calculations: Calculations;
+  displaySubtotal: number;
+  displayTaxTotal: number;
+  displayTaxIsIncluded: boolean;
+  checkoutGrandTotal: number;
   roundOffAmount: number;
   paymentAmounts: PaymentAmount;
   displayCurrencySymbol: string;
   isB2B: boolean;
   isB2C: boolean;
   currentDate: string;
-  backendTaxPreview: BackendTaxPreview | null;
 }
 
 export default function InvoicePreview({
@@ -28,23 +31,17 @@ export default function InvoicePreview({
   selectedCustomer,
   cartItems,
   calculations,
+  displaySubtotal,
+  displayTaxTotal,
+  displayTaxIsIncluded,
+  checkoutGrandTotal,
   roundOffAmount,
   paymentAmounts,
   displayCurrencySymbol,
   isB2B,
   isB2C,
   currentDate,
-  backendTaxPreview,
 }: InvoicePreviewProps) {
-  const backendTaxLines = backendTaxPreview?.tax_breakdown || [];
-  const hasBackendTaxBreakdown = backendTaxLines.length > 0;
-  const displayTaxIsIncluded = hasBackendTaxBreakdown
-    ? backendTaxLines.some((line) => Number(line.included_in_print_rate) === 1)
-    : calculations.isInclusive;
-  const displayTaxTotal = backendTaxPreview
-    ? backendTaxPreview.total_taxes_and_charges || 0
-    : calculations.taxAmount;
-
   if (invoiceSubmitted && invoiceData) {
     return (
       <div className="mb-4"> 
@@ -119,7 +116,7 @@ export default function InvoicePreview({
       <div className="border-t border-gray-200 dark:border-gray-600 pt-2 space-y-1 text-sm">
         <div className="flex justify-between">
           <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
-          <span className="text-gray-900 dark:text-white">{formatCurrencyWithSymbol(calculations.subtotal, displayCurrencySymbol)}</span>
+          <span className="text-gray-900 dark:text-white">{formatCurrencyWithSymbol(displaySubtotal, displayCurrencySymbol)}</span>
         </div>
         {calculations.couponDiscount > 0 && (
           <div className="flex justify-between text-green-600 dark:text-green-400">
@@ -144,7 +141,7 @@ export default function InvoicePreview({
         <div className="border-t border-gray-200 dark:border-gray-600 pt-1">
           <div className="flex justify-between font-bold">
             <span className="text-gray-900 dark:text-white">Total</span>
-            <span className="text-gray-900 dark:text-white">{formatCurrencyWithSymbol(calculations.grandTotal, displayCurrencySymbol)}</span>
+            <span className="text-gray-900 dark:text-white">{formatCurrencyWithSymbol(checkoutGrandTotal, displayCurrencySymbol)}</span>
           </div>
         </div>
 
@@ -164,7 +161,7 @@ export default function InvoicePreview({
           <div className="border-t border-gray-200 dark:border-gray-600 pt-2 mt-2">
             <div className="flex justify-between text-sm">
               <span className="text-orange-600 dark:text-orange-400 font-medium">Outstanding Amount:</span>
-              <span className="text-orange-600 dark:text-orange-400 font-bold">{formatCurrencyWithSymbol(calculations.grandTotal, displayCurrencySymbol)}</span>
+              <span className="text-orange-600 dark:text-orange-400 font-bold">{formatCurrencyWithSymbol(checkoutGrandTotal, displayCurrencySymbol)}</span>
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Payment to be collected separately</p>
           </div>

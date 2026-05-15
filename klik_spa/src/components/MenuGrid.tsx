@@ -6,11 +6,13 @@ import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../hooks/useTheme";
 import { useProduct } from "../providers/ProductProvider";
 import { usePOSProfileStore } from "../stores/posProfileStore";
-import { Settings, LogOut, Moon, Sun, Grid3X3, List, Store, RefreshCw } from "lucide-react";
+import { Settings, LogOut, Moon, Sun, Grid3X3, List, Store, RefreshCw, Lock, Unlock } from "lucide-react";
 import { clearCacheAndReload } from "../utils/clearCache";
 import CategoryTabs from "./CategoryTabs";
 import ProductGrid from "./ProductGrid";
 import SearchBar from "./SearchBar";
+import SalespersonAuthModal from "./dialog/SalespersonAuthModal";
+import { useSalespersonStore } from "../stores/salespersonStore";
 
 interface MenuGridProps {
   onRefreshStock?: () => void;
@@ -35,8 +37,10 @@ export default function MenuGrid({ onRefreshStock, onScanBarcode }: MenuGridProp
   } = useProduct();
   
   const { posDetails } = usePOSProfileStore();
+  const { activeSalesperson, rememberLocked, ensureInitialized } = useSalespersonStore();
   
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showSalespersonModal, setShowSalespersonModal] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(defaultView);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -53,6 +57,12 @@ export default function MenuGrid({ onRefreshStock, onScanBarcode }: MenuGridProp
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (posDetails?.custom_sales_person_pin_required) {
+      void ensureInitialized();
+    }
+  }, [posDetails?.custom_sales_person_pin_required, ensureInitialized]);
 
   const handleLogout = async () => {
     try {
@@ -73,8 +83,10 @@ export default function MenuGrid({ onRefreshStock, onScanBarcode }: MenuGridProp
   };
 
   const displayName = user?.full_name || user?.name || "Guest User";
+  const userEmail = user?.email || user?.name || "No email";
   const posProfileName = posDetails?.name || "POS Profile";
   const initials = getInitials(displayName);
+  const requiresSalespersonPin = !!posDetails?.custom_sales_person_pin_required;
 
   const handleSearchChange = (query: string) => {
     searchProducts(query);
@@ -123,7 +135,17 @@ export default function MenuGrid({ onRefreshStock, onScanBarcode }: MenuGridProp
           <div className="flex items-center space-x-4 ml-6 relative" ref={dropdownRef}>
             <div className="text-right">
               <div className="text-sm font-medium text-gray-900 dark:text-white">{posProfileName}</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">{displayName}</div>
+              {requiresSalespersonPin ? (
+                <button
+                  type="button"
+                  onClick={() => setShowSalespersonModal(true)}
+                  className="mt-1 inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition-colors hover:border-beveren-300 hover:text-beveren-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                >
+                  {rememberLocked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
+                  <span>{activeSalesperson?.salesperson_name || "Verify salesperson"}</span>
+                </button>
+              ) : null}
+              <div className="text-xs text-gray-500 dark:text-gray-400">{userEmail}</div>
             </div>
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
@@ -241,6 +263,13 @@ export default function MenuGrid({ onRefreshStock, onScanBarcode }: MenuGridProp
           isSearching={isSearching}
         />
       </div>
+
+      <SalespersonAuthModal
+        isOpen={showSalespersonModal}
+        onClose={() => setShowSalespersonModal(false)}
+        title="Change salesperson"
+        description="Switch the active salesperson for this POS session."
+      />
     </div>
   );
 }

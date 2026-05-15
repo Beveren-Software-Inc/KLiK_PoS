@@ -10,9 +10,11 @@ import { UOMSelectField } from "./UOMSelectField";
 import { SerialBatchBundleModal } from "./SerialBatchBundleSelector";
 import { useCartStore } from "../../stores/cartStore";
 import ProductDetailsModal from "../ProductDetailsModal";
+import { getEffectiveDisplayRate, getEffectiveItemRate, getExclusiveTaxRateForItem } from "../../utils/cartPricing";
 
 interface CartItemRowProps {
   item: CartItem;
+  itemId: string;
   isExpanded: boolean;
   onToggleExpand: () => void;
   itemDiscount: any;
@@ -84,6 +86,7 @@ interface ItemFullData {
 
 export const CartItemRow = ({
   item,
+  itemId,
   isExpanded,
   onToggleExpand,
   itemDiscount,
@@ -122,8 +125,13 @@ export const CartItemRow = ({
   const [isFetchingBundleData, setIsFetchingBundleData] = useState(false);
   const [modalEntries, setModalEntries] = useState<BundleEntry[]>([]);
   const [modalQty, setModalQty] = useState(item.quantity);
+  const [localQty, setLocalQty] = useState(item.quantity);
   const [isRateEditing, setIsRateEditing] = useState(false);
   const [rateInputValue, setRateInputValue] = useState("");
+
+  useEffect(() => {
+    setLocalQty(item.quantity);
+  }, [item.quantity]);
   const [localDiscountPct, setLocalDiscountPct] = useState<number>(() => {
     const amt = itemDiscount.discountAmount || 0;
     return item.price > 0 ? parseFloat(((amt / item.price) * 100).toFixed(2)) : 0;
@@ -306,13 +314,7 @@ export const CartItemRow = ({
     const rate = Math.max(0, value);
     onCustomRateChange(item, rate);
     onDiscountChange(item.id, "discountAmount", 0);
-
-    const diff = item.price - rate;
-    if (diff > 0) {
-      onDiscountChange(item.id, "discountAmount", diff);
-    } else {
-      setLocalDiscountPct(0);
-    }
+    setLocalDiscountPct(0);
   };
 
   const handleDiscountPercentageChange = (value: number) => {
@@ -328,16 +330,27 @@ export const CartItemRow = ({
     setLocalDiscountPct(item.price > 0 ? parseFloat(((amt / item.price) * 100).toFixed(2)) : 0);
   };
 
-  const discountedPrice = (() => {
-    if (itemDiscount.customRate !== undefined && itemDiscount.customRate !== null) {
-      return Math.max(0, itemDiscount.customRate);
-    }
-    return Math.max(0, item.price - (itemDiscount.discountAmount || 0));
-  })();
+  const isTaxIncludedInBasicRate =
+    posDetails?.is_tax_included_in_basic_rate === 1
+    || posDetails?.is_tax_included_in_basic_rate === "1"
+    || posDetails?.is_tax_included_in_basic_rate === true;
+
+  const discountedPrice = getEffectiveItemRate(item, {
+    itemDiscounts: { [item.id]: itemDiscount },
+    isTaxIncludedInBasicRate,
+  });
+  const displayRateInclTax = getEffectiveDisplayRate(item, {
+    itemDiscounts: { [item.id]: itemDiscount },
+    isTaxIncludedInBasicRate,
+  });
+  const exclusiveTaxRate = getExclusiveTaxRateForItem(item, { isTaxIncludedInBasicRate });
+  const hasExclusiveTax = exclusiveTaxRate > 0;
+  const totalTaxRate = hasExclusiveTax ? exclusiveTaxRate : Number(item.total_tax_rate || 0);
+  const taxAmountPerUnit = Math.max(0, displayRateInclTax - discountedPrice);
   const originalTotal = item.price * item.quantity;
-  const discountedTotal = discountedPrice * item.quantity;
-  const amount = (itemDiscount.customRate !== undefined && itemDiscount.customRate !== null ? itemDiscount.customRate : item.price) * item.quantity;
-  const displayRate = itemDiscount.customRate ?? (item.price > 0 ? item.price : "");
+  const discountedTotal = displayRateInclTax * item.quantity;
+  const amount = discountedTotal;
+  const displayRate = itemDiscount.customRate ?? (displayRateInclTax > 0 ? displayRateInclTax : "");
 
   const hasBundleEntries = bundleEntries.length > 0;
 
@@ -356,151 +369,129 @@ export const CartItemRow = ({
 
   return (
     <>
-      <div className={isMobile ? "bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden" : ""}>
-        <div className={`flex items-center ${isMobile ? "p-3" : "py-2"}`}>
-          <div className="flex-shrink-0 mr-2">
-            <button
-              onClick={onToggleExpand}
-              className={`${
-                isMobile ? "w-5 h-5" : "w-5 h-5"
-              } rounded-full bg-gray-100 dark:bg-gray-600 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-500 transition-all duration-200`}
-              title="Show/Hide Details"
-            >
-              <svg
-                className={`${
-                  isMobile ? "w-3 h-3" : "w-4 h-4"
-                } text-beveren-500 dark:text-gray-400 transform transition-transform duration-200 ${
-                  isExpanded ? "rotate-90" : ""
-                }`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+      <div
+        data-cart-item-id={itemId}
+        className={isMobile ? "bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden" : ""}
+      >
+        <div className={isMobile ? "p-3" : "px-2 py-2"}>
+          {/* Row 1: name + remove */}
+          <div className="flex items-start gap-1">
+            <div className="flex-1 min-w-0">
+              <button
+                type="button"
+                onClick={onToggleExpand}
+                title="Show/Hide Details"
+                className="w-full text-left font-semibold text-gray-900 dark:text-white cursor-pointer text-sm leading-tight flex items-start gap-1"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
-            </button>
-          </div>
-
-          {item.image ? (
-            <div className="flex-shrink-0">
-              <img
-                src={item.image}
-                alt={item.name}
-                className={`${
-                  isMobile ? "w-16 h-16" : "w-12 h-12"
-                } rounded-lg object-cover`}
-                crossOrigin="anonymous"
-              />
-            </div>
-          ) : (
-            <></>
-          )}
-
-          <div className="flex-1 min-w-0 px-3">
-            <h4
-              className={`font-semibold text-gray-900 dark:text-white ${
-                isMobile ? "text-base" : "text-sm"
-              } truncate`}
-            >
-              {item.name}
-            </h4>
-            <p
-              className={`text-gray-500 dark:text-gray-400 capitalize font-medium ${
-                isMobile ? "text-sm" : "text-xs"
-              }`}
-            >
-              {item.category}
-            </p>
-            <div className={`${isMobile ? "text-base" : "text-sm"}`}>
-              {discountedPrice !== item.price ? (
-                <div className="flex items-center space-x-2">
-                  <span className="text-gray-400 line-through text-xs">
-                    {formatCurrencyWithSymbol(item.price, currency_symbol)}
-                  </span>
-                  <span className="text-beveren-600 dark:text-beveren-400 font-semibold">
-                    {formatCurrencyWithSymbol(discountedPrice, currency_symbol)}
-                  </span>
-                </div>
-              ) : (
-                <div className="text-beveren-600 dark:text-beveren-400 font-semibold">
-                  {formatCurrencyWithSymbol(item.price, currency_symbol)}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex-shrink-0 flex items-center ml-10 space-x-1 min-w-[70px] justify-center">
-            <button
-              onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
-              className={`${
-                isMobile ? "w-8 h-8" : "w-5 h-5"
-              } rounded-full bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors`}
-            >
-              <Minus
-                size={isMobile ? 16 : 14}
-                className="text-gray-600 dark:text-gray-400"
-              />
-            </button>
-            <span
-              className={`${
-                isMobile ? "w-10" : "w-8"
-              } text-center font-semibold text-gray-900 dark:text-white text-sm`}
-            >
-              {item.quantity}
-            </span>
-            <button
-              onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-              className={`${
-                isMobile ? "w-8 h-8" : "w-7 h-7"
-              } rounded-full bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors`}
-            >
-              <Plus
-                size={isMobile ? 16 : 14}
-                className="text-blue-600 dark:text-blue-400"
-              />
-            </button>
-          </div>
-
-          <div className="flex-shrink-0 text-right min-w-[80px] px-2">
-            {discountedTotal !== originalTotal ? (
-              <div>
-                <p className="text-gray-400 line-through text-xs">
-                  {formatCurrencyWithSymbol(originalTotal, currency_symbol)}
-                </p>
-                <p
-                  className={`text-beveren-600 dark:text-beveren-400 font-semibold ${
-                    isMobile ? "text-base" : "text-sm"
+                <svg
+                  className={`flex-shrink-0 w-3 h-3 mt-0.5 text-gray-400 dark:text-gray-500 transform transition-transform duration-200 ${
+                    isExpanded ? "rotate-90" : ""
                   }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  {formatCurrencyWithSymbol(discountedTotal, currency_symbol)}
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                <span className="min-w-0 break-words">{item.name}</span>
+              </button>
+              {!!posDetails?.custom_show_item_code_in_product_list && (item.item_code || item.id) && (
+                <p className="text-xs text-gray-400 dark:text-gray-500 font-mono leading-tight pl-4">
+                  {item.item_code || item.id}
                 </p>
-              </div>
-            ) : (
-              <p
-                className={`text-beveren-600 dark:text-beveren-400 font-semibold ${
-                  isMobile ? "text-base" : "text-sm"
-                }`}
-              >
-                {formatCurrencyWithSymbol(amount, currency_symbol)}
+              )}
+              <p className={`text-gray-500 dark:text-gray-400 capitalize font-medium pl-4 ${isMobile ? "text-sm" : "text-xs"}`}>
+                {item.category}
               </p>
-            )}
-          </div>
-
-          <div className="flex-shrink-0 ml-2 flex gap-1">
+            </div>
             <button
               onClick={() => onRemoveItem?.(item.id)}
-              className={`${
+              className={`flex-shrink-0 ${
                 isMobile ? "w-8 h-8" : "w-6 h-6"
               } rounded-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-200 dark:hover:border-red-800 hover:text-red-600 dark:hover:text-red-400 transition-colors`}
               title="Remove item"
             >
               <X size={isMobile ? 16 : 12} />
             </button>
+          </div>
+
+          {/* Row 2: rate | qty pill | total */}
+          <div className="flex items-center gap-2 mt-1.5 pl-4">
+            <div className="text-right">
+              <p className="text-gray-500 dark:text-gray-400 capitalize font-medium text-xs whitespace-nowrap">
+                {formatCurrencyWithSymbol(displayRateInclTax, currency_symbol)}
+              </p>
+            </div>
+
+            <div className="flex items-center border border-gray-200 dark:border-gray-600 rounded-full overflow-hidden">
+              <button
+                onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
+                className={`${
+                  isMobile ? "w-7 h-7" : "w-6 h-6"
+                } flex items-center justify-center text-gray-400 dark:text-gray-500 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-500 dark:hover:text-red-400 transition-colors`}
+              >
+                <Minus size={isMobile ? 12 : 10} />
+              </button>
+              <input
+                type="number"
+                min="0"
+                value={localQty}
+                onChange={(e) => setLocalQty(parseInt(e.target.value, 10) || 0)}
+                onBlur={() => {
+                  const available = item.available;
+                  if (available > 0 && localQty > available) {
+                    setLocalQty(available);
+                    onUpdateQuantity(item.id, available);
+                    toast.warning(`Only ${available} units available. Quantity set to ${available}.`);
+                  } else {
+                    onUpdateQuantity(item.id, localQty);
+                  }
+                }}
+                onKeyDown={(e) => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } }}
+                onClick={(e) => (e.target as HTMLInputElement).select()}
+                className={`${isMobile ? "w-9" : "w-8"} text-center font-semibold text-gray-900 dark:text-white text-sm border-x border-gray-200 dark:border-gray-600 py-0.5 bg-transparent focus:outline-none focus:bg-gray-50 dark:focus:bg-gray-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+              />
+              <button
+                onClick={() => {
+                  const next = item.quantity + 1;
+                  if (item.available > 0 && next > item.available) {
+                    toast.warning(`Only ${item.available} units available.`);
+                  } else {
+                    onUpdateQuantity(item.id, next);
+                  }
+                }}
+                className={`${
+                  isMobile ? "w-7 h-7" : "w-6 h-6"
+                } flex items-center justify-center text-gray-400 dark:text-gray-500 hover:bg-green-50 dark:hover:bg-green-900/30 hover:text-green-600 dark:hover:text-green-400 transition-colors`}
+              >
+                <Plus size={isMobile ? 12 : 10} />
+              </button>
+            </div>
+
+            <div className={`ml-auto text-right font-mono tabular-nums`}>
+              {discountedTotal !== originalTotal ? (
+                <div>
+                  <p className="text-gray-400 line-through text-xs whitespace-nowrap">
+                    {formatCurrencyWithSymbol(originalTotal, currency_symbol)}
+                  </p>
+                  <p
+                    className={`text-beveren-600 dark:text-beveren-400 font-semibold whitespace-nowrap ${
+                      isMobile ? "text-base" : "text-sm"
+                    }`}
+                  >
+                    {formatCurrencyWithSymbol(discountedTotal, currency_symbol)}
+                  </p>
+                </div>
+              ) : (
+                <p
+                  className={`text-beveren-600 dark:text-beveren-400 font-semibold whitespace-nowrap ${
+                    isMobile ? "text-base" : "text-sm"
+                  }`}
+                >
+                  {formatCurrencyWithSymbol(amount, currency_symbol)}
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -538,7 +529,7 @@ export const CartItemRow = ({
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
-                    Rate
+                    Rate (Incl. Tax)
                   </label>
                   <input
                     type="number"
@@ -567,24 +558,56 @@ export const CartItemRow = ({
                     }}
                     readOnly={!posDetails?.allow_rate_change}
                     placeholder="0"
-                    className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
+                    className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-4 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
                       showNegativeMarginWarning ? "border-red-300 dark:border-red-600" : showPositiveMarginWarning ? "border-blue-300 dark:border-blue-600" : ""
                     }`}
                   />
                 </div>
                 <div>
                   <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
-                    Amount
+                    Amount (Incl. Tax)
                   </label>
                   <input
                     type="number"
                     step="0.01"
                     value={amount}
                     readOnly
-                    className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white cursor-not-allowed`}
+                    className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-4 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white cursor-not-allowed`}
                   />
                 </div>
               </div>
+
+              {totalTaxRate > 0 && (
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
+                      Tax Rate
+                    </label>
+                    <input
+                      type="text"
+                      value={`${totalTaxRate.toFixed(2)}%`}
+                      readOnly
+                      className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-4 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white cursor-not-allowed`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
+                      Base Rate (Excl. Tax)
+                    </label>
+                    <input
+                      type="text"
+                      value={formatCurrencyWithSymbol(discountedPrice, currency_symbol)}
+                      readOnly
+                      className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-4 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white cursor-not-allowed`}
+                    />
+                  </div>
+                  {hasExclusiveTax && taxAmountPerUnit > 0 && (
+                    <div className="col-span-2 text-xs text-gray-500 dark:text-gray-400">
+                      Tax per unit: {formatCurrencyWithSymbol(taxAmountPerUnit, currency_symbol)}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
@@ -599,7 +622,7 @@ export const CartItemRow = ({
                     onChange={(e) => handleDiscountAmountChange(parseFloat(e.target.value) || 0)}
                     readOnly={!posDetails?.allow_discount_change}
                     placeholder="0.00"
-                    className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+                    className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-4 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
                   />
                 </div>
                 <div>
@@ -615,7 +638,7 @@ export const CartItemRow = ({
                     onChange={(e) => handleDiscountPercentageChange(parseFloat(e.target.value) || 0)}
                     readOnly={!posDetails?.allow_discount_change}
                     placeholder="0.0"
-                    className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+                    className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-4 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
                   />
                 </div>
               </div>
@@ -624,7 +647,7 @@ export const CartItemRow = ({
                 <div className="mb-4">
                   <button
                     onClick={handleOpenModal}
-                    className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md border ${
+                    className={`w-full flex items-center justify-center gap-2 px-3 py-4 rounded-md border ${
                       hasBundleEntries
                         ? "border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30"
                         : "border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30"
@@ -697,7 +720,7 @@ export const CartItemRow = ({
                 ) : null}
 
                 {currentWarehouseStock && (
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className={`grid gap-3 ${(showPositiveMarginWarning || showNegativeMarginWarning) ? "grid-cols-3" : "grid-cols-2"}`}>
                     <div className="bg-gray-50 dark:bg-gray-700/40 rounded-md p-3 border border-gray-200 dark:border-gray-600">
                       <p className="text-[10px] text-gray-400 uppercase font-semibold">Stock Balance</p>
                       <p className="text-base font-bold text-gray-900 dark:text-white">
@@ -714,37 +737,27 @@ export const CartItemRow = ({
                         <p className="text-[10px] text-gray-500 mt-1">per {fullItemData?.uom}</p>
                       </div>
                     )}
-                  </div>
-                )}
-
-                {showPositiveMarginWarning && (
-                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">Margin Analysis:</span>
-                      <span className="text-xs font-semibold text-green-600 dark:text-green-400">
-                        +{formatCurrencyWithSymbol(marginAmount, currency_symbol)} ({marginPercentage.toFixed(1)}%)
-                      </span>
-                    </div>
-                    <div className="text-[10px] text-blue-600 dark:text-blue-400 mt-1">
-                      Selling above valuation rate
-                    </div>
-                  </div>
-                )}
-
-                {showNegativeMarginWarning && (
-                  <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-md border border-red-200 dark:border-red-800">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-red-700 dark:text-red-300 font-medium">Margin Alert:</span>
-                      <span className="text-xs font-semibold text-red-600 dark:text-red-400">
-                        {formatCurrencyWithSymbol(marginAmount, currency_symbol)} ({marginPercentage.toFixed(1)}%)
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <AlertTriangle size={12} className="text-red-600 dark:text-red-400" />
-                      <span className="text-[10px] text-red-600 dark:text-red-400">
-                        Selling below valuation rate - potential loss of {formatCurrencyWithSymbol(Math.abs(marginAmount), currency_symbol)} per unit
-                      </span>
-                    </div>
+                    {showPositiveMarginWarning && (
+                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-md p-3 border border-blue-200 dark:border-blue-800">
+                        <p className="text-[10px] text-blue-500 dark:text-blue-400 uppercase font-semibold">Margin</p>
+                        <p className="text-base font-bold text-green-600 dark:text-green-400">
+                          +{formatCurrencyWithSymbol(marginAmount, currency_symbol)}
+                        </p>
+                        <p className="text-[10px] text-green-600 dark:text-green-400 mt-1">{marginPercentage.toFixed(1)}%</p>
+                      </div>
+                    )}
+                    {showNegativeMarginWarning && (
+                      <div className="bg-red-50 dark:bg-red-900/20 rounded-md p-3 border border-red-200 dark:border-red-800">
+                        <p className="text-[10px] text-red-500 dark:text-red-400 uppercase font-semibold flex items-center gap-1">
+                          <AlertTriangle size={9} />
+                          Margin
+                        </p>
+                        <p className="text-base font-bold text-red-600 dark:text-red-400">
+                          {formatCurrencyWithSymbol(marginAmount, currency_symbol)}
+                        </p>
+                        <p className="text-[10px] text-red-500 dark:text-red-400 mt-1">{marginPercentage.toFixed(1)}% · below cost</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -774,7 +787,7 @@ export const CartItemRow = ({
                 <button
                   type="button"
                   onClick={() => onDuplicateItem(item)}
-                  className="flex items-center justify-center gap-2 px-3 py-2 rounded-md border border-dashed border-beveren-400 dark:border-beveren-500 text-beveren-600 dark:text-beveren-400 bg-beveren-50 dark:bg-beveren-900/20 hover:bg-beveren-100 dark:hover:bg-beveren-900/40 transition-colors text-sm font-medium"
+                  className="flex items-center justify-center gap-2 px-3 py-4 rounded-md border border-dashed border-beveren-400 dark:border-beveren-500 text-beveren-600 dark:text-beveren-400 bg-beveren-50 dark:bg-beveren-900/20 hover:bg-beveren-100 dark:hover:bg-beveren-900/40 transition-colors text-sm font-medium"
                   title="Add another line for the same product with a different batch, serial or UOM"
                 >
                   <Copy size={isMobile ? 15 : 13} />
@@ -783,7 +796,7 @@ export const CartItemRow = ({
                 <button
                   type="button"
                   onClick={() => setShowProductModal(true)}
-                  className="flex items-center justify-center gap-2 px-3 py-2 rounded-md border border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors text-sm font-medium"
+                  className="flex items-center justify-center gap-2 px-3 py-4 rounded-md border border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors text-sm font-medium"
                 >
                   <Eye size={isMobile ? 15 : 13} />
                   View Full Details

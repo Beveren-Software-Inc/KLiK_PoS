@@ -15,6 +15,10 @@ export interface CartItem {
   name: string
   category: string
   price: number
+  original_price?: number
+  discount_amount?: number
+  discount_percentage?: number
+  custom_rate?: number
   image: string
   quantity: number
   available?: number
@@ -26,6 +30,16 @@ export interface CartItem {
   has_serial_no?: boolean
   has_batch_no?: boolean
   valuation_rate?: number
+  item_tax_template?: string
+  item_tax_rate?: Record<string, number>
+  total_tax_rate?: number
+  tax_templates?: TaxTemplate[]
+}
+
+export interface TaxTemplate {
+  account: string
+  rate: number
+  is_inclusive: boolean
 }
 
 export interface BundleEntry {
@@ -43,6 +57,7 @@ export interface PriceListRate {
 
 export interface MenuItem {
   id: string
+  item_code?: string
   name: string
   category: string
   price: number

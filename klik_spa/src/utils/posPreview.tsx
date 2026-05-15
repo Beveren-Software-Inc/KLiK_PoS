@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getPrintFormatHTML } from "./getPrintHTML.js";
 import { usePOSProfileStore } from "../stores/posProfileStore.js";
 
@@ -14,36 +14,60 @@ export default function PrintPreview({ invoice }: PrintPreviewProps) {
   const [html, setHtml] = useState("");
   const [style, setStyle] = useState("");
   const [loading, setLoading] = useState(true);
+  const lastLoadedKeyRef = useRef<string>("");
 
-  const { posDetails, loading: posLoading } = usePOSProfileStore();
+  const { posDetails, isLoading: posLoading } = usePOSProfileStore();
+  const invoiceName = typeof invoice?.name === "string" ? invoice.name : "";
+  const posProfile = typeof invoice?.pos_profile === "string" ? invoice.pos_profile : "";
+  const printFormat = typeof posDetails?.print_format === "string" ? posDetails.print_format : "";
 
   useEffect(() => {
+    let isCancelled = false;
+
     const fetchPrintHTML = async () => {
       // Wait until posDetails is loaded
       if (posLoading || !posDetails) return;
 
+      const requestKey = `${invoiceName}::${posProfile}::${printFormat}`;
+      if (requestKey === lastLoadedKeyRef.current && html) {
+        return;
+      }
+
       setLoading(true);
       try {
-        // console.log("Fetching print format for invoice:", printFormat);
-        // Convert invoice to the format expected by getPrintFormatHTML
-        const invoiceName = typeof invoice.name === 'string' ? invoice.name : '';
         const invoiceForAPI: { doctype: string; name: string; [key: string]: unknown } = {
           ...invoice,
-          doctype: 'Sales Invoice',
-          name: invoiceName
+          doctype: "Sales Invoice",
+          name: invoiceName,
         };
-        const { html, style } = await getPrintFormatHTML(invoiceForAPI, posDetails?.print_format as string);
-        setHtml(html);
-        setStyle(style);
+
+        const { html: previewHtml, style: previewStyle } = await getPrintFormatHTML(
+          invoiceForAPI,
+          printFormat
+        );
+
+        if (isCancelled) return;
+
+        setHtml(previewHtml);
+        setStyle(previewStyle);
+        lastLoadedKeyRef.current = requestKey;
       } catch (err) {
-        console.error("Error loading print format:", err);
+        if (!isCancelled) {
+          console.error("Error loading print format:", err);
+        }
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     };
 
     fetchPrintHTML();
-  }, [invoice, posDetails, posLoading, posDetails?.print_format ]); // re-run when posDetails or invoice changes
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [invoice, invoiceName, posProfile, posLoading, posDetails, printFormat, html]);
 
   if (loading) return <p>Loading Print Preview...</p>;
 

@@ -546,6 +546,9 @@ export default function ClosingShiftPage() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Invoice
                     </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                      Date
+                    </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Customer
                     </th>
@@ -569,12 +572,11 @@ export default function ClosingShiftPage() {
                   {filteredInvoices.map((invoice) => (
                     <tr key={invoice.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-4 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">{invoice.id}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {invoice.date} {invoice.time}
-                          </div>
-                        </div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">{invoice.id}</div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900 dark:text-white">{invoice.date}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{invoice.time}</div>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-white">{invoice.customer}</div>
@@ -890,6 +892,9 @@ export default function ClosingShiftPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Invoice
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                      Date
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Customer
                     </th>
@@ -919,12 +924,11 @@ export default function ClosingShiftPage() {
                   {filteredInvoices.map((invoice) => (
                     <tr key={invoice.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">{invoice.id}</div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {invoice.date} {invoice.time}
-                          </div>
-                        </div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">{invoice.id}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900 dark:text-white">{invoice.date}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{invoice.time}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-white">{invoice.customer}</div>

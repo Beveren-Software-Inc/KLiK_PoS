@@ -15,16 +15,15 @@ def get_sales_tax_categories():
 
 		result = []
 		for cat in tax_categories:
-			# Get the first tax entry to determine rate and type
-			tax_entry = frappe.db.get_value(
+			tax_rows = frappe.get_all(
 				"Sales Taxes and Charges",
-				{"parent": cat.name},
-				["rate", "included_in_print_rate"],
-				as_dict=True,
+				filters={"parent": cat.name},
+				fields=["account_head", "charge_type", "rate", "included_in_print_rate"],
 			)
 
-			tax_rate = tax_entry.get("rate", 0.0) if tax_entry else 0.0
-			is_inclusive = tax_entry.get("included_in_print_rate", 0) if tax_entry else 0
+			on_net_total_rows = [row for row in tax_rows if row.charge_type == "On Net Total"]
+			tax_rate = sum(float(row.rate or 0) for row in on_net_total_rows)
+			is_inclusive = any(bool(row.included_in_print_rate) for row in on_net_total_rows)
 
 			result.append(
 				{
@@ -33,6 +32,15 @@ def get_sales_tax_categories():
 					"rate": float(tax_rate),
 					"is_inclusive": bool(is_inclusive),
 					"type": "inclusive" if is_inclusive else "exclusive",
+					"tax_lines": [
+						{
+							"account_head": row.account_head,
+							"charge_type": row.charge_type,
+							"rate": float(row.rate or 0),
+							"included_in_print_rate": bool(row.included_in_print_rate),
+						}
+						for row in tax_rows
+					],
 				}
 			)
 

@@ -5,21 +5,32 @@ import { cacheDraftInvoiceItems } from './draftInvoiceCache';
 import type { Customer } from '../../types';
 
 export interface InvoiceItem {
+  name?: string;
   item_code: string;
   item_name: string;
   qty: number;
   rate: number;
+  price_list_rate?: number;
+  discount_amount?: number;
+  discount_percentage?: number;
   amount: number;
+  uom?: string;
   description?: string;
 }
 
 export interface CartItem {
   id: string;
+  item_code?: string;
   name: string;
   category: string;
   price: number;
+  original_price?: number;
+  discount_amount?: number;
+  discount_percentage?: number;
+  custom_rate?: number;
   image: string;
   quantity: number;
+  uom?: string;
 }
 
 export async function addDraftInvoiceToCart(invoiceId: string): Promise<boolean> {
@@ -33,14 +44,24 @@ export async function addDraftInvoiceToCart(invoiceId: string): Promise<boolean>
 
     // Convert invoice items to cart items
     const cartItems: CartItem[] = [];
-    for (const item of invoiceData.items) {
+    for (const [index, item] of invoiceData.items.entries()) {
+      const discountAmount = Number(item.discount_amount) || 0;
+      const discountPercentage = Number(item.discount_percentage) || 0;
+      const priceListRate = Number(item.price_list_rate) || 0;
+      const originalRate = priceListRate > 0 ? priceListRate : Number(item.rate || 0) + discountAmount;
       const cartItem: CartItem = {
-        id: item.item_code,
+        // Keep each draft line unique so duplicate item codes don't collapse into one cart row.
+        id: item.name || `${item.item_code}-${index}`,
+        item_code: item.item_code,
         name: item.item_name,
         category: 'General',
-        price: item.rate,
+        price: originalRate,
+        original_price: originalRate,
+        discount_amount: discountAmount,
+        discount_percentage: discountPercentage,
         image: '',
         quantity: item.qty,
+        uom: item.uom,
       };
       cartItems.push(cartItem);
     }

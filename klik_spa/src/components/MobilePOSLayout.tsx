@@ -6,12 +6,14 @@ import { useTheme } from "../hooks/useTheme"
 import { useCartStore } from "../stores/cartStore"
 import { formatCurrencyWithSymbol } from "../utils/currency"
 import { usePOSProfileStore } from "../stores/posProfileStore";
-import { ShoppingCart, Search, Settings, LogOut, Moon, Sun, Scan, Grid3X3, List, Store, RefreshCw } from "lucide-react"
+import { ShoppingCart, Search, Settings, LogOut, Moon, Sun, Scan, Grid3X3, List, Store, RefreshCw, Lock, Unlock } from "lucide-react"
 import { clearCacheAndReload } from "../utils/clearCache"
 import CategoryTabs from "./CategoryTabs"
 import ProductGrid from "./ProductGrid"
 import BottomNavigation from "./BottomNavigation"
 import type { MenuItem, CartItem } from "../../types"
+import SalespersonAuthModal from "./dialog/SalespersonAuthModal"
+import { useSalespersonStore } from "../stores/salespersonStore"
 
 interface MobilePOSLayoutProps {
   items: MenuItem[]
@@ -48,8 +50,10 @@ export default function MobilePOSLayout({
   const { theme, toggleTheme } = useTheme()
   const { posDetails, loading: posLoading } = usePOSProfileStore()
   const { cartItems, addToCart } = useCartStore()
+  const { activeSalesperson, rememberLocked, ensureInitialized } = useSalespersonStore()
   const navigate = useNavigate()
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showSalespersonModal, setShowSalespersonModal] = useState(false)
 
   // Initialize viewMode based on POS profile
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -82,6 +86,12 @@ export default function MobilePOSLayout({
     }
   }, [dropdownRef])
 
+  useEffect(() => {
+    if (posDetails?.custom_sales_person_pin_required) {
+      void ensureInitialized()
+    }
+  }, [posDetails?.custom_sales_person_pin_required, ensureInitialized])
+
   const handleLogout = async () => {
     try {
       await logout()
@@ -102,8 +112,10 @@ export default function MobilePOSLayout({
   }
 
   const displayName = user?.full_name || user?.name || "Guest User"
+  const userEmail = user?.email || user?.name || "No email"
   const posProfileName = posDetails?.name || "POS Profile"
   const initials = getInitials(displayName)
+  const requiresSalespersonPin = !!posDetails?.custom_sales_person_pin_required
 
   const totalItems = cartItems.reduce((sum: number, item: CartItem) => sum + item.quantity, 0)
   const totalAmount = cartItems.reduce((sum: number, item: CartItem) => sum + item.price * item.quantity, 0)
@@ -132,7 +144,17 @@ export default function MobilePOSLayout({
           <div className="flex items-center space-x-2 relative" ref={dropdownRef}>
             <div className="text-right">
               <div className="text-xs font-medium text-gray-900 dark:text-white">{posProfileName}</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">{displayName}</div>
+              {requiresSalespersonPin && (
+                <button
+                  type="button"
+                  onClick={() => setShowSalespersonModal(true)}
+                  className="mt-1 inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                >
+                  {rememberLocked ? <Lock size={10} /> : <Unlock size={10} />}
+                  <span>{activeSalesperson?.salesperson_name || "Verify"}</span>
+                </button>
+              )}
+              <div className="text-xs text-gray-500 dark:text-gray-400">{userEmail}</div>
             </div>
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
@@ -165,6 +187,13 @@ export default function MobilePOSLayout({
                   </div>
                 </div>
 
+
+              <SalespersonAuthModal
+                isOpen={showSalespersonModal}
+                onClose={() => setShowSalespersonModal(false)}
+                title="Change salesperson"
+                description="Switch the active salesperson for this device."
+              />
                 {/* Menu items */}
                 <div className="py-1">
                   <Link

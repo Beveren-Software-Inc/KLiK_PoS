@@ -52,9 +52,7 @@ export default function MobilePaymentPage() {
     // Cart will be cleared when user closes the payment page
     console.log("MobilePaymentPage: Payment completed - cart will be cleared when page is closed");
   }
-//eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleHoldOrder = (orderData: any) => {
-    console.log('Order held:', orderData)
+  const handleHoldOrder = () => {
     clearCart()
     navigate('/pos')
   }

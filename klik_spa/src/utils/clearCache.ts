@@ -1,4 +1,5 @@
 import { useCartStore } from '../stores/cartStore';
+import { useSalespersonStore } from '../stores/salespersonStore';
 import { clearDraftInvoiceCache } from './draftInvoiceCache';
 
 // Cache keys used throughout the application
@@ -31,6 +32,10 @@ export function clearAllCache(): void {
     const { clearCart } = useCartStore.getState();
     clearCart();
     console.log('✅ Cart state cleared');
+
+    const { clearActiveSalesperson } = useSalespersonStore.getState();
+    clearActiveSalesperson();
+    console.log('✅ Salesperson state cleared');
 
     // Clear any other app-related localStorage items
     // (excluding theme, language, and other user preferences)

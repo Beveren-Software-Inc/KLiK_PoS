@@ -11,6 +11,7 @@ interface ProductCardProps {
   onAddToCart: (item: MenuItem) => void;
   isMobile?: boolean;
   scannerOnly?: boolean;
+  showItemCode?: boolean;
 }
 
 export default function ProductCard({
@@ -18,6 +19,7 @@ export default function ProductCard({
   onAddToCart,
   isMobile = false,
   scannerOnly = false,
+  showItemCode = false,
 }: ProductCardProps) {
   const [showTooltip, setShowTooltip] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -134,6 +136,11 @@ export default function ProductCard({
             >
               {item.name}
             </h3>
+            {showItemCode && (
+              <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
+                {item.item_code || item.id}
+              </p>
+            )}
           </div>
           <div className="flex items-center justify-between">
             <p

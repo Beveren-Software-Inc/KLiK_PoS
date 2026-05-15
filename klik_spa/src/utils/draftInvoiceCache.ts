@@ -63,29 +63,20 @@ export async function loadCachedItemsToCart(): Promise<boolean> {
     return false;
   }
 
-  const { setSelectedCustomer, addToCartWithQuantity } = useCartStore.getState();
+  const mappedItems = cachedData.items.map((item) => ({
+    ...item,
+    item_code: item.item_code || item.id,
+    quantity: item.quantity,
+    bundle_entries: item.bundle_entries || [],
+  }));
 
-  // Set customer if available
-  if (cachedData.customer) {
-    setSelectedCustomer(cachedData.customer);
-  }
-
-  // Add cached items to cart with correct quantities
-  for (const item of cachedData.items) {
-    const cartItem = {
-      id: item.id,
-      name: item.name,
-      category: item.category,
-      price: item.price,
-      image: item.image,
-      available: item.available,
-      uom: item.uom,
-      item_code: item.id,
-    };
-
-    // Use the new method to add items with specific quantities
-    await addToCartWithQuantity(cartItem, item.quantity);
-  }
+  // Replace cart atomically to preserve original draft rates and line breakdown.
+  useCartStore.setState((state) => ({
+    ...state,
+    cartItems: mappedItems,
+    appliedCoupons: [],
+    selectedCustomer: cachedData.customer,
+  }));
 
   return true;
 }

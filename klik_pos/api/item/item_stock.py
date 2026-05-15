@@ -215,10 +215,10 @@ def _fetch_batch_stock(item_codes, warehouse):
         placeholders = ", ".join(["%s"] * len(item_codes))
 
         query = f"""
-            SELECT item_code, actual_qty
-            FROM `tabBin`
-            WHERE item_code IN ({placeholders})
-            AND warehouse = %s
+            SELECT b.item_code, b.actual_qty
+            FROM `tabBin` b
+            WHERE b.item_code IN ({placeholders})
+            AND b.warehouse = %s
         """
         query = apply_sql_permissions(query)
 

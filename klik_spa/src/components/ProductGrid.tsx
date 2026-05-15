@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useMemo } from "react";
+import { useEffect, useRef, useCallback, useMemo, useState } from "react";
+import type { MenuItem } from "../../types";
 import { useProduct } from "../providers/ProductProvider";
 import ProductCard from "./ProductCard";
 import ProductLineView from "./ProductLineView";
+import SalespersonAuthModal from "./dialog/SalespersonAuthModal";
 import { useCartStore } from "../stores/cartStore";
 import { usePOSProfileStore } from "../stores/posProfileStore";
+import { useSalespersonStore } from "../stores/salespersonStore";
 
 
 interface ProductGridProps {
@@ -30,9 +33,15 @@ export default function ProductGrid({
   const { filteredItems, hideUnavailableItems } = useProduct();
   const { addToCart } = useCartStore();
   const { posDetails } = usePOSProfileStore();
+  const { activeSalesperson, ensureInitialized, isRestoring } = useSalespersonStore();
+  const [showSalespersonModal, setShowSalespersonModal] = useState(false);
+  const [pendingCartItem, setPendingCartItem] = useState<MenuItem | null>(null);
 
   const defaultView = posDetails?.custom_default_view || "Grid View";
   const viewMode = propViewMode || (defaultView === "List View" ? "list" : "grid");
+  const showItemCode = !!posDetails?.custom_show_item_code_in_product_list;
+  const requiresSalespersonPin = !!posDetails?.custom_sales_person_pin_required;
+  const isSalespersonLockActive = requiresSalespersonPin && !activeSalesperson && !isRestoring;
 
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -41,15 +50,66 @@ export default function ProductGrid({
     [filteredItems, hideUnavailableItems],
   );
 
-  const handleAddToCart = useCallback((item: any) => {
-    if (item.available <= 0) return;
-    if (scannerOnly) return;
-    
-    addToCart({
+  useEffect(() => {
+    if (requiresSalespersonPin) {
+      void ensureInitialized();
+    }
+  }, [requiresSalespersonPin, ensureInitialized]);
+
+  useEffect(() => {
+    if (isSalespersonLockActive) {
+      setShowSalespersonModal(true);
+      return;
+    }
+
+    setShowSalespersonModal(false);
+    setPendingCartItem(null);
+  }, [isSalespersonLockActive]);
+
+  const addItemToCart = useCallback(async (item: MenuItem) => {
+    await addToCart({
       ...item,
       item_code: item.id,
     });
-  }, [addToCart, scannerOnly]);
+  }, [addToCart]);
+
+  const handleAddToCart = useCallback(async (item: MenuItem) => {
+    if (item.available <= 0) return;
+    if (scannerOnly) return;
+
+    if (requiresSalespersonPin) {
+      await ensureInitialized();
+
+      const {
+        activeSalesperson: currentSalesperson,
+        isRestoring: isCurrentlyRestoring,
+      } = useSalespersonStore.getState();
+
+      if (isCurrentlyRestoring) {
+        return;
+      }
+
+      if (!currentSalesperson) {
+        setPendingCartItem(item);
+        setShowSalespersonModal(true);
+        return;
+      }
+    }
+
+    await addItemToCart(item);
+  }, [addItemToCart, ensureInitialized, requiresSalespersonPin, scannerOnly]);
+
+  const handleSalespersonAuthenticated = useCallback(() => {
+    const itemToAdd = pendingCartItem;
+    setPendingCartItem(null);
+    setShowSalespersonModal(false);
+
+    if (!itemToAdd) {
+      return;
+    }
+
+    void addItemToCart(itemToAdd);
+  }, [addItemToCart, pendingCartItem]);
 
   const handleObserver = useCallback(
     (entries: IntersectionObserverEntry[]) => {
@@ -70,21 +130,23 @@ export default function ProductGrid({
     };
 
     const observer = new IntersectionObserver(handleObserver, option);
+    const currentLoadMoreRef = loadMoreRef.current;
 
-    if (loadMoreRef.current) {
-      observer.observe(loadMoreRef.current);
+    if (currentLoadMoreRef) {
+      observer.observe(currentLoadMoreRef);
     }
 
     return () => {
-      if (loadMoreRef.current) {
-        observer.unobserve(loadMoreRef.current);
+      if (currentLoadMoreRef) {
+        observer.unobserve(currentLoadMoreRef);
       }
     };
   }, [handleObserver]);
 
   if (viewMode === "list") {
     return (
-      <div className="flex flex-col relative">
+      <>
+        <div className="flex flex-col relative">
         {isSearching && (
           <div className="absolute inset-0 bg-white/50 dark:bg-gray-900/50 z-10 flex items-center justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-beveren-600"></div>
@@ -93,6 +155,7 @@ export default function ProductGrid({
         <ProductLineView
           items={inStockItems}
           onAddToCart={handleAddToCart}
+          showItemCode={showItemCode}
           scannerOnly={scannerOnly}
         />
 
@@ -118,28 +181,62 @@ export default function ProductGrid({
             )}
           </div>
         )}
-      </div>
+        </div>
+
+        <SalespersonAuthModal
+          isOpen={showSalespersonModal}
+          onClose={() => {
+            setShowSalespersonModal(false);
+            setPendingCartItem(null);
+          }}
+          onAuthenticated={handleSalespersonAuthenticated}
+          title="Verify salesperson"
+          description="Verify the salesperson before adding items to the cart."
+        />
+      </>
     );
   }
 
   if (inStockItems.length === 0 && !isSearching) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="text-6xl mb-4">🔍</div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-            No items found
-          </h3>
-          <p className="text-gray-500 dark:text-gray-400">
-            Try adjusting your search or filters
-          </p>
+      <>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="text-6xl mb-4">🔍</div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              No items found
+            </h3>
+            <p className="text-gray-500 dark:text-gray-400">
+              Try adjusting your search or filters
+            </p>
+          </div>
         </div>
-      </div>
+
+        <SalespersonAuthModal
+          isOpen={showSalespersonModal}
+          onClose={() => {
+            if (isSalespersonLockActive) {
+              return;
+            }
+            setShowSalespersonModal(false);
+            setPendingCartItem(null);
+          }}
+          onAuthenticated={handleSalespersonAuthenticated}
+          allowDismiss={!isSalespersonLockActive}
+          title={isSalespersonLockActive ? "Unlock POS" : "Verify salesperson"}
+          description={
+            isSalespersonLockActive
+              ? "Enter the salesperson PIN to unlock this POS session and continue."
+              : "Verify the salesperson before adding items to the cart."
+          }
+        />
+      </>
     );
   }
 
   return (
-    <div className="p-6 bg-gray-50 dark:bg-gray-900 relative">
+    <>
+      <div className="p-6 bg-gray-50 dark:bg-gray-900 relative">
       {isSearching && (
         <div className="absolute inset-0 bg-white/50 dark:bg-gray-900/50 z-10 flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-beveren-600"></div>
@@ -151,6 +248,7 @@ export default function ProductGrid({
             key={item.id}
             item={item}
             onAddToCart={handleAddToCart}
+            showItemCode={showItemCode}
             scannerOnly={scannerOnly}
           />
         ))}
@@ -178,6 +276,26 @@ export default function ProductGrid({
           )}
         </div>
       )}
-    </div>
+      </div>
+
+      <SalespersonAuthModal
+        isOpen={showSalespersonModal}
+        onClose={() => {
+          if (isSalespersonLockActive) {
+            return;
+          }
+          setShowSalespersonModal(false);
+          setPendingCartItem(null);
+        }}
+        onAuthenticated={handleSalespersonAuthenticated}
+        allowDismiss={!isSalespersonLockActive}
+        title={isSalespersonLockActive ? "Unlock POS" : "Verify salesperson"}
+        description={
+          isSalespersonLockActive
+            ? "Enter the salesperson PIN to unlock this POS session and continue."
+            : "Verify the salesperson before adding items to the cart."
+        }
+      />
+    </>
   );
 }

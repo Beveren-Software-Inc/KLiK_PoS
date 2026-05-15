@@ -58,7 +58,7 @@ export const QuantityInput = ({
       onBlur={handleBlur}
       className={`w-full ${
         isMobile ? "text-sm" : "text-sm"
-      } px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
+      } px-3 py-4 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white`}
     />
   );
 };

@@ -27,11 +27,13 @@ import type { SalesInvoice } from "../../types";
 import { useCustomerInvoices } from "../hooks/useCustomerInvoices";
 import { toast } from "react-toastify";
 import { extractErrorFromException } from "../utils/errorExtraction";
-import { createSalesReturn, submitDraftInvoice } from "../services/salesInvoice";
-
+import { createSalesReturn } from "../services/salesInvoice";
+import PaymentDialog from "../components/dialog/PaymentDialog";
 import { useCustomerDetails } from "../hooks/useCustomers";
 import EditDraftInvoiceDialog from "../components/EditDraftInvoiceDialog";
 import { addDraftInvoiceToCart } from "../utils/draftInvoiceToCart";
+import { loadCachedItemsToCart } from "../utils/draftInvoiceCache";
+import { useCartStore } from "../stores/cartStore";
 import { isToday, isThisWeek, isThisMonth, isThisYear } from "../utils/time";
 import AddCustomerModal from "../components/customer/AddCustomerModal";
 import BottomNavigation from "../components/BottomNavigation";
@@ -57,6 +59,7 @@ export default function CustomerDetailsPage() {
 
   // Edit draft invoice dialog states
   const [showEditDraftDialog, setShowEditDraftDialog] = useState(false);
+  const [showDraftPaymentDialog, setShowDraftPaymentDialog] = useState(false);
   const [draftInvoiceToEdit, setDraftInvoiceToEdit] = useState<SalesInvoice | null>(null);
 
   const { id: customerId } = useParams();
@@ -214,16 +217,17 @@ export default function CustomerDetailsPage() {
 
   const handleSubmitDirect = async (invoice: SalesInvoice) => {
     try {
-      await submitDraftInvoice(invoice.id);
-      toast.success(`Draft invoice ${invoice.id} submitted successfully`);
-      setShowEditDraftDialog(false);
-      setDraftInvoiceToEdit(null);
-      // Refresh the invoices list
-      window.location.reload();
+      const success = await addDraftInvoiceToCart(invoice.id);
+      if (success) {
+        await loadCachedItemsToCart();
+        setShowEditDraftDialog(false);
+        setDraftInvoiceToEdit(null);
+        setShowDraftPaymentDialog(true);
+      }
       //eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
-      console.error("Error submitting draft invoice:", error);
-      const errorMessage = extractErrorFromException(error, "Failed to submit draft invoice");
+      console.error("Error opening payment dialog for draft invoice:", error);
+      const errorMessage = extractErrorFromException(error, "Failed to load invoice for payment");
       toast.error(errorMessage);
     }
   };
@@ -1084,6 +1088,26 @@ export default function CustomerDetailsPage() {
           onGoToCart={handleGoToCart}
           onSubmitDirect={handleSubmitDirect}
         />
+
+        {showDraftPaymentDialog && (
+          <PaymentDialog
+            isOpen={showDraftPaymentDialog}
+            onClose={(paymentCompleted) => {
+              setShowDraftPaymentDialog(false);
+              if (paymentCompleted) window.location.reload();
+            }}
+            cartItems={useCartStore.getState().cartItems}
+            appliedCoupons={[]}
+            selectedCustomer={useCartStore.getState().selectedCustomer}
+            onCompletePayment={() => {
+              setShowDraftPaymentDialog(false);
+              window.location.reload();
+            }}
+            onHoldOrder={() => setShowDraftPaymentDialog(false)}
+            isMobile={false}
+            isFullPage={false}
+          />
+        )}
       </div>
     </div>
   );

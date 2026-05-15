@@ -12,6 +12,7 @@ interface ProductLineViewProps {
   onAddToCart: (item: MenuItem) => void
   isMobile?: boolean
   scannerOnly?: boolean
+  showItemCode?: boolean
 }
 
 export default function ProductLineView({
@@ -19,6 +20,7 @@ export default function ProductLineView({
   onAddToCart,
   isMobile = false,
   scannerOnly = false,
+  showItemCode = false,
 }: ProductLineViewProps) {
   const [hoveredItemId, setHoveredItemId] = useState<string | number | null>(null)
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null)
@@ -78,7 +80,16 @@ export default function ProductLineView({
                   }`}
                   onClick={() => !isDisabled && onAddToCart(item)}
                 >
-                  <div className={`${isMobile ? "col-span-3" : "col-span-4"} flex items-start`}>
+                  <div className={`${isMobile ? "col-span-3" : "col-span-4"} flex items-center gap-2`}>
+                    {item.image ? (
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        className={`flex-shrink-0 rounded object-cover ${isMobile ? "w-8 h-8" : "w-9 h-9"} ${isDisabled ? "opacity-60" : ""}`}
+                      />
+                    ) : (
+                      <div className={`flex-shrink-0 rounded bg-gray-100 dark:bg-gray-700 ${isMobile ? "w-8 h-8" : "w-9 h-9"} ${isDisabled ? "opacity-60" : ""}`} />
+                    )}
                     <div className="flex-1 min-w-0 relative">
                       <div className="flex items-center gap-1">
                         <h3 className={`font-medium text-gray-900 dark:text-white ${isMobile ? "text-xs leading-tight" : "text-sm"} ${isMobile ? "break-words" : "truncate"} ${isDisabled ? "opacity-60" : ""}`}>
@@ -109,11 +120,17 @@ export default function ProductLineView({
                           )}
                         </div>
                       </div>
+                      {showItemCode && (
+                        <p className={`text-gray-600 dark:text-gray-300 ${isMobile ? "text-xs leading-tight" : "text-sm"} ${isMobile ? "break-words" : "truncate"} ${isDisabled ? "opacity-60" : ""}`}>
+                          {item.item_code || item.id}
+                        </p>
+                      )}
                       <p className={`text-gray-500 dark:text-gray-400 ${isMobile ? "text-xs leading-tight" : "text-sm"} ${isMobile ? "break-words" : "truncate"} ${isDisabled ? "opacity-60" : ""}`}>
                         {item.category}
                       </p>
                     </div>
                   </div>
+
 
                   <div className={`${isMobile ? "col-span-2" : "col-span-2"} flex items-center justify-center ${isDisabled ? "opacity-60" : ""}`}>
                     <span className={`font-semibold text-beveren-600 dark:text-beveren-400 ${isMobile ? "text-xs" : "text-sm"}`}>

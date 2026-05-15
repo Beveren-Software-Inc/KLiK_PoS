@@ -22,28 +22,3 @@ def validate_unique_pos_pin(doc, method=None):
 
     if len(pin_str) != 4:
         frappe.throw(_("POS PIN must be exactly 4 digits"))
-
-    SalesPerson = Table("tabSales Person")
-    Auth = Table("__Auth")
-
-    existing = (
-        frappe.qb.from_(SalesPerson)
-        .inner_join(Auth)
-        .on(Auth.name == SalesPerson.name)
-        .select(SalesPerson.name, SalesPerson.sales_person_name)
-        .where(Auth.doctype == "Sales Person")
-        .where(Auth.fieldname == "pos_pin")
-        .where(SalesPerson.name != doc.name)
-    ).run(as_dict=True)
-
-    for sp in existing:
-        try:
-            sp_doc = frappe.get_doc("Sales Person", sp.name)
-            existing_pin = sp_doc.get_password("pos_pin")
-
-            if existing_pin and str(existing_pin) == str(current_pin):
-                frappe.throw(
-                    _("This PIN is already in use. Please choose a different PIN.")
-                )
-        except Exception:
-            continue

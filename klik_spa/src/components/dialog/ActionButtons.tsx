@@ -5,7 +5,11 @@ interface ActionButtonsProps {
   isProcessingPayment: boolean;
   isHoldingOrder: boolean;
   isActionButtonDisabled: () => boolean;
+  showMpesaButton: boolean;
+  isMpesaButtonDisabled: () => boolean;
   getActionButtonText: () => string;
+  getMpesaButtonText: () => string;
+  onInitiateMpesa: () => void;
   onCompletePayment: () => void;
   onHoldOrder: () => void;
   onEditOrder?: () => void;
@@ -19,7 +23,11 @@ export default function ActionButtons({
   isProcessingPayment,
   isHoldingOrder,
   isActionButtonDisabled,
+  showMpesaButton,
+  isMpesaButtonDisabled,
   getActionButtonText,
+  getMpesaButtonText,
+  onInitiateMpesa,
   onCompletePayment,
   onHoldOrder,
   onEditOrder,
@@ -70,6 +78,15 @@ export default function ActionButtons({
             )}
           </button>
        )}
+      {showMpesaButton && (
+        <button
+          onClick={onInitiateMpesa}
+          disabled={isMpesaButtonDisabled()}
+          className="px-8 py-2 rounded-lg font-semibold border border-emerald-600 text-emerald-700 disabled:border-gray-300 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-emerald-50 transition-colors flex items-center space-x-2"
+        >
+          <span>{getMpesaButtonText()}</span>
+        </button>
+      )}
       <button
         onClick={onCompletePayment}
         disabled={isActionButtonDisabled()}

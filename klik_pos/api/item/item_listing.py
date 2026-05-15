@@ -7,6 +7,7 @@ from klik_pos.klik_pos.utils import get_current_pos_profile
 from ..sql_builder import apply_sql_permissions
 from .item_price import fetch_item_price
 from .item_stock import apply_queue_reservations_to_stock_map, fetch_item_balance
+from .search_utils import build_item_search_conditions
 
 
 @frappe.whitelist(allow_guest=True)
@@ -92,27 +93,37 @@ def get_items(
             params_list.append(category)
             count_params.append(category)
 
-        search_term = None
-        if search and search.strip():
-            search_term = f"%{search.strip()}%"
-            search_condition = """
-                AND (
-                    i.name LIKE %s
-                    OR i.item_name LIKE %s
-                    OR i.description LIKE %s
-                    OR EXISTS (
-                        SELECT 1 FROM `tabItem Barcode` ib
-                        WHERE ib.parent = i.name AND ib.barcode LIKE %s
-                    )
-                )
-            """
-            base_query.append(search_condition)
-            count_query.append(search_condition)
-            params_list.extend([search_term, search_term, search_term, search_term])
-            count_params.extend([search_term, search_term, search_term, search_term])
+        enhanced_search = bool(getattr(pos_doc, "custom_enhanced_search", False))
+        search_clauses, search_params = build_item_search_conditions(search or "", enhanced_search)
+        base_query.extend(search_clauses)
+        count_query.extend(search_clauses)
+        params_list.extend(search_params)
+        count_params.extend(search_params)
+        # pass raw search string to category-count helper so it applies the same logic
+        search_term = search.strip() if search and search.strip() else None
 
         count_sql = "\n".join(count_query)
         count_sql = apply_sql_permissions(count_sql)
+
+        # Permission denied — user can't see any items, return empty
+        if count_sql.strip().upper().startswith("SELECT 1 WHERE 1=0"):
+            return {
+                "items": [],
+                "item_groups": [],
+                "total_count": 0,
+                "has_more": False,
+                "limit": limit,
+                "offset": offset,
+            }
+
+        # Validate placeholder count matches params AFTER sql rewrite
+        placeholder_count = count_sql.count("%s")
+        if placeholder_count != len(count_params):
+            frappe.log_error(
+                message=f"Count query placeholder mismatch. placeholders={placeholder_count}, params={len(count_params)}\nSQL:\n{count_sql}",
+                title="Get Items Count Query Param Mismatch",
+            )
+            frappe.throw(_("Something went wrong while fetching item data."))
 
         total_result = frappe.db.sql(
             count_sql,
@@ -128,6 +139,14 @@ def get_items(
         main_sql = "\n".join(base_query)
         main_sql = apply_sql_permissions(main_sql)
 
+        placeholder_count = main_sql.count("%s")
+        if placeholder_count != len(params_list):
+            frappe.log_error(
+                message=f"Main query placeholder mismatch. placeholders={placeholder_count}, params={len(params_list)}\nSQL:\n{main_sql}",
+                title="Get Items Main Query Param Mismatch",
+            )
+            frappe.throw(_("Something went wrong while fetching item data."))
+
         items = frappe.db.sql(
             main_sql,
             tuple(params_list),
@@ -135,7 +154,7 @@ def get_items(
         )
 
         item_groups_data = _get_item_groups_with_counts(
-            pos_doc, warehouse, hide_unavailable, search_term, category
+            pos_doc, warehouse, hide_unavailable, search_term, category, enhanced_search
         )
 
         if not items:
@@ -292,9 +311,26 @@ def _get_conversion_factor_sql(item_code, uom):
         return 1
 
 
-def _get_item_groups_with_counts(pos_doc, warehouse, hide_unavailable, search_term=None, selected_category=None):
+def _get_item_groups_with_counts(pos_doc, warehouse, hide_unavailable, search_term=None, selected_category=None, enhanced_search=False):
     try:
         item_groups = []
+
+        def _prepare_sql_args(sql_query, query_params):
+            """Return params tuple, or () if no placeholders. Returns None only on unrecoverable mismatch."""
+            params = tuple(query_params) if query_params else ()
+            placeholder_count = sql_query.count("%s")
+
+            if placeholder_count == 0:
+                return ()
+
+            if placeholder_count != len(params):
+                frappe.log_error(
+                    message=f"Placeholder mismatch in item group query. placeholders={placeholder_count}, params={len(params)}\nSQL: {sql_query}",
+                    title="Item Group Query Param Mismatch",
+                )
+                return None
+
+            return params
         
         allowed_groups = []
         
@@ -318,22 +354,17 @@ def _get_item_groups_with_counts(pos_doc, warehouse, hide_unavailable, search_te
                 group_query_params = []
             
             if search_term:
-                group_query += """
-                    AND (
-                        i.name LIKE %s
-                        OR i.item_name LIKE %s
-                        OR i.description LIKE %s
-                        OR EXISTS (
-                            SELECT 1 FROM `tabItem Barcode` ib
-                            WHERE ib.parent = i.name AND ib.barcode LIKE %s
-                        )
-                    )
-                """
-                group_query_params.extend([search_term, search_term, search_term, search_term])
+                s_clauses, s_params = build_item_search_conditions(search_term, enhanced_search)
+                group_query += " " + " ".join(s_clauses)
+                group_query_params.extend(s_params)
             
             group_query = apply_sql_permissions(group_query)
+            args = _prepare_sql_args(group_query, group_query_params)
+
+            if args is None:
+                return []
             
-            group_results = frappe.db.sql(group_query, tuple(group_query_params) if group_query_params else None, as_dict=True)
+            group_results = frappe.db.sql(group_query, args, as_dict=True)
             allowed_groups = [row["item_group"] for row in group_results]
         
         if not allowed_groups:
@@ -354,22 +385,17 @@ def _get_item_groups_with_counts(pos_doc, warehouse, hide_unavailable, search_te
                 params.append(warehouse)
             
             if search_term:
-                count_query += """
-                    AND (
-                        i.name LIKE %s
-                        OR i.item_name LIKE %s
-                        OR i.description LIKE %s
-                        OR EXISTS (
-                            SELECT 1 FROM `tabItem Barcode` ib
-                            WHERE ib.parent = i.name AND ib.barcode LIKE %s
-                        )
-                    )
-                """
-                params.extend([search_term, search_term, search_term, search_term])
+                s_clauses, s_params = build_item_search_conditions(search_term, enhanced_search)
+                count_query += " " + " ".join(s_clauses)
+                params.extend(s_params)
             
             count_sql = apply_sql_permissions(count_query)
+            args = _prepare_sql_args(count_sql, params)
+
+            if args is None:
+                continue
             
-            result = frappe.db.sql(count_sql, tuple(params), as_dict=True)
+            result = frappe.db.sql(count_sql, args, as_dict=True)
             item_count = result[0]["item_count"] if result else 0
             
             if item_count > 0:

@@ -7,6 +7,12 @@ export interface TaxCategory {
   rate: number
   is_inclusive: boolean
   type: "inclusive" | "exclusive"
+  tax_lines?: Array<{
+    account_head: string
+    charge_type: string
+    rate: number
+    included_in_print_rate: boolean
+  }>
 }
 
 export function useSalesTaxCharges() {

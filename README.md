@@ -1,7 +1,7 @@
 <div align="center" markdown="1">
 
 <!-- <img src=".github/klik-logo.svg" alt="KLiK PoS logo" width="80"/> -->
-<h1>KLiK PoS</h1>
+<h1>KLiK PoS - cec</h1>
 
 [![CI](https://github.com/Beveren-Software-Inc/KLiK_PoS/actions/workflows/ci.yaml/badge.svg?branch=develop)](https://github.com/Beveren-Software-Inc/KLiK_PoS/actions/workflows/ci.yaml) <br>
 

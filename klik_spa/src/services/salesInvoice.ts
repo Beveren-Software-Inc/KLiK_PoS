@@ -228,7 +228,7 @@ export async function markInvoiceAsPrinted(invoiceName: string) {
   return result.message;
 }
 
-export async function submitDraftInvoice(invoiceId: string) {
+export async function submitDraftInvoice(invoiceId: string, data?: unknown) {
   const csrfToken = window.csrf_token;
 
   const response = await fetch('/api/method/klik_pos.api.sales_invoice.submit_draft_invoice', {
@@ -237,7 +237,7 @@ export async function submitDraftInvoice(invoiceId: string) {
       'Content-Type': 'application/json',
       'X-Frappe-CSRF-Token': csrfToken
     },
-    body: JSON.stringify({ invoice_id: invoiceId }),
+    body: JSON.stringify({ invoice_id: invoiceId, data }),
     credentials: 'include'
   });
 

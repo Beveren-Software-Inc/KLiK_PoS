@@ -5,6 +5,10 @@ import type { BackendTaxPreview, Calculations } from "./types";
 
 interface TotalsSectionProps {
   calculations: Calculations;
+  displaySubtotal: number;
+  displayTaxTotal: number;
+  displayTaxIsIncluded: boolean;
+  checkoutGrandTotal: number;
   roundOffAmount: number;
   roundOffInput: string;
   roundOffEnabled: boolean;
@@ -23,6 +27,10 @@ interface TotalsSectionProps {
 
 export default function TotalsSection({
   calculations,
+  displaySubtotal,
+  displayTaxTotal,
+  displayTaxIsIncluded,
+  checkoutGrandTotal,
   roundOffAmount,
   roundOffInput,
   roundOffEnabled,
@@ -41,12 +49,6 @@ export default function TotalsSection({
   const backendTaxLines = backendTaxPreview?.tax_breakdown || [];
   const hasBackendTaxPreview = backendTaxPreview !== null;
   const hasBackendTaxBreakdown = backendTaxLines.length > 0;
-  const displayTaxIsIncluded = hasBackendTaxBreakdown
-    ? backendTaxLines.some((line) => Number(line.included_in_print_rate) === 1)
-    : calculations.isInclusive;
-  const displayTaxTotal = hasBackendTaxPreview
-    ? backendTaxPreview?.total_taxes_and_charges || 0
-    : calculations.taxAmount;
 
   return (
     <div>
@@ -82,7 +84,7 @@ export default function TotalsSection({
           <div className="flex justify-between">
             <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
             <span className="font-medium text-gray-900 dark:text-white">
-              {formatCurrencyWithSymbol(calculations.subtotal, displayCurrencySymbol)}
+              {formatCurrencyWithSymbol(displaySubtotal, displayCurrencySymbol)}
             </span>
           </div>
           {calculations.couponDiscount > 0 && (
@@ -93,7 +95,9 @@ export default function TotalsSection({
           )}
           <div className="flex justify-between">
             <span className="text-gray-600 dark:text-gray-400">
-              Tax ({calculations.selectedTax?.rate}% {displayTaxIsIncluded ? "Incl." : "Excl."})
+              {calculations.selectedTax
+                ? `Tax (${calculations.selectedTax.rate}% ${displayTaxIsIncluded ? "Incl." : "Excl."})`
+                : `Tax ${displayTaxIsIncluded ? "(Incl.)" : ""}`}
             </span>
             <span className={`font-medium ${displayTaxIsIncluded ? "text-blue-600 dark:text-blue-400" : "text-gray-900 dark:text-white"}`}>
               {displayTaxIsIncluded
@@ -130,7 +134,7 @@ export default function TotalsSection({
             <div className="flex justify-between">
               <span className="text-xl font-bold text-gray-900 dark:text-white">Grand Total</span>
               <span className="text-xl font-bold text-gray-900 dark:text-white">
-                {formatCurrencyWithSymbol(calculations.grandTotal, displayCurrencySymbol)}
+                {formatCurrencyWithSymbol(checkoutGrandTotal, displayCurrencySymbol)}
               </span>
             </div>
           </div>
@@ -149,11 +153,11 @@ export default function TotalsSection({
                   {formatCurrencyWithSymbol(outstandingAmount, displayCurrencySymbol)}
                 </span>
               </div>
-              {totalPaidAmount > calculations.grandTotal && (
+              {totalPaidAmount > checkoutGrandTotal && (
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Change</span>
                   <span className="font-bold text-green-600 dark:text-green-400">
-                    {formatCurrencyWithSymbol(subtractCurrency(totalPaidAmount, calculations.grandTotal), displayCurrencySymbol)}
+                    {formatCurrencyWithSymbol(subtractCurrency(totalPaidAmount, checkoutGrandTotal), displayCurrencySymbol)}
                   </span>
                 </div>
               )}

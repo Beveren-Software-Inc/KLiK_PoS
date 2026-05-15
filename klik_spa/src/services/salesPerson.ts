@@ -1,7 +1,30 @@
 import { extractErrorMessage } from "../utils/errorExtraction";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function verifyPin(pin: string, device_id: string) {
+export interface SalespersonIdentity {
+  name: string;
+  salesperson_name: string;
+}
+
+export interface SalespersonSummary {
+  salesperson: string;
+  salesperson_name: string;
+  has_pin: boolean;
+}
+
+interface SalespersonApiResponse {
+  success: boolean;
+  salesperson?: string;
+  salesperson_name?: string;
+  salespeople?: SalespersonSummary[];
+  message?: string;
+}
+
+export async function verifyPin(
+  pin: string,
+  device_id: string,
+  salesperson?: string,
+  pos_profile?: string
+): Promise<SalespersonApiResponse> {
   const csrfToken = window.csrf_token;
 
   const response = await fetch(
@@ -12,7 +35,7 @@ export async function verifyPin(pin: string, device_id: string) {
         "Content-Type": "application/json",
         "X-Frappe-CSRF-Token": csrfToken,
       },
-      body: JSON.stringify({ pin, device_id }),
+      body: JSON.stringify({ pin, device_id, salesperson, pos_profile }),
       credentials: "include",
     }
   );
@@ -27,8 +50,10 @@ export async function verifyPin(pin: string, device_id: string) {
   return result.message;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function getRememberedSalesperson(device_id: string) {
+export async function getRememberedSalesperson(
+  device_id: string,
+  pos_profile?: string
+): Promise<SalespersonApiResponse> {
   const csrfToken = window.csrf_token;
 
   const response = await fetch(
@@ -39,7 +64,7 @@ export async function getRememberedSalesperson(device_id: string) {
         "Content-Type": "application/json",
         "X-Frappe-CSRF-Token": csrfToken,
       },
-      body: JSON.stringify({ device_id }),
+      body: JSON.stringify({ device_id, pos_profile }),
       credentials: "include",
     }
   );
@@ -57,7 +82,6 @@ export async function getRememberedSalesperson(device_id: string) {
   return result.message;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function clearRememberedSalesperson(device_id: string) {
   const csrfToken = window.csrf_token;
 
@@ -85,4 +109,35 @@ export async function clearRememberedSalesperson(device_id: string) {
   }
 
   return result.message;
+}
+
+export async function listSalespeople(
+  pos_profile?: string
+): Promise<SalespersonSummary[]> {
+  const params = new URLSearchParams();
+  if (pos_profile) {
+    params.set("pos_profile", pos_profile);
+  }
+
+  const endpoint = params.toString()
+    ? `/api/method/klik_pos.api.sales_person.list_salespeople?${params.toString()}`
+    : "/api/method/klik_pos.api.sales_person.list_salespeople";
+
+  const response = await fetch(
+    endpoint,
+    {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      credentials: "include",
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    const errorMessage = extractErrorMessage(result, "Failed to load salespeople");
+    throw new Error(errorMessage);
+  }
+
+  return result.message?.salespeople || [];
 }

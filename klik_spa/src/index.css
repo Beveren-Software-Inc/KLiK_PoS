@@ -255,3 +255,9 @@
   outline: none !important;
   width: 100%;
 }
+/* Compact Rows in Invoice History page */
+@layer utilities {
+  .py-4 {
+    padding-block: 0.2rem; 
+  }
+}

@@ -60,7 +60,8 @@ const PAGE_SIZE = 1000;
 const LOAD_MORE_SIZE = 500;
 const CACHE_DURATION = 5 * 60 * 1000;
 let currentPosName = '';
-let refreshTimers: NodeJS.Timeout[] = [];
+let refreshTimers: Array<ReturnType<typeof setInterval>> = [];
+let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useProductStore = create<ProductStoreState>()(
   persist(
@@ -195,7 +196,7 @@ export const useProductStore = create<ProductStoreState>()(
       },
 
       initializePOS: async (posName: string, customerId = '') => {
-        const { lastFullRefresh, products, isLoading, isInitialized } = get();
+        const { lastFullRefresh, products, isLoading, isInitialized, searchQuery, selectedCategory } = get();
         
         const effectiveCustomer = get().getEffectiveCustomer();
         const effectiveCustomerId = customerId || effectiveCustomer?.id || '';
@@ -236,8 +237,8 @@ export const useProductStore = create<ProductStoreState>()(
             lastFullRefresh: Date.now(),
             lastUpdated: new Date(),
             error: null,
-            searchQuery: '',
-            selectedCategory: 'all',
+            searchQuery,
+            selectedCategory,
             isInitialized: true,
           });
           
@@ -261,6 +262,10 @@ export const useProductStore = create<ProductStoreState>()(
         const effectiveCustomer = get().getEffectiveCustomer();
         const customerId = effectiveCustomer?.id || '';
         const priceList = effectiveCustomer?.sellingPriceList || effectiveCustomer?.priceListCurrency;
+        const requestSearchQuery = searchQuery;
+        const requestCategory = selectedCategory;
+        const requestCustomerId = customerId;
+        const requestPriceList = priceList;
         
         set({ isLoading: reset, error: null });
         
@@ -268,11 +273,26 @@ export const useProductStore = create<ProductStoreState>()(
           const result = await fetchProductsFromAPI(
             reset ? PAGE_SIZE : LOAD_MORE_SIZE,
             reset ? 0 : get().currentOffset,
-            searchQuery,
-            selectedCategory,
+            requestSearchQuery,
+            requestCategory,
             customerId,
             priceList
           );
+
+          // Ignore stale responses that no longer match the active query/filter/customer context.
+          const latest = get();
+          const latestCustomer = latest.getEffectiveCustomer();
+          const latestCustomerId = latestCustomer?.id || '';
+          const latestPriceList = latestCustomer?.sellingPriceList || latestCustomer?.priceListCurrency;
+          if (
+            latest.searchQuery !== requestSearchQuery ||
+            latest.selectedCategory !== requestCategory ||
+            latestCustomerId !== requestCustomerId ||
+            latestPriceList !== requestPriceList
+          ) {
+            set({ isLoading: false });
+            return;
+          }
           
           set({
             products: reset ? result.items : [...get().products, ...result.items],
@@ -301,6 +321,12 @@ export const useProductStore = create<ProductStoreState>()(
 
       searchProducts: async (query: string, immediate = false) => {
         const trimmedQuery = query.trim();
+
+        if (searchTimer) {
+          clearTimeout(searchTimer);
+          searchTimer = null;
+        }
+
         set({ searchQuery: query, isSearching: true });
 
         if (!trimmedQuery) {
@@ -310,10 +336,10 @@ export const useProductStore = create<ProductStoreState>()(
         }
         
         if (!immediate) {
-          const timer = setTimeout(async () => {
+          searchTimer = setTimeout(async () => {
             await get().executeSearch(trimmedQuery);
           }, 400);
-          return () => clearTimeout(timer);
+          return;
         }
         
         await get().executeSearch(trimmedQuery);
@@ -345,6 +371,10 @@ export const useProductStore = create<ProductStoreState>()(
       },
 
       clearSearch: () => {
+        if (searchTimer) {
+          clearTimeout(searchTimer);
+          searchTimer = null;
+        }
         set({ searchQuery: '' });
         get().fetchProducts(true);
       },
@@ -450,11 +480,9 @@ export const useProductStore = create<ProductStoreState>()(
       setSelectedCustomer: (customer: Customer | null) => {
         set({ selectedCustomer: customer });
         
-        if (customer) {
-          useCartStore.getState().setSelectedCustomer(customer);
-        }
+        useCartStore.getState().setSelectedCustomer(customer);
         
-        if (currentPosName) {
+        if (currentPosName && customer) {
           get().initializePOS(currentPosName, customer?.id || '');
         }
       },
@@ -560,7 +588,7 @@ if (typeof window !== 'undefined') {
     
     if (previousProfileState.hideUnavailableItems !== state.hideUnavailableItems ||
         previousProfileState.useScannerOnly !== state.useScannerOnly) {
-      if (productStore.isInitialized) {
+      if (productStore.isInitialized && !productStore.searchQuery.trim()) {
         productStore.fetchProducts(true);
       }
     }

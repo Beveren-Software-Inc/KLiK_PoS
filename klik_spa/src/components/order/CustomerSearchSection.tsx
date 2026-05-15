@@ -265,13 +265,13 @@ export const CustomerSearchSection = ({
     e.stopPropagation();
     isSelectingRef.current = true;
     shouldPreventSearchRef.current = true;
+    setUserRemovedDefaultCustomer(true);
     onCustomerClear();
     setProductCustomer(null);
-    fetchProducts(true);
-    setUserRemovedDefaultCustomer(true);
     setSearch("");
-    setIsOpen(false);
+    setIsOpen(true);
     setHighlightedIndex(-1);
+    inputRef.current?.focus();
     setTimeout(() => {
       isSelectingRef.current = false;
       shouldPreventSearchRef.current = false;

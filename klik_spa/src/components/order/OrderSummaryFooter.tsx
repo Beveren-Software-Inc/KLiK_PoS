@@ -10,6 +10,7 @@ interface OrderSummaryFooterProps {
   onCheckout: () => void;
   onClearCart: () => void;
   onHoldOrder: () => void;
+  isHoldingOrder?: boolean;
   isValidating: boolean;
   isMobile?: boolean;
   currency_symbol?: string;
@@ -24,6 +25,7 @@ export const OrderSummaryFooter = ({
   onCheckout,
   onClearCart,
   onHoldOrder,
+  isHoldingOrder = false,
   isValidating,
   isMobile,
   currency_symbol,
@@ -46,9 +48,10 @@ export const OrderSummaryFooter = ({
         {allow_holding_invoices && (
           <button
             onClick={onHoldOrder}
-            className="px-3 py-2 border border-beveren-600 text-beveren-600 dark:text-beveren-400 rounded-lg font-medium hover:bg-beveren-600 hover:text-white transition-colors text-sm"
+            disabled={isHoldingOrder}
+            className={`px-3 py-2 border border-beveren-600 text-beveren-600 dark:text-beveren-400 rounded-lg font-medium hover:bg-beveren-600 hover:text-white transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed ${isHoldingOrder ? 'opacity-60 cursor-not-allowed' : ''}`}
           >
-            Hold
+            {isHoldingOrder ? 'Holding...' : 'Hold'}
           </button>
         )}
         <button
