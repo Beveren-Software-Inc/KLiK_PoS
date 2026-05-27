@@ -1121,9 +1121,6 @@ def queue_sales_invoice(data):
 			_mark_invoice_queued(doc, frappe.session.user)
 			doc.save(ignore_permissions=True)
 
-			if tax_id:
-				doc.db_set("tax_id", tax_id)
-
 			try:
 				_reserve_stock_for_queued_invoice(doc)
 			except Exception as reserve_error:
@@ -1140,6 +1137,9 @@ def queue_sales_invoice(data):
 			)
 
 			doc.save(ignore_permissions=True)
+
+			if tax_id:
+				doc.db_set("tax_id", tax_id)
 
 			processing_time = time.time() - start_time
 			frappe.logger().info(f"Invoice {doc.name} queued in {processing_time:.2f} seconds")
@@ -1225,6 +1225,7 @@ def process_queued_sales_invoice(invoice_name, requested_by=None):
 	"""Background worker that submits a queued draft sales invoice."""
 	try:
 		doc = frappe.get_doc("Sales Invoice", invoice_name)
+		tax_id = doc.tax_id
 		if doc.docstatus != 0:
 			_apply_klik_invoice_flags(doc, is_submitted=True)
 			_update_queue_fields(doc, QUEUE_STATUSES["submitted"], None)
@@ -1234,6 +1235,8 @@ def process_queued_sales_invoice(invoice_name, requested_by=None):
 		attempts = int(getattr(doc, "queue_attempts", 0) or 0) + 1
 		_update_queue_fields(doc, QUEUE_STATUSES["processing"], attempts=attempts)
 		doc.save(ignore_permissions=True)
+		if tax_id:
+			doc.tax_id = tax_id
 		_apply_klik_invoice_flags(doc, is_submitted=True)
 		doc.submit()
 		doc.reload()
