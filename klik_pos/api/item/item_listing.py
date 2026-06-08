@@ -47,7 +47,8 @@ def get_items(
                 "FROM `tabItem` i",
                 "INNER JOIN `tabBin` b ON i.name = b.item_code",
                 "WHERE i.disabled = 0",
-                "AND i.is_stock_item = 1",
+                # "AND i.is_stock_item = 1",
+                "AND IFNULL(i.is_fixed_asset, 0) = 0",
                 "AND b.actual_qty > 0",
             ]
             count_query = [
@@ -55,7 +56,8 @@ def get_items(
                 "FROM `tabItem` i",
                 "INNER JOIN `tabBin` b ON i.name = b.item_code",
                 "WHERE i.disabled = 0",
-                "AND i.is_stock_item = 1",
+                # "AND i.is_stock_item = 1",
+                "AND IFNULL(i.is_fixed_asset, 0) = 0",
                 "AND b.actual_qty > 0",
             ]
         else:
@@ -63,13 +65,15 @@ def get_items(
                 f"SELECT DISTINCT {select_fields}",
                 "FROM `tabItem` i",
                 "WHERE i.disabled = 0",
-                "AND i.is_stock_item = 1",
+                # "AND i.is_stock_item = 1",
+                "AND IFNULL(i.is_fixed_asset, 0) = 0",
             ]
             count_query = [
                 "SELECT COUNT(DISTINCT i.name) as total",
                 "FROM `tabItem` i",
                 "WHERE i.disabled = 0",
-                "AND i.is_stock_item = 1",
+                # "AND i.is_stock_item = 1",
+                "AND IFNULL(i.is_fixed_asset, 0) = 0",
             ]
 
         if hide_unavailable and warehouse:
@@ -342,7 +346,8 @@ def _get_item_groups_with_counts(pos_doc, warehouse, hide_unavailable, search_te
                 SELECT DISTINCT i.item_group
                 FROM `tabItem` i
                 WHERE i.disabled = 0
-                AND i.is_stock_item = 1
+                # AND i.is_stock_item = 1
+                AND IFNULL(i.is_fixed_asset, 0) = 0
                 AND i.item_group IS NOT NULL
                 AND i.item_group != ''
             """
@@ -375,7 +380,8 @@ def _get_item_groups_with_counts(pos_doc, warehouse, hide_unavailable, search_te
                 SELECT COUNT(DISTINCT i.name) as item_count
                 FROM `tabItem` i
                 WHERE i.disabled = 0
-                AND i.is_stock_item = 1
+                # AND i.is_stock_item = 1
+                AND IFNULL(i.is_fixed_asset, 0) = 0
                 AND i.item_group = %s
             """
             params = [group_name]
