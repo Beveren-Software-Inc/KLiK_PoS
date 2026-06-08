@@ -84,5 +84,4 @@ export async function updateItemUOMAndPrice(
 ): Promise<void> {
   // This function will be called to update the cart item with new UOM and price
   // The actual implementation depends on how the cart update is handled
-  console.log(`Updating item ${itemId} to UOM ${selectedUOM} with price ${newPrice}`);
 }

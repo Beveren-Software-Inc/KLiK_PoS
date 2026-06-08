@@ -29,7 +29,6 @@ export async function makeAPICall(url: string, options: APICallOptions = {}): Pr
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
-      console.log(`Making API call (attempt ${attempt + 1}/${retries + 1}):`, { url, options: defaultOptions });
 
       const response = await fetch(url, {
         ...defaultOptions,
@@ -72,7 +71,6 @@ export async function makeAPICall(url: string, options: APICallOptions = {}): Pr
 
       // Wait before retrying
       if (retryDelay > 0) {
-        console.log(`Retrying in ${retryDelay}ms...`);
         await new Promise(resolve => setTimeout(resolve, retryDelay));
       }
     }

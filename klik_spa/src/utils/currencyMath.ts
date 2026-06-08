@@ -1,20 +1,32 @@
 /**
- * Currency math utilities to handle floating point precision issues
- * All amounts are treated as cents to avoid floating point errors
+ * Currency math utilities to handle floating point precision issues.
+ * Precision follows Frappe boot defaults when available.
  */
+
+export function getCurrencyPrecision(): number {
+  const maybeFrappe = (globalThis as unknown as {
+    frappe?: { boot?: { sysdefaults?: { currency_precision?: string | number } } }
+  }).frappe;
+  const precision = Number(maybeFrappe?.boot?.sysdefaults?.currency_precision);
+  return Number.isFinite(precision) && precision >= 0 ? precision : 2;
+}
+
+function getCurrencyFactor(): number {
+  return 10 ** getCurrencyPrecision();
+}
 
 /**
  * Convert dollars to cents (multiply by 100)
  */
 export function toCents(dollars: number): number {
-  return Math.round(dollars * 100);
+  return Math.round(dollars * getCurrencyFactor());
 }
 
 /**
  * Convert cents to dollars (divide by 100)
  */
 export function toDollars(cents: number): number {
-  return cents / 100;
+  return cents / getCurrencyFactor();
 }
 
 /**
@@ -52,17 +64,18 @@ export function divideCurrency(amount: number, divisor: number): number {
 }
 
 /**
- * Round currency amount to 2 decimal places
+ * Round currency amount to Frappe currency precision
  */
 export function roundCurrency(amount: number): number {
-  return Math.round(amount * 100) / 100;
+  const factor = getCurrencyFactor();
+  return Math.round((Number(amount) || 0) * factor) / factor;
 }
 
 /**
- * Format currency amount to 2 decimal places string
+ * Format currency amount to Frappe currency precision string
  */
 export function formatCurrencyAmount(amount: number): string {
-  return roundCurrency(amount).toFixed(2);
+  return roundCurrency(amount).toFixed(getCurrencyPrecision());
 }
 
 /**

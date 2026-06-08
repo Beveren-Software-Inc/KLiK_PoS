@@ -317,7 +317,6 @@ export default function ClosingShiftPage() {
   // Helper function to check if invoice has items that can still be returned
   const hasReturnableItems = (invoice: SalesInvoice) => {
     if (!invoice || !invoice.items) {
-      console.log("No invoice or items found for:", invoice?.id);
       return false;
     }
 
@@ -350,7 +349,6 @@ export default function ClosingShiftPage() {
   };
 
   const handleCancel = (invoiceId: string) => {
-    console.log("Cancelling invoice:", invoiceId);
     setShowInvoiceModal(false);
   };
 
@@ -420,7 +418,7 @@ export default function ClosingShiftPage() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto pb-20 w-[98%] mx-auto px-2 py-4">
+        <div className="flex-1 overflow-y-auto w-[98%] mx-auto px-2 py-4 [padding-bottom:calc(12rem+env(safe-area-inset-bottom))]">
           {/* Warning if no opening entry */}
           {hasNoOpeningEntry && (
             <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-6">
@@ -734,6 +732,9 @@ export default function ClosingShiftPage() {
           onRefund={handleRefund}
           onCancel={handleCancel}
         />
+
+        {/* Extra runway so the last section clears the fixed bottom navbar */}
+        <div className="h-20" aria-hidden="true" />
 
         {/* Bottom Navigation */}
         <BottomNavigation />

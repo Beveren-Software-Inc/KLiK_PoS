@@ -102,6 +102,7 @@ export default function ProductTooltip({
   const costPrice = data?.valuation_rate || data?.standard_rate || item.cost_price || 0;
   const margin = item.price - costPrice;
   const marginPercentage = costPrice > 0 ? (margin / item.price) * 100 : 0;
+  const bundleComponents = item.bundle_items ?? [];
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -155,12 +156,40 @@ export default function ProductTooltip({
           <div className="space-y-4">
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-4 rounded-lg">
               <p className="text-[10px] text-blue-600 dark:text-blue-400 uppercase font-semibold tracking-wide">
-                Sale Price
+                {item.is_product_bundle ? "Bundle Sale Price" : "Sale Price"}
               </p>
               <p className="text-3xl font-bold text-gray-900 dark:text-white">
                 {formatCurrencyWithSymbol(item.price, item.currency_symbol)}
               </p>
             </div>
+
+            {item.is_product_bundle && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-900/20">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                    Packed Items
+                  </p>
+                  <span className="text-[10px] font-semibold text-amber-800 dark:text-amber-200">
+                    {item.available} available
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  {bundleComponents.slice(0, 3).map((component) => (
+                    <div key={component.item_code} className="flex justify-between gap-3 text-[11px]">
+                      <span className="truncate text-gray-700 dark:text-gray-300">{component.item_name}</span>
+                      <span className="shrink-0 font-semibold text-gray-900 dark:text-white">
+                        {component.qty} {component.uom || ""}
+                      </span>
+                    </div>
+                  ))}
+                  {bundleComponents.length > 3 && (
+                    <div className="text-center text-[10px] text-amber-700 dark:text-amber-300">
+                      +{bundleComponents.length - 3} more components
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {data?.batches && data.batches.length > 0 && (
               <div>
@@ -247,7 +276,7 @@ export default function ProductTooltip({
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg">
               <p className="text-[10px] text-gray-500 uppercase font-semibold tracking-wide">
-                Sale Price
+                {item.is_product_bundle ? "Bundle Price" : "Sale Price"}
               </p>
               <p className="text-xl font-bold text-gray-900 dark:text-white">
                 {formatCurrencyWithSymbol(item.price, item.currency_symbol)}
@@ -263,6 +292,34 @@ export default function ProductTooltip({
               </p>
             </div>
           </div>
+
+          {item.is_product_bundle && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-900/20">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                  Packed Items
+                </p>
+                <span className="text-[10px] font-semibold text-amber-800 dark:text-amber-200">
+                  {item.available} available
+                </span>
+              </div>
+              <div className="space-y-1">
+                {bundleComponents.slice(0, 3).map((component) => (
+                  <div key={component.item_code} className="flex justify-between gap-3 text-[11px]">
+                    <span className="truncate text-gray-700 dark:text-gray-300">{component.item_name}</span>
+                    <span className="shrink-0 font-semibold text-gray-900 dark:text-white">
+                      {component.qty} {component.uom || ""}
+                    </span>
+                  </div>
+                ))}
+                {bundleComponents.length > 3 && (
+                  <div className="text-center text-[10px] text-amber-700 dark:text-amber-300">
+                    +{bundleComponents.length - 3} more components
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 p-3 rounded-lg">
             <div className="flex justify-between items-baseline">

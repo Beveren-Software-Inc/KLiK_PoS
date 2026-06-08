@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { Calculator, ChevronDown, Eye, Loader2, MailPlus, MessageCirclePlus, MessageSquarePlus, Printer } from "lucide-react";
+import { Award, ChevronDown, Eye, Loader2, MailPlus, MessageCirclePlus, MessageSquarePlus, Printer, X } from "lucide-react";
 import { useCartStore } from "../../stores/cartStore";
 import { usePaymentModes } from "../../hooks/usePaymentModes";
 import { useSalesTaxCharges } from "../../hooks/useSalesTaxCharges";
@@ -11,12 +11,13 @@ import { useDeliveryPersonnel } from "../../hooks/useDeliveryPersonnel";
 import {
   createDraftSalesInvoice,
   createSalesInvoice,
+  previewLoyaltyRedemption,
   submitDraftInvoice,
   validateCheckoutInvoice,
 } from "../../services/salesInvoice";
 import { clearDraftInvoiceCache, getOriginalDraftInvoiceId } from "../../utils/draftInvoiceCache";
 import { formatCurrencyWithSymbol, getCurrencySymbol } from "../../utils/currency";
-import { calculateRemainingAmount, calculateTotalPayments, roundCurrency, subtractCurrency } from "../../utils/currencyMath";
+import { calculateRemainingAmount, calculateTotalPayments, roundCurrency } from "../../utils/currencyMath";
 import { extractErrorFromException } from "../../utils/errorExtraction";
 import { fetchWhatsAppTemplates, getDefaultWhatsAppTemplate, processTemplate, getDefaultMessageTemplate } from "../../services/whatsappTemplateService";
 import { fetchEmailTemplates, getDefaultEmailTemplate, processEmailTemplate, getDefaultEmailMessageTemplate } from "../../services/emailTemplateService";
@@ -68,6 +69,12 @@ interface MpesaRealtimeEvent {
   request_name?: string;
   status?: string;
   transaction_id?: string;
+}
+
+interface AppliedLoyaltyRedemption {
+  loyalty_program: string;
+  loyalty_points: number;
+  loyalty_amount: number;
 }
 
 interface FrappeRealtimeClient {
@@ -152,6 +159,7 @@ export default function PaymentDialog(props: PaymentDialogProps) {
   const [showDeliveryPersonnelModal, setShowDeliveryPersonnelModal] = useState(false);
   const [showSalespersonModal, setShowSalespersonModal] = useState(false);
   const [selectedDeliveryPersonnel, setSelectedDeliveryPersonnel] = useState<string | null>(null);
+  const [deliveryCharge, setDeliveryCharge] = useState(0);
   const [taxPin, setTaxPin] = useState("");
   const [backendTaxPreview, setBackendTaxPreview] = useState<BackendTaxPreview | null>(null);
   const [isTaxPreviewLoading, setIsTaxPreviewLoading] = useState(false);
@@ -166,9 +174,13 @@ export default function PaymentDialog(props: PaymentDialogProps) {
   const [selectedMpesaPayments, setSelectedMpesaPayments] = useState<MpesaRegisterPayment[]>([]);
   const [mergeMpesaPayments, setMergeMpesaPayments] = useState(true);
   const [isLoadingMpesaRegisterPayments, setIsLoadingMpesaRegisterPayments] = useState(false);
+  const [loyaltyPointsInput, setLoyaltyPointsInput] = useState("");
+  const [appliedLoyalty, setAppliedLoyalty] = useState<AppliedLoyaltyRedemption | null>(null);
+  const [isApplyingLoyalty, setIsApplyingLoyalty] = useState(false);
   const backendTaxPreviewRef = useRef<BackendTaxPreview | null>(null);
   const taxPreviewRequestIdRef = useRef(0);
   const taxPreviewCacheRef = useRef<Map<string, CachedTaxPreviewEntry>>(new Map());
+  const initializedCreditDefaultRef = useRef(false);
 
   const { posDetails } = usePOSProfileStore();
   const posLoading = false;
@@ -198,6 +210,14 @@ export default function PaymentDialog(props: PaymentDialogProps) {
   const print_receipt_on_order_complete = posDetails?.print_receipt_on_order_complete;
   const deliveryRequiredValue = posDetails?.custom_delivery_required;
   const isDeliveryRequired = deliveryRequiredValue === 1;
+  const isDeliveryChargeEnabled =
+    posDetails?.custom_enable_delivery_charge === 1
+    || posDetails?.custom_enable_delivery_charge === "1"
+    || posDetails?.custom_enable_delivery_charge === true;
+  const deliveryChargeItemCode =
+    typeof posDetails?.custom_delivery_charge_item === "string"
+      ? posDetails.custom_delivery_charge_item
+      : "";
   const allowPartialPayments = Boolean(posDetails?.allow_partial_payment);
   const requiresSalespersonPin = !!posDetails?.custom_sales_person_pin_required;
   const allow_holding_invoices = Boolean(posDetails?.allow_holding_invoices);
@@ -209,6 +229,13 @@ export default function PaymentDialog(props: PaymentDialogProps) {
     posDetails?.custom_auto_allocate_remaining_payment === 1 ||
     posDetails?.custom_auto_allocate_remaining_payment === "1" ||
     posDetails?.custom_auto_allocate_remaining_payment === true;
+
+  const defaultSalesType = useMemo(() => {
+    const rawValue = typeof posDetails?.default_sales_type === "string"
+      ? posDetails.default_sales_type
+      : "Cash";
+    return rawValue.trim().toLowerCase();
+  }, [posDetails?.default_sales_type]);
 
   const [enableBackgroundSubmission, setEnableBackgroundSubmission] = useState<boolean>(
     Boolean(posDetails?.enable_background_invoice_submission)
@@ -271,30 +298,28 @@ export default function PaymentDialog(props: PaymentDialogProps) {
   const calculations: Calculations = useMemo(() => {
     // subtotal uses exclusive (pre-tax) prices so the tax line is separately visible
     const subtotal = cartItems.reduce((sum, item) => {
-      return sum + getEffectiveItemRate(item) * item.quantity;
+      return roundCurrency(sum + roundCurrency(getEffectiveItemRate(item) * item.quantity));
     }, 0);
-    const couponDiscount = appliedCoupons.reduce((sum, coupon) => sum + coupon.value, 0);
-    const taxableAmount = Math.max(0, subtotal - couponDiscount);
+    const couponDiscount = appliedCoupons.reduce((sum, coupon) => roundCurrency(sum + coupon.value), 0);
+    const taxableAmount = roundCurrency(Math.max(0, subtotal - couponDiscount));
     const selectedTax = selectedTaxTemplate;
     const taxRate = selectedTax?.rate || 0;
     const isInclusive = isTaxIncludedInBasicRate || selectedTax?.is_inclusive || false;
     let taxAmount: number;
     let grandTotal: number;
     if (isInclusive) {
-      taxAmount = (taxableAmount * taxRate) / (100 + taxRate);
-      taxAmount = parseFloat(taxAmount.toFixed(2));
+      taxAmount = roundCurrency((taxableAmount * taxRate) / (100 + taxRate));
       grandTotal = taxableAmount;
     } else {
-      taxAmount = (taxableAmount * taxRate) / 100;
-      taxAmount = parseFloat(taxAmount.toFixed(2));
-      grandTotal = taxableAmount + taxAmount;
+      taxAmount = roundCurrency((taxableAmount * taxRate) / 100);
+      grandTotal = roundCurrency(taxableAmount + taxAmount);
     }
     return {
       subtotal,
       couponDiscount,
       taxableAmount,
       taxAmount,
-      grandTotal: grandTotal + roundOffAmount,
+      grandTotal: roundCurrency(grandTotal + roundOffAmount),
       selectedTax,
       isInclusive,
     };
@@ -303,22 +328,30 @@ export default function PaymentDialog(props: PaymentDialogProps) {
   // Inclusive grand total: sum of discountedPriceIncl (already computed correctly in OrderSummary mapping)
   // This is reliable regardless of whether items have ERPNext Item Tax Templates
   const inclGrandTotal = useMemo(() => {
-    return cartItems.reduce((sum, item) => {
-      return sum + getEffectiveDisplayRate(item) * item.quantity;
-    }, 0) + roundOffAmount;
-  }, [cartItems, getEffectiveDisplayRate, roundOffAmount]);
+    const itemTotal = cartItems.reduce((sum, item) => {
+      return roundCurrency(sum + roundCurrency(getEffectiveDisplayRate(item) * item.quantity));
+    }, 0);
+    return roundCurrency(itemTotal + roundOffAmount + Number(deliveryCharge || 0));
+  }, [cartItems, deliveryCharge, getEffectiveDisplayRate, roundOffAmount]);
 
   const totalPaidAmount = calculateTotalPayments(Object.values(paymentAmounts));
+  const hasNegativePaymentAmount = Object.values(paymentAmounts).some((amount) => amount < 0);
   const backendTaxLines = backendTaxPreview?.tax_breakdown || [];
   const hasBackendTaxPreview = backendTaxPreview !== null;
   const hasBackendTaxBreakdown = backendTaxLines.length > 0;
+  const backendRoundedTotal = roundCurrency(Number(backendTaxPreview?.rounded_total || 0));
+  const backendGrandTotal = roundCurrency(Number(backendTaxPreview?.grand_total || inclGrandTotal));
   const checkoutGrandTotal = hasBackendTaxPreview
-    ? Number(backendTaxPreview?.grand_total || inclGrandTotal)
-    : inclGrandTotal;
-  const outstandingAmount = calculateRemainingAmount(checkoutGrandTotal, Object.values(paymentAmounts));
+    ? backendTaxPreview?.disable_rounded_total === 0 && backendRoundedTotal > 0
+      ? backendRoundedTotal
+      : backendGrandTotal
+    : roundCurrency(inclGrandTotal);
+  const loyaltyAmount = Number(appliedLoyalty?.loyalty_amount || 0);
+  const checkoutPayableTotal = roundCurrency(Math.max(0, checkoutGrandTotal - loyaltyAmount));
+  const outstandingAmount = calculateRemainingAmount(checkoutPayableTotal, Object.values(paymentAmounts));
 
   // Tax amount = inclusive grand total minus exclusive subtotal (works for both item templates and global taxes)
-  const localTaxTotal = parseFloat((checkoutGrandTotal - calculations.subtotal - (calculations.couponDiscount > 0 ? 0 : 0)).toFixed(2));
+  const localTaxTotal = roundCurrency(checkoutGrandTotal - calculations.subtotal - (calculations.couponDiscount > 0 ? 0 : 0));
 
   const displaySubtotal = hasBackendTaxPreview
     ? Number(backendTaxPreview?.net_total || calculations.subtotal)
@@ -330,7 +363,7 @@ export default function PaymentDialog(props: PaymentDialogProps) {
     ? backendTaxPreview?.total_taxes_and_charges || 0
     : calculations.taxAmount > 0 ? calculations.taxAmount : Math.max(0, localTaxTotal);
   
-  const previousCheckoutGrandTotalRef = useRef(checkoutGrandTotal);
+  const previousCheckoutGrandTotalRef = useRef(checkoutPayableTotal);
 
   const roundOffEnabled = (() => {
     if (!posDetails?.custom_allow_write_off) return false;
@@ -405,6 +438,113 @@ export default function PaymentDialog(props: PaymentDialogProps) {
     return null;
   }, [modes, paymentAmounts]);
 
+  const trimPaymentAmountsToPayable = useCallback((payableTotal: number) => {
+    setPaymentAmounts((prev) => {
+      const updated = { ...prev };
+      let excess = roundCurrency(calculateTotalPayments(Object.values(updated)) - payableTotal);
+
+      if (excess <= 0) {
+        return updated;
+      }
+
+      const preferredIds = [
+        lastModifiedMethodId,
+        activeMethodId,
+        ...Object.entries(updated)
+          .filter(([, amount]) => (amount || 0) > 0)
+          .map(([methodId]) => methodId),
+      ].filter((methodId, index, all): methodId is string => Boolean(methodId) && all.indexOf(methodId) === index);
+
+      for (const methodId of preferredIds) {
+        if (excess <= 0) break;
+        const currentAmount = Number(updated[methodId] || 0);
+        if (currentAmount <= 0) continue;
+        const reduction = Math.min(currentAmount, excess);
+        updated[methodId] = roundCurrency(currentAmount - reduction);
+        excess = roundCurrency(excess - reduction);
+      }
+
+      return updated;
+    });
+  }, [activeMethodId, lastModifiedMethodId]);
+
+  const clearLoyaltyRedemption = useCallback(() => {
+    setAppliedLoyalty(null);
+    setLoyaltyPointsInput("");
+  }, []);
+
+  const handleLoyaltyPointsInputChange = useCallback((value: string) => {
+    setLoyaltyPointsInput(value);
+
+    const loyalty = selectedCustomer?.loyalty;
+    const points = Number.parseInt(value || "0", 10);
+    const availablePoints = Number(loyalty?.available_points ?? loyalty?.loyalty_points ?? 0);
+    const conversionFactor = Number(loyalty?.conversion_factor || 0);
+
+    if (!loyalty?.enabled || !loyalty.loyalty_program || !Number.isFinite(points) || points <= 0) {
+      setAppliedLoyalty(null);
+      return;
+    }
+
+    if (points > availablePoints || conversionFactor <= 0) {
+      setAppliedLoyalty(null);
+      return;
+    }
+
+    const loyaltyAmount = roundCurrency(Math.min(points * conversionFactor, checkoutGrandTotal));
+    setAppliedLoyalty({
+      loyalty_program: loyalty.loyalty_program,
+      loyalty_points: points,
+      loyalty_amount: loyaltyAmount,
+    });
+    trimPaymentAmountsToPayable(roundCurrency(Math.max(0, checkoutGrandTotal - loyaltyAmount)));
+  }, [checkoutGrandTotal, selectedCustomer?.loyalty, trimPaymentAmountsToPayable]);
+
+  const handleApplyLoyaltyRedemption = useCallback(async () => {
+    const loyalty = selectedCustomer?.loyalty;
+    const points = Number.parseInt(loyaltyPointsInput || "0", 10);
+
+    if (!selectedCustomer?.id || !loyalty?.enabled || !loyalty.loyalty_program) {
+      toast.error("Selected customer is not enrolled in a loyalty program.");
+      return;
+    }
+
+    if (!Number.isFinite(points) || points <= 0) {
+      toast.error("Enter loyalty points greater than zero.");
+      return;
+    }
+
+    if (points > Number(loyalty.available_points ?? loyalty.loyalty_points ?? 0)) {
+      toast.error("Entered points exceed the customer's available loyalty balance.");
+      return;
+    }
+
+    try {
+      setIsApplyingLoyalty(true);
+      const preview = await previewLoyaltyRedemption(
+        selectedCustomer.id,
+        points,
+        checkoutGrandTotal,
+        posCompanyName || undefined,
+        loyalty.loyalty_program,
+      );
+
+      setAppliedLoyalty({
+        loyalty_program: preview.loyalty_program,
+        loyalty_points: preview.loyalty_points,
+        loyalty_amount: Number(preview.loyalty_amount || 0),
+      });
+      const newPayableTotal = roundCurrency(Math.max(0, checkoutGrandTotal - Number(preview.loyalty_amount || 0)));
+      trimPaymentAmountsToPayable(newPayableTotal);
+      toast.success("Loyalty redemption applied.");
+    } catch (error) {
+      setAppliedLoyalty(null);
+      toast.error(extractErrorFromException(error, "Failed to apply loyalty redemption"));
+    } finally {
+      setIsApplyingLoyalty(false);
+    }
+  }, [checkoutGrandTotal, loyaltyPointsInput, posCompanyName, selectedCustomer, trimPaymentAmountsToPayable]);
+
   const refreshMpesaStatus = useCallback(async (requestName?: string) => {
     const name = requestName || mpesaFlow?.requestName;
     if (!name) return;
@@ -435,28 +575,8 @@ export default function PaymentDialog(props: PaymentDialogProps) {
     deliveryPersonnel: string | null = null,
     options?: { excludeActiveMpesa?: boolean }
   ) => {
-    const netAmountToSend = isB2B ? totalPaidAmount : checkoutGrandTotal;
     const activeMpesaPayment = options?.excludeActiveMpesa ? getActiveMpesaPayment() : null;
-    const adjustedPaymentMethods = isB2B
-      ? Object.entries(paymentAmounts).filter(([, amount]) => amount > 0)
-      : (() => {
-          const validPayments = Object.entries(paymentAmounts).filter(([, amount]) => amount > 0);
-          if (validPayments.length === 0) return [];
-          const totalPaymentAmount = validPayments.reduce((sum, [, amount]) => sum + amount, 0);
-          if (totalPaymentAmount > checkoutGrandTotal) {
-            const excess = totalPaymentAmount - checkoutGrandTotal;
-            const lastPaymentIndex = validPayments.length - 1;
-            const lastPayment = validPayments[lastPaymentIndex];
-            if (!lastPayment) return [];
-            const [, lastAmount] = lastPayment;
-            const adjustedLastAmount = parseFloat(Math.max(0, lastAmount - excess).toFixed(2));
-            return validPayments.map(([method, amount], index) => {
-              if (index === lastPaymentIndex) return [method, adjustedLastAmount];
-              return [method, amount];
-            });
-          }
-          return validPayments;
-        })();
+    const adjustedPaymentMethods = Object.entries(paymentAmounts).filter(([, amount]) => amount > 0);
 
     return {
       items: cartItems.map((item) => {
@@ -504,8 +624,10 @@ export default function PaymentDialog(props: PaymentDialogProps) {
       taxType: displayTaxIsIncluded ? "inclusive" : "exclusive",
       couponDiscount: calculations.couponDiscount,
       roundOffAmount,
+      deliveryCharge: Number(deliveryCharge || 0),
+      delivery_charge: Number(deliveryCharge || 0),
       grandTotal: checkoutGrandTotal,
-      amountPaid: netAmountToSend,
+      amountPaid: totalPaidAmount,
       outstandingAmount: outstandingAmount,
       appliedCoupons,
       businessType: posDetails?.business_type,
@@ -518,6 +640,12 @@ export default function PaymentDialog(props: PaymentDialogProps) {
       allow_partial_payment: allowPartialPayments,
       salesperson: currentSalesperson?.name || null,
       tax_id: taxPin || null,
+      loyalty: appliedLoyalty
+        ? {
+            loyalty_program: appliedLoyalty.loyalty_program,
+            loyalty_points: appliedLoyalty.loyalty_points,
+          }
+        : null,
     };
   };
 
@@ -720,7 +848,7 @@ export default function PaymentDialog(props: PaymentDialogProps) {
     });
 
     const remaining = roundCurrency(
-      checkoutGrandTotal - calculateTotalPayments(Object.values(updatedAmounts)),
+      checkoutPayableTotal - calculateTotalPayments(Object.values(updatedAmounts)),
     );
 
     if (remaining > 0) {
@@ -758,7 +886,7 @@ export default function PaymentDialog(props: PaymentDialogProps) {
     if (invoiceSubmitted || isProcessingPayment) return;
     const newPaymentAmounts: PaymentAmount = {};
     paymentMethods.forEach((method) => { newPaymentAmounts[method.id] = 0; });
-    newPaymentAmounts[methodId] = checkoutGrandTotal;
+    newPaymentAmounts[methodId] = checkoutPayableTotal;
     setLastModifiedMethodId(methodId);
     setPaymentAmounts(newPaymentAmounts);
     setActiveMethodId(methodId);
@@ -848,11 +976,6 @@ export default function PaymentDialog(props: PaymentDialogProps) {
     }
   };
 
-  const handleSalesTaxChange = (value: string) => {
-    if (invoiceSubmitted || isProcessingPayment) return;
-    setSelectedSalesTaxCharges(value);
-  };
-
   useEffect(() => {
     const requestId = taxPreviewRequestIdRef.current + 1;
     taxPreviewRequestIdRef.current = requestId;
@@ -885,6 +1008,13 @@ export default function PaymentDialog(props: PaymentDialogProps) {
       SalesTaxCharges: selectedSalesTaxCharges,
       businessType: posDetails?.business_type || "",
       roundOffAmount: Number(roundOffAmount || 0),
+      deliveryCharge: Number(deliveryCharge || 0),
+      loyalty: appliedLoyalty
+        ? {
+            loyalty_program: appliedLoyalty.loyalty_program,
+            loyalty_points: appliedLoyalty.loyalty_points,
+          }
+        : null,
     };
 
     const previewCacheKey = JSON.stringify(previewPayload);
@@ -938,6 +1068,15 @@ export default function PaymentDialog(props: PaymentDialogProps) {
           SalesTaxCharges: selectedSalesTaxCharges,
           businessType: posDetails?.business_type,
           roundOffAmount,
+          deliveryCharge,
+          loyalty: appliedLoyalty
+            ? {
+                loyalty_program: appliedLoyalty.loyalty_program,
+                loyalty_points: appliedLoyalty.loyalty_points,
+              }
+            : null,
+          // Preview-only context: avoid checkout payment validation until user submits payment.
+          status: "held",
         };
 
         const response = await validateCheckoutInvoice(payload);
@@ -1005,6 +1144,11 @@ export default function PaymentDialog(props: PaymentDialogProps) {
     salesTaxLoading,
     posDetails?.business_type,
     roundOffAmount,
+    deliveryCharge,
+    appliedLoyalty,
+    isCreditSale,
+    dueDate,
+    allowPartialPayments,
     getEffectiveItemRate,
   ]);
 
@@ -1092,17 +1236,26 @@ export default function PaymentDialog(props: PaymentDialogProps) {
       setShowMpesaOptionsModal(false);
       setMpesaSearchTerm("");
       setSelectedMpesaPayments([]);
+      setDeliveryCharge(0);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    clearLoyaltyRedemption();
+  }, [clearLoyaltyRedemption, selectedCustomer?.id, isOpen]);
 
   const processPayment = async (deliveryPersonnel: string | null = null) => {
     if (!selectedCustomer || !selectedCustomer.name) {
       toast.error("Kindly select a customer");
       return;
     }
+    if (hasNegativePaymentAmount) {
+      toast.error("Payment amounts cannot be negative.");
+      return;
+    }
     if (!isCreditSale) {
       const totalPaid = calculateTotalPayments(Object.values(paymentAmounts));
-      const orderTotal = checkoutGrandTotal;
+      const orderTotal = checkoutPayableTotal;
       
       if (totalPaid < orderTotal) {
         const remainingAmount = orderTotal - totalPaid;
@@ -1110,11 +1263,6 @@ export default function PaymentDialog(props: PaymentDialogProps) {
         return;
       }
       
-      if (totalPaid > orderTotal && !posDetails?.allow_overpayment) {
-        const overpayAmount = totalPaid - orderTotal;
-        toast.error(`Overpayment not allowed. Please adjust payment amounts. Overpayment: ${formatCurrencyWithSymbol(overpayAmount, displayCurrencySymbol)}`);
-        return;
-      }
     }
     if (isCreditSale && !dueDate) {
       toast.error("Please select a due date for this credit sale");
@@ -1264,6 +1412,7 @@ export default function PaymentDialog(props: PaymentDialogProps) {
         taxType: calculations.isInclusive ? "inclusive" : "exclusive",
         couponDiscount: calculations.couponDiscount,
         roundOffAmount,
+        deliveryCharge,
         grandTotal: checkoutGrandTotal,
         appliedCoupons,
         itemDiscounts,
@@ -1273,6 +1422,12 @@ export default function PaymentDialog(props: PaymentDialogProps) {
         businessType: posDetails?.business_type,
         salesperson: currentSalesperson?.name || null,
         tax_id: taxPin || null,
+        loyalty: appliedLoyalty
+          ? {
+              loyalty_program: appliedLoyalty.loyalty_program,
+              loyalty_points: appliedLoyalty.loyalty_points,
+            }
+          : null,
         draft_invoice_id: getOriginalDraftInvoiceId(),
       };
 
@@ -1416,6 +1571,27 @@ export default function PaymentDialog(props: PaymentDialogProps) {
   }, [isOpen, dueDate]);
 
   useEffect(() => {
+    if (!isOpen) {
+      initializedCreditDefaultRef.current = false;
+      return;
+    }
+
+    if (initializedCreditDefaultRef.current) {
+      return;
+    }
+
+    const shouldDefaultToCredit = allowPartialPayments && defaultSalesType === "credit";
+    setIsCreditSale(shouldDefaultToCredit);
+
+    if (shouldDefaultToCredit) {
+      setPaymentAmounts({});
+      setLastModifiedMethodId(null);
+    }
+
+    initializedCreditDefaultRef.current = true;
+  }, [isOpen, allowPartialPayments, defaultSalesType]);
+
+  useEffect(() => {
     if (isOpen) setTaxPin("");
   }, [isOpen]);
 
@@ -1429,21 +1605,21 @@ export default function PaymentDialog(props: PaymentDialogProps) {
     if (isOpen && modes.length > 0 && !isCreditSale) {
       const defaultMode = modes.find((mode) => mode.default === 1);
       if (defaultMode && Object.keys(paymentAmounts).length === 0) {
-        const defaultAmount = parseFloat(checkoutGrandTotal.toFixed(2));
+        const defaultAmount = parseFloat(checkoutPayableTotal.toFixed(2));
         setLastModifiedMethodId(defaultMode.mode_of_payment);
         setPaymentAmounts({ [defaultMode.mode_of_payment]: defaultAmount });
       }
     }
-  }, [isOpen, modes, checkoutGrandTotal, isB2B, isB2C, paymentAmounts, isCreditSale]);
+  }, [isOpen, modes, checkoutPayableTotal, isB2B, isB2C, paymentAmounts, isCreditSale]);
 
   useEffect(() => {
     if (!isOpen || invoiceSubmitted || isProcessingPayment || isCreditSale) {
-      previousCheckoutGrandTotalRef.current = checkoutGrandTotal;
+      previousCheckoutGrandTotalRef.current = checkoutPayableTotal;
       return;
     }
 
     const previousTotal = previousCheckoutGrandTotalRef.current;
-    if (Math.abs(previousTotal - checkoutGrandTotal) < 0.0001) {
+    if (Math.abs(previousTotal - checkoutPayableTotal) < 0.0001) {
       return;
     }
 
@@ -1463,31 +1639,14 @@ export default function PaymentDialog(props: PaymentDialogProps) {
 
       const defaultMode = modes.find((mode) => mode.default === 1)?.mode_of_payment;
       if (entries.length === 1 && defaultMode && entries[0]?.[0] === defaultMode) {
-        return { [defaultMode]: roundCurrency(checkoutGrandTotal) };
+        return { [defaultMode]: roundCurrency(checkoutPayableTotal) };
       }
 
       return prev;
     });
 
-    previousCheckoutGrandTotalRef.current = checkoutGrandTotal;
-  }, [checkoutGrandTotal, isOpen, invoiceSubmitted, isProcessingPayment, isCreditSale, modes]);
-
-  useEffect(() => {
-    if (modes.length > 0 && Object.keys(paymentAmounts).length > 0) {
-      const defaultMode = modes.find((mode) => mode.default === 1);
-      if (defaultMode) {
-        const totalPayments = Object.values(paymentAmounts).reduce((sum, amount) => sum + (amount || 0), 0);
-        const excess = totalPayments - checkoutGrandTotal;
-        const paymentEntries = Object.entries(paymentAmounts);
-        const highestAmountMethod = paymentEntries.reduce((max, current) => (current[1] || 0) > (max[1] || 0) ? current : max);
-        const [highestMethodId, highestAmount] = highestAmountMethod;
-        if (highestAmount > 0 && excess > 0) {
-          const newAmount = Math.max(0, highestAmount - excess);
-          setPaymentAmounts((prev) => ({ ...prev, [highestMethodId]: newAmount }));
-        }
-      }
-    }
-  }, [checkoutGrandTotal, modes, isB2C, isB2B, paymentAmounts]);
+    previousCheckoutGrandTotalRef.current = checkoutPayableTotal;
+  }, [checkoutPayableTotal, isOpen, invoiceSubmitted, isProcessingPayment, isCreditSale, modes]);
 
   useEffect(() => {
     if (invoiceSubmitted && invoiceData && print_receipt_on_order_complete) {
@@ -1606,6 +1765,86 @@ export default function PaymentDialog(props: PaymentDialogProps) {
     setShowMpesaOptionsModal(true);
   };
 
+  const renderLoyaltyRedemption = () => {
+    const loyalty = selectedCustomer?.loyalty;
+    if (!selectedCustomer || !loyalty?.enabled || !loyalty.loyalty_program) {
+      return null;
+    }
+
+    const availablePoints = Number(loyalty.available_points ?? loyalty.loyalty_points ?? 0);
+    const redeemableValue = Number(loyalty.redeemable_value || 0);
+    const tier = loyalty.loyalty_program_tier || loyalty.customer_loyalty_program_tier;
+
+    return (
+      <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
+              <Award className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-gray-900 dark:text-white">Redeem Loyalty Points</div>
+              <div className="text-xs text-gray-600 dark:text-gray-300">
+                {loyalty.loyalty_program_name || loyalty.loyalty_program}
+                {tier ? ` · ${tier}` : ""}
+              </div>
+            </div>
+          </div>
+          <div className="text-right text-xs text-gray-600 dark:text-gray-300">
+            <div className="font-semibold text-gray-900 dark:text-white">
+              {availablePoints.toLocaleString()} pts
+            </div>
+            <div>{formatCurrencyWithSymbol(redeemableValue, displayCurrencySymbol)}</div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+          <input
+            type="number"
+            min="0"
+            step="1"
+            max={availablePoints}
+            value={loyaltyPointsInput}
+            onChange={(event) => handleLoyaltyPointsInputChange(event.target.value)}
+            disabled={invoiceSubmitted || isProcessingPayment || isApplyingLoyalty || availablePoints <= 0}
+            placeholder="Points to redeem"
+            className="w-full px-3 py-2 border border-amber-200 dark:border-amber-800 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:cursor-not-allowed disabled:opacity-50"
+          />
+          <button
+            type="button"
+            onClick={() => void handleApplyLoyaltyRedemption()}
+            disabled={invoiceSubmitted || isProcessingPayment || isApplyingLoyalty || availablePoints <= 0 || !appliedLoyalty}
+            className="px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
+          >
+            {isApplyingLoyalty ? "Applying..." : "Apply"}
+          </button>
+        </div>
+
+        {appliedLoyalty && (
+          <div className="flex items-center justify-between gap-3 rounded-md bg-white dark:bg-gray-800 border border-amber-200 dark:border-amber-800 p-3">
+            <div>
+              <div className="text-sm font-medium text-gray-900 dark:text-white">
+                {appliedLoyalty.loyalty_points.toLocaleString()} points applied
+              </div>
+              <div className="text-xs text-gray-600 dark:text-gray-300">
+                {formatCurrencyWithSymbol(appliedLoyalty.loyalty_amount, displayCurrencySymbol)} will reduce amount due.
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={clearLoyaltyRedemption}
+              disabled={invoiceSubmitted || isProcessingPayment}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+              title="Remove loyalty redemption"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderMpesaStatusNotice = () => {
     if (!mpesaFlow) return null;
 
@@ -1678,16 +1917,16 @@ export default function PaymentDialog(props: PaymentDialogProps) {
 
   if (isMobile) {
     return (
-      <div className={isFullPage ? "h-full bg-white dark:bg-gray-900 overflow-y-auto custom-scrollbar" : "fixed inset-0 bg-white dark:bg-gray-900 z-50 overflow-y-auto custom-scrollbar"}>
-        <div className="min-h-screen">
-          {!isFullPage && (
-            <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
-              <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {invoiceSubmitted ? "Invoice Queued" : isB2B ? "Submit Invoice" : "Payment"}
-              </h1>
-            </div>
-          )}
-          <div className="p-4 space-y-6">
+      <div className={isFullPage ? "h-full bg-white dark:bg-gray-900 flex flex-col overflow-hidden" : "fixed inset-0 bg-white dark:bg-gray-900 z-50 flex flex-col overflow-hidden"}>
+        {!isFullPage && (
+          <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between z-10">
+            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {invoiceSubmitted ? "Invoice Queued" : isB2B ? "Submit Invoice" : "Payment"}
+            </h1>
+          </div>
+        )}
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+          <div className="p-4 space-y-6 [padding-bottom:calc(8rem+env(safe-area-inset-bottom))]">
             {invoiceSubmitted ? (
               <div className="space-y-4">
                 <div className="flex items-center justify-center space-x-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
@@ -1763,6 +2002,7 @@ export default function PaymentDialog(props: PaymentDialogProps) {
                     ))}
                   </div>
                 </div>
+                {renderLoyaltyRedemption()}
                 {renderMpesaStatusNotice()}
                 {allowPartialPayments && (
                   <div className="space-y-3 pt-2">
@@ -1777,95 +2017,56 @@ export default function PaymentDialog(props: PaymentDialogProps) {
                     )}
                   </div>
                 )}
-                <div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Round Off</label>
-                      <div className="flex space-x-2">
-                        <input type="number" value={roundOffInput} onChange={(e) => handleRoundOffChange(e.target.value)} disabled={invoiceSubmitted || isProcessingPayment || !roundOffEnabled} placeholder="-0.00" className={`flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${invoiceSubmitted || isProcessingPayment || !roundOffEnabled ? "cursor-not-allowed opacity-50" : ""}`} />
-                        <button onClick={handleRoundOff} disabled={invoiceSubmitted || isProcessingPayment || !roundOffEnabled} className={`px-3 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors ${invoiceSubmitted || isProcessingPayment || !roundOffEnabled ? "cursor-not-allowed opacity-50" : ""}`} title="Auto Round">
-                          <Calculator size={16} />
-                        </button>
-                      </div>
-                    </div>
+                {isDeliveryChargeEnabled && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Delivery Charge (Service Item)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={deliveryCharge}
+                      onChange={(e) => setDeliveryCharge(Math.max(0, Number(e.target.value || 0)))}
+                      disabled={invoiceSubmitted || isProcessingPayment}
+                      className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${invoiceSubmitted || isProcessingPayment ? "cursor-not-allowed opacity-50" : ""}`}
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {deliveryChargeItemCode
+                        ? `Posted as service item: ${deliveryChargeItemCode}`
+                        : "Set Delivery Charge Item on POS Profile to post this amount as a service item."}
+                    </p>
                   </div>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
-                    <span className="font-medium text-gray-900 dark:text-white">{formatCurrencyWithSymbol(displaySubtotal, displayCurrencySymbol)}</span>
-                  </div>
-                  {calculations.couponDiscount > 0 && (
-                    <div className="flex justify-between text-green-600 dark:text-green-400">
-                      <span>Discount</span>
-                      <span>-{formatCurrencyWithSymbol(calculations.couponDiscount, displayCurrencySymbol)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Tax ({calculations.selectedTax?.rate}% {displayTaxIsIncluded ? "Incl." : "Excl."})</span>
-                    <span className={`font-medium ${displayTaxIsIncluded ? "text-beveren-600 dark:text-beveren-400" : "text-gray-900 dark:text-white"}`}>
-                      {displayTaxIsIncluded
-                        ? `(${formatCurrencyWithSymbol(displayTaxTotal, displayCurrencySymbol)})`
-                        : formatCurrencyWithSymbol(displayTaxTotal, displayCurrencySymbol)}
-                    </span>
-                  </div>
-                  {(isTaxPreviewLoading || hasBackendTaxPreview) && (
-                    <div className="rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 p-2 space-y-1">
-                      {isTaxPreviewLoading ? (
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Calculating tax breakdown...</div>
-                      ) : !hasBackendTaxBreakdown ? (
-                        <div className="text-xs text-gray-500 dark:text-gray-400">ERPNext returned a tax total for this checkout, but no line-level breakdown rows were provided.</div>
-                      ) : (
-                        backendTaxLines.map((taxLine, index) => (
-                          <div key={`${taxLine.account_head || taxLine.description || "tax"}-${index}`} className="flex justify-between text-xs">
-                            <span className="text-gray-600 dark:text-gray-300">{taxLine.description || taxLine.account_head || "Tax"}</span>
-                            <span className="text-gray-900 dark:text-white">
-                              {Number(taxLine.included_in_print_rate) === 1
-                                ? `(${formatCurrencyWithSymbol(Number(taxLine.tax_amount) || 0, displayCurrencySymbol)})`
-                                : formatCurrencyWithSymbol(Number(taxLine.tax_amount) || 0, displayCurrencySymbol)}
-                            </span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-                  {roundOffAmount !== 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Round Off</span>
-                      <span className="font-medium text-gray-900 dark:text-white">{formatCurrencyWithSymbol(roundOffAmount, displayCurrencySymbol)}</span>
-                    </div>
-                  )}
-                  <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
-                    <div className="flex justify-between">
-                      <span className="text-lg font-bold text-gray-900 dark:text-white">Grand Total</span>
-                      <span className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrencyWithSymbol(checkoutGrandTotal, displayCurrencySymbol)}</span>
-                    </div>
-                  </div>
-                  {(isB2C || isB2B) && (
-                    <>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Total Paid</span>
-                        <span className="font-medium text-beveren-600 dark:text-blue-400">{formatCurrencyWithSymbol(totalPaidAmount, displayCurrencySymbol)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Outstanding</span>
-                        <span className="font-medium text-red-600 dark:text-red-400">{formatCurrencyWithSymbol(outstandingAmount, displayCurrencySymbol)}</span>
-                      </div>
-                      {totalPaidAmount > checkoutGrandTotal && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600 dark:text-gray-400">Change</span>
-                          <span className="font-medium text-beveren-600 dark:text-beveren-400">{formatCurrencyWithSymbol(subtractCurrency(totalPaidAmount, checkoutGrandTotal), displayCurrencySymbol)}</span>
-                        </div>
-                      )}
-                    </>
-                  )}
-                  {isB2B && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Outstanding Amount</span>
-                      <span className="font-medium text-orange-600 dark:text-orange-400">{formatCurrencyWithSymbol(checkoutGrandTotal, displayCurrencySymbol)}</span>
-                    </div>
-                  )}
-                </div>
+                )}
+                <TaxSection
+                  selectedCustomer={selectedCustomer}
+                  invoiceSubmitted={invoiceSubmitted}
+                  isProcessingPayment={isProcessingPayment}
+                  taxPin={taxPin}
+                  onTaxPinChange={setTaxPin}
+                  calculations={calculations}
+                  displayCurrencySymbol={displayCurrencySymbol}
+                  backendTaxPreview={backendTaxPreview}
+                  isTaxPreviewLoading={isTaxPreviewLoading}
+                  taxPreviewError={taxPreviewError}
+                  roundOffInput={roundOffInput}
+                  roundOffEnabled={roundOffEnabled}
+                  onRoundOffChange={handleRoundOffChange}
+                  onRoundOff={handleRoundOff}
+                />
+
+                <TotalsSection
+                  calculations={calculations}
+                  displaySubtotal={displaySubtotal}
+                  displayTaxTotal={displayTaxTotal}
+                  displayTaxIsIncluded={displayTaxIsIncluded}
+                  checkoutGrandTotal={checkoutGrandTotal}
+                  loyaltyAmount={loyaltyAmount}
+                  checkoutPayableTotal={checkoutPayableTotal}
+                  totalPaidAmount={totalPaidAmount}
+                  outstandingAmount={outstandingAmount}
+                  displayCurrencySymbol={displayCurrencySymbol}
+                  isB2B={isB2B}
+                  backendTaxPreview={backendTaxPreview}
+                />
                 <div className="space-y-3 pt-6">
                   <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
                     <label className="flex items-center gap-3 cursor-pointer group">
@@ -2026,6 +2227,7 @@ export default function PaymentDialog(props: PaymentDialogProps) {
                   setActiveMethodId={setActiveMethodId}
                 />
 
+                {renderLoyaltyRedemption()}
                 {renderMpesaStatusNotice()}
 
                 {allowPartialPayments && (
@@ -2042,20 +2244,41 @@ export default function PaymentDialog(props: PaymentDialogProps) {
                   </div>
                 )}
 
+                {isDeliveryChargeEnabled && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Delivery Charge (Service Item)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={deliveryCharge}
+                      onChange={(e) => setDeliveryCharge(Math.max(0, Number(e.target.value || 0)))}
+                      disabled={invoiceSubmitted || isProcessingPayment}
+                      className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${invoiceSubmitted || isProcessingPayment ? "cursor-not-allowed opacity-50" : ""}`}
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {deliveryChargeItemCode
+                        ? `Posted as service item: ${deliveryChargeItemCode}`
+                        : "Set Delivery Charge Item on POS Profile to post this amount as a service item."}
+                    </p>
+                  </div>
+                )}
+
                 <TaxSection
                   selectedCustomer={selectedCustomer}
                   invoiceSubmitted={invoiceSubmitted}
                   isProcessingPayment={isProcessingPayment}
                   taxPin={taxPin}
                   onTaxPinChange={setTaxPin}
-                  selectedSalesTaxCharges={selectedSalesTaxCharges}
-                  onTaxChange={handleSalesTaxChange}
-                  salesTaxCharges={salesTaxCharges}
                   calculations={calculations}
                   displayCurrencySymbol={displayCurrencySymbol}
                   backendTaxPreview={backendTaxPreview}
                   isTaxPreviewLoading={isTaxPreviewLoading}
                   taxPreviewError={taxPreviewError}
+                  roundOffInput={roundOffInput}
+                  roundOffEnabled={roundOffEnabled}
+                  onRoundOffChange={handleRoundOffChange}
+                  onRoundOff={handleRoundOff}
                 />
 
                 <SalesPersonSection
@@ -2079,20 +2302,13 @@ export default function PaymentDialog(props: PaymentDialogProps) {
                   displayTaxTotal={displayTaxTotal}
                   displayTaxIsIncluded={displayTaxIsIncluded}
                   checkoutGrandTotal={checkoutGrandTotal}
-                  roundOffAmount={roundOffAmount}
-                  roundOffInput={roundOffInput}
-                  roundOffEnabled={roundOffEnabled}
-                  invoiceSubmitted={invoiceSubmitted}
-                  isProcessingPayment={isProcessingPayment}
+                  loyaltyAmount={loyaltyAmount}
+                  checkoutPayableTotal={checkoutPayableTotal}
                   totalPaidAmount={totalPaidAmount}
                   outstandingAmount={outstandingAmount}
                   displayCurrencySymbol={displayCurrencySymbol}
                   isB2B={isB2B}
-                  isB2C={isB2C}
                   backendTaxPreview={backendTaxPreview}
-                  taxPreviewError={taxPreviewError}
-                  onRoundOffChange={handleRoundOffChange}
-                  onRoundOff={handleRoundOff}
                 />
               </>
             )}

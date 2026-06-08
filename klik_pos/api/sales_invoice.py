@@ -11,6 +11,11 @@ from frappe.utils import cint, flt, nowdate
 from klik_pos.klik_pos.utils import get_current_pos_profile
 
 from .item.item_price import get_price_list_with_customer_priority
+from .loyalty import (
+	apply_loyalty_redemption,
+	get_invoice_loyalty_summary,
+	normalize_loyalty_redemption,
+)
 from .sql_builder import apply_sql_permissions
 
 # Performance optimization: Cache frequently accessed data
@@ -304,6 +309,18 @@ def _validate_reserved_stock_for_items(doc, exclude_invoice=None):
 	if not getattr(doc, "items", None):
 		return
 
+	item_codes_in_doc = list({row.item_code for row in doc.items if row.item_code})
+	item_stock_flag_map = {}
+	if item_codes_in_doc:
+		item_stock_flag_map = {
+			row.name: int(row.is_stock_item or 0)
+			for row in frappe.get_all(
+				"Item",
+				filters={"name": ["in", item_codes_in_doc]},
+				fields=["name", "is_stock_item"],
+			)
+		}
+
 	required_qty_map = {}
 	item_codes = set()
 	warehouses = set()
@@ -311,7 +328,7 @@ def _validate_reserved_stock_for_items(doc, exclude_invoice=None):
 	for row in doc.items:
 		if not row.item_code or not row.warehouse:
 			continue
-		if hasattr(row, "is_stock_item") and int(row.is_stock_item or 0) == 0:
+		if item_stock_flag_map.get(row.item_code, 1) == 0:
 			continue
 
 		required_qty = flt(abs(getattr(row, "stock_qty", 0) or 0))
@@ -489,6 +506,27 @@ def _get_payment_methods_from_invoice(doc):
 	return payment_methods
 
 
+def _get_invoice_response_summary(doc):
+	return {
+		"name": doc.name,
+		"doctype": doc.doctype,
+		"customer": doc.customer,
+		"customer_name": doc.customer_name,
+		"posting_date": doc.posting_date,
+		"base_grand_total": doc.base_grand_total,
+		"grand_total": doc.grand_total,
+		"rounded_total": doc.rounded_total,
+		"paid_amount": doc.paid_amount,
+		"outstanding_amount": doc.outstanding_amount,
+		"currency": doc.currency,
+		"currency_symbol": frappe.db.get_value("Currency", doc.currency, "symbol") or doc.currency,
+		"status": doc.status,
+		"is_pos": doc.is_pos,
+		"company": doc.company,
+		"loyalty": get_invoice_loyalty_summary(doc),
+	}
+
+
 class PartialPaymentValidationError(ValidationError):
 	pass
 
@@ -654,17 +692,24 @@ def _get_user_ids_by_full_name(full_name):
 		return []
 
 
+def _sql_in_clause(values):
+	"""Build a parameterized SQL IN clause for dynamic value lists."""
+	values = list(values or [])
+	return ", ".join(["%s"] * len(values)), tuple(values)
+
+
 def _batch_fetch_cashier_names(user_ids):
 	"""Batch fetch cashier names for given user IDs."""
 	if not user_ids:
 		return {}
 
+	placeholders, params = _sql_in_clause(user_ids)
 	cashier_query = """
 		SELECT name, full_name
 		FROM `tabUser`
 		WHERE name IN ({})
-	""".format(",".join([f"'{uid}'" for uid in user_ids]))
-	cashier_results = frappe.db.sql(cashier_query, as_dict=True)
+	""".format(placeholders)
+	cashier_results = frappe.db.sql(cashier_query, params, as_dict=True)
 	return {user.name: user.full_name or user.name for user in cashier_results}
 
 
@@ -673,12 +718,13 @@ def _batch_fetch_payment_methods(invoice_names):
 	if not invoice_names:
 		return {}
 
+	placeholders, params = _sql_in_clause(invoice_names)
 	payment_query = """
 		SELECT parent, mode_of_payment, amount
 		FROM `tabSales Invoice Payment`
 		WHERE parent IN ({})
-	""".format(",".join([f"'{name}'" for name in invoice_names]))
-	payment_results = frappe.db.sql(payment_query, as_dict=True)
+	""".format(placeholders)
+	payment_results = frappe.db.sql(payment_query, params, as_dict=True)
 
 	# Group by parent invoice
 	payment_methods_map = {}
@@ -697,12 +743,13 @@ def _batch_fetch_items(invoice_names):
 	if not invoice_names:
 		return {}
 
+	placeholders, params = _sql_in_clause(invoice_names)
 	items_query = """
 		SELECT parent, item_code, qty, rate, amount
 		FROM `tabSales Invoice Item`
 		WHERE parent IN ({})
-	""".format(",".join([f"'{name}'" for name in invoice_names]))
-	items_results = frappe.db.sql(items_query, as_dict=True)
+	""".format(placeholders)
+	items_results = frappe.db.sql(items_query, params, as_dict=True)
 
 	# Group by parent invoice
 	items_map = {}
@@ -771,6 +818,7 @@ def _calculate_return_quantities(invoice, items):
 	if not item_codes:
 		return
 
+	item_placeholders, item_params = _sql_in_clause(item_codes)
 	returns_query = """
 		SELECT sii.item_code, COALESCE(SUM(ABS(sii.qty)), 0) as total_returned_qty
 		FROM `tabSales Invoice` si
@@ -781,9 +829,11 @@ def _calculate_return_quantities(invoice, items):
 		  AND si.docstatus = 1
 		  AND si.customer = %s
 		GROUP BY sii.item_code
-	""".format(",".join([f"'{code}'" for code in item_codes]))
+	""".format(item_placeholders)
 
-	returns_data = frappe.db.sql(returns_query, (invoice.name, invoice.customer), as_dict=True)
+	returns_data = frappe.db.sql(
+		returns_query, (invoice.name, *item_params, invoice.customer), as_dict=True
+	)
 	returned_qty_map = {row.item_code: row.total_returned_qty for row in returns_data}
 
 	# Update items with return data
@@ -830,6 +880,7 @@ def get_invoice_details(invoice_id):
 			"data": {
 				**invoice_data,
 				"items": items,
+				"loyalty": get_invoice_loyalty_summary(invoice),
 				**address_data,
 			},
 		}
@@ -864,6 +915,7 @@ def validate_checkout_invoice(data):
 			mode_of_payment,
 			business_type,
 			roundoff_amount,
+			delivery_charge,
 			delivery_personnel,
 			is_credit_sale,
 			allow_partial_payment,
@@ -871,6 +923,7 @@ def validate_checkout_invoice(data):
 			salesperson,
 			tax_id,
 			enable_background_submission,
+			loyalty_redemption,
 		) = parse_invoice_data(data)
 
 		preview_doc = build_sales_invoice_doc(
@@ -881,6 +934,7 @@ def validate_checkout_invoice(data):
 			mode_of_payment,
 			business_type,
 			roundoff_amount,
+			delivery_charge,
 			include_payments=False,
 			delivery_personnel=delivery_personnel,
 			is_credit_sale=is_credit_sale,
@@ -889,6 +943,7 @@ def validate_checkout_invoice(data):
 			tax_id=tax_id,
 			create_batch_and_serial_bundle=False,
 			enable_background_submission=enable_background_submission,
+			loyalty_redemption=loyalty_redemption,
 		)
 
 		validate_required_salesperson(preview_doc)
@@ -946,6 +1001,7 @@ def _get_invoice_items_with_returns(invoice_id, customer):
 	returned_qty_map = {}
 
 	if item_codes:
+		item_placeholders, item_params = _sql_in_clause(item_codes)
 		returns_query = """
 			SELECT sii.item_code, COALESCE(SUM(ABS(sii.qty)), 0) as total_returned_qty
 			FROM `tabSales Invoice` si
@@ -956,9 +1012,11 @@ def _get_invoice_items_with_returns(invoice_id, customer):
 			  AND si.docstatus = 1
 			  AND si.customer = %s
 			GROUP BY sii.item_code
-		""".format(",".join([f"'{code}'" for code in item_codes]))
+		""".format(item_placeholders)
 
-		returns_data = frappe.db.sql(returns_query, (invoice_id, customer), as_dict=True)
+		returns_data = frappe.db.sql(
+			returns_query, (invoice_id, *item_params, customer), as_dict=True
+		)
 		returned_qty_map = {row.item_code: row.total_returned_qty for row in returns_data}
 
 	# Build items list with return data
@@ -1075,6 +1133,7 @@ def queue_sales_invoice(data):
 			mode_of_payment,
 			business_type,
 			roundoff_amount,
+			delivery_charge,
 			delivery_personnel,
 			is_credit_sale,
 			allow_partial_payment,
@@ -1082,6 +1141,7 @@ def queue_sales_invoice(data):
 			salesperson,
 			tax_id,
 			enable_background_submission,
+			loyalty_redemption,
 		) = parse_invoice_data(data)
 
 		if not customer:
@@ -1097,6 +1157,7 @@ def queue_sales_invoice(data):
 			mode_of_payment,
 			business_type,
 			roundoff_amount,
+			delivery_charge,
 			include_payments=True,
 			delivery_personnel=delivery_personnel,
 			is_credit_sale=is_credit_sale,
@@ -1105,13 +1166,15 @@ def queue_sales_invoice(data):
 			salesperson=salesperson,
 			tax_id=tax_id,
 			enable_background_submission=enable_background_submission,
+			loyalty_redemption=loyalty_redemption,
 		)
 
 		validate_required_salesperson(doc)
 
-		doc.base_paid_amount = amount_paid
-		doc.paid_amount = amount_paid
-		doc.outstanding_amount = max(flt(doc.grand_total) - flt(amount_paid), 0)
+		paid_credit = flt(amount_paid) + flt(getattr(doc, "loyalty_amount", 0))
+		doc.base_paid_amount = paid_credit
+		doc.paid_amount = paid_credit
+		doc.outstanding_amount = max(flt(doc.grand_total) - paid_credit, 0)
 		doc.reserve_stock = 1
 		_apply_klik_invoice_flags(doc, is_held=False, is_submitted=False)
 
@@ -1149,19 +1212,7 @@ def queue_sales_invoice(data):
 				"queue_status": doc.queue_status,
 				"invoice_name": doc.name,
 				"invoice_id": doc.name,
-				"invoice": {
-					"name": doc.name,
-					"doctype": doc.doctype,
-					"customer": doc.customer,
-					"customer_name": doc.customer_name,
-					"posting_date": doc.posting_date,
-					"base_grand_total": doc.base_grand_total,
-					"currency": doc.currency,
-					"currency_symbol": frappe.db.get_value("Currency", doc.currency, "symbol") or doc.currency,
-					"status": doc.status,
-					"is_pos": doc.is_pos,
-					"company": doc.company,
-				},
+				"invoice": _get_invoice_response_summary(doc),
 				"payment_entry": None,
 				"processing_time": round(processing_time, 2),
 			}
@@ -1198,19 +1249,7 @@ def queue_sales_invoice(data):
 				"success": True,
 				"invoice_name": doc.name,
 				"invoice_id": doc.name,
-				"invoice": {
-					"name": doc.name,
-					"doctype": doc.doctype,
-					"customer": doc.customer,
-					"customer_name": doc.customer_name,
-					"posting_date": doc.posting_date,
-					"base_grand_total": doc.base_grand_total,
-					"currency": doc.currency,
-					"currency_symbol": frappe.db.get_value("Currency", doc.currency, "symbol") or doc.currency,
-					"status": doc.status,
-					"is_pos": doc.is_pos,
-					"company": doc.company,
-				},
+				"invoice": _get_invoice_response_summary(doc),
 				"payment_entry": None,
 				"processing_time": round(processing_time, 2),
 			}
@@ -1323,6 +1362,7 @@ def create_draft_invoice(data):
 			mode_of_payment,
 			business_type,
 			roundoff_amount,
+			delivery_charge,
 			delivery_personnel,
 			is_credit_sale,
 			allow_partial_payment,
@@ -1330,6 +1370,7 @@ def create_draft_invoice(data):
 			salesperson,
 			tax_id,
 			enable_background_submission,
+			loyalty_redemption,
 		) = parse_invoice_data(data)
 
 		if target_draft_invoice_id:
@@ -1350,6 +1391,7 @@ def create_draft_invoice(data):
 				mode_of_payment,
 				business_type,
 				roundoff_amount,
+				delivery_charge,
 				delivery_personnel=delivery_personnel,
 				is_credit_sale=is_credit_sale,
 				allow_partial_payment=allow_partial_payment,
@@ -1357,6 +1399,7 @@ def create_draft_invoice(data):
 				salesperson=salesperson,
 				tax_id=tax_id,
 				enable_background_submission=enable_background_submission,
+				loyalty_redemption=loyalty_redemption,
 			)
 		else:
 			doc = build_sales_invoice_doc(
@@ -1367,6 +1410,7 @@ def create_draft_invoice(data):
 				mode_of_payment,
 				business_type,
 				roundoff_amount,
+				delivery_charge,
 				include_payments=True,
 				delivery_personnel=delivery_personnel,
 				is_credit_sale=is_credit_sale,
@@ -1375,6 +1419,7 @@ def create_draft_invoice(data):
 				salesperson=salesperson,
 				tax_id=tax_id,
 				enable_background_submission=enable_background_submission,
+				loyalty_redemption=loyalty_redemption,
 			)
 
 			validate_required_salesperson(doc)
@@ -1416,16 +1461,43 @@ def parse_invoice_data(data):
 	customer = data.get("customer", {}).get("id")
 	items = []
 	item_discounts = data.get("itemDiscounts", {})
-	is_credit_sale = _as_bool(data.get("isCreditSale") or data.get("is_credit_sale"))
+	has_positive_priced_item = False
+	raw_credit_sale_flag = data.get("isCreditSale")
+	if raw_credit_sale_flag is None:
+		raw_credit_sale_flag = data.get("is_credit_sale")
+	is_credit_sale = _as_bool(raw_credit_sale_flag)
 	allow_partial_payment = _as_bool(
 		data.get("allowPartialPayment") or data.get("allow_partial_payment")
 	)
 	enable_background_submission = _as_bool(
 		data.get("enable_background_invoice_submission") or 0
 	)
+	loyalty_redemption = normalize_loyalty_redemption(data)
 	due_date = data.get("dueDate") or data.get("due_date")
 	mode_of_payment = None
 	default_payment_mode = None
+	checkout_status = str(data.get("status") or "").strip().lower()
+	has_payment_submission_context = any(
+		key in data
+		for key in (
+			"paymentMethods",
+			"amountPaid",
+			"isCreditSale",
+			"is_credit_sale",
+			"dueDate",
+			"due_date",
+		)
+	)
+
+	if raw_credit_sale_flag is None and has_payment_submission_context:
+		default_sales_type = (
+			getattr(get_current_pos_profile(), "default_sales_type", None) or "Cash"
+		).strip().lower()
+		is_credit_sale = default_sales_type == "credit"
+
+	allow_zero_rate_sales = cint(
+		getattr(get_current_pos_profile(), "allow_zero_rate_sales", 0) or 0
+	)
 
 	for item in data.get("items", []):
 		# Draft edit flows can send a unique cart-line id and the actual item code separately.
@@ -1471,8 +1543,23 @@ def parse_invoice_data(data):
 		})
 
 		price = flt(item.get("price") or 0)
+		quantity = flt(item.get("quantity") or 0)
+		if price > 0 and quantity > 0:
+			has_positive_priced_item = True
 
-		if price <= 0 and discount_percentage <= 0 and discount_amount <= 0:
+		if price < 0:
+			frappe.throw(
+				_("Rate cannot be negative for item {0}").format(
+					item_code or _("Unknown Item")
+				)
+			)
+
+		if (
+			price == 0
+			and discount_percentage <= 0
+			and discount_amount <= 0
+			and not allow_zero_rate_sales
+		):
 			frappe.throw(
 				_("Rate must be greater than 0 for item {0} when no discount is set").format(
 					item_code or _("Unknown Item")
@@ -1480,25 +1567,96 @@ def parse_invoice_data(data):
 			)
 
 	amount_paid = 0.0
-	sales_and_tax_charges = get_current_pos_profile().taxes_and_charges
+	pos_profile = get_current_pos_profile()
+	sales_and_tax_charges = pos_profile.taxes_and_charges
 	business_type = data.get("businessType")
 
 	roundoff_amount = data.get("roundOffAmount", 0.0)
+	delivery_charge = flt(data.get("deliveryCharge") or data.get("delivery_charge") or 0.0)
+	if delivery_charge < 0:
+		frappe.throw(_("Delivery charge cannot be negative."))
+
+	if delivery_charge > 0:
+		allow_delivery_charge = cint(getattr(pos_profile, "custom_enable_delivery_charge", 0) or 0)
+		if allow_delivery_charge != 1:
+			frappe.throw(_("Delivery charge is not enabled for this POS Profile."))
+
+		delivery_item_code = (getattr(pos_profile, "custom_delivery_charge_item", None) or "").strip()
+		if not delivery_item_code:
+			frappe.throw(
+				_("Set Delivery Charge Item on POS Profile to use delivery charges.")
+			)
+
+		delivery_item = frappe.db.get_value(
+			"Item",
+			delivery_item_code,
+			["name", "disabled", "is_sales_item", "is_stock_item"],
+			as_dict=1,
+		)
+		if not delivery_item or cint(delivery_item.get("disabled") or 0) == 1:
+			frappe.throw(
+				_("Delivery Charge Item {0} is missing or disabled.").format(
+					frappe.bold(delivery_item_code)
+				)
+			)
+
+		if cint(delivery_item.get("is_sales_item") or 0) != 1:
+			frappe.throw(
+				_("Delivery Charge Item {0} must be allowed in sales.").format(
+					frappe.bold(delivery_item_code)
+				)
+			)
+
+		if cint(delivery_item.get("is_stock_item") or 0) == 1:
+			frappe.throw(
+				_("Delivery Charge Item {0} must be a non-stock service item.").format(
+					frappe.bold(delivery_item_code)
+				)
+			)
 
 	if roundoff_amount != 0:
 		_roundoff_account = get_writeoff_account()
 
 	if data.get("amountPaid"):
 		amount_paid = data.get("amountPaid")
+	if flt(amount_paid or 0) < 0:
+		frappe.throw(_("Payment amounts cannot be negative."))
 
 	if data.get("paymentMethods"):
 		mode_of_payment = data.get("paymentMethods")
+		if isinstance(mode_of_payment, list):
+			for payment in mode_of_payment:
+				if not isinstance(payment, dict):
+					continue
+				if flt(payment.get("amount") or 0) < 0:
+					frappe.throw(_("Payment amounts cannot be negative."))
 
-	if is_credit_sale:
+	if is_credit_sale and has_payment_submission_context:
+		if not due_date:
+			frappe.throw(_("Please select a due date for this credit sale"))
+
+		if customer and _is_walkin_customer(customer):
+			frappe.throw(_("Credit sales require a non walk-in customer."))
+
+		if _has_positive_payment_amount(mode_of_payment):
+			frappe.throw(
+				_("Credit sale cannot include payment amounts. Disable Credit Sale to collect payment.")
+			)
+
+		# Trust payment rows for credit-sale validation and always persist as unpaid.
+		amount_paid = 0.0
 		default_payment_mode = _get_default_payment_mode()
 		mode_of_payment = _normalize_credit_sale_payment_methods(mode_of_payment, default_payment_mode)
-		if not _has_positive_payment_amount(mode_of_payment):
-			amount_paid = 0.0
+	elif (
+		has_payment_submission_context
+		and checkout_status != "held"
+		and has_positive_priced_item
+		and not loyalty_redemption
+	):
+		if flt(amount_paid or 0) <= 0 or not _has_positive_payment_amount(mode_of_payment):
+			frappe.throw(
+				_("Cash sale requires at least one payment method with a positive amount.")
+			)
 
 	if data.get("SalesTaxCharges"):
 		sales_and_tax_charges = data.get("SalesTaxCharges")
@@ -1518,6 +1676,7 @@ def parse_invoice_data(data):
 		mode_of_payment,
 		business_type,
 		roundoff_amount,
+		delivery_charge,
 		delivery_personnel,
 		is_credit_sale,
 		allow_partial_payment,
@@ -1525,6 +1684,7 @@ def parse_invoice_data(data):
 		salesperson,
 		tax_id,
 		enable_background_submission,
+		loyalty_redemption,
 	)
 
 
@@ -1536,6 +1696,7 @@ def build_sales_invoice_doc(
 	mode_of_payment,
 	business_type,
 	roundoff_amount=0.0,
+	delivery_charge=0.0,
 	include_payments=False,
 	delivery_personnel=None,
 	is_credit_sale=False,
@@ -1545,6 +1706,7 @@ def build_sales_invoice_doc(
 	tax_id=None,
 	create_batch_and_serial_bundle=True,
 	enable_background_submission=False,
+	loyalty_redemption=None,
 ):
 	"""Main function to build a sales invoice document."""
 	doc = frappe.new_doc("Sales Invoice")
@@ -1574,7 +1736,9 @@ def build_sales_invoice_doc(
 	_set_pos_profile_fields(doc, pos_profile, customer, business_type, amount_paid, allow_partial_payment)
 
 	# Ensure batch/serial requirements are satisfied BEFORE building items
+	_validate_no_variant_templates(items)
 	_validate_and_autofetch_batch_and_serial(items, pos_profile)
+	_validate_product_bundle_components(items, pos_profile)
 
 	# Set posting details
 	_set_posting_fields(doc)
@@ -1597,10 +1761,14 @@ def build_sales_invoice_doc(
 
 	# Build per-item taxes from item_tax_rate fields
 	_populate_per_item_taxes(doc, pos_profile, force_inclusive_tax=force_inclusive_tax)
+	_upsert_delivery_charge_service_item(doc, pos_profile, delivery_charge)
 
 	doc.set_taxes()
 	doc.set_missing_values()
 	doc.calculate_taxes_and_totals()
+	apply_loyalty_redemption(doc, loyalty_redemption)
+	if loyalty_redemption:
+		doc.calculate_taxes_and_totals()
 
 	if create_batch_and_serial_bundle:
 		_create_batch_and_serial_bundle(items, doc)
@@ -1609,6 +1777,7 @@ def build_sales_invoice_doc(
 	if include_payments:
 		doc.is_pos = 1
 		_add_payment_entries(doc, mode_of_payment)
+		doc.calculate_taxes_and_totals()
 
 	if is_credit_sale and due_date:
 		doc.due_date = due_date
@@ -1625,6 +1794,7 @@ def _update_existing_draft_invoice(
 	mode_of_payment,
 	business_type,
 	roundoff_amount,
+	delivery_charge=0.0,
 	delivery_personnel=None,
 	is_credit_sale=False,
 	allow_partial_payment=False,
@@ -1632,6 +1802,7 @@ def _update_existing_draft_invoice(
 	salesperson=None,
 	tax_id=None,
 	enable_background_submission=False,
+	loyalty_redemption=None,
 ):
 	rebuilt_doc = build_sales_invoice_doc(
 		customer,
@@ -1641,6 +1812,7 @@ def _update_existing_draft_invoice(
 		mode_of_payment,
 		business_type,
 		roundoff_amount,
+		delivery_charge,
 		include_payments=True,
 		delivery_personnel=delivery_personnel,
 		is_credit_sale=is_credit_sale,
@@ -1650,6 +1822,7 @@ def _update_existing_draft_invoice(
 		tax_id=tax_id,
 		create_batch_and_serial_bundle=False,
 		enable_background_submission=enable_background_submission,
+		loyalty_redemption=loyalty_redemption,
 	)
 
 	invoice_doc.customer = rebuilt_doc.customer
@@ -1667,6 +1840,12 @@ def _update_existing_draft_invoice(
 	invoice_doc.warehouse = rebuilt_doc.warehouse
 	invoice_doc.cost_center = rebuilt_doc.cost_center
 	invoice_doc.is_pos = rebuilt_doc.is_pos
+	invoice_doc.redeem_loyalty_points = rebuilt_doc.redeem_loyalty_points
+	invoice_doc.loyalty_points = rebuilt_doc.loyalty_points
+	invoice_doc.loyalty_amount = rebuilt_doc.loyalty_amount
+	invoice_doc.loyalty_program = rebuilt_doc.loyalty_program
+	invoice_doc.loyalty_redemption_account = rebuilt_doc.loyalty_redemption_account
+	invoice_doc.loyalty_redemption_cost_center = rebuilt_doc.loyalty_redemption_cost_center
 	invoice_doc.taxes_and_charges = rebuilt_doc.taxes_and_charges
 	invoice_doc.set("items", [])
 	for item_row in rebuilt_doc.get("items", []):
@@ -1685,9 +1864,11 @@ def _update_existing_draft_invoice(
 	invoice_doc.set_missing_values()
 	invoice_doc.calculate_taxes_and_totals()
 
-	# Payments must be applied AFTER calculate_taxes_and_totals to preserve entered amounts.
+	# Payments must be applied after the first totals pass, then totals are recalculated
+	# so ERPNext includes both payment rows and loyalty redemption in paid/outstanding amounts.
 	invoice_doc.set("payments", [])
 	_add_payment_entries(invoice_doc, mode_of_payment)
+	invoice_doc.calculate_taxes_and_totals()
 
 	validate_required_salesperson(invoice_doc)
 	_apply_klik_invoice_flags(invoice_doc, is_held=True, is_submitted=False)
@@ -1770,9 +1951,17 @@ def _create_batch_and_serial_bundle(items, doc):
 		if not item_code or not serial_batch_bundle:
 			continue
 
-		item_meta = frappe.db.get_value("Item", item_code, ["has_batch_no", "has_serial_no"], as_dict=1)
+		item_meta = frappe.db.get_value(
+			"Item",
+			item_code,
+			["has_batch_no", "has_serial_no", "is_stock_item"],
+			as_dict=1,
+		)
 
-		if not item_meta or not (item_meta.has_batch_no or item_meta.has_serial_no):
+		if not item_meta or int(item_meta.get("is_stock_item") or 0) == 0:
+			continue
+
+		if not (item_meta.has_batch_no or item_meta.has_serial_no):
 			continue
 
 		row = _select_invoice_row_for_bundle(doc, item_code, idx, used_rows)
@@ -1878,6 +2067,10 @@ def _validate_and_autofetch_batch_and_serial(items, pos_profile):
 			continue
 
 		item_db_data = item_data_map.get(item_code, {}) or {}
+		is_stock_item = int(item_db_data.get("is_stock_item") or 0)
+		if not is_stock_item:
+			continue
+
 		has_batch_no = int(item_db_data.get("has_batch_no") or 0)
 		has_serial_no = int(item_db_data.get("has_serial_no") or 0)
 		bundle_entries = item.get("bundle_entries") or item.get("serial_batch_bundle") or []
@@ -1912,6 +2105,106 @@ def _validate_and_autofetch_batch_and_serial(items, pos_profile):
 					_(
 						"Serial No / Batch No are mandatory for Item {0}. Please select a batch before submitting the invoice."
 					).format(item_code)
+				)
+
+
+def _validate_no_variant_templates(items):
+	if not items:
+		return
+
+	item_codes = [item.get("id") for item in items if item.get("id")]
+	if not item_codes:
+		return
+
+	templates = frappe.get_all(
+		"Item",
+		filters={"name": ["in", item_codes], "has_variants": 1},
+		pluck="name",
+	)
+	if templates:
+		frappe.throw(
+			_(
+				"Item {0} is a variant template. Please select a specific variant before submitting the invoice."
+			).format(", ".join(templates))
+		)
+
+
+def _validate_product_bundle_components(items, pos_profile):
+	if not items:
+		return
+
+	bundle_item_codes = [item.get("id") for item in items if item.get("id")]
+	if not bundle_item_codes:
+		return
+
+	placeholders = ", ".join(["%s"] * len(bundle_item_codes))
+	bundle_rows = frappe.db.sql(
+		f"""
+		SELECT
+			pb.new_item_code AS bundle_item_code,
+			pbi.item_code,
+			pbi.qty,
+			i.item_name,
+			i.is_stock_item,
+			i.has_batch_no,
+			i.has_serial_no
+		FROM `tabProduct Bundle` pb
+		INNER JOIN `tabProduct Bundle Item` pbi ON pbi.parent = pb.name
+		INNER JOIN `tabItem` i ON i.name = pbi.item_code
+		WHERE pb.disabled = 0
+		AND pb.new_item_code IN ({placeholders})
+		ORDER BY pb.new_item_code, pbi.idx
+		""",
+		tuple(bundle_item_codes),
+		as_dict=True,
+	)
+
+	if not bundle_rows:
+		return
+
+	rows_by_bundle = {}
+	for row in bundle_rows:
+		rows_by_bundle.setdefault(row.bundle_item_code, []).append(row)
+
+	for item in items:
+		bundle_item_code = item.get("id")
+		component_rows = rows_by_bundle.get(bundle_item_code)
+		if not component_rows:
+			continue
+
+		parent_qty = flt(item.get("quantity") or 0)
+		for component in component_rows:
+			component_name = component.item_name or component.item_code
+			if cint(component.has_batch_no) or cint(component.has_serial_no):
+				frappe.throw(
+					_(
+						"Product Bundle {0} contains tracked component {1}. Klik POS does not yet support batch or serial selection for bundled components."
+					).format(bundle_item_code, component_name)
+				)
+
+			if not cint(component.is_stock_item):
+				continue
+
+			required_qty = flt(component.qty or 0) * parent_qty
+			available_qty = flt(
+				frappe.db.get_value(
+					"Bin",
+					{"item_code": component.item_code, "warehouse": pos_profile.warehouse},
+					"actual_qty",
+				)
+				or 0
+			)
+			if available_qty < required_qty:
+				frappe.throw(
+					_(
+						"Insufficient stock for Product Bundle {0}. Component {1} requires {2}, but only {3} is available in warehouse {4}."
+					).format(
+						bundle_item_code,
+						component_name,
+						required_qty,
+						available_qty,
+						pos_profile.warehouse,
+					)
 				)
 
 def _autofetch_batch_fifo(item_code, warehouse, qty):
@@ -2041,6 +2334,78 @@ def _set_taxes_and_charges(doc, sales_and_tax_charges, pos_profile):
 		doc.taxes_and_charges = pos_profile.taxes_and_charges
 
 
+def _upsert_delivery_charge_service_item(doc, pos_profile, delivery_charge):
+	"""Create or update a configured delivery service item row using checkout delivery charge."""
+	charge = flt(delivery_charge or 0)
+	if charge <= 0:
+		return
+
+	enabled = cint(getattr(pos_profile, "custom_enable_delivery_charge", 0) or 0) == 1
+	if not enabled:
+		return
+
+	delivery_item_code = (getattr(pos_profile, "custom_delivery_charge_item", None) or "").strip()
+	if not delivery_item_code:
+		frappe.throw(_("Set Delivery Charge Item on POS Profile to use delivery charges."))
+
+	delivery_item = frappe.db.get_value(
+		"Item",
+		delivery_item_code,
+		["name", "item_name", "disabled", "is_sales_item", "is_stock_item", "stock_uom"],
+		as_dict=1,
+	)
+	if not delivery_item or cint(delivery_item.get("disabled") or 0) == 1:
+		frappe.throw(
+			_("Delivery Charge Item {0} is missing or disabled.").format(
+				frappe.bold(delivery_item_code)
+			)
+		)
+
+	if cint(delivery_item.get("is_sales_item") or 0) != 1:
+		frappe.throw(
+			_("Delivery Charge Item {0} must be allowed in sales.").format(
+				frappe.bold(delivery_item_code)
+			)
+		)
+
+	if cint(delivery_item.get("is_stock_item") or 0) == 1:
+		frappe.throw(
+			_("Delivery Charge Item {0} must be a non-stock service item.").format(
+				frappe.bold(delivery_item_code)
+			)
+		)
+
+	delivery_row = None
+	for row in getattr(doc, "items", []) or []:
+		if row.item_code == delivery_item_code:
+			delivery_row = row
+			break
+
+	if delivery_row:
+		delivery_row.qty = 1
+		delivery_row.uom = delivery_row.uom or delivery_item.get("stock_uom") or "Nos"
+		delivery_row.rate = charge
+		delivery_row.price_list_rate = charge
+		delivery_row.amount = charge
+		delivery_row.base_rate = charge
+		delivery_row.base_amount = charge
+		return
+
+	item_data_map = _batch_fetch_item_data([delivery_item_code])
+	_precache_item_accounts([delivery_item_code], pos_profile.company)
+	delivery_item_payload = {
+		"id": delivery_item_code,
+		"quantity": 1,
+		"price": charge,
+		"uom": delivery_item.get("stock_uom") or "Nos",
+		"item_tax_template": "",
+		"item_tax_rate": {},
+		"discountPercentage": 0,
+		"discountAmount": 0,
+	}
+	doc.append("items", _prepare_item_data(doc, delivery_item_payload, item_data_map, pos_profile))
+
+
 def _is_pos_profile_tax_included_in_basic_rate(pos_profile):
 	"""Return True when Klik POS should treat entered rates as tax-inclusive."""
 	if not pos_profile:
@@ -2067,13 +2432,14 @@ def _batch_fetch_item_data(item_codes):
 	if not item_codes:
 		return {}
 
+	placeholders, params = _sql_in_clause(item_codes)
 	item_query = """
-		SELECT name, has_batch_no, has_serial_no
+		SELECT name, has_batch_no, has_serial_no, is_stock_item
 		FROM `tabItem`
 		WHERE name IN ({})
-	""".format(",".join([f"'{code}'" for code in item_codes]))
+	""".format(placeholders)
 
-	item_results = frappe.db.sql(item_query, as_dict=True)
+	item_results = frappe.db.sql(item_query, params, as_dict=True)
 	return {item.name: item for item in item_results}
 
 
@@ -2228,6 +2594,10 @@ def _add_uom_to_item(item_data, item):
 
 def _add_batch_to_item(item_data, item, item_db_data):
 	"""Add batch information if item has batch tracking."""
+	is_stock_item = int(item_db_data.get("is_stock_item") or 0)
+	if not is_stock_item:
+		return
+
 	has_batch_no = item_db_data.get("has_batch_no", 0)
 	batch_number = item.get("batchNumber")
 
@@ -2427,6 +2797,18 @@ def _has_positive_payment_amount(payment_methods):
 		except Exception:
 			continue
 	return False
+
+
+def _is_walkin_customer(customer):
+	"""Return True when the selected customer is marked as walk-in."""
+	if not customer:
+		return False
+
+	try:
+		is_walkin = frappe.db.get_value("Customer", customer, "custom_is_walkin")
+		return cint(is_walkin or 0) == 1
+	except Exception:
+		return False
 
 
 def get_tax_template(template_name):
@@ -2822,12 +3204,24 @@ class CustomSalesInvoice(SalesInvoice):
 		if not self.update_stock or getattr(self, "is_return", 0):
 			return
 
+		item_codes = list({row.item_code for row in self.items if row.item_code})
+		item_stock_flag_map = {}
+		if item_codes:
+			item_stock_flag_map = {
+				row.name: int(row.is_stock_item or 0)
+				for row in frappe.get_all(
+					"Item",
+					filters={"name": ["in", item_codes]},
+					fields=["name", "is_stock_item"],
+				)
+			}
+
 		own_reserved_map = _get_sales_invoice_reservation_map(self.name)
 
 		for row in self.items:
 			if not row.item_code or not row.warehouse:
 				continue
-			if hasattr(row, "is_stock_item") and int(row.is_stock_item or 0) == 0:
+			if item_stock_flag_map.get(row.item_code, 1) == 0:
 				continue
 
 			required_qty = flt(abs(getattr(row, "stock_qty", 0) or 0))
@@ -2868,8 +3262,13 @@ class CustomSalesInvoice(SalesInvoice):
 			"POS Profile", self.pos_profile, "allow_partial_payment"
 		)
 		allow_partial_payment = allow_partial_payment or getattr(self, "custom_allow_partial_payment", 0)
-		invoice_total = flt(self.rounded_total) or flt(self.grand_total)
-		paid_amount = flt(self.paid_amount)
+		precision = self.precision("rounded_total")
+		if precision is None:
+			precision = self.precision("grand_total")
+		invoice_total = flt(self.rounded_total, precision) or flt(self.grand_total, precision)
+		paid_amount = flt(self.paid_amount, precision)
+		if paid_amount < invoice_total and flt(getattr(self, "loyalty_amount", 0)):
+			paid_amount = flt(paid_amount + flt(self.loyalty_amount, precision), precision)
 
 		if not allow_partial_payment and paid_amount < invoice_total:
 			frappe.throw(
@@ -3230,6 +3629,8 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None, s
 			_invoice_item_pairs = [(item.parent, item.item_code) for item in all_items]
 
 			if item_codes:
+				invoice_placeholders, invoice_params = _sql_in_clause(invoice_names)
+				item_placeholders, item_params = _sql_in_clause(item_codes)
 				# Create a more efficient query to get all returned quantities
 				returns_query = """
 					SELECT
@@ -3245,11 +3646,13 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None, s
 					  AND rsi.customer = %s
 					GROUP BY rsi.return_against, sii.item_code
 				""".format(
-					",".join([f"'{name}'" for name in invoice_names]),
-					",".join([f"'{code}'" for code in item_codes]),
+					invoice_placeholders,
+					item_placeholders,
 				)
 
-				returns_data = frappe.db.sql(returns_query, (customer,), as_dict=True)
+				returns_data = frappe.db.sql(
+					returns_query, (*invoice_params, *item_params, customer), as_dict=True
+				)
 				returned_qty_map = {
 					(row.original_invoice, row.item_code): row.total_returned_qty for row in returns_data
 				}
@@ -3607,6 +4010,7 @@ def submit_draft_invoice(invoice_id, data=None):
 				mode_of_payment,
 				business_type,
 				roundoff_amount,
+				delivery_charge,
 				delivery_personnel,
 				is_credit_sale,
 				allow_partial_payment,
@@ -3614,6 +4018,7 @@ def submit_draft_invoice(invoice_id, data=None):
 				salesperson,
 				tax_id,
 				enable_background_submission,
+				loyalty_redemption,
 			) = parse_invoice_data(data)
 
 			rebuilt_doc = build_sales_invoice_doc(
@@ -3624,6 +4029,7 @@ def submit_draft_invoice(invoice_id, data=None):
 				mode_of_payment,
 				business_type,
 				roundoff_amount,
+				delivery_charge,
 				include_payments=True,
 				delivery_personnel=delivery_personnel,
 				is_credit_sale=is_credit_sale,
@@ -3633,6 +4039,7 @@ def submit_draft_invoice(invoice_id, data=None):
 				tax_id=tax_id,
 				create_batch_and_serial_bundle=False,
 				enable_background_submission=enable_background_submission,
+				loyalty_redemption=loyalty_redemption,
 			)
 
 			invoice_doc.customer = rebuilt_doc.customer
@@ -3650,6 +4057,12 @@ def submit_draft_invoice(invoice_id, data=None):
 			invoice_doc.warehouse = rebuilt_doc.warehouse
 			invoice_doc.cost_center = rebuilt_doc.cost_center
 			invoice_doc.is_pos = rebuilt_doc.is_pos
+			invoice_doc.redeem_loyalty_points = rebuilt_doc.redeem_loyalty_points
+			invoice_doc.loyalty_points = rebuilt_doc.loyalty_points
+			invoice_doc.loyalty_amount = rebuilt_doc.loyalty_amount
+			invoice_doc.loyalty_program = rebuilt_doc.loyalty_program
+			invoice_doc.loyalty_redemption_account = rebuilt_doc.loyalty_redemption_account
+			invoice_doc.loyalty_redemption_cost_center = rebuilt_doc.loyalty_redemption_cost_center
 			invoice_doc.taxes_and_charges = rebuilt_doc.taxes_and_charges
 			invoice_doc.set("items", [])
 			for item_row in rebuilt_doc.get("items", []):
@@ -3668,10 +4081,11 @@ def submit_draft_invoice(invoice_id, data=None):
 			invoice_doc.set_missing_values()
 			invoice_doc.calculate_taxes_and_totals()
 
-			# Payments must be applied AFTER calculate_taxes_and_totals to prevent
-			# ERPNext's set_payments() from overwriting the user-entered amounts.
+			# Payments must be applied after the first totals pass, then totals are recalculated
+			# so ERPNext includes both payment rows and loyalty redemption in paid/outstanding amounts.
 			invoice_doc.set("payments", [])
 			_add_payment_entries(invoice_doc, mode_of_payment)
+			invoice_doc.calculate_taxes_and_totals()
 
 			invoice_doc.save(ignore_permissions=True)
 

@@ -161,7 +161,6 @@ export default function MainPOSScreen() {
         if (!isMountedRef.current) return
         const hasCached = hasCachedDraftInvoiceItems()
         if (hasCached) {
-          console.log('Loading cached draft invoice items to cart')
           await loadCachedItemsToCart()
         }
         if (isMountedRef.current) {

@@ -38,18 +38,11 @@ export function useCreatePOSClosingEntry(): UseCreateClosingReturn {
         credentials: "include",
       });
 
-      console.log('Closing entry response:', {
-        status: res.status,
-        statusText: res.statusText,
-        ok: res.ok
-      });
-
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       }
 
       const data = await res.json();
-      console.log('Closing entry data:', data);
 
       if (data.message) {
         setSuccess(true);

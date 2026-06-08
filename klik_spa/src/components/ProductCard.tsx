@@ -23,12 +23,31 @@ export default function ProductCard({
 }: ProductCardProps) {
   const [showTooltip, setShowTooltip] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const isOutOfStock = item.available <= 0;
+  const isServiceItem = item.is_stock_item === false;
+  const isOutOfStock = item.is_stock_item !== false && item.available <= 0;
   const isDisabled = isOutOfStock || scannerOnly;
+  const bundleCount = item.is_product_bundle ? item.bundle_items?.length || 0 : 0;
+  const variantCount = item.is_variant_template ? item.variant_count || 0 : 0;
+  const expectedPrice = Number(item.price_with_vat ?? item.price);
+  const basePrice = Number(item.price || 0);
+  const showsAdjustedPrice = Math.abs(expectedPrice - basePrice) > 0.004;
   const formattedPrice = formatCurrencyWithSymbol(
-    item.price,
+    expectedPrice,
     item.currency_symbol,
   );
+  const formattedBasePrice = formatCurrencyWithSymbol(
+    basePrice,
+    item.currency_symbol,
+  );
+  const taxRate = Number(item.tax_info?.total_tax_rate || 0);
+  const taxBadgeLabel = item.tax_info?.has_vat
+    ? `VAT ${taxRate.toFixed(taxRate % 1 === 0 ? 0 : 2)}% ${item.tax_info.is_inclusive ? "Incl" : "Excl"}`
+    : "No VAT";
+  const taxBadgeClass = item.tax_info?.has_vat
+    ? item.tax_info.is_inclusive
+      ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-700"
+      : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-700"
+    : "bg-gray-50 text-gray-500 border-gray-200 dark:bg-gray-700/50 dark:text-gray-300 dark:border-gray-600";
 
   const handleModalOpen = () => {
     setShowTooltip(false);
@@ -106,9 +125,25 @@ export default function ProductCard({
             </div>
           )}
 
+          {item.is_product_bundle && (
+            <div className="absolute bottom-2 left-2 bg-amber-600 text-white px-1.5 py-0.5 rounded-md text-xs font-medium z-10">
+              Bundle
+            </div>
+          )}
+
+          {item.is_variant_template && (
+            <div className="absolute bottom-2 left-2 bg-sky-600 text-white px-1.5 py-0.5 rounded-md text-xs font-medium z-10">
+              Options
+            </div>
+          )}
+
           {!isOutOfStock && (
-            <div className="absolute top-2 right-2 bg-slate-600 text-white px-1.5 py-0.5 rounded-md text-xs font-medium z-10">
-              {item.available}
+            <div
+              className={`absolute top-2 right-2 text-white px-1.5 py-0.5 rounded-md text-xs font-medium z-10 ${
+                item.is_variant_template ? "bg-sky-700" : item.is_product_bundle ? "bg-amber-700" : isServiceItem ? "bg-indigo-600" : "bg-slate-600"
+              }`}
+            >
+              {item.is_variant_template ? variantCount : item.is_product_bundle ? item.available : isServiceItem ? "Service" : item.available}
             </div>
           )}
 
@@ -128,17 +163,27 @@ export default function ProductCard({
         </div>
 
         <div
-          className={`${isMobile ? "p-2 h-12" : "p-3 h-16"} flex flex-col justify-between ${isDisabled ? "opacity-70" : ""}`}
+          className={`${isMobile ? "p-2 min-h-[5.25rem]" : "p-2 h-20"} flex flex-col justify-between ${isDisabled ? "opacity-70" : ""}`}
         >
           <div>
             <h3
-              className={`font-semibold text-gray-900 dark:text-white truncate ${isMobile ? "text-xs" : "text-sm"}`}
+              className={`font-semibold text-gray-900 dark:text-white ${isMobile ? "text-xs leading-tight break-words whitespace-normal" : "text-sm truncate"}`}
             >
               {item.name}
             </h3>
             {showItemCode && (
               <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
                 {item.item_code || item.id}
+              </p>
+            )}
+            {item.is_product_bundle && (
+              <p className="text-[10px] text-amber-700 dark:text-amber-300 truncate">
+                {bundleCount} packed {bundleCount === 1 ? "item" : "items"}
+              </p>
+            )}
+            {item.is_variant_template && (
+              <p className="text-[10px] text-sky-700 dark:text-sky-300 truncate">
+                {variantCount} {variantCount === 1 ? "variant" : "variants"}
               </p>
             )}
           </div>
@@ -149,10 +194,25 @@ export default function ProductCard({
               {item.category}
             </p>
             <span
-              className={`font-bold text-beveren-600 dark:text-beveren-400 ${isMobile ? "text-xs" : "text-sm"}`}
+              className={`shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-semibold leading-none ${taxBadgeClass}`}
+              title={item.tax_info?.item_tax_template || item.tax_info?.source || taxBadgeLabel}
             >
-              {formattedPrice}
+              {taxBadgeLabel}
             </span>
+          </div>
+          <div className="flex items-center justify-end">
+            <div className="text-right">
+              <span
+                className={`block font-bold text-beveren-600 dark:text-beveren-400 ${isMobile ? "text-xs" : "text-sm"}`}
+              >
+                {formattedPrice}
+              </span>
+              {showsAdjustedPrice && (
+                <span className="block text-[10px] font-medium leading-tight text-gray-600 dark:text-gray-300">
+                  Base {formattedBasePrice}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>

@@ -91,7 +91,6 @@ class ERPNextAPI {
 
   async login(username: string, password: string, otp?: string, tmpId?: string): Promise<LoginResponse> {
     try {
-      console.log('Attempting login to:', this.config.baseUrl);
 
       // Try the standard login endpoint first
       const loginPayload: Record<string, string> = {
@@ -111,12 +110,9 @@ class ERPNextAPI {
         credentials: 'include'
       });
 
-      console.log('Login response status:', response.status);
-      console.log('Login response headers:', Object.fromEntries(response.headers.entries()));
 
       // If 404, try alternative endpoint
       if (response.status === 404) {
-        console.log('Trying alternative login endpoint...');
         response = await fetch(`${this.config.baseUrl}/api/method/frappe.auth.login`, {
           method: 'POST',
           headers: {
@@ -126,7 +122,6 @@ class ERPNextAPI {
           body: JSON.stringify(loginPayload),
           credentials: 'include'
         });
-        console.log('Alternative login response status:', response.status);
       }
 
       if (!response.ok) {
@@ -157,7 +152,6 @@ class ERPNextAPI {
       }
 
       const data = await response.json();
-      console.log('Login response data:', data);
 
       // Frappe 2FA challenge response
       if (data?.tmp_id && data?.verification) {
@@ -179,15 +173,12 @@ class ERPNextAPI {
           if (sidMatch && sidMatch[1]) {
             this.sessionId = sidMatch[1];
             localStorage.setItem('erpnext_sid', this.sessionId);
-            console.log('Session ID stored:', this.sessionId);
           }
         }
 
         // Fetch complete user profile data from ERPNext
         try {
-          console.log('Fetching user profile data...');
           const userProfile = await this.getCurrentUserProfile();
-          console.log('User profile fetched:', userProfile);
 
           if (userProfile) {
             return {
@@ -362,7 +353,6 @@ async logout(): Promise<void> {
   // Test connection to ERPNext server
   async testConnection(): Promise<{ success: boolean; message: string; details?: unknown }> {
     try {
-      console.log('Testing connection to:', this.config.baseUrl);
 
       // First try the ping endpoint
       let response = await fetch(`${this.config.baseUrl}/api/method/ping`, {
@@ -374,15 +364,8 @@ async logout(): Promise<void> {
         credentials: 'include'
       });
 
-      console.log('Ping response:', {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries())
-      });
-
       if (response.status === 404) {
         // Try alternative endpoints
-        console.log('Ping failed, trying version endpoint...');
         response = await fetch(`${this.config.baseUrl}/api/method/frappe.utils.get_site_info`, {
           method: 'GET',
           headers: {
@@ -440,7 +423,6 @@ async logout(): Promise<void> {
     };
 
     try {
-      console.log('Making API call:', { url, options: defaultOptions });
       const response = await fetch(url, defaultOptions);
 
       if (!response.ok) {
@@ -568,7 +550,6 @@ async logout(): Promise<void> {
     const storedSid = localStorage.getItem('erpnext_sid');
     if (storedSid) {
       this.sessionId = storedSid;
-      console.log('Session restored from localStorage:', storedSid);
     }
   }
 }

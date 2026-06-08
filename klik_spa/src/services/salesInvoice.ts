@@ -1,6 +1,71 @@
 
 import { extractErrorMessage } from "../utils/errorExtraction";
 
+export interface LoyaltyRedemptionPreview {
+  loyalty_program: string
+  loyalty_points: number
+  loyalty_amount: number
+  posting_date?: string
+}
+
+export async function getCustomerLoyalty(customer: string, company?: string, loyaltyProgram?: string) {
+  const params = new URLSearchParams({ customer });
+  if (company) params.append('company', company);
+  if (loyaltyProgram) params.append('loyalty_program', loyaltyProgram);
+
+  const response = await fetch(`/api/method/klik_pos.api.loyalty.get_customer_loyalty?${params.toString()}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include'
+  });
+
+  const result = await response.json();
+
+  if (!response.ok || !result.message || result.message.success === false) {
+    const errorMessage = extractErrorMessage(result, result.message?.error || 'Failed to fetch loyalty details');
+    throw new Error(errorMessage);
+  }
+
+  return result.message.data;
+}
+
+export async function previewLoyaltyRedemption(
+  customer: string,
+  loyaltyPoints: number,
+  transactionAmount?: number,
+  company?: string,
+  loyaltyProgram?: string
+): Promise<LoyaltyRedemptionPreview> {
+  const csrfToken = window.csrf_token;
+
+  const response = await fetch('/api/method/klik_pos.api.loyalty.preview_loyalty_redemption', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Frappe-CSRF-Token': csrfToken
+    },
+    body: JSON.stringify({
+      customer,
+      loyalty_points: loyaltyPoints,
+      transaction_amount: transactionAmount,
+      company,
+      loyalty_program: loyaltyProgram
+    }),
+    credentials: 'include'
+  });
+
+  const result = await response.json();
+
+  if (!response.ok || !result.message || result.message.success === false) {
+    const errorMessage = extractErrorMessage(result, result.message?.error || 'Failed to preview loyalty redemption');
+    throw new Error(errorMessage);
+  }
+
+  return result.message.data;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function createDraftSalesInvoice(data: any) {
 const csrfToken = window.csrf_token;
@@ -110,7 +175,6 @@ export async function createSalesReturn(invoiceName: string) {
   });
 
   const result = await response.json();
-  console.log("Return Invoice result:", result);
 
   if (!response.ok || !result.message || result.message.success === false) {
     const serverMsg = result._server_messages
@@ -242,7 +306,6 @@ export async function submitDraftInvoice(invoiceId: string, data?: unknown) {
   });
 
   const result = await response.json();
-  console.log("Submit draft invoice result:", result);
 
   if (!response.ok || !result.message || result.message.success === false) {
     const errorMessage = extractErrorMessage(result, result.message?.error || 'Failed to submit draft invoice');

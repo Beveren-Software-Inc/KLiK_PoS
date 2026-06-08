@@ -50,7 +50,6 @@ export const InvoiceWhatsAppSender: React.FC<InvoiceWhatsAppSenderProps> = ({
 
       setResult(response);
       onSuccess?.(response);
-      console.log('Invoice WhatsApp sent successfully:', response);
       //eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       const userFriendlyError = getUserFriendlyError(err.message || 'Failed to send invoice WhatsApp message', 'whatsapp');

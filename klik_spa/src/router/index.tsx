@@ -5,6 +5,7 @@ import DashboardPage from "../pages/DashboardPage";
 import ClosingShiftPage from "../pages/ClosingShiftPage";
 import SettingsPage from "../components/SettingsPage";
 import PaymentPage from "../pages/PaymentPage";
+import PaymentEntriesPage from "../pages/PaymentEntriesPage";
 import CustomersPage from "../components/CustomersPage";
 import CartPage from "../components/CartPage";
 import MobileCustomersPage from "../components/MobileCustomersPage";
@@ -81,6 +82,10 @@ const router = createBrowserRouter([
       {
         path: "payment/:invoiceId",
         element: <ProtectedRoute element={<PaymentPage />} />,
+      },
+      {
+        path: "payments",
+        element: <ProtectedRoute element={<PaymentEntriesPage />} />,
       },
     ],
   },

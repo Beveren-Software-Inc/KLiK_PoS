@@ -17,20 +17,24 @@ import {
 } from "../../services/salesInvoice";
 import { getOriginalDraftInvoiceId } from "../../utils/draftInvoiceCache";
 import { CustomerSearchSection } from "./CustomerSearchSection";
+import CustomerLoyaltySummary from "./CustomerLoyaltySummary";
 import { CartItemRow } from "./CartItemRow";
 import { OrderSummaryFooter } from "./OrderSummaryFooter";
 import { usePOSProfileStore } from "../../stores/posProfileStore";
 import { useSalespersonStore } from "../../stores/salespersonStore";
 import { getEffectiveDisplayRate, getEffectiveItemRate } from "../../utils/cartPricing";
+import { roundCurrency } from "../../utils/currencyMath";
 
 interface OrderSummaryProps {
   onClearCart?: () => void;
   isMobile?: boolean;
+  onPaymentCompleted?: () => void;
 }
 
 export default function OrderSummary({
   onClearCart,
   isMobile = false,
+  onPaymentCompleted,
 }: OrderSummaryProps) {
   const {
     cartItems,
@@ -68,6 +72,7 @@ export default function OrderSummary({
           discountPercentage: persistedDiscountPercentage,
           discountAmount: persistedDiscountAmount,
           customRate: persistedCustomRate,
+          customRateIncludesTax: (item as CartItem & { custom_rate_includes_tax?: boolean }).custom_rate_includes_tax,
           serial_batch_bundle: serialBatchBundle,
           bundle_entries: item.bundle_entries,
         };
@@ -76,6 +81,7 @@ export default function OrderSummary({
           discountPercentage: persistedDiscountPercentage,
           discountAmount: persistedDiscountAmount,
           customRate: persistedCustomRate,
+          customRateIncludesTax: (item as CartItem & { custom_rate_includes_tax?: boolean }).custom_rate_includes_tax,
         };
       }
     });
@@ -124,6 +130,7 @@ export default function OrderSummary({
             discountPercentage: persistedDiscountPercentage,
             discountAmount: persistedDiscountAmount,
             customRate: persistedCustomRate,
+            customRateIncludesTax: (item as CartItem & { custom_rate_includes_tax?: boolean }).custom_rate_includes_tax,
             serial_batch_bundle: serialBatchBundle,
             bundle_entries: bundleEntries,
           };
@@ -210,34 +217,38 @@ export default function OrderSummary({
   }, [cartItems]);
 
   const getDiscountedPrice = (item: CartItem) => {
-    return getEffectiveItemRate(item, {
+    return roundCurrency(getEffectiveItemRate(item, {
       itemDiscounts,
       isTaxIncludedInBasicRate,
-    });
+    }));
   };
 
   const getDisplayPriceInclusive = (item: CartItem) => {
-    return getEffectiveDisplayRate(item, {
+    return roundCurrency(getEffectiveDisplayRate(item, {
       itemDiscounts,
       isTaxIncludedInBasicRate,
-    });
+    }));
   };
 
   const getOriginalDisplayPriceInclusive = (item: CartItem) => {
-    return getEffectiveDisplayRate(item, {
+    return roundCurrency(getEffectiveDisplayRate(item, {
       itemDiscounts: {},
       isTaxIncludedInBasicRate,
-    });
+    }));
   };
 
-  const subtotal = cartItems.reduce((sum, item) => sum + getDisplayPriceInclusive(item) * item.quantity, 0);
+  const getLineTotalInclusive = (item: CartItem) => {
+    return roundCurrency(getDisplayPriceInclusive(item) * item.quantity);
+  };
+
+  const subtotal = cartItems.reduce((sum, item) => roundCurrency(sum + getLineTotalInclusive(item)), 0);
   const totalItemDiscount = cartItems.reduce((sum, item) => {
-    const original = getOriginalDisplayPriceInclusive(item) * item.quantity;
-    const discounted = getDisplayPriceInclusive(item) * item.quantity;
-    return sum + (original - discounted);
+    const original = roundCurrency(getOriginalDisplayPriceInclusive(item) * item.quantity);
+    const discounted = getLineTotalInclusive(item);
+    return roundCurrency(sum + roundCurrency(original - discounted));
   }, 0);
   const couponDiscount = 0;
-  const total = Math.max(0, subtotal - couponDiscount);
+  const total = roundCurrency(Math.max(0, subtotal - couponDiscount));
 
   const handleUpdateQuantity = (id: string, quantity: number) => {
     if (quantity <= 0) {
@@ -262,12 +273,13 @@ export default function OrderSummary({
     }));
   };
 
-  const handleCustomRateChange = (item: CartItem, newRate?: number) => {
+  const handleCustomRateChange = (item: CartItem, newRate?: number, includesTax?: boolean) => {
     setItemDiscounts(prev => ({
       ...prev,
       [item.id]: {
         ...(prev[item.id] || {}),
         customRate: newRate,
+        customRateIncludesTax: includesTax,
         discountPercentage: 0,
         discountAmount: 0,
       }
@@ -408,12 +420,14 @@ export default function OrderSummary({
   };
 
   const handleCompletePayment = async (paymentData: any) => {
-    console.log("OrderSummary: Payment completed, invoice created", paymentData);
   };
 
   const handleClosePaymentDialog = async (paymentCompleted?: boolean) => {
     setShowPaymentDialog(false);
-    if (paymentCompleted) handleClearCart();
+    if (paymentCompleted) {
+      handleClearCart();
+      onPaymentCompleted?.();
+    }
 
     try {
       await refreshStockOnly();
@@ -451,6 +465,10 @@ export default function OrderSummary({
           onCustomerSelect={handleCustomerSelect}
           onCustomerClear={handleCustomerClear}
           isMobile={isMobile}
+        />
+        <CustomerLoyaltySummary
+          customer={selectedCustomer}
+          currencySymbol={currency_symbol}
         />
       </div>
 
@@ -541,8 +559,8 @@ export default function OrderSummary({
             discountedPriceIncl: getDisplayPriceInclusive(item),
             discountedPrice: getDisplayPriceInclusive(item),
             itemDiscount: itemDiscounts[item.id] || {},
-            originalPrice: item.price,
-            finalAmount: getDisplayPriceInclusive(item) * item.quantity,
+            originalPrice: roundCurrency(item.price),
+            finalAmount: getLineTotalInclusive(item),
           }))}
           appliedCoupons={[]}
           selectedCustomer={selectedCustomer}

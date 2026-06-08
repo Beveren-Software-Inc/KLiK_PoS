@@ -91,6 +91,7 @@ def get_stock_updates():
                 FROM `tabItem` i
                 INNER JOIN `tabBin` b ON i.name = b.item_code
                 WHERE i.disabled = 0
+                AND IFNULL(i.is_sales_item, 1) = 1
                 AND i.is_stock_item = 1
                 AND b.warehouse = %s
                 AND b.actual_qty > 0
@@ -122,7 +123,7 @@ def get_stock_updates():
             item_codes = [item["name"] for item in items]
 
         else:
-            filters = {"disabled": 0, "is_stock_item": 1}
+            filters = {"disabled": 0, "is_stock_item": 1, "is_sales_item": 1}
 
             if pos_doc.get("item_groups"):
                 groups = [

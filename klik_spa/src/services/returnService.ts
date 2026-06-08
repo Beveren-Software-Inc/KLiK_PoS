@@ -170,7 +170,6 @@ export async function createMultiInvoiceReturn(
     });
 
     const data = await response.json();
-    console.log('Multi-invoice return response:', data);
 
     if (!response.ok) {
       throw new Error(data.message || 'Failed to create multi-invoice return');

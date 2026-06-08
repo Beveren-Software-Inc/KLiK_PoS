@@ -363,7 +363,7 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto pb-20 w-[98%] mx-auto px-2 py-4">
+        <div className="flex-1 overflow-y-auto w-[98%] mx-auto px-2 py-4 [padding-bottom:calc(12rem+env(safe-area-inset-bottom))]">
           {/* Enhanced Filters */}
           {showFilters && (
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 mb-6">
@@ -930,6 +930,9 @@ if (Object.prototype.hasOwnProperty.call(hourlySales, hour)) {
               </div>
             </div>
           </div>
+
+          {/* Extra runway so the last card clears the fixed bottom navbar */}
+          <div className="h-20" aria-hidden="true" />
         </div>
 
         {/* Bottom Navigation */}

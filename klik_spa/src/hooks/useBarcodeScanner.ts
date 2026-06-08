@@ -49,12 +49,20 @@ export function useBarcodeScanner(onAddToCart: (item: MenuItem) => void): UseBar
 
         if (data.message && data.message.item_code) {
           // Convert API response to MenuItem format
+          const isStockItem = data.message.is_stock_item !== false;
           const item = {
             id: data.message.item_code,
             name: data.message.item_name || data.message.item_code,
             category: data.message.item_group || 'General',
             price: data.message.price || 0,
             available: data.message.available || 0,
+            is_stock_item: isStockItem,
+            is_product_bundle: data.message.is_product_bundle || false,
+            bundle_items: data.message.bundle_items || [],
+            is_variant_template: data.message.is_variant_template || false,
+            has_variants: data.message.has_variants || false,
+            variant_of: data.message.variant_of,
+            variant_based_on: data.message.variant_based_on,
             image: data.message.image,
             sold: 0
           }

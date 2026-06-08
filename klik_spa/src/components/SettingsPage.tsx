@@ -172,7 +172,6 @@ export default function SettingsPage() {
             </div>
             <button
               onClick={() => {
-                console.log('Theme toggle clicked, current theme:', theme)
                 toggleTheme()
               }}
               className="bg-beveren-600 text-white px-4 py-2 rounded-lg hover:bg-beveren-700 transition-colors"

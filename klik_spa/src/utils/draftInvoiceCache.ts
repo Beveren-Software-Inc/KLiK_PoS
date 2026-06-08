@@ -21,7 +21,6 @@ export function cacheDraftInvoiceItems(invoiceId: string, items: CartItem[], cus
     originalDraftInvoiceId: invoiceId // Store the original draft invoice ID
   };
 
-  console.log("cacheDraftInvoiceItems - storing cache:", cache);
   localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
 }
 

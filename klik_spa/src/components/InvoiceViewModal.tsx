@@ -71,7 +71,6 @@ export default function InvoiceViewModal({
 
     try {
       const result = await createSalesReturn(invoiceName);
-      console.log(result);
       toast.success(`Invoice returned: ${result.return_invoice}`);
       //eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {

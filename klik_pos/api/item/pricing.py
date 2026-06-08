@@ -9,7 +9,7 @@ from ..sql_builder import apply_sql_permissions
 
 
 @frappe.whitelist(allow_guest=True)
-def get_cart_pricing(cart_items, customer=None):
+def get_cart_pricing(cart_items, customer=None, price_list=None):
     """
     Single API call to get all pricing information for cart items
     Returns: {
@@ -34,7 +34,7 @@ def get_cart_pricing(cart_items, customer=None):
         if not cart_items:
             return {"items": [], "total_discount": 0, "total_after_discount": 0}
 
-        context = _build_pricing_context(customer)
+        context = _build_pricing_context(customer, price_list)
         erpnext_items = _prepare_erpnext_items(cart_items, context)
 
         if not erpnext_items:
@@ -64,7 +64,7 @@ def _parse_cart_items(cart_items):
     return cart_items
 
 
-def _build_pricing_context(customer=None):
+def _build_pricing_context(customer=None, price_list=None):
     pos_profile = get_current_pos_profile()
     company = pos_profile.company if pos_profile else frappe.defaults.get_user_default("Company")
     
@@ -72,7 +72,7 @@ def _build_pricing_context(customer=None):
         "pos_profile": pos_profile,
         "company": company,
         "warehouse": pos_profile.warehouse if pos_profile else None,
-        "price_list": _get_price_list(customer),
+        "price_list": price_list or _get_price_list(customer),
         "currency": frappe.get_cached_value("Company", company, "default_currency") or "SAR",
         "customer": customer,
         "customer_group": None,
@@ -91,6 +91,17 @@ def _build_pricing_context(customer=None):
             context["territory"] = customer_doc[0].territory
 
     return context
+
+
+@frappe.whitelist()
+def get_selling_price_lists():
+    rows = frappe.get_all(
+        "Price List",
+        filters={"selling": 1, "enabled": 1},
+        fields=["name", "currency"],
+        order_by="name asc",
+    )
+    return {"price_lists": rows}
 
 
 def _get_price_list(customer=None):

@@ -6,6 +6,7 @@ from erpnext.accounts.party import get_party_details
 from frappe import _
 
 from klik_pos.klik_pos.utils import get_current_pos_profile
+from klik_pos.api.loyalty import get_customer_loyalty_summary
 from .sql_builder import apply_sql_permissions
 
 
@@ -155,6 +156,11 @@ def get_customers(limit: int = 100, start: int = 0, search: str = ""):
             cust["contact"] = None
             cust["address"] = None
             cust["default_currency"] = cust.get("default_currency")
+            cust["loyalty"] = get_customer_loyalty_summary(
+                cust.get("name"),
+                company=company,
+            )
+            cust["loyalty_points"] = cust["loyalty"].get("loyalty_points", 0)
         
         return {
             "success": True,
@@ -327,6 +333,10 @@ def get_customer_info(customer_name: str):
             "address_data": address_data,
             "is_walkin": getattr(customer, "custom_is_walkin", 0),
             "tax_id": customer.tax_id,
+            "loyalty": get_customer_loyalty_summary(
+                customer.name,
+                company=getattr(pos_profile, "company", None),
+            ),
             **party_details,
         }
 

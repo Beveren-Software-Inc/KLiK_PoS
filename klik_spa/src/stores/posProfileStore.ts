@@ -19,6 +19,9 @@ export interface POSProfile {
   currency_symbol?: string;
   is_zatca_enabled?: boolean;
   business_type?: "B2B" | "B2C" | "B2B & B2C";
+  default_sales_type?: "Cash" | "Credit" | string;
+  allow_zero_rate_sales?: boolean | number;
+  allow_price_list_switching?: boolean | number;
   hide_unavailable_items?: boolean;
   custom_use_scanner_fully?: boolean;
   custom_hide_expected_amount?: boolean;
@@ -26,6 +29,10 @@ export interface POSProfile {
   write_off_account?: string;
   write_off_cost_center?: string;
   custom_delivery_required?: number;
+  custom_enable_service_items?: boolean | number;
+  custom_enable_delivery_charge?: boolean | number;
+  custom_delivery_charge_item?: string;
+  custom_delivery_charge_account?: string;
   custom_prevent_invoice_reprinting?: boolean | number;
   custom_allow_return?: boolean | number | string;
   custom_allow_to_create_and_edit_customers?: number;

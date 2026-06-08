@@ -11,6 +11,7 @@ import { SerialBatchBundleModal } from "./SerialBatchBundleSelector";
 import { useCartStore } from "../../stores/cartStore";
 import ProductDetailsModal from "../ProductDetailsModal";
 import { getEffectiveDisplayRate, getEffectiveItemRate, getExclusiveTaxRateForItem } from "../../utils/cartPricing";
+import { roundCurrency } from "../../utils/currencyMath";
 
 interface CartItemRowProps {
   item: CartItem;
@@ -22,7 +23,7 @@ interface CartItemRowProps {
   onRemoveItem?: (id: string) => void;
   onUOMChange: (itemId: string, uom: string, price: number) => void;
   onDiscountChange: (itemId: string, field: string, value: number | string) => void;
-  onCustomRateChange: (item: CartItem, rate?: number) => void;
+  onCustomRateChange: (item: CartItem, rate?: number, includesTax?: boolean) => void;
   onDuplicateItem: (item: CartItem) => void;
   onBundleUpdate?: (itemId: string, bundleId: string, entries: any[]) => void;
   selectedCustomer?: { id: string } | null;
@@ -148,6 +149,7 @@ export const CartItemRow = ({
   const hasSerialOrBatch = item.has_serial_no || item.has_batch_no;
   const warehouse = posDetails?.warehouse || "";
   const restrictCostVisibility = posDetails?.restrict_cost_visibility_in_tooltip ?? true;
+  const allowPriceListSwitching = !!posDetails?.allow_price_list_switching;
 
   const fetchFullItemDetails = useCallback(async () => {
     if (!warehouse) return;
@@ -303,6 +305,11 @@ export const CartItemRow = ({
     await fetchBundleData(qty, true);
   };
 
+  const isTaxIncludedInBasicRate =
+    posDetails?.is_tax_included_in_basic_rate === 1
+    || posDetails?.is_tax_included_in_basic_rate === "1"
+    || posDetails?.is_tax_included_in_basic_rate === true;
+
   const handleRateChange = (value?: number) => {
     if (value === undefined || value === null || Number.isNaN(value)) {
       onCustomRateChange(item, undefined);
@@ -312,7 +319,7 @@ export const CartItemRow = ({
     }
 
     const rate = Math.max(0, value);
-    onCustomRateChange(item, rate);
+    onCustomRateChange(item, rate, isTaxIncludedInBasicRate);
     onDiscountChange(item.id, "discountAmount", 0);
     setLocalDiscountPct(0);
   };
@@ -330,10 +337,24 @@ export const CartItemRow = ({
     setLocalDiscountPct(item.price > 0 ? parseFloat(((amt / item.price) * 100).toFixed(2)) : 0);
   };
 
-  const isTaxIncludedInBasicRate =
-    posDetails?.is_tax_included_in_basic_rate === 1
-    || posDetails?.is_tax_included_in_basic_rate === "1"
-    || posDetails?.is_tax_included_in_basic_rate === true;
+  const handleLinePriceListChange = (priceListName: string) => {
+    onDiscountChange(item.id, "selectedPriceList", priceListName);
+    if (!priceListName) {
+      handleRateChange(undefined);
+      return;
+    }
+
+    const matchingPrice = fullItemData?.price_lists?.find((priceList) =>
+      priceList.price_list === priceListName
+      && (!priceList.uom || priceList.uom === item.uom)
+    ) || fullItemData?.price_lists?.find((priceList) => priceList.price_list === priceListName);
+
+    if (matchingPrice) {
+      onCustomRateChange(item, Number(matchingPrice.rate || 0), false);
+      onDiscountChange(item.id, "discountAmount", 0);
+      setLocalDiscountPct(0);
+    }
+  };
 
   const discountedPrice = getEffectiveItemRate(item, {
     itemDiscounts: { [item.id]: itemDiscount },
@@ -346,11 +367,12 @@ export const CartItemRow = ({
   const exclusiveTaxRate = getExclusiveTaxRateForItem(item, { isTaxIncludedInBasicRate });
   const hasExclusiveTax = exclusiveTaxRate > 0;
   const totalTaxRate = hasExclusiveTax ? exclusiveTaxRate : Number(item.total_tax_rate || 0);
-  const taxAmountPerUnit = Math.max(0, displayRateInclTax - discountedPrice);
-  const originalTotal = item.price * item.quantity;
-  const discountedTotal = displayRateInclTax * item.quantity;
+  const taxAmountPerUnit = roundCurrency(Math.max(0, displayRateInclTax - discountedPrice));
+  const originalTotal = roundCurrency(item.price * item.quantity);
+  const discountedTotal = roundCurrency(displayRateInclTax * item.quantity);
   const amount = discountedTotal;
-  const displayRate = itemDiscount.customRate ?? (displayRateInclTax > 0 ? displayRateInclTax : "");
+  const editableRate = hasExclusiveTax ? discountedPrice : displayRateInclTax;
+  const displayRate = editableRate > 0 ? editableRate : "";
 
   const hasBundleEntries = bundleEntries.length > 0;
 
@@ -529,7 +551,7 @@ export const CartItemRow = ({
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
-                    Rate (Incl. Tax)
+                    {hasExclusiveTax ? "Rate (Excl. Tax)" : "Rate (Incl. Tax)"}
                   </label>
                   <input
                     type="number"
@@ -592,11 +614,11 @@ export const CartItemRow = ({
                   </div>
                   <div>
                     <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
-                      Base Rate (Excl. Tax)
+                      {hasExclusiveTax ? "Rate (Incl. Tax)" : "Base Rate"}
                     </label>
                     <input
                       type="text"
-                      value={formatCurrencyWithSymbol(discountedPrice, currency_symbol)}
+                      value={formatCurrencyWithSymbol(hasExclusiveTax ? displayRateInclTax : discountedPrice, currency_symbol)}
                       readOnly
                       className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-4 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white cursor-not-allowed`}
                     />
@@ -608,6 +630,29 @@ export const CartItemRow = ({
                   )}
                 </div>
               )}
+
+              {allowPriceListSwitching && fullItemData?.price_lists?.length ? (
+                <div className="mb-4">
+                  <label className={`block text-gray-700 dark:text-gray-300 font-medium ${isMobile ? "text-sm" : "text-sm"} mb-2`}>
+                    Item Price List
+                  </label>
+                  <select
+                    value={itemDiscount.selectedPriceList || ""}
+                    onChange={(event) => handleLinePriceListChange(event.target.value)}
+                    disabled={!posDetails?.allow_rate_change}
+                    className={`w-full ${isMobile ? "text-sm" : "text-sm"} px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-beveren-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:opacity-60`}
+                  >
+                    <option value="">Use order price list</option>
+                    {fullItemData.price_lists
+                      .filter((priceList) => !priceList.uom || priceList.uom === item.uom)
+                      .map((priceList) => (
+                        <option key={`${priceList.price_list}-${priceList.uom || ""}-${priceList.rate}`} value={priceList.price_list}>
+                          {priceList.price_list}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              ) : null}
 
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>

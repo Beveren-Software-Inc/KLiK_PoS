@@ -323,16 +323,6 @@ const getStatusBadge = (status: string) => {
       return matchesPayment && matchesCustomer && matchesCashier && matchesStatus && matchesDate;
     });
 
-    // Debug: Log filtering results
-    if (activeTab !== "all") {
-      console.log(`[InvoiceHistory] Filtering by status "${activeTab}":`, {
-        totalInvoices: invoices.length,
-        filteredCount: filtered.length,
-        activeTab,
-        sampleStatuses: invoices.slice(0, 5).map(inv => inv.status)
-      });
-    }
-
     return filtered;
   }, [invoices, activeTab, dateFilter, customerFilter, paymentFilter, cashierFilter, isLoading, error, filterInvoiceByDate]);
 
@@ -789,7 +779,6 @@ const getStatusBadge = (status: string) => {
     // Helper function to check if invoice has items that can still be returned
   const hasReturnableItems = (invoice: SalesInvoice) => {
     if (!invoice || !invoice.items) {
-      console.log("No invoice or items found for:", invoice?.id);
       return false;
     }
 
@@ -901,7 +890,6 @@ const getStatusBadge = (status: string) => {
   };
 
   const handleCancel = (invoiceId: string) => {
-    console.log("Cancelling invoice:", invoiceId);
     setShowInvoiceModal(false);
   };
 

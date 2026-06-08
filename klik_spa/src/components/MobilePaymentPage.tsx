@@ -13,44 +13,40 @@ export default function MobilePaymentPage() {
   const { cartItems, appliedCoupons, selectedCustomer, clearCart } = useCartStore()
   const { refreshStockOnly, updateBatchQuantitiesForItems } = useProducts();
 
-  const handleClose = () => {
-    // Note: paymentCompleted flag removed to match onClick signature
-    // Only clear cart if payment was completed
-    const paymentCompleted = false; // This should be tracked elsewhere
+  const handleClose = (paymentCompleted?: boolean) => {
     if (paymentCompleted) {
       // console.log("MobilePaymentPage: Payment was completed - clearing cart for next order");
       clearCart();
       // Clear draft invoice cache since payment is completed
       clearDraftInvoiceCache();
     } else {
-      console.log("MobilePaymentPage: Payment was not completed - keeping cart items");
     }
 
     // Simple stock refresh and navigate back
     (async () => {
       try {
         await refreshStockOnly();
-      console.log("Stock refreshed after payment modal close");
 
       // Also update batch quantities for items that were in the cart
       const cartItemCodes = cartItems.map(item => item.item_code || item.id);
       if (cartItemCodes.length > 0) {
-        console.log("MobilePaymentPage: Updating batch quantities for cart items:", cartItemCodes);
         await updateBatchQuantitiesForItems(cartItemCodes);
-        console.log("MobilePaymentPage: Batch quantities updated successfully");
       }
       } catch (error) {
         console.error("Failed to refresh stock:", error);
       }
     })();
+    if (paymentCompleted) {
+      navigate('/pos', { replace: true })
+      return
+    }
+
     navigate(-1)
   }
 //eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleCompletePayment = async (paymentData: any) => {
-    console.log('Payment completed:', paymentData)
     // Don't clear cart immediately - let user see invoice preview
     // Cart will be cleared when user closes the payment page
-    console.log("MobilePaymentPage: Payment completed - cart will be cleared when page is closed");
   }
   const handleHoldOrder = () => {
     clearCart()

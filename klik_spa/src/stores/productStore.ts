@@ -54,6 +54,7 @@ interface ProductStoreState {
   checkAndInitialize: () => void;
   syncCustomerFromCart: () => void;
   getEffectiveCustomer: () => Customer | null;
+  getEffectivePriceList: () => string;
 }
 
 const PAGE_SIZE = 1000;
@@ -90,7 +91,13 @@ export const useProductStore = create<ProductStoreState>()(
         const { products } = get();
         const hideUnavailable = usePOSProfileStore.getState().hideUnavailableItems;
         if (hideUnavailable) {
-          return products.filter(p => p.available > 0);
+          return products.filter((p) => {
+            const isStockItem = p.is_stock_item !== false;
+            if (!isStockItem) {
+              return true;
+            }
+            return (p.available || 0) > 0;
+          });
         }
         return products;
       },
@@ -108,6 +115,15 @@ export const useProductStore = create<ProductStoreState>()(
           return cartCustomer;
         }
         return selectedCustomer;
+      },
+
+      getEffectivePriceList: () => {
+        const allowPriceListSwitching = !!usePOSProfileStore.getState().posDetails?.allow_price_list_switching;
+        const cartState = useCartStore.getState();
+        return (allowPriceListSwitching ? cartState.selectedPriceList : null)
+          || cartState.selectedCustomer?.sellingPriceList
+          || get().selectedCustomer?.sellingPriceList
+          || "";
       },
 
       syncCustomerFromCart: () => {
@@ -200,7 +216,7 @@ export const useProductStore = create<ProductStoreState>()(
         
         const effectiveCustomer = get().getEffectiveCustomer();
         const effectiveCustomerId = customerId || effectiveCustomer?.id || '';
-        const effectivePriceList = effectiveCustomer?.sellingPriceList || effectiveCustomer?.priceListCurrency;
+        const effectivePriceList = get().getEffectivePriceList();
         
         const isCacheValid = lastFullRefresh && 
           (Date.now() - lastFullRefresh) < CACHE_DURATION && 
@@ -261,7 +277,7 @@ export const useProductStore = create<ProductStoreState>()(
         
         const effectiveCustomer = get().getEffectiveCustomer();
         const customerId = effectiveCustomer?.id || '';
-        const priceList = effectiveCustomer?.sellingPriceList || effectiveCustomer?.priceListCurrency;
+        const priceList = get().getEffectivePriceList();
         const requestSearchQuery = searchQuery;
         const requestCategory = selectedCategory;
         const requestCustomerId = customerId;
@@ -283,7 +299,7 @@ export const useProductStore = create<ProductStoreState>()(
           const latest = get();
           const latestCustomer = latest.getEffectiveCustomer();
           const latestCustomerId = latestCustomer?.id || '';
-          const latestPriceList = latestCustomer?.sellingPriceList || latestCustomer?.priceListCurrency;
+          const latestPriceList = latest.getEffectivePriceList();
           if (
             latest.searchQuery !== requestSearchQuery ||
             latest.selectedCategory !== requestCategory ||
@@ -350,7 +366,7 @@ export const useProductStore = create<ProductStoreState>()(
         
         const effectiveCustomer = get().getEffectiveCustomer();
         const customerId = effectiveCustomer?.id || '';
-        const priceList = effectiveCustomer?.sellingPriceList || effectiveCustomer?.priceListCurrency;
+        const priceList = get().getEffectivePriceList();
         
         try {
           const result = await fetchProductsFromAPI(500, 0, query, selectedCategory, customerId, priceList);
@@ -579,7 +595,7 @@ if (typeof window !== 'undefined') {
   
   let previousProfileState = usePOSProfileStore.getState();
   
-  const unsubscribe = usePOSProfileStore.subscribe((state) => {
+  const unsubscribeProfile = usePOSProfileStore.subscribe((state) => {
     const productStore = useProductStore.getState();
     
     if (state.isInitialized && state.posDetails?.name && !productStore.isInitialized && !productStore.isLoading) {
@@ -595,9 +611,25 @@ if (typeof window !== 'undefined') {
     
     previousProfileState = state;
   });
+
+  let previousSelectedPriceList = useCartStore.getState().selectedPriceList;
+  const unsubscribePriceList = useCartStore.subscribe((state) => {
+    if (state.selectedPriceList === previousSelectedPriceList) {
+      return;
+    }
+
+    previousSelectedPriceList = state.selectedPriceList;
+    const productStore = useProductStore.getState();
+    if (productStore.isInitialized) {
+      productStore.fetchProducts(true);
+    }
+  });
   
   if ((window as any).__productStoreUnsubscribe) {
     (window as any).__productStoreUnsubscribe();
   }
-  (window as any).__productStoreUnsubscribe = unsubscribe;
+  (window as any).__productStoreUnsubscribe = () => {
+    unsubscribeProfile();
+    unsubscribePriceList();
+  };
 }

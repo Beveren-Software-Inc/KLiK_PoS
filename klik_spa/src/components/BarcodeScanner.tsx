@@ -152,7 +152,6 @@ export default function BarcodeScannerModal({ onBarcodeDetected, onClose, isOpen
                   return
                 }
                 const detectedBarcode = firstBarcode.rawValue
-                console.log('Barcode detected:', detectedBarcode)
 
                 // Stop detection and process barcode
                 stopDetection()

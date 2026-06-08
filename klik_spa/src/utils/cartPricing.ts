@@ -1,3 +1,5 @@
+import { roundCurrency } from "./currencyMath";
+
 interface TaxTemplateLike {
   is_inclusive?: boolean;
 }
@@ -30,6 +32,7 @@ interface DiscountDataLike {
   discountPercentage?: number;
   discountAmount?: number;
   customRate?: number;
+  customRateIncludesTax?: boolean;
 }
 
 type DiscountMapLike = Record<string, DiscountDataLike | undefined>;
@@ -115,10 +118,10 @@ export function getEffectiveItemRate(item: PricingItemLike, options: RateOptions
   if (customRate !== undefined && customRate !== null) {
     const enteredRate = Math.max(0, Number(customRate) || 0);
     const exclusiveTaxRate = getExclusiveTaxRateForItem(item, options);
-    if (exclusiveTaxRate > 0) {
-      return enteredRate / (1 + exclusiveTaxRate / 100);
+    if (exclusiveTaxRate > 0 && discountData.customRateIncludesTax !== false) {
+      return roundCurrency(enteredRate / (1 + exclusiveTaxRate / 100));
     }
-    return enteredRate;
+    return roundCurrency(enteredRate);
   }
 
   let rate = Number(item?.price || 0);
@@ -128,14 +131,14 @@ export function getEffectiveItemRate(item: PricingItemLike, options: RateOptions
   if (discountAmount > 0) {
     rate = Math.max(0, rate - discountAmount);
   }
-  return Math.max(0, rate);
+  return roundCurrency(Math.max(0, rate));
 }
 
 export function getEffectiveDisplayRate(item: PricingItemLike, options: RateOptions = {}) {
   const baseRate = getEffectiveItemRate(item, options);
   const exclusiveTaxRate = getExclusiveTaxRateForItem(item, options);
   if (exclusiveTaxRate > 0) {
-    return baseRate * (1 + exclusiveTaxRate / 100);
+    return roundCurrency(baseRate * (1 + exclusiveTaxRate / 100));
   }
-  return baseRate;
+  return roundCurrency(baseRate);
 }

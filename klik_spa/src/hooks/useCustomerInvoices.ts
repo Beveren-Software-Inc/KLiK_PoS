@@ -28,7 +28,6 @@ export function useCustomerInvoices(customerName: string) {
 
     try {
       const start = page * LIMIT;
-      console.log(`Fetching customer invoices - customer: ${customerName}, page: ${page}, start: ${start}, limit: ${LIMIT}`);
 
       // Search for invoices by customer name
       const searchParam = `&search=${encodeURIComponent(customerName)}`;
@@ -44,18 +43,11 @@ export function useCustomerInvoices(customerName: string) {
         }
       );
 
-      console.log('Customer invoices response:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok
-      });
-
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const resData = await response.json();
-      console.log('Customer invoices data:', resData);
 
       if (!resData.message || !resData.message.success) {
         throw new Error(resData.message?.error || resData.error || "Failed to fetch customer invoices");

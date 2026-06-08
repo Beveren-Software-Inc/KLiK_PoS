@@ -88,7 +88,6 @@ class BackgroundSyncService {
 
           this.queueStockUpdates(updates);
           this.lastSync = new Date();
-          console.log(`Background sync: Updated ${updateCount} items`);
         }
       }
     } catch (error) {

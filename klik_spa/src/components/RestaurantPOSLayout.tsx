@@ -30,14 +30,15 @@ export default function RetailPOSLayout() {
 
   const addItemToCart = (item: MenuItem) => {
     const existingItem = cartItems.find((cartItem) => cartItem.id === item.id);
+    const isStockItem = item.is_stock_item !== false;
 
-    if (item.available <= 0) {
+    if (isStockItem && item.available <= 0) {
       toast.error(`${item.name} is out of stock`);
       return;
     }
 
     if (existingItem) {
-      if (existingItem.quantity >= item.available) {
+      if (isStockItem && existingItem.quantity >= item.available) {
         toast.error(`Only ${item.available} ${item.uom || "units"} of ${item.name} available`);
         return;
       }
@@ -66,7 +67,7 @@ export default function RetailPOSLayout() {
   };
 
   const handleAddToCart = (item: MenuItem) => {
-    if (item.available <= 0) return;
+    if (item.is_stock_item !== false && item.available <= 0) return;
     if (useScannerOnly) {
       toast.info("Scanner-only mode: Use barcode scanner to add items");
       return;
@@ -79,7 +80,12 @@ export default function RetailPOSLayout() {
       setCartItems(cartItems.filter((item) => item.id !== id));
     } else {
       const item = cartItems.find((cartItem) => cartItem.id === id);
-      if (item && item.available !== undefined && quantity > item.available) {
+      if (
+        item
+        && item.is_stock_item !== false
+        && item.available !== undefined
+        && quantity > item.available
+      ) {
         toast.error(`Only ${item.available} ${item.uom || "units"} of ${item.name} available`);
         return;
       }

@@ -80,4 +80,26 @@ export interface Customer {
   salesTeam?: any[]
   vatNumber?: string
   paymentMethod?: string
+  loyalty?: LoyaltySummary
+  loyaltyProgram?: string | null
+  loyaltyTier?: string | null
+  redeemableValue?: number
+}
+
+export interface LoyaltySummary {
+  enabled: boolean
+  loyalty_program: string | null
+  loyalty_program_name?: string | null
+  loyalty_program_type?: string | null
+  loyalty_program_tier?: string | null
+  customer_loyalty_program_tier?: string | null
+  loyalty_points: number
+  available_points?: number
+  conversion_factor?: number
+  redeemable_value: number
+  total_spent?: number
+  collection_factor?: number
+  expense_account?: string | null
+  cost_center?: string | null
+  company?: string | null
 }

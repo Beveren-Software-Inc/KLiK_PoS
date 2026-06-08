@@ -192,7 +192,7 @@ function SerialCard({ serial, currencySymbol, showCost }: { serial: SerialEntry;
 export default function ProductDetailsModal({ item, onClose }: ProductDetailsModalProps) {
   const [data, setData] = useState<ItemFullData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<"pricing" | "stock" | "details">("pricing")
+  const [activeTab, setActiveTab] = useState<"pricing" | "stock" | "details" | "bundle">("pricing")
   const { posDetails, loading } = usePOSProfileStore()
 
   const warehouse = useMemo(() => {
@@ -215,7 +215,6 @@ export default function ProductDetailsModal({ item, onClose }: ProductDetailsMod
         )
         const res = await response.json()
         if (res?.message) {
-          console.log(res.message);
           
           setData(res.message)
         }
@@ -236,8 +235,10 @@ export default function ProductDetailsModal({ item, onClose }: ProductDetailsMod
   const hasSerialOnly = data?.has_serial_no && !data?.has_batch_no
   const hasBoth = data?.has_batch_no && data?.has_serial_no
 
+  const bundleComponents = item.bundle_items ?? []
   const tabs = [
     { key: "pricing" as const, label: "Pricing & Warehouse" },
+    ...(item.is_product_bundle ? [{ key: "bundle" as const, label: "Bundle" }] : []),
     { key: "stock" as const, label: hasBoth ? "Batches & Serials" : hasBatchOnly ? "Batches" : hasSerialOnly ? "Serials" : "Stock" },
     { key: "details" as const, label: "Details" },
   ]
@@ -272,14 +273,22 @@ export default function ProductDetailsModal({ item, onClose }: ProductDetailsMod
                       <p className="text-xs text-gray-500 dark:text-gray-400">{data.brand}</p>
                     </>
                   )}
+                  {item.is_product_bundle && (
+                    <>
+                      <span className="text-gray-300 dark:text-gray-600">•</span>
+                      <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">Product Bundle</p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
             
             <div className="text-right">
-              <p className="text-xs text-gray-400 uppercase font-semibold">Total Stock (All Warehouses)</p>
+              <p className="text-xs text-gray-400 uppercase font-semibold">
+                {item.is_product_bundle ? "Available Bundles" : "Total Stock (All Warehouses)"}
+              </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {totalQty.toLocaleString()} <span className="text-sm font-normal text-gray-500">{data?.uom}</span>
+                {(item.is_product_bundle ? item.available : totalQty).toLocaleString()} <span className="text-sm font-normal text-gray-500">{item.is_product_bundle ? item.uom || "Nos" : data?.uom}</span>
               </p>
               {totalValue > 0 && !restrictCostVisibility && (
                 <p className="text-xs text-gray-500 mt-0.5">Value: {fmt(totalValue, sym)}</p>
@@ -394,6 +403,71 @@ export default function ProductDetailsModal({ item, onClose }: ProductDetailsMod
                         </tbody>
                       </table>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === "bundle" && (
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-amber-200 dark:border-amber-700 bg-amber-50/60 dark:bg-amber-900/20 p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-100">Packed Components</h3>
+                        <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                          This bundle can currently sell {item.available.toLocaleString()} units from the selected POS warehouse.
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-md bg-amber-600 px-2 py-1 text-xs font-semibold text-white">
+                        {bundleComponents.length} {bundleComponents.length === 1 ? "item" : "items"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
+                    <table className="w-full text-sm min-w-[720px]">
+                      <thead>
+                        <tr className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-600">
+                          <th className="text-left p-3 font-semibold text-gray-600 dark:text-gray-400 text-xs uppercase">Component</th>
+                          <th className="text-right p-3 font-semibold text-gray-600 dark:text-gray-400 text-xs uppercase">Qty in Bundle</th>
+                          <th className="text-right p-3 font-semibold text-gray-600 dark:text-gray-400 text-xs uppercase">Available</th>
+                          <th className="text-right p-3 font-semibold text-gray-600 dark:text-gray-400 text-xs uppercase">Can Pack</th>
+                          <th className="text-left p-3 font-semibold text-gray-600 dark:text-gray-400 text-xs uppercase">Tracking</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-700/60">
+                        {bundleComponents.map((component) => {
+                          const tracked = component.has_batch_no || component.has_serial_no
+                          return (
+                            <tr key={component.item_code} className="hover:bg-gray-50 dark:hover:bg-gray-700/20 transition-colors">
+                              <td className="p-3">
+                                <p className="font-medium text-gray-900 dark:text-white">{component.item_name}</p>
+                                <p className="text-xs font-mono text-gray-500 dark:text-gray-400">{component.item_code}</p>
+                              </td>
+                              <td className="p-3 text-right font-semibold text-gray-900 dark:text-white">
+                                {component.qty.toLocaleString()} {component.uom || ""}
+                              </td>
+                              <td className="p-3 text-right text-gray-700 dark:text-gray-300">
+                                {component.is_stock_item ? component.available?.toLocaleString() ?? 0 : "Service"}
+                              </td>
+                              <td className="p-3 text-right font-semibold text-gray-900 dark:text-white">
+                                {component.is_stock_item ? component.available_bundle_qty?.toLocaleString() ?? 0 : "—"}
+                              </td>
+                              <td className="p-3">
+                                {tracked ? (
+                                  <span className="rounded-md bg-red-100 px-2 py-1 text-xs font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                                    Not supported yet
+                                  </span>
+                                ) : (
+                                  <span className="rounded-md bg-green-100 px-2 py-1 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                                    Ready
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}

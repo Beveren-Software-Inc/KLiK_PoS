@@ -51,6 +51,7 @@ export default function PaymentMethods({
               </div>
               <input
                 type="number"
+                min="0"
                 step="0.01"
                 value={method.amount || ""}
                 onChange={(e) => {

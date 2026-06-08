@@ -58,29 +58,47 @@ export default function ProductLineView({
     <>
       <div className={`${isMobile ? "p-4" : "p-2"} bg-gray-50 dark:bg-gray-900`}>
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 mb-4 overflow-visible">
-          <div className={`${isMobile ? "grid grid-cols-8 gap-2 px-3 py-3" : "grid grid-cols-12 gap-4 px-4 py-3"} bg-gray-50 dark:bg-gray-700 border-b`}>
-            <div className="col-span-4 text-xs font-semibold text-gray-900 dark:text-white">Product</div>
-            <div className="col-span-2 text-xs font-semibold text-center text-gray-900 dark:text-white">Rate</div>
-            <div className="col-span-2 text-xs font-semibold text-center text-gray-900 dark:text-white">Qty</div>
-            {!isMobile && <div className="col-span-2 text-xs font-semibold text-center text-gray-900 dark:text-white">UOM</div>}
-            <div className="col-span-2 text-xs font-semibold text-center text-gray-900 dark:text-white">Action</div>
-          </div>
+          {!isMobile && (
+            <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-gray-50 dark:bg-gray-700 border-b">
+              <div className="col-span-4 text-xs font-semibold text-gray-900 dark:text-white">Product</div>
+              <div className="col-span-2 text-xs font-semibold text-center text-gray-900 dark:text-white">Rate</div>
+              <div className="col-span-2 text-xs font-semibold text-center text-gray-900 dark:text-white">Qty</div>
+              <div className="col-span-2 text-xs font-semibold text-center text-gray-900 dark:text-white">UOM</div>
+              <div className="col-span-2 text-xs font-semibold text-center text-gray-900 dark:text-white">Action</div>
+            </div>
+          )}
 
           <div className="divide-y divide-gray-200 dark:divide-gray-600">
             {items.map((item) => {
-              const isOutOfStock = item.available <= 0
+              const isServiceItem = item.is_stock_item === false
+              const isOutOfStock = item.is_stock_item !== false && item.available <= 0
               const isDisabled = isOutOfStock || scannerOnly
-              const formattedPrice = formatCurrencyWithSymbol(item.price, item.currency_symbol)
+              const expectedPrice = Number(item.price_with_vat ?? item.price)
+              const basePrice = Number(item.price || 0)
+              const showsAdjustedPrice = Math.abs(expectedPrice - basePrice) > 0.004
+              const formattedPrice = formatCurrencyWithSymbol(expectedPrice, item.currency_symbol)
+              const formattedBasePrice = formatCurrencyWithSymbol(basePrice, item.currency_symbol)
+              const taxRate = Number(item.tax_info?.total_tax_rate || 0)
+              const taxBadgeLabel = item.tax_info?.has_vat
+                ? `VAT ${taxRate.toFixed(taxRate % 1 === 0 ? 0 : 2)}% ${item.tax_info.is_inclusive ? "Incl" : "Excl"}`
+                : "No VAT"
+              const taxBadgeClass = item.tax_info?.has_vat
+                ? item.tax_info.is_inclusive
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-700"
+                  : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-700"
+                : "bg-gray-50 text-gray-500 border-gray-200 dark:bg-gray-700/50 dark:text-gray-300 dark:border-gray-600"
+              const bundleCount = item.is_product_bundle ? item.bundle_items?.length || 0 : 0
+              const variantCount = item.is_variant_template ? item.variant_count || 0 : 0
 
               return (
                 <div
                   key={item.id}
-                  className={`grid ${isMobile ? "grid-cols-8" : "grid-cols-12"} gap-4 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
+                  className={`${isMobile ? "px-3 py-3" : "grid grid-cols-12 gap-4 px-4 py-3"} hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
                     !isDisabled && "cursor-pointer"
                   }`}
                   onClick={() => !isDisabled && onAddToCart(item)}
                 >
-                  <div className={`${isMobile ? "col-span-3" : "col-span-4"} flex items-center gap-2`}>
+                  <div className={`${isMobile ? "flex items-center gap-2" : "col-span-4 flex items-center gap-2"}`}>
                     {item.image ? (
                       <img
                         src={item.image}
@@ -128,51 +146,114 @@ export default function ProductLineView({
                       <p className={`text-gray-500 dark:text-gray-400 ${isMobile ? "text-xs leading-tight" : "text-sm"} ${isMobile ? "break-words" : "truncate"} ${isDisabled ? "opacity-60" : ""}`}>
                         {item.category}
                       </p>
-                    </div>
-                  </div>
-
-
-                  <div className={`${isMobile ? "col-span-2" : "col-span-2"} flex items-center justify-center ${isDisabled ? "opacity-60" : ""}`}>
-                    <span className={`font-semibold text-beveren-600 dark:text-beveren-400 ${isMobile ? "text-xs" : "text-sm"}`}>
-                      {formattedPrice}
-                    </span>
-                  </div>
-
-                  <div className={`${isMobile ? "col-span-2" : "col-span-2"} flex items-center justify-center ${isDisabled ? "opacity-60" : ""}`}>
-                    <span className={`font-medium ${isMobile ? "text-xs" : "text-sm"} ${
-                      isOutOfStock ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-white"
-                    }`}>
-                      {isOutOfStock ? "0" : item.available}
-                    </span>
-                  </div>
-
-                  {!isMobile && (
-                    <div className={`col-span-2 flex items-center justify-center ${isDisabled ? "opacity-60" : ""}`}>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        {item.uom || "Nos"}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className={`${isMobile ? "col-span-1" : "col-span-2"} flex items-center justify-center`}>
-                    {isDisabled ? (
-                      <span className={`text-gray-400 dark:text-gray-500 ${isMobile ? "text-xs" : "text-xs"} opacity-60`}>
-                        {isOutOfStock ? "Out" : "Scan"}
-                      </span>
-                    ) : (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onAddToCart(item)
-                        }}
-                        className={`bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-medium rounded-md transition-colors hover:bg-slate-200 dark:hover:bg-slate-600 hover:border-slate-400 dark:hover:border-slate-500 ${
-                          isMobile ? "px-2 py-1 text-xs" : "px-3 py-1.5 text-sm"
-                        }`}
+                      <span
+                        className={`mt-1 inline-flex max-w-full rounded border px-1.5 py-0.5 text-[9px] font-semibold leading-none ${taxBadgeClass} ${isDisabled ? "opacity-60" : ""}`}
+                        title={item.tax_info?.item_tax_template || item.tax_info?.source || taxBadgeLabel}
                       >
-                        {isMobile ? "+" : "Add"}
-                      </button>
-                    )}
+                        {taxBadgeLabel}
+                      </span>
+                      {item.is_product_bundle && (
+                        <p className={`text-amber-700 dark:text-amber-300 ${isMobile ? "text-xs leading-tight" : "text-xs"} ${isMobile ? "break-words" : "truncate"} ${isDisabled ? "opacity-60" : ""}`}>
+                          Bundle · {bundleCount} packed {bundleCount === 1 ? "item" : "items"}
+                        </p>
+                      )}
+                      {item.is_variant_template && (
+                        <p className={`text-sky-700 dark:text-sky-300 ${isMobile ? "text-xs leading-tight" : "text-xs"} ${isMobile ? "break-words" : "truncate"} ${isDisabled ? "opacity-60" : ""}`}>
+                          Options · {variantCount} {variantCount === 1 ? "variant" : "variants"}
+                        </p>
+                      )}
+                    </div>
                   </div>
+
+                  {isMobile ? (
+                    <div className="mt-2 grid grid-cols-12 gap-2 items-end">
+                      <div className={`col-span-4 ${isDisabled ? "opacity-60" : ""}`}>
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400">Rate</p>
+                        <p className="font-semibold text-beveren-600 dark:text-beveren-400 text-xs">
+                          {formattedPrice}
+                        </p>
+                        {showsAdjustedPrice && (
+                          <p className="text-[12px] font-medium leading-tight text-gray-600 dark:text-gray-300">
+                            Base {formattedBasePrice}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className={`col-span-3 text-center ${isDisabled ? "opacity-60" : ""}`}>
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400">Qty</p>
+                        <p className={`font-medium text-xs ${
+                          isOutOfStock ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-white"
+                        }`}>
+                          {isOutOfStock ? "0" : item.is_variant_template ? variantCount : item.is_product_bundle ? item.available : isServiceItem ? "Service" : item.available}
+                        </p>
+                      </div>
+
+                      <div className="col-span-5 flex justify-end">
+                        {isDisabled ? (
+                          <span className="text-gray-400 dark:text-gray-500 text-xs opacity-60">
+                            {isOutOfStock ? "Out" : "Scan"}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onAddToCart(item)
+                            }}
+                            className="bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-medium rounded-md transition-colors hover:bg-slate-200 dark:hover:bg-slate-600 hover:border-slate-400 dark:hover:border-slate-500 px-3 py-1.5 text-xs"
+                          >
+                            Add
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className={`col-span-2 flex items-center justify-center ${isDisabled ? "opacity-60" : ""}`}>
+                        <div className="text-center">
+                          <span className="block font-semibold text-beveren-600 dark:text-beveren-400 text-sm">
+                            {formattedPrice}
+                          </span>
+                          {showsAdjustedPrice && (
+                            <span className="block text-[10px] font-medium leading-tight text-gray-600 dark:text-gray-300">
+                              Base {formattedBasePrice}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className={`col-span-2 flex items-center justify-center ${isDisabled ? "opacity-60" : ""}`}>
+                        <span className={`font-medium text-sm ${
+                          isOutOfStock ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-white"
+                        }`}>
+                          {isOutOfStock ? "0" : item.is_variant_template ? variantCount : item.is_product_bundle ? item.available : isServiceItem ? "Service" : item.available}
+                        </span>
+                      </div>
+
+                      <div className={`col-span-2 flex items-center justify-center ${isDisabled ? "opacity-60" : ""}`}>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                          {item.uom || "Nos"}
+                        </span>
+                      </div>
+
+                      <div className="col-span-2 flex items-center justify-center">
+                        {isDisabled ? (
+                          <span className="text-gray-400 dark:text-gray-500 text-xs opacity-60">
+                            {isOutOfStock ? "Out" : "Scan"}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onAddToCart(item)
+                            }}
+                            className="bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-medium rounded-md transition-colors hover:bg-slate-200 dark:hover:bg-slate-600 hover:border-slate-400 dark:hover:border-slate-500 px-3 py-1.5 text-sm"
+                          >
+                            Add
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               )
             })}

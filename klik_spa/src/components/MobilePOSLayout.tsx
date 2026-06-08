@@ -8,7 +8,6 @@ import { formatCurrencyWithSymbol } from "../utils/currency"
 import { usePOSProfileStore } from "../stores/posProfileStore";
 import { ShoppingCart, Search, Settings, LogOut, Moon, Sun, Scan, Grid3X3, List, Store, RefreshCw, Lock, Unlock } from "lucide-react"
 import { clearCacheAndReload } from "../utils/clearCache"
-import CategoryTabs from "./CategoryTabs"
 import ProductGrid from "./ProductGrid"
 import BottomNavigation from "./BottomNavigation"
 import type { MenuItem, CartItem } from "../../types"
@@ -303,10 +302,6 @@ export default function MobilePOSLayout({
           </div>
         </div>
 
-        {/* Categories */}
-        <div className="px-4 pb-2">
-          <CategoryTabs selectedCategory={selectedCategory} onCategoryChange={onCategoryChange} isMobile={true} />
-        </div>
       </div>
 
       {/* Products Grid */}

@@ -19,6 +19,7 @@ import { useCustomers } from "../../hooks/useCustomers";
 import { useCustomerPermission } from "../../hooks/useCustomerPermission";
 import { usePOSProfileStore } from "../../stores/posProfileStore";
 import { useProductStore } from "../../stores/productStore";
+import { useCartStore } from "../../stores/cartStore";
 import countryList from "react-select-country-list";
 import { parsePhoneNumber } from "react-phone-number-input";
 import AddCustomerModal from "../customer/AddCustomerModal";
@@ -28,6 +29,11 @@ interface CustomerSearchSectionProps {
   onCustomerSelect: (customer: Customer) => void;
   onCustomerClear: () => void;
   isMobile?: boolean;
+}
+
+interface SellingPriceList {
+  name: string;
+  currency?: string;
 }
 
 export const CustomerSearchSection = ({
@@ -62,8 +68,41 @@ export const CustomerSearchSection = ({
   const { posDetails } = usePOSProfileStore();
   const { checkCustomerPermission } = useCustomerPermission();
   const { fetchProducts, setSelectedCustomer: setProductCustomer } = useProductStore();
+  const selectedPriceList = useCartStore((state) => state.selectedPriceList);
+  const setSelectedPriceList = useCartStore((state) => state.setSelectedPriceList);
+  const refreshCartPricing = useCartStore((state) => state.refreshCartPricing);
+  const [priceLists, setPriceLists] = useState<SellingPriceList[]>([]);
+  const [isLoadingPriceLists, setIsLoadingPriceLists] = useState(false);
 
   const canCreateCustomer = posDetails?.custom_allow_to_create_and_edit_customers === 1;
+  const allowPriceListSwitching = !!posDetails?.allow_price_list_switching;
+  const defaultPriceList = selectedCustomer?.sellingPriceList || posDetails?.selling_price_list || "";
+  const activePriceList = selectedPriceList || defaultPriceList;
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchPriceLists = async () => {
+      setIsLoadingPriceLists(true);
+      try {
+        const response = await fetch("/api/method/klik_pos.api.item.pricing.get_selling_price_lists", {
+          credentials: "include",
+        });
+        const data = await response.json();
+        if (!cancelled) {
+          setPriceLists(data?.message?.price_lists || []);
+        }
+      } catch (error) {
+        console.error("Failed to fetch selling price lists:", error);
+      } finally {
+        if (!cancelled) setIsLoadingPriceLists(false);
+      }
+    };
+
+    fetchPriceLists();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const fetchCustomerInfo = async (customerName: string): Promise<Customer | null> => {
     try {
@@ -102,7 +141,7 @@ export const CustomerSearchSection = ({
         employeeCount: customer.employee_count || "",
         registrationScheme: customer.registration_scheme || "",
         registrationNumber: customer.registration_number || "",
-        loyaltyPoints: customer.custom_loyalty_points || 0,
+        loyaltyPoints: customer.loyalty?.loyalty_points || customer.custom_loyalty_points || 0,
         totalSpent: customer.custom_total_spent || 0,
         totalOrders: customer.custom_total_orders || 0,
         preferredPaymentMethod: (customer.payment_method as "Cash" | "Bank Card" | "Bank Payment" | "Credit") || "Cash",
@@ -155,7 +194,11 @@ export const CustomerSearchSection = ({
         currencyCode: customer.currency || null,
         salesTeam: customer.sales_team || [],
         vatNumber: customer.vat_number || "",
-        paymentMethod: customer.payment_method || "Cash"
+        paymentMethod: customer.payment_method || "Cash",
+        loyalty: customer.loyalty || undefined,
+        loyaltyProgram: customer.loyalty?.loyalty_program || null,
+        loyaltyTier: customer.loyalty?.loyalty_program_tier || customer.loyalty?.customer_loyalty_program_tier || null,
+        redeemableValue: customer.loyalty?.redeemable_value || 0,
       };
       
       return transformedCustomer;
@@ -240,16 +283,25 @@ export const CustomerSearchSection = ({
       if (fullCustomer) {
         onCustomerSelect(fullCustomer);
         setProductCustomer(fullCustomer);
+        if (!selectedPriceList && fullCustomer.sellingPriceList) {
+          await setSelectedPriceList(fullCustomer.sellingPriceList);
+        }
         await fetchProducts(true);
       } else {
         onCustomerSelect(customer);
         setProductCustomer(customer);
+        if (!selectedPriceList && customer.sellingPriceList) {
+          await setSelectedPriceList(customer.sellingPriceList);
+        }
         await fetchProducts(true);
       }
     } catch (error) {
       console.error("Error fetching customer info:", error);
       onCustomerSelect(customer);
       setProductCustomer(customer);
+      if (!selectedPriceList && customer.sellingPriceList) {
+        await setSelectedPriceList(customer.sellingPriceList);
+      }
       await fetchProducts(true);
     } finally {
       setIsLoading(false);
@@ -259,6 +311,12 @@ export const CustomerSearchSection = ({
         shouldPreventSearchRef.current = false;
       }, 300);
     }
+  };
+
+  const handlePriceListChange = async (value: string) => {
+    await setSelectedPriceList(value || null);
+    await refreshCartPricing();
+    await fetchProducts(true);
   };
 
   const handleClear = (e: React.MouseEvent) => {
@@ -637,6 +695,24 @@ export const CustomerSearchSection = ({
           </button>
         )}
       </div>
+
+      {allowPriceListSwitching && (
+      <div className="mt-2">
+        <select
+          value={activePriceList}
+          onChange={(event) => { void handlePriceListChange(event.target.value); }}
+          disabled={isLoadingPriceLists}
+          className="w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-beveren-500 focus:border-transparent disabled:opacity-60"
+        >
+          {!activePriceList && <option value="">Default Price List</option>}
+          {priceLists.map((priceList) => (
+            <option key={priceList.name} value={priceList.name}>
+              {priceList.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      )}
 
       {showAddCustomerModal && (
         <AddCustomerModal

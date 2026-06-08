@@ -18,6 +18,7 @@ import {
   ArrowLeft,
   Clock,
   AlertCircle,
+  Banknote,
 
 } from "lucide-react";
 
@@ -36,6 +37,7 @@ import { loadCachedItemsToCart } from "../utils/draftInvoiceCache";
 import { useCartStore } from "../stores/cartStore";
 import { isToday, isThisWeek, isThisMonth, isThisYear } from "../utils/time";
 import AddCustomerModal from "../components/customer/AddCustomerModal";
+import CustomerPaymentEntryModal from "../components/customer/CustomerPaymentEntryModal";
 import BottomNavigation from "../components/BottomNavigation";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 
@@ -51,9 +53,11 @@ export default function CustomerDetailsPage() {
   // Single Invoice Return states
   const [showSingleReturn, setShowSingleReturn] = useState(false);
   const [selectedInvoiceForReturn, setSelectedInvoiceForReturn] = useState<SalesInvoice | null>(null);
+  const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<SalesInvoice | null>(null);
 
   // Customer edit modal state
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   //eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
 
@@ -108,14 +112,6 @@ export default function CustomerDetailsPage() {
     });
   }, [invoices, searchQuery, statusFilter, dateFilter, isLoading, error, customer]);
 
-  // Debug log for filtered results
-  console.log('CustomerPageDetails: Filtered customer invoices:', {
-    customerInvoicesCount: customerInvoices.length,
-    customerInvoices: customerInvoices
-  });
-
-
-
   const getStatusBadge = (status: string) => {
     const baseClasses = "px-2 py-1 rounded-full text-xs font-medium";
     const normalized = status?.toLowerCase() || "";
@@ -157,7 +153,6 @@ export default function CustomerDetailsPage() {
   // Helper function to check if invoice has items that can still be returned
   const hasReturnableItems = (invoice: SalesInvoice) => {
     if (!invoice || !invoice.items) {
-      console.log("No invoice or items found for:", invoice?.id);
       return false;
     }
 
@@ -249,6 +244,11 @@ export default function CustomerDetailsPage() {
     window.location.reload();
   };
 
+  const handleInvoicePaymentCreated = () => {
+    setSelectedInvoiceForPayment(null);
+    window.location.reload();
+  };
+
  const handleReturnClick = async (invoiceName: string) => {
     try {
       const result = await createSalesReturn(invoiceName);
@@ -263,7 +263,6 @@ export default function CustomerDetailsPage() {
 
   //eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleSaveCustomer = (customer: any) => {
-    console.log('Saving customer:', customer);
     setShowAddModal(false);
     setSelectedCustomer(null);
   };
@@ -362,19 +361,29 @@ export default function CustomerDetailsPage() {
                   </p>
                 </div>
               </div>
-              {posDetails && posDetails?.custom_allow_to_create_and_edit_customers === 1 && (
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => {
-                    console.log('Customer data being passed to modal:', customer);
-                    setSelectedCustomer(customer);
-                    setShowAddModal(true);
-                  }}
-                  className="flex items-center space-x-2 px-3 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors text-sm"
+                  onClick={() => setShowPaymentModal(true)}
+                  className="flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                  type="button"
                 >
-                  <Edit className="w-4 h-4" />
-                  <span>Edit</span>
+                  <Banknote className="w-4 h-4" />
+                  <span>Pay</span>
                 </button>
-              )}
+                {posDetails && posDetails?.custom_allow_to_create_and_edit_customers === 1 && (
+                  <button
+                    onClick={() => {
+                      setSelectedCustomer(customer);
+                      setShowAddModal(true);
+                    }}
+                    className="flex items-center space-x-2 px-3 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors text-sm"
+                    type="button"
+                  >
+                    <Edit className="w-4 h-4" />
+                    <span>Edit</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -587,6 +596,14 @@ export default function CustomerDetailsPage() {
                                 Edit
                               </button>
                             )}
+                            {Number((invoice as any).amountDue || 0) > 0 && (
+                              <button
+                                onClick={() => setSelectedInvoiceForPayment(invoice)}
+                                className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
+                              >
+                                Pay
+                              </button>
+                            )}
                                                   {/* @ts-expect-error just ignore */}
                             {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && !invoice.is_return && hasReturnableItems(invoice) && (
                               <button
@@ -650,7 +667,6 @@ export default function CustomerDetailsPage() {
           onClose={() => setShowInvoiceModal(false)}
           onRefund={handleRefund}
           onCancel={(invoiceId) => {
-            console.log("Invoice cancelled:", invoiceId);
             setShowInvoiceModal(false);
           }}
         />
@@ -670,6 +686,25 @@ export default function CustomerDetailsPage() {
               setSelectedCustomer(null);
             }}
             onSave={handleSaveCustomer}
+          />
+        )}
+
+        {showPaymentModal && (
+          <CustomerPaymentEntryModal
+            customer={customer}
+            onClose={() => setShowPaymentModal(false)}
+          />
+        )}
+
+        {selectedInvoiceForPayment && (
+          <CustomerPaymentEntryModal
+            customer={customer}
+            salesInvoiceName={selectedInvoiceForPayment.name || selectedInvoiceForPayment.id}
+            outstandingAmount={Number((selectedInvoiceForPayment as any).amountDue || 0)}
+            defaultAmount={Number((selectedInvoiceForPayment as any).amountDue || 0)}
+            invoiceCurrency={selectedInvoiceForPayment.currency}
+            onClose={() => setSelectedInvoiceForPayment(null)}
+            onCreated={handleInvoicePaymentCreated}
           />
         )}
 
@@ -709,19 +744,29 @@ export default function CustomerDetailsPage() {
                   </p>
                 </div>
               </div>
-              {posDetails && posDetails?.custom_allow_to_create_and_edit_customers === 1 && (
+              <div className="flex items-center gap-3">
                 <button
-                  onClick={() => {
-                    console.log('Customer data being passed to modal:', customer);
-                    setSelectedCustomer(customer);
-                    setShowAddModal(true);
-                  }}
-                  className="flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors"
+                  onClick={() => setShowPaymentModal(true)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  type="button"
                 >
-                  <Edit className="w-4 h-4" />
-                  <span>Update Customer</span>
+                  <Banknote className="w-4 h-4" />
+                  <span>Receive Payment</span>
                 </button>
-              )}
+                {posDetails && posDetails?.custom_allow_to_create_and_edit_customers === 1 && (
+                  <button
+                    onClick={() => {
+                      setSelectedCustomer(customer);
+                      setShowAddModal(true);
+                    }}
+                    className="flex items-center space-x-2 px-4 py-2 bg-beveren-600 text-white rounded-lg hover:bg-beveren-700 transition-colors"
+                    type="button"
+                  >
+                    <Edit className="w-4 h-4" />
+                    <span>Update Customer</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -994,6 +1039,14 @@ export default function CustomerDetailsPage() {
                                   Edit
                                 </button>
                               )}
+                              {Number((invoice as any).amountDue || 0) > 0 && (
+                                <button
+                                  onClick={() => setSelectedInvoiceForPayment(invoice)}
+                                  className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
+                                >
+                                  Pay
+                                </button>
+                              )}
                                                     {/* @ts-expect-error just ignore */}
                               {["Paid", "Unpaid", "Overdue", "Partly Paid", "Credit Note Issued"].includes(invoice.status) && !invoice.is_return && hasReturnableItems(invoice) && (
                                 <button
@@ -1055,7 +1108,6 @@ export default function CustomerDetailsPage() {
           onClose={() => setShowInvoiceModal(false)}
           onRefund={handleRefund}
           onCancel={(invoiceId) => {
-            console.log("Invoice cancelled:", invoiceId);
             setShowInvoiceModal(false);
           }}
         />
@@ -1077,6 +1129,25 @@ export default function CustomerDetailsPage() {
               setSelectedCustomer(null);
             }}
             onSave={handleSaveCustomer}
+          />
+        )}
+
+        {showPaymentModal && (
+          <CustomerPaymentEntryModal
+            customer={customer}
+            onClose={() => setShowPaymentModal(false)}
+          />
+        )}
+
+        {selectedInvoiceForPayment && (
+          <CustomerPaymentEntryModal
+            customer={customer}
+            salesInvoiceName={selectedInvoiceForPayment.name || selectedInvoiceForPayment.id}
+            outstandingAmount={Number((selectedInvoiceForPayment as any).amountDue || 0)}
+            defaultAmount={Number((selectedInvoiceForPayment as any).amountDue || 0)}
+            invoiceCurrency={selectedInvoiceForPayment.currency}
+            onClose={() => setSelectedInvoiceForPayment(null)}
+            onCreated={handleInvoicePaymentCreated}
           />
         )}
 

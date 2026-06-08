@@ -46,6 +46,7 @@ export default function CartPage() {
           onUpdateQuantity={updateQuantity}
           onRemoveItem={removeItem}
           onClearCart={clearCart}
+          onPaymentCompleted={() => navigate('/pos', { replace: true })}
           appliedCoupons={appliedCoupons}
           onApplyCoupon={applyCoupon}
           onRemoveCoupon={removeCoupon}

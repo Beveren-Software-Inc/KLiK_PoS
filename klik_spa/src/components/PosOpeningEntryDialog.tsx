@@ -150,11 +150,9 @@ const POSOpeningModal: React.FC<POSOpeningModalProps> = ({
         opening_amount: method.opening_amount || 0
       }));
       
-      console.log("Opening balance data:", openingBalance, "Selected profile:", selectedProfile);
       await createOpeningEntry(openingBalance, selectedProfile || undefined);
 
       clearAllCache();
-      console.log("🧹 Cache cleared after creating new opening entry");
 
       try {
         await fetch('/api/method/klik_pos.api.cache.clear_backend_cache', {
@@ -165,7 +163,6 @@ const POSOpeningModal: React.FC<POSOpeningModalProps> = ({
           },
           credentials: 'include'
         });
-        console.log("✅ Backend cache cleared after creating new opening entry");
       } catch (e) {
         console.warn('⚠️ Failed to clear backend cache after opening entry:', e);
       }

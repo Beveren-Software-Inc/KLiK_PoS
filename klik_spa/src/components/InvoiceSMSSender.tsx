@@ -49,7 +49,6 @@ export const InvoiceSMSSender: React.FC<InvoiceSMSSenderProps> = ({
 
       setResult(response);
       onSuccess?.(response);
-      console.log('Invoice SMS sent successfully:', response);
       //eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       const userFriendlyError = getUserFriendlyError(err.message || 'Failed to send invoice SMS message', 'sms');

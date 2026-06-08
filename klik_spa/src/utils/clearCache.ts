@@ -13,29 +13,23 @@ const CACHE_KEYS = {
 
 export function clearAllCache(): void {
   try {
-    console.log('🧹 Clearing all application cache...');
 
     // Clear product cache
     localStorage.removeItem(CACHE_KEYS.PRODUCTS);
     localStorage.removeItem(CACHE_KEYS.PRODUCTS_EXPIRY);
-    console.log('✅ Product cache cleared');
 
     // Clear draft invoice cache
     clearDraftInvoiceCache();
-    console.log('✅ Draft invoice cache cleared');
 
     // Clear cart cache
     localStorage.removeItem(CACHE_KEYS.CART);
-    console.log('✅ Cart cache cleared');
 
     // Clear cart state in memory
     const { clearCart } = useCartStore.getState();
     clearCart();
-    console.log('✅ Cart state cleared');
 
     const { clearActiveSalesperson } = useSalespersonStore.getState();
     clearActiveSalesperson();
-    console.log('✅ Salesperson state cleared');
 
     // Clear any other app-related localStorage items
     // (excluding theme, language, and other user preferences)
@@ -57,10 +51,8 @@ export function clearAllCache(): void {
 
     appKeys.forEach(key => {
       localStorage.removeItem(key);
-      console.log(`✅ Cleared cache key: ${key}`);
     });
 
-    console.log('🎉 All cache cleared successfully!');
 
   } catch (error) {
     console.error('❌ Error clearing cache:', error);
@@ -73,7 +65,6 @@ export function clearAllCache(): void {
  */
 async function clearBackendCache(): Promise<void> {
   try {
-    console.log('🧹 Clearing backend cache...');
 
     const response = await fetch('/api/method/klik_pos.api.cache.clear_backend_cache', {
       method: 'POST',
@@ -87,7 +78,6 @@ async function clearBackendCache(): Promise<void> {
     const data = await response.json();
 
     if (data.message?.success) {
-      console.log('✅ Backend cache cleared successfully');
     } else {
       console.warn('⚠️ Backend cache clear failed:', data.message?.error || 'Unknown error');
     }
@@ -106,7 +96,6 @@ export async function clearCacheAndReload(): Promise<void> {
     await clearBackendCache();
 
     // Show a brief message before reload
-    console.log('🔄 Reloading page with fresh data...');
 
     // Reload the page after a short delay to ensure cache is cleared
     setTimeout(() => {

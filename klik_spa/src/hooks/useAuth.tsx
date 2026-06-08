@@ -156,7 +156,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const isValid = await erpnextAPI.validateSession()
       if (!isValid) {
-        console.log("Session expired, logging out")
         await logout()
         return false
       }

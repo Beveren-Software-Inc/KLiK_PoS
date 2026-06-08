@@ -20,11 +20,9 @@ export const formatTime = (timeString: unknown): string => {
   // Convert to string if it's not already
   const timeStr = String(timeString);
 
-  console.log('formatTime input:', timeString, 'converted to string:', timeStr);
 
   // If it's already in HH:MM:SS format, return as is
   if (/^\d{2}:\d{2}:\d{2}$/.test(timeStr)) {
-    console.log('Already in HH:MM:SS format');
     return timeStr;
   }
 
@@ -32,7 +30,6 @@ export const formatTime = (timeString: unknown): string => {
   if (timeStr.includes('.')) {
     const result = timeStr.split('.')[0];
     if (result) {
-      console.log('Removed microseconds:', result);
       return result;
     }
   }
@@ -43,12 +40,10 @@ export const formatTime = (timeString: unknown): string => {
     if (timePart && timePart.includes('.')) {
       const result = timePart.split('.')[0];
       if (result) {
-        console.log('Extracted time from datetime:', result);
         return result;
       }
     }
     if (timePart) {
-      console.log('Extracted time from datetime (no microseconds):', timePart);
       return timePart;
     }
   }
@@ -61,7 +56,6 @@ export const formatTime = (timeString: unknown): string => {
     const minutes = timeMatch[2];
     const seconds = timeMatch[3];
     const result = `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}`;
-    console.log('Fixed single-digit seconds:', timeStr, '->', result);
     return result;
   }
 
@@ -72,7 +66,6 @@ export const formatTime = (timeString: unknown): string => {
     const minutes = timeMatchAny[2];
     const seconds = timeMatchAny[3];
     const result = `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}`;
-    console.log('Fixed any single-digit parts:', timeStr, '->', result);
     return result;
   }
 
@@ -82,7 +75,6 @@ export const formatTime = (timeString: unknown): string => {
     const hours = timeMatchNoSeconds[1];
     const minutes = timeMatchNoSeconds[2];
     const result = `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:00`;
-    console.log('Added missing seconds:', timeStr, '->', result);
     return result;
   }
 
@@ -92,7 +84,6 @@ export const formatTime = (timeString: unknown): string => {
     if (!isNaN(date.getTime())) {
       const timeResult = date.toTimeString().split(' ')[0];
       if (timeResult) {
-        console.log('Parsed as number/Date:', timeResult);
         return timeResult;
       }
     }
@@ -103,7 +94,6 @@ export const formatTime = (timeString: unknown): string => {
   if (!isNaN(date.getTime())) {
     const timeResult = date.toTimeString().split(' ')[0];
     if (timeResult) {
-      console.log('Parsed as Date string:', timeResult);
       return timeResult;
     }
   }
@@ -116,7 +106,6 @@ export const formatTime = (timeString: unknown): string => {
       const m = String(timeObj.minutes || 0).padStart(2, '0');
       const s = String(timeObj.seconds || 0).padStart(2, '0');
       const result = `${h}:${m}:${s}`;
-      console.log('Parsed as time object:', result);
       return result;
     }
   }
@@ -129,12 +118,10 @@ export const formatTime = (timeString: unknown): string => {
     const seconds = parts[2];
     if (/^\d{1,2}$/.test(hours) && /^\d{1,2}$/.test(minutes) && /^\d{1,2}$/.test(seconds)) {
       const result = `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}`;
-      console.log('Fallback padding:', timeStr, '->', result);
       return result;
     }
   }
 
-  console.log('No pattern matched, returning original:', timeStr);
   return timeStr;
 };
 

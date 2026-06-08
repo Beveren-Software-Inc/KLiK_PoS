@@ -10,10 +10,12 @@ import {
   Users,
   Eye,
   Edit,
+  Banknote,
 
 } from "lucide-react"
 import { useCustomers } from "../hooks/useCustomers" // Import the hook
 import AddCustomerModal from "./customer/AddCustomerModal"
+import CustomerPaymentEntryModal from "./customer/CustomerPaymentEntryModal"
 import type { Customer } from "../types/customer"
 
 import BottomNavigation from "./BottomNavigation"
@@ -27,6 +29,7 @@ export default function CustomersPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [showAddModal, setShowAddModal] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
+  const [paymentCustomer, setPaymentCustomer] = useState<Customer | null>(null)
   const [prefilledData, setPrefilledData] = useState<{name?: string, email?: string, phone?: string}>({})
   const [globalTotals, setGlobalTotals] = useState<{ total_customers: number; total_invoices: number } | null>(null)
   const [canManageCustomers, setCanManageCustomers] = useState(false)
@@ -346,6 +349,17 @@ export default function CustomersPage() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
+                                setPaymentCustomer(customer)
+                              }}
+                              className="text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
+                              title="Receive Payment"
+                              aria-label={`Receive payment from ${customer.name}`}
+                            >
+                              <Banknote size={16} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
                                 navigate(`/customers/${customer.id}`)
                               }}
                               className="text-beveren-600 hover:text-beveren-700 dark:text-beveren-400 dark:hover:text-beveren-300"
@@ -400,7 +414,6 @@ export default function CustomersPage() {
         {/* Add/Edit Customer Modal */}
         {showAddModal && (
           <>
-            {console.log('Opening modal with prefilled data:', prefilledData)}
             <AddCustomerModal
               customer={selectedCustomer}
               onClose={() => {
@@ -409,11 +422,9 @@ export default function CustomersPage() {
                 setPrefilledData({})
               }}
           onSave={(customer: Partial<Customer>) => {
-            console.log('Saving customer:', customer)
 
             // If it's a new customer (not editing), reload the page to show the new customer
             if (!selectedCustomer && customer.id) {
-              console.log('New customer created, reloading page to show updated list')
               // Small delay to ensure the backend has processed the creation
               setTimeout(() => {
                 window.location.reload()
@@ -428,6 +439,13 @@ export default function CustomersPage() {
               prefilledData={prefilledData}
             />
           </>
+        )}
+
+        {paymentCustomer && (
+          <CustomerPaymentEntryModal
+            customer={paymentCustomer}
+            onClose={() => setPaymentCustomer(null)}
+          />
         )}
 
         {/* Bottom Navigation */}
@@ -609,6 +627,17 @@ export default function CustomersPage() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
+                              setPaymentCustomer(customer)
+                            }}
+                            className="text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
+                            title="Receive Payment"
+                            aria-label={`Receive payment from ${customer.name}`}
+                          >
+                            <Banknote size={16} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
                               navigate(`/customers/${customer.id}`)
                             }}
                             className="text-beveren-600 hover:text-beveren-700 dark:text-beveren-400 dark:hover:text-beveren-300"
@@ -643,7 +672,6 @@ export default function CustomersPage() {
       {/* Add/Edit Customer Modal */}
       {showAddModal && (
         <>
-          {console.log('Opening modal with prefilled data:', prefilledData)}
         <AddCustomerModal
           customer={selectedCustomer}
           onClose={() => {
@@ -652,11 +680,9 @@ export default function CustomersPage() {
               setPrefilledData({}) // Clear prefilled data
           }}
           onSave={(customer: Partial<Customer>) => {
-            console.log('Saving customer (desktop):', customer)
 
             // If it's a new customer (not editing), reload the page to show the new customer
             if (!selectedCustomer && customer.id) {
-              console.log('New customer created, reloading page to show updated list')
               // Small delay to ensure the backend has processed the creation
               setTimeout(() => {
                 window.location.reload()
@@ -671,6 +697,12 @@ export default function CustomersPage() {
             prefilledData={prefilledData}
         />
         </>
+      )}
+      {paymentCustomer && (
+        <CustomerPaymentEntryModal
+          customer={paymentCustomer}
+          onClose={() => setPaymentCustomer(null)}
+        />
       )}
     </div>
   )

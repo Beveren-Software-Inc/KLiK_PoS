@@ -6,12 +6,14 @@ import { useProduct } from "../providers/ProductProvider";
 import ProductCard from "./ProductCard";
 import ProductLineView from "./ProductLineView";
 import SalespersonAuthModal from "./dialog/SalespersonAuthModal";
+import VariantPickerModal from "./VariantPickerModal";
 import { useCartStore } from "../stores/cartStore";
 import { usePOSProfileStore } from "../stores/posProfileStore";
 import { useSalespersonStore } from "../stores/salespersonStore";
 
 
 interface ProductGridProps {
+  isMobile?: boolean;
   scannerOnly?: boolean;
   viewMode?: "grid" | "list";
   hasMore?: boolean;
@@ -22,6 +24,7 @@ interface ProductGridProps {
 }
 
 export default function ProductGrid({
+  isMobile = false,
   scannerOnly = false,
   viewMode: propViewMode,
   hasMore = false,
@@ -30,12 +33,13 @@ export default function ProductGrid({
   totalCount = 0,
   isSearching = false,
 }: ProductGridProps) {
-  const { filteredItems, hideUnavailableItems } = useProduct();
+  const { filteredItems, hideUnavailableItems, selectedCustomer } = useProduct();
   const { addToCart } = useCartStore();
   const { posDetails } = usePOSProfileStore();
   const { activeSalesperson, ensureInitialized, isRestoring } = useSalespersonStore();
   const [showSalespersonModal, setShowSalespersonModal] = useState(false);
   const [pendingCartItem, setPendingCartItem] = useState<MenuItem | null>(null);
+  const [variantTemplateItem, setVariantTemplateItem] = useState<MenuItem | null>(null);
 
   const defaultView = posDetails?.custom_default_view || "Grid View";
   const viewMode = propViewMode || (defaultView === "List View" ? "list" : "grid");
@@ -46,7 +50,11 @@ export default function ProductGrid({
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const inStockItems = useMemo(
-    () => (hideUnavailableItems ? filteredItems.filter((item) => item.available > 0) : filteredItems),
+    () => (
+      hideUnavailableItems
+        ? filteredItems.filter((item) => item.is_stock_item === false || item.available > 0)
+        : filteredItems
+    ),
     [filteredItems, hideUnavailableItems],
   );
 
@@ -66,15 +74,24 @@ export default function ProductGrid({
     setPendingCartItem(null);
   }, [isSalespersonLockActive]);
 
-  const addItemToCart = useCallback(async (item: MenuItem) => {
+  const addConcreteItemToCart = useCallback(async (item: MenuItem) => {
     await addToCart({
       ...item,
       item_code: item.id,
     });
   }, [addToCart]);
 
+  const addItemToCart = useCallback(async (item: MenuItem) => {
+    if (item.is_variant_template || item.has_variants) {
+      setVariantTemplateItem(item);
+      return;
+    }
+
+    await addConcreteItemToCart(item);
+  }, [addConcreteItemToCart]);
+
   const handleAddToCart = useCallback(async (item: MenuItem) => {
-    if (item.available <= 0) return;
+    if (item.is_stock_item !== false && item.available <= 0) return;
     if (scannerOnly) return;
 
     if (requiresSalespersonPin) {
@@ -110,6 +127,10 @@ export default function ProductGrid({
 
     void addItemToCart(itemToAdd);
   }, [addItemToCart, pendingCartItem]);
+
+  const handleVariantSelected = useCallback(async (variant: MenuItem) => {
+    await addConcreteItemToCart(variant);
+  }, [addConcreteItemToCart]);
 
   const handleObserver = useCallback(
     (entries: IntersectionObserverEntry[]) => {
@@ -155,6 +176,7 @@ export default function ProductGrid({
         <ProductLineView
           items={inStockItems}
           onAddToCart={handleAddToCart}
+          isMobile={isMobile}
           showItemCode={showItemCode}
           scannerOnly={scannerOnly}
         />
@@ -193,6 +215,14 @@ export default function ProductGrid({
           title="Verify salesperson"
           description="Verify the salesperson before adding items to the cart."
         />
+        {variantTemplateItem && (
+          <VariantPickerModal
+            item={variantTemplateItem}
+            customerId={selectedCustomer?.id}
+            onClose={() => setVariantTemplateItem(null)}
+            onSelectVariant={handleVariantSelected}
+          />
+        )}
       </>
     );
   }
@@ -230,24 +260,33 @@ export default function ProductGrid({
               : "Verify the salesperson before adding items to the cart."
           }
         />
+        {variantTemplateItem && (
+          <VariantPickerModal
+            item={variantTemplateItem}
+            customerId={selectedCustomer?.id}
+            onClose={() => setVariantTemplateItem(null)}
+            onSelectVariant={handleVariantSelected}
+          />
+        )}
       </>
     );
   }
 
   return (
     <>
-      <div className="p-6 bg-gray-50 dark:bg-gray-900 relative">
+      <div className={`${isMobile ? "p-3" : "p-6"} bg-gray-50 dark:bg-gray-900 relative`}>
       {isSearching && (
         <div className="absolute inset-0 bg-white/50 dark:bg-gray-900/50 z-10 flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-beveren-600"></div>
         </div>
       )}
-      <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4">
+      <div className={`grid ${isMobile ? "gap-3 grid-cols-2 sm:grid-cols-2" : "gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4"}`}>
         {inStockItems.map((item) => (
           <ProductCard
             key={item.id}
             item={item}
             onAddToCart={handleAddToCart}
+            isMobile={isMobile}
             showItemCode={showItemCode}
             scannerOnly={scannerOnly}
           />
@@ -296,6 +335,14 @@ export default function ProductGrid({
             : "Verify the salesperson before adding items to the cart."
         }
       />
+      {variantTemplateItem && (
+        <VariantPickerModal
+          item={variantTemplateItem}
+          customerId={selectedCustomer?.id}
+          onClose={() => setVariantTemplateItem(null)}
+          onSelectVariant={handleVariantSelected}
+        />
+      )}
     </>
   );
 }

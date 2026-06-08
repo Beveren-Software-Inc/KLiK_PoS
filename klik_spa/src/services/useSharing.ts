@@ -14,7 +14,6 @@ export async function sendEmails(data: any) {
   });
 
   const result = await response.json();
-  console.log("Send email result:", result);
 
   if (!response.ok || !result.message || result.message.status !== "success") {
     const serverMsg = result._server_messages
@@ -100,7 +99,6 @@ export async function getWhatsAppSetup() {
 export async function sendWhatsAppMessage(data: WhatsAppData) {
   const csrfToken = window.csrf_token;
 
-  console.log("Simple WhatsApp data", data);
 
   const response = await fetch('/api/method/klik_pos.api.whatsapp.deliver_invoice_via_whatsapp', {
     method: 'POST',
@@ -113,7 +111,6 @@ export async function sendWhatsAppMessage(data: WhatsAppData) {
   });
 
   const result = await response.json();
-  console.log("Send Simple WhatsApp result:", result);
 
   if (!response.ok || !result.message || result.message.status !== "success") {
     const serverMsg = result._server_messages
@@ -128,12 +125,6 @@ export async function sendWhatsAppMessage(data: WhatsAppData) {
 // Function for sending template messages
 export async function sendTemplateWhatsApp(mobile: string, templateName: string, parameters?: string[]) {
   const csrfToken = window.csrf_token;
-
-  console.log("Template WhatsApp data", {
-    mobile_no: mobile,
-    template_name: templateName,
-    template_parameters: parameters
-  });
 
   const response = await fetch('/api/method/klik_pos.api.whatsapp.send_template_whatsapp', {
     method: 'POST',
@@ -150,7 +141,6 @@ export async function sendTemplateWhatsApp(mobile: string, templateName: string,
   });
 
   const result = await response.json();
-  console.log("Send Template WhatsApp result:", result);
 
   if (!response.ok || !result.message || result.message.status !== "success") {
     const serverMsg = result._server_messages
@@ -194,7 +184,6 @@ export async function getSMSGateway() {
 export async function sendSMSMessage(data: { mobile_no: string; message: string; customer_name?: string }) {
   const csrfToken = window.csrf_token;
 
-  console.log("SMS data", data);
 
   const response = await fetch('/api/method/klik_pos.api.sms.send_sms_message', {
     method: 'POST',
@@ -207,7 +196,6 @@ export async function sendSMSMessage(data: { mobile_no: string; message: string;
   });
 
   const result = await response.json();
-  console.log("Send SMS result:", result);
 
   if (!response.ok || !result.message || result.message.status !== "success") {
     const serverMsg = result._server_messages
@@ -223,7 +211,6 @@ export async function sendSMSMessage(data: { mobile_no: string; message: string;
 export async function sendInvoiceSMS(data: { mobile_no: string; customer_name: string; invoice_data: string; message?: string }) {
   const csrfToken = window.csrf_token;
 
-  console.log("Invoice SMS data", data);
 
   const response = await fetch('/api/method/klik_pos.api.sms.send_invoice_sms', {
     method: 'POST',
@@ -236,7 +223,6 @@ export async function sendInvoiceSMS(data: { mobile_no: string; customer_name: s
   });
 
   const result = await response.json();
-  console.log("Send Invoice SMS result:", result);
 
   if (!response.ok || !result.message || result.message.status !== "success") {
     const serverMsg = result._server_messages
@@ -251,12 +237,6 @@ export async function sendInvoiceSMS(data: { mobile_no: string; customer_name: s
 // Function for sending invoice with PDF attachment
 export async function sendInvoiceWithPDF(mobile: string, invoiceNo: string, message?: string) {
   const csrfToken = window.csrf_token;
-
-  console.log("Invoice PDF data", {
-    mobile_no: mobile,
-    invoice_data: invoiceNo,
-    message: message || 'Your invoice is ready!'
-  });
 
   const response = await fetch('/api/method/klik_pos.api.whatsapp.send_invoice_whatsapp', {
     method: 'POST',
@@ -273,7 +253,6 @@ export async function sendInvoiceWithPDF(mobile: string, invoiceNo: string, mess
   });
 
   const result = await response.json();
-  console.log("Send Invoice PDF result:", result);
 
   if (!response.ok || !result.message || result.message.status !== "success") {
     const serverMsg = result._server_messages
@@ -294,7 +273,6 @@ export async function sendInvoiceWhatsApp(data: {
 }) {
   const csrfToken = window.csrf_token;
 
-  console.log("Frontend Invoice WhatsApp data", data);
 
   const response = await fetch('/api/method/klik_pos.api.whatsapp.send_invoice_whatsapp', {
     method: 'POST',
@@ -312,7 +290,6 @@ export async function sendInvoiceWhatsApp(data: {
   });
 
   const result = await response.json();
-  console.log("Frontend Invoice WhatsApp result:", result);
 
   if (!response.ok || !result.message || result.message.status !== "success") {
     const serverMsg = result._server_messages

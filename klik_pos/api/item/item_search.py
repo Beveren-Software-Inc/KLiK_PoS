@@ -1,11 +1,36 @@
 import frappe
 from frappe import _
+from frappe.utils import cint
 
 from klik_pos.klik_pos.utils import get_current_pos_profile
 
 from ..sql_builder import apply_sql_permissions
 from .item_price import fetch_item_price
 from .item_stock import fetch_item_balance
+from .item_listing import _fetch_product_bundle_map
+
+
+def _include_service_items(pos_doc):
+    return cint(getattr(pos_doc, "custom_enable_service_items", 0) or 0) == 1
+
+
+def _validate_item_sales_eligibility(item_data, include_service_items):
+    if not item_data:
+        frappe.throw(_("Item details not found"))
+
+    if cint(item_data.get("disabled") or 0) == 1:
+        frappe.throw(_("Item is disabled."))
+
+    if cint(item_data.get("is_sales_item") or 0) == 0:
+        frappe.throw(_("Item is not allowed in sales."))
+
+    is_stock_item = cint(item_data.get("is_stock_item") or 0) == 1
+    is_product_bundle = cint(item_data.get("is_product_bundle") or 0) == 1
+    is_variant_template = cint(item_data.get("has_variants") or 0) == 1
+    if not is_stock_item and not is_product_bundle and not is_variant_template and not include_service_items:
+        frappe.throw(_("Service items are disabled for this POS Profile."))
+
+    return is_stock_item
 
 
 @frappe.whitelist(allow_guest=True)
@@ -14,6 +39,7 @@ def get_item_by_barcode(barcode: str):
         pos_doc = get_current_pos_profile()
         warehouse = pos_doc.warehouse
         price_list = pos_doc.selling_price_list
+        include_service_items = _include_service_items(pos_doc)
 
         item_sql = """
             SELECT parent
@@ -54,21 +80,32 @@ def get_item_by_barcode(barcode: str):
                 _("Item not found for barcode: {0}").format(barcode)
             )
 
-        item_list = frappe.get_list(
+        item_data = frappe.db.get_value(
             "Item",
-            filters={"name": item_code},
-            fields=["item_name", "description", "item_group", "image"],
-            limit=1,
+            item_code,
+            ["item_name", "description", "item_group", "image", "disabled", "is_sales_item", "is_stock_item", "has_variants", "variant_of", "variant_based_on"],
+            as_dict=True,
         )
 
-        if not item_list:
+        if not item_data:
             frappe.throw(
                 _("Item details not found for: {0}").format(item_code)
             )
 
-        item_data = item_list[0]
+        item_data["is_product_bundle"] = 1 if frappe.db.exists("Product Bundle", {"new_item_code": item_code, "disabled": 0}) else 0
+        is_product_bundle = cint(item_data.get("is_product_bundle") or 0) == 1
+        is_variant_template = cint(item_data.get("has_variants") or 0) == 1
+        is_stock_item = _validate_item_sales_eligibility(item_data, include_service_items)
 
-        balance = fetch_item_balance(item_code, warehouse)
+        balance = fetch_item_balance(item_code, warehouse) if is_stock_item else 0
+        bundle_items = _fetch_product_bundle_map([item_code], warehouse).get(item_code, []) if is_product_bundle else []
+        if is_product_bundle:
+            stock_component_limits = [
+                int(component.get("available_bundle_qty") or 0)
+                for component in bundle_items
+                if component.get("is_stock_item")
+            ]
+            balance = min(stock_component_limits) if stock_component_limits else 0
 
         price_info = fetch_item_price(
             item_code,
@@ -84,6 +121,13 @@ def get_item_by_barcode(barcode: str):
             "currency": price_info["currency"],
             "currency_symbol": price_info["currency_symbol"],
             "available": balance,
+            "is_stock_item": False if is_variant_template else True if is_product_bundle else is_stock_item,
+            "is_product_bundle": is_product_bundle,
+            "bundle_items": bundle_items,
+            "is_variant_template": is_variant_template,
+            "has_variants": is_variant_template,
+            "variant_of": item_data.get("variant_of"),
+            "variant_based_on": item_data.get("variant_based_on"),
             "image": item_data.image,
         }
 
@@ -106,6 +150,7 @@ def get_item_by_identifier(code: str):
         pos_doc = get_current_pos_profile()
         warehouse = pos_doc.warehouse
         price_list = pos_doc.selling_price_list
+        include_service_items = _include_service_items(pos_doc)
 
         matched_type = None
         matched_value = None
@@ -172,21 +217,32 @@ def get_item_by_identifier(code: str):
                 _("Item not found for identifier: {0}").format(code)
             )
 
-        item_list = frappe.get_list(
+        item_data = frappe.db.get_value(
             "Item",
-            filters={"name": item_code},
-            fields=["item_name", "description", "item_group", "image"],
-            limit=1,
+            item_code,
+            ["item_name", "description", "item_group", "image", "disabled", "is_sales_item", "is_stock_item", "has_variants", "variant_of", "variant_based_on"],
+            as_dict=True,
         )
 
-        if not item_list:
+        if not item_data:
             frappe.throw(
                 _("Item details not found for: {0}").format(item_code)
             )
 
-        item_data = item_list[0]
+        item_data["is_product_bundle"] = 1 if frappe.db.exists("Product Bundle", {"new_item_code": item_code, "disabled": 0}) else 0
+        is_product_bundle = cint(item_data.get("is_product_bundle") or 0) == 1
+        is_variant_template = cint(item_data.get("has_variants") or 0) == 1
+        is_stock_item = _validate_item_sales_eligibility(item_data, include_service_items)
 
-        balance = fetch_item_balance(item_code, warehouse)
+        balance = fetch_item_balance(item_code, warehouse) if is_stock_item else 0
+        bundle_items = _fetch_product_bundle_map([item_code], warehouse).get(item_code, []) if is_product_bundle else []
+        if is_product_bundle:
+            stock_component_limits = [
+                int(component.get("available_bundle_qty") or 0)
+                for component in bundle_items
+                if component.get("is_stock_item")
+            ]
+            balance = min(stock_component_limits) if stock_component_limits else 0
 
         price_info = fetch_item_price(
             item_code,
@@ -202,6 +258,13 @@ def get_item_by_identifier(code: str):
             "currency": price_info["currency"],
             "currency_symbol": price_info["currency_symbol"],
             "available": balance,
+            "is_stock_item": False if is_variant_template else True if is_product_bundle else is_stock_item,
+            "is_product_bundle": is_product_bundle,
+            "bundle_items": bundle_items,
+            "is_variant_template": is_variant_template,
+            "has_variants": is_variant_template,
+            "variant_of": item_data.get("variant_of"),
+            "variant_based_on": item_data.get("variant_based_on"),
             "image": item_data.image,
             "matched_type": matched_type,
             "matched_value": matched_value,

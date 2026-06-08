@@ -11,7 +11,6 @@ export default function MobileAddCustomerPage() {
 
   const handleSave = (customer: Partial<Customer>) => {
     // Handle saving customer
-    console.log('Saving customer:', customer)
     // Navigate back after saving
     navigate(-1)
   }

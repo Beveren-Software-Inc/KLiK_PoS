@@ -33,7 +33,6 @@ export default function CustomerDetailPage() {
 
   const handleSaveCustomer = (updatedCustomer: Partial<Customer>) => {
     // In a real app, this would update the customer in the backend
-    console.log('Saving customer:', updatedCustomer)
     setShowEditModal(false)
     // For now, we'll just close the modal since we're using mock data
     // In a real implementation, you'd update the customer and refresh the data

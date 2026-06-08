@@ -85,7 +85,6 @@ export default function NavBar() {
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => {
-                  console.log('Avatar clicked, current showUserMenu:', showUserMenu)
                   setShowUserMenu(!showUserMenu)
                 }}
                 className="w-10 h-10 bg-beveren-600 rounded-full flex items-center justify-center hover:bg-beveren-700 transition-colors focus:outline-none focus:ring-2 focus:ring-beveren-300 cursor-pointer"
