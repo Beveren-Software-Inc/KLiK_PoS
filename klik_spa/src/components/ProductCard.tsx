@@ -24,7 +24,8 @@ export default function ProductCard({
   const [showTooltip, setShowTooltip] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const isOutOfStock = item.available <= 0;
-  const isDisabled = isOutOfStock || scannerOnly;
+  const isServiceItem = !item.is_stock_item;
+  const isDisabled = (isOutOfStock && !isServiceItem) || scannerOnly;
   const formattedPrice = formatCurrencyWithSymbol(
     item.price,
     item.currency_symbol,
@@ -106,19 +107,19 @@ export default function ProductCard({
             </div>
           )}
 
-          {!isOutOfStock && (
+          {!isOutOfStock && !isServiceItem && (
             <div className="absolute top-2 right-2 bg-slate-600 text-white px-1.5 py-0.5 rounded-md text-xs font-medium z-10">
               {item.available}
             </div>
           )}
 
-          {isOutOfStock && (
+          {isOutOfStock && !isServiceItem && (
             <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-20">
               <span className="text-white font-bold text-xs">Out of Stock</span>
             </div>
           )}
 
-          {scannerOnly && !isOutOfStock && (
+          {scannerOnly && !isOutOfStock && !isServiceItem && (
             <div className="absolute inset-0 flex items-center justify-center z-20">
               <span className="text-blue-600 dark:text-blue-400 font-semibold text-xs bg-white/90 dark:bg-gray-800/90 px-2 py-1 rounded-md shadow-sm border border-blue-200 dark:border-blue-700">
                 Scan Only

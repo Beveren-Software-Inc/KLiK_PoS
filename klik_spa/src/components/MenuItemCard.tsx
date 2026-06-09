@@ -9,15 +9,17 @@ interface MenuItemCardProps {
 
 export default function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) {
   const isOutOfStock = item.available <= 0
+  const isServiceItem = !item.is_stock_item
+
 
   return (
     <div
       className={`rounded-xl p-3 shadow-sm transition-shadow relative ${
-        isOutOfStock
+        (isOutOfStock && !isServiceItem)
           ? "bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-700 opacity-70 cursor-not-allowed"
           : "bg-white dark:bg-gray-800 hover:shadow-md cursor-pointer"
       }`}
-      onClick={isOutOfStock ? undefined : onAddToCart}
+      onClick={(isOutOfStock && !isServiceItem) ? undefined : onAddToCart}
     >
       {/* Discount Badge - Smaller size */}
       {item.discount && (
@@ -47,8 +49,8 @@ export default function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) {
         <h3 className="font-semibold text-gray-800 dark:text-white text-sm leading-tight">{item.name}</h3>
 
         <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
-          <span>{item.available} Available</span>
-          <span>•</span>
+          {!isServiceItem && <span>{item.available} Available</span>}
+          {!isServiceItem && <span>•</span>}
           <span>{item.sold} Sold</span>
         </div>
 

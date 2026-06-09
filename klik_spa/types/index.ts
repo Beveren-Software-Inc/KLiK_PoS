@@ -34,6 +34,8 @@ export interface CartItem {
   item_tax_rate?: Record<string, number>
   total_tax_rate?: number
   tax_templates?: TaxTemplate[]
+  is_stock_item?: number | boolean // 1/true for stock items, 0/false for service items
+
 }
 
 export interface TaxTemplate {
@@ -73,6 +75,7 @@ export interface MenuItem {
   cost_price?: number
   price_lists?: PriceListRate[]
   item_group?: string // Item group reference
+  is_stock_item?: number | boolean // 1/true for stock items, 0/false for service items
 }
 
 export interface Category {

@@ -220,13 +220,14 @@ export const useCartStore = create<CartState>()(
           .filter((cartItem) => (cartItem.item_code || cartItem.id) === incomingCode)
           .reduce((sum, cartItem) => sum + cartItem.quantity, 0);
 
-        if (item.available !== undefined && item.available <= 0) {
-          toast.error(`${item.name} is out of stock`);
-          return;
-        }
+        const isServiceItem = Number(item.is_stock_item) === 0;
+        // if (item.available !== undefined && item.available <= 0) {
+        //   toast.error(`${item.name} is out of stock`);
+        //   return;
+        // }
 
         if (existingItem) {
-          if (item.available !== undefined && totalMatchingQty >= item.available) {
+          if (!isServiceItem && item.available !== undefined && totalMatchingQty >= item.available) {
             toast.error(`Only ${item.available} ${item.uom || 'units'} of ${item.name} available`);
             return;
           }
@@ -291,16 +292,29 @@ export const useCartStore = create<CartState>()(
           .filter((cartItem) => (cartItem.item_code || cartItem.id) === incomingCode)
           .reduce((sum, cartItem) => sum + cartItem.quantity, 0);
 
-        if (item.available !== undefined && item.available < quantity) {
+        const isServiceItem = Number(item.is_stock_item) === 0;
+        
+        if (!isServiceItem && item.available !== undefined && item.available < quantity) {
           toast.error(`Only ${item.available} ${item.uom || 'units'} of ${item.name} available`);
           return;
         }
 
         if (existingItem) {
-          if (item.available !== undefined && (totalMatchingQty + quantity) > item.available) {
+          if (!isServiceItem && item.available !== undefined && (totalMatchingQty + quantity) > item.available) {
             toast.error(`Only ${item.available} ${item.uom || 'units'} of ${item.name} available`);
             return;
           }
+        
+        // if (item.available !== undefined && item.available < quantity) {
+        //   toast.error(`Only ${item.available} ${item.uom || 'units'} of ${item.name} available`);
+        //   return;
+        // }
+
+        // if (existingItem) {
+        //   if (item.available !== undefined && (totalMatchingQty + quantity) > item.available) {
+        //     toast.error(`Only ${item.available} ${item.uom || 'units'} of ${item.name} available`);
+        //     return;
+        //   }
 
           const targetId = existingItem.id;
           const updatedQty = existingItem.quantity + quantity;
@@ -362,7 +376,8 @@ export const useCartStore = create<CartState>()(
         }
 
         const item = state.cartItems.find((cartItem) => cartItem.id === id);
-        if (item && item.available !== undefined && quantity > item.available) {
+        const isServiceItem = Number(item?.is_stock_item) === 0;
+        if (!isServiceItem && item && item.available !== undefined && quantity > item.available) {
           toast.error(`Only ${item.available} ${item.uom || 'units'} of ${item.name} available`);
           return;
         }

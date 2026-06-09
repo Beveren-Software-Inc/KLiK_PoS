@@ -74,8 +74,8 @@ export default function ProductGrid({
   }, [addToCart]);
 
   const handleAddToCart = useCallback(async (item: MenuItem) => {
-    if (item.available <= 0) return;
-    if (scannerOnly) return;
+    // if (item.available <= 0) return;
+    // if (scannerOnly) return;
 
     if (requiresSalespersonPin) {
       await ensureInitialized();

@@ -69,7 +69,8 @@ export default function ProductLineView({
           <div className="divide-y divide-gray-200 dark:divide-gray-600">
             {items.map((item) => {
               const isOutOfStock = item.available <= 0
-              const isDisabled = isOutOfStock || scannerOnly
+              const isServiceItem = !item.is_stock_item
+              const isDisabled = (isOutOfStock && !isServiceItem) || scannerOnly
               const formattedPrice = formatCurrencyWithSymbol(item.price, item.currency_symbol)
 
               return (
@@ -140,9 +141,9 @@ export default function ProductLineView({
 
                   <div className={`${isMobile ? "col-span-2" : "col-span-2"} flex items-center justify-center ${isDisabled ? "opacity-60" : ""}`}>
                     <span className={`font-medium ${isMobile ? "text-xs" : "text-sm"} ${
-                      isOutOfStock ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-white"
+                      (isOutOfStock && !isServiceItem) ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-white"
                     }`}>
-                      {isOutOfStock ? "0" : item.available}
+                      {isServiceItem ? "-" : (isOutOfStock ? "0" : item.available)}
                     </span>
                   </div>
 
@@ -157,7 +158,7 @@ export default function ProductLineView({
                   <div className={`${isMobile ? "col-span-1" : "col-span-2"} flex items-center justify-center`}>
                     {isDisabled ? (
                       <span className={`text-gray-400 dark:text-gray-500 ${isMobile ? "text-xs" : "text-xs"} opacity-60`}>
-                        {isOutOfStock ? "Out" : "Scan"}
+                        {(isOutOfStock && !isServiceItem) ? "Out" : "Scan"}
                       </span>
                     ) : (
                       <button

@@ -311,7 +311,15 @@ def _validate_reserved_stock_for_items(doc, exclude_invoice=None):
 	for row in doc.items:
 		if not row.item_code or not row.warehouse:
 			continue
-		if hasattr(row, "is_stock_item") and int(row.is_stock_item or 0) == 0:
+		# if hasattr(row, "is_stock_item") and int(row.is_stock_item or 0) == 0:
+		# 	continue
+		is_stock_item = frappe.get_cached_value(
+			"Item",
+			row.item_code,
+			"is_stock_item"
+		)
+
+		if not cint(is_stock_item):
 			continue
 
 		required_qty = flt(abs(getattr(row, "stock_qty", 0) or 0))
