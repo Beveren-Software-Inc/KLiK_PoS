@@ -108,8 +108,14 @@ export default function ProductCard({
           )}
 
           {!isOutOfStock && !isServiceItem && (
-            <div className="absolute top-2 right-2 bg-slate-600 text-white px-1.5 py-0.5 rounded-md text-xs font-medium z-10">
+            <div className="absolute top-2 right-2 bg-beveren-600 text-white px-1.5 py-0.5 rounded-md text-xs font-medium z-10">
               {item.available}
+            </div>
+          )}
+
+          {isServiceItem && (
+            <div className="absolute top-2 right-2 bg-beveren-600 text-white px-1.5 py-0.5 rounded-md text-xs font-medium z-10">
+              Service
             </div>
           )}
 
@@ -129,7 +135,7 @@ export default function ProductCard({
         </div>
 
         <div
-          className={`${isMobile ? "p-2 h-12" : "p-3 h-16"} flex flex-col justify-between ${isDisabled ? "opacity-70" : ""}`}
+          className={`${isMobile ? "p-2 min-h-12" : "p-3 min-h-16"} flex flex-col justify-between ${isDisabled ? "opacity-70" : ""}`}
         >
           <div>
             <h3
@@ -150,7 +156,9 @@ export default function ProductCard({
               {item.category}
             </p>
             <span
-              className={`font-bold text-beveren-600 dark:text-beveren-400 ${isMobile ? "text-xs" : "text-sm"}`}
+              className={`font-bold text-beveren-600 dark:text-beveren-400 ${
+                isMobile ? "text-xs" : "text-xs"
+              }`}
             >
               {formattedPrice}
             </span>
