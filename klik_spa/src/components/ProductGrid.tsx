@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback, useMemo, useState } from "react";
 import type { MenuItem } from "../../types";
 import { useProduct } from "../providers/ProductProvider";
+import { isItemOutOfStock, isServiceItem } from "../utils/itemStock";
 import ProductCard from "./ProductCard";
 import ProductLineView from "./ProductLineView";
 import SalespersonAuthModal from "./dialog/SalespersonAuthModal";
@@ -52,7 +53,9 @@ export default function ProductGrid({
   const inStockItems = useMemo(
     () => (
       hideUnavailableItems
-        ? filteredItems.filter((item) => item.is_stock_item === false || item.available > 0)
+        ? filteredItems.filter(
+            (item) => isServiceItem(item) || (item.available != null && item.available > 0),
+          )
         : filteredItems
     ),
     [filteredItems, hideUnavailableItems],
@@ -91,7 +94,7 @@ export default function ProductGrid({
   }, [addConcreteItemToCart]);
 
   const handleAddToCart = useCallback(async (item: MenuItem) => {
-    if (item.is_stock_item !== false && item.available <= 0) return;
+    if (isItemOutOfStock(item)) return;
     if (scannerOnly) return;
 
     if (requiresSalespersonPin) {

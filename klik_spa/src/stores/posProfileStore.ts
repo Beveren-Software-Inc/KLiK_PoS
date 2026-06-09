@@ -30,6 +30,7 @@ export interface POSProfile {
   write_off_cost_center?: string;
   custom_delivery_required?: number;
   custom_enable_service_items?: boolean | number;
+  custom_allow_service_sale?: boolean | number;
   custom_enable_delivery_charge?: boolean | number;
   custom_delivery_charge_item?: string;
   custom_delivery_charge_account?: string;

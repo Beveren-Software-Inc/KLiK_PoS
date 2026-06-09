@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import type { MenuItem, VariantAttributeOption } from "../../types";
 import { formatCurrencyWithSymbol } from "../utils/currency";
+import { isItemOutOfStock, isServiceItem } from "../utils/itemStock";
 
 interface VariantPickerResponse {
   template: {
@@ -91,8 +92,7 @@ export default function VariantPickerModal({
     matchingVariants.find((variant) => variant.id === selectedVariantId) ??
     (matchingVariants.length === 1 ? matchingVariants[0] : null);
 
-  const isOutOfStock =
-    selectedVariant?.is_stock_item !== false && (selectedVariant?.available ?? 0) <= 0;
+  const isOutOfStock = selectedVariant ? isItemOutOfStock(selectedVariant) : false;
 
   const handleSelect = (attribute: string, value: string) => {
     setSelected((current) => ({
@@ -204,7 +204,7 @@ export default function VariantPickerModal({
                 <div className="grid gap-2">
                   {matchingVariants.map((variant) => {
                     const active = selectedVariant?.id === variant.id;
-                    const disabled = variant.is_stock_item !== false && variant.available <= 0;
+                    const disabled = isItemOutOfStock(variant);
                     return (
                       <button
                         key={variant.id}
@@ -235,7 +235,7 @@ export default function VariantPickerModal({
                             {formatCurrencyWithSymbol(variant.price, variant.currency_symbol)}
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {variant.is_stock_item === false
+                            {isServiceItem(variant)
                               ? "Service"
                               : disabled
                               ? "Out"

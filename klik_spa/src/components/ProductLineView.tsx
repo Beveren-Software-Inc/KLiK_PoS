@@ -6,6 +6,7 @@ import ProductTooltip from "./ProductTooltip"
 import ProductDetailsModal from "./ProductDetailsModal"
 
 import { formatCurrencyWithSymbol } from "../utils/currency"
+import { isItemOutOfStock, isServiceItem } from "../utils/itemStock"
 
 interface ProductLineViewProps {
   items: MenuItem[]
@@ -70,8 +71,8 @@ export default function ProductLineView({
 
           <div className="divide-y divide-gray-200 dark:divide-gray-600">
             {items.map((item) => {
-              const isServiceItem = item.is_stock_item === false
-              const isOutOfStock = item.is_stock_item !== false && item.available <= 0
+              const serviceItem = isServiceItem(item)
+              const isOutOfStock = isItemOutOfStock(item)
               const isDisabled = isOutOfStock || scannerOnly
               const expectedPrice = Number(item.price_with_vat ?? item.price)
               const basePrice = Number(item.price || 0)
@@ -184,7 +185,7 @@ export default function ProductLineView({
                         <p className={`font-medium text-xs ${
                           isOutOfStock ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-white"
                         }`}>
-                          {isOutOfStock ? "0" : item.is_variant_template ? variantCount : item.is_product_bundle ? item.available : isServiceItem ? "Service" : item.available}
+                          {isOutOfStock ? "0" : item.is_variant_template ? variantCount : item.is_product_bundle ? item.available : serviceItem ? "Service" : item.available}
                         </p>
                       </div>
 
@@ -225,7 +226,7 @@ export default function ProductLineView({
                         <span className={`font-medium text-sm ${
                           isOutOfStock ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-white"
                         }`}>
-                          {isOutOfStock ? "0" : item.is_variant_template ? variantCount : item.is_product_bundle ? item.available : isServiceItem ? "Service" : item.available}
+                          {isOutOfStock ? "0" : item.is_variant_template ? variantCount : item.is_product_bundle ? item.available : serviceItem ? "Service" : item.available}
                         </span>
                       </div>
 

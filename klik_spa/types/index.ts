@@ -102,8 +102,8 @@ export interface MenuItem {
   price_with_vat?: number
   originalPrice?: number
   image: string
-  available: number
-  is_stock_item?: boolean
+  available: number | null
+  is_stock_item?: boolean | number
   sold: number
   discount?: number
   description?: string

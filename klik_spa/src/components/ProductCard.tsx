@@ -5,6 +5,7 @@ import type { MenuItem } from "../../types";
 import ProductTooltip from "./ProductTooltip";
 import ProductDetailsModal from "./ProductDetailsModal";
 import { formatCurrencyWithSymbol } from "../utils/currency";
+import { isItemOutOfStock, isServiceItem } from "../utils/itemStock";
 
 interface ProductCardProps {
   item: MenuItem;
@@ -23,8 +24,8 @@ export default function ProductCard({
 }: ProductCardProps) {
   const [showTooltip, setShowTooltip] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const isServiceItem = item.is_stock_item === false;
-  const isOutOfStock = item.is_stock_item !== false && item.available <= 0;
+  const serviceItem = isServiceItem(item);
+  const isOutOfStock = isItemOutOfStock(item);
   const isDisabled = isOutOfStock || scannerOnly;
   const bundleCount = item.is_product_bundle ? item.bundle_items?.length || 0 : 0;
   const variantCount = item.is_variant_template ? item.variant_count || 0 : 0;
@@ -140,10 +141,10 @@ export default function ProductCard({
           {!isOutOfStock && (
             <div
               className={`absolute top-2 right-2 text-white px-1.5 py-0.5 rounded-md text-xs font-medium z-10 ${
-                item.is_variant_template ? "bg-sky-700" : item.is_product_bundle ? "bg-amber-700" : isServiceItem ? "bg-indigo-600" : "bg-slate-600"
+                item.is_variant_template ? "bg-sky-700" : item.is_product_bundle ? "bg-amber-700" : serviceItem ? "bg-indigo-600" : "bg-slate-600"
               }`}
             >
-              {item.is_variant_template ? variantCount : item.is_product_bundle ? item.available : isServiceItem ? "Service" : item.available}
+              {item.is_variant_template ? variantCount : item.is_product_bundle ? item.available : serviceItem ? "Service" : item.available}
             </div>
           )}
 

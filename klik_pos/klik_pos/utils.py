@@ -1,5 +1,6 @@
 import frappe
 from frappe import _
+from frappe.utils import cint
 
 # Performance optimization: Cache frequently accessed data per user and opening entry
 # Key: f"{user}|{opening_entry or 'none'}", Value: POS Profile name (identity only)
@@ -67,3 +68,14 @@ def clear_pos_profile_cache(user=None):
 def get_user_default_company():
 	user = frappe.session.user
 	return frappe.defaults.get_user_default(user, "Company")
+
+
+def pos_allows_service_items(pos_doc):
+	"""Return True when the POS Profile allows selling non-stock service items."""
+	if not pos_doc:
+		return False
+
+	return (
+		cint(getattr(pos_doc, "custom_allow_service_sale", 0) or 0) == 1
+		or cint(getattr(pos_doc, "custom_enable_service_items", 0) or 0) == 1
+	)

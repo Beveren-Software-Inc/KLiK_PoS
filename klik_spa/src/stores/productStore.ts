@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { isServiceItem } from '../utils/itemStock';
 import type { MenuItem, Customer, ItemGroup } from '../../types';
 import { usePOSProfileStore } from './posProfileStore';
 import { useCartStore } from './cartStore';
@@ -91,13 +92,7 @@ export const useProductStore = create<ProductStoreState>()(
         const { products } = get();
         const hideUnavailable = usePOSProfileStore.getState().hideUnavailableItems;
         if (hideUnavailable) {
-          return products.filter((p) => {
-            const isStockItem = p.is_stock_item !== false;
-            if (!isStockItem) {
-              return true;
-            }
-            return (p.available || 0) > 0;
-          });
+          return products.filter((p) => isServiceItem(p) || (p.available != null && p.available > 0));
         }
         return products;
       },
@@ -416,7 +411,9 @@ export const useProductStore = create<ProductStoreState>()(
             set(state => ({
               products: state.products.map(product => ({
                 ...product,
-                available: stockUpdates[product.id] ?? product.available
+                available: isServiceItem(product)
+                  ? product.available
+                  : (stockUpdates[product.id] ?? product.available),
               })),
               lastUpdated: new Date(),
               isRefreshingStock: false,
@@ -457,8 +454,10 @@ export const useProductStore = create<ProductStoreState>()(
             set(state => ({
               products: state.products.map(product => ({
                 ...product,
-                available: stockUpdates[product.id] ?? product.available
-              }))
+                available: isServiceItem(product)
+                  ? product.available
+                  : (stockUpdates[product.id] ?? product.available),
+              })),
             }));
           }
         } catch (error) {

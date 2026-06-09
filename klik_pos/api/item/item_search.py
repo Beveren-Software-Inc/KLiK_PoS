@@ -2,16 +2,12 @@ import frappe
 from frappe import _
 from frappe.utils import cint
 
-from klik_pos.klik_pos.utils import get_current_pos_profile
+from klik_pos.klik_pos.utils import get_current_pos_profile, pos_allows_service_items
 
 from ..sql_builder import apply_sql_permissions
 from .item_price import fetch_item_price
 from .item_stock import fetch_item_balance
 from .item_listing import _fetch_product_bundle_map
-
-
-def _include_service_items(pos_doc):
-    return cint(getattr(pos_doc, "custom_enable_service_items", 0) or 0) == 1
 
 
 def _validate_item_sales_eligibility(item_data, include_service_items):
@@ -39,7 +35,7 @@ def get_item_by_barcode(barcode: str):
         pos_doc = get_current_pos_profile()
         warehouse = pos_doc.warehouse
         price_list = pos_doc.selling_price_list
-        include_service_items = _include_service_items(pos_doc)
+        include_service_items = pos_allows_service_items(pos_doc)
 
         item_sql = """
             SELECT parent
@@ -120,8 +116,14 @@ def get_item_by_barcode(barcode: str):
             "price": price_info["price"],
             "currency": price_info["currency"],
             "currency_symbol": price_info["currency_symbol"],
-            "available": balance,
-            "is_stock_item": False if is_variant_template else True if is_product_bundle else is_stock_item,
+            "available": balance if (is_stock_item or is_product_bundle) else None,
+            "is_stock_item": (
+                0
+                if is_variant_template
+                else 1
+                if is_product_bundle
+                else (1 if is_stock_item else 0)
+            ),
             "is_product_bundle": is_product_bundle,
             "bundle_items": bundle_items,
             "is_variant_template": is_variant_template,
@@ -150,7 +152,7 @@ def get_item_by_identifier(code: str):
         pos_doc = get_current_pos_profile()
         warehouse = pos_doc.warehouse
         price_list = pos_doc.selling_price_list
-        include_service_items = _include_service_items(pos_doc)
+        include_service_items = pos_allows_service_items(pos_doc)
 
         matched_type = None
         matched_value = None
@@ -257,8 +259,14 @@ def get_item_by_identifier(code: str):
             "price": price_info["price"],
             "currency": price_info["currency"],
             "currency_symbol": price_info["currency_symbol"],
-            "available": balance,
-            "is_stock_item": False if is_variant_template else True if is_product_bundle else is_stock_item,
+            "available": balance if (is_stock_item or is_product_bundle) else None,
+            "is_stock_item": (
+                0
+                if is_variant_template
+                else 1
+                if is_product_bundle
+                else (1 if is_stock_item else 0)
+            ),
             "is_product_bundle": is_product_bundle,
             "bundle_items": bundle_items,
             "is_variant_template": is_variant_template,

@@ -7,6 +7,7 @@ import { toast } from 'react-toastify'
 import { clearDraftInvoiceCache } from '../utils/draftInvoiceCache'
 import { usePOSProfileStore } from './posProfileStore'
 import { roundCurrency } from '../utils/currencyMath'
+import { isServiceItem } from '../utils/itemStock'
 
 interface SerialBatchEntry {
   serial_no?: string;
@@ -39,8 +40,8 @@ const roundToCurrencyPrecision = (value: number): number => {
   return roundCurrency(value);
 };
 
-const hasFiniteAvailableStock = (item: { available?: number; is_stock_item?: boolean }) => {
-  if (item.is_stock_item === false) {
+const hasFiniteAvailableStock = (item: { available?: number | null; is_stock_item?: boolean | number | null }) => {
+  if (isServiceItem(item)) {
     return false;
   }
   return typeof item.available === 'number' && Number.isFinite(item.available);
@@ -228,7 +229,7 @@ export const useCartStore = create<CartState>()(
           .filter((cartItem) => (cartItem.item_code || cartItem.id) === incomingCode)
           .reduce((sum, cartItem) => sum + cartItem.quantity, 0);
 
-        if (hasFiniteAvailableStock(item) && item.available <= 0) {
+        if (hasFiniteAvailableStock(item) && item.available != null && item.available <= 0) {
           toast.error(`${item.name} is out of stock`);
           return;
         }

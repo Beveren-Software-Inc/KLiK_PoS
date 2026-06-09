@@ -2,7 +2,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, getdate
 
-from klik_pos.klik_pos.utils import get_current_pos_profile
+from klik_pos.klik_pos.utils import get_current_pos_profile, pos_allows_service_items
 
 from ..sql_builder import apply_sql_permissions
 from .item_price import fetch_item_price
@@ -30,7 +30,7 @@ def get_items(
 
     requested_price_list = price_list
     pos_doc, warehouse, pos_price_list, hide_unavailable = _get_pos_context()
-    include_service_items = _include_service_items(pos_doc)
+    include_service_items = pos_allows_service_items(pos_doc)
     
     price_list = requested_price_list or _get_priority_price_list(customer, pos_doc, pos_price_list)
 
@@ -301,8 +301,20 @@ def get_items(
                     "price": price,
                     "currency": currency,
                     "currency_symbol": currency_symbol,
-                    "available": variant_count if is_variant_template else balance if (is_stock_item or is_product_bundle) else 0,
-                    "is_stock_item": False if is_variant_template else True if is_product_bundle else is_stock_item,
+                    "available": (
+                        variant_count
+                        if is_variant_template
+                        else balance
+                        if (is_stock_item or is_product_bundle)
+                        else None
+                    ),
+                    "is_stock_item": (
+                        0
+                        if is_variant_template
+                        else 1
+                        if is_product_bundle
+                        else (1 if is_stock_item else 0)
+                    ),
                     "is_product_bundle": is_product_bundle,
                     "bundle_items": bundle_items,
                     "is_variant_template": is_variant_template,
@@ -655,7 +667,16 @@ def _get_item_groups_with_counts(
                 group_query += " AND (i.is_stock_item = 1 OR i.has_variants = 1 OR pb.name IS NOT NULL)"
             
             if hide_unavailable and warehouse:
-                group_query += " AND (i.has_variants = 1 OR pb.name IS NOT NULL OR EXISTS (SELECT 1 FROM `tabBin` b WHERE b.item_code = i.name AND b.warehouse = %s AND b.actual_qty > 0))"
+                if include_service_items:
+                    group_query += (
+                        " AND (i.has_variants = 1 OR pb.name IS NOT NULL OR i.is_stock_item = 0"
+                        " OR EXISTS (SELECT 1 FROM `tabBin` b WHERE b.item_code = i.name AND b.warehouse = %s AND b.actual_qty > 0))"
+                    )
+                else:
+                    group_query += (
+                        " AND (i.has_variants = 1 OR pb.name IS NOT NULL"
+                        " OR EXISTS (SELECT 1 FROM `tabBin` b WHERE b.item_code = i.name AND b.warehouse = %s AND b.actual_qty > 0))"
+                    )
                 group_query_params = [warehouse]
             else:
                 group_query_params = []
@@ -691,7 +712,16 @@ def _get_item_groups_with_counts(
             params = [group_name]
             
             if hide_unavailable and warehouse:
-                count_query += " AND (i.has_variants = 1 OR pb.name IS NOT NULL OR EXISTS (SELECT 1 FROM `tabBin` b WHERE b.item_code = i.name AND b.warehouse = %s AND b.actual_qty > 0))"
+                if include_service_items:
+                    count_query += (
+                        " AND (i.has_variants = 1 OR pb.name IS NOT NULL OR i.is_stock_item = 0"
+                        " OR EXISTS (SELECT 1 FROM `tabBin` b WHERE b.item_code = i.name AND b.warehouse = %s AND b.actual_qty > 0))"
+                    )
+                else:
+                    count_query += (
+                        " AND (i.has_variants = 1 OR pb.name IS NOT NULL"
+                        " OR EXISTS (SELECT 1 FROM `tabBin` b WHERE b.item_code = i.name AND b.warehouse = %s AND b.actual_qty > 0))"
+                    )
                 params.append(warehouse)
             
             if search_term:
@@ -810,10 +840,6 @@ def _get_priority_price_list(customer=None, pos_profile=None, default_price_list
         return default_price_list
     
     return None
-
-
-def _include_service_items(pos_doc):
-    return cint(getattr(pos_doc, "custom_enable_service_items", 0) or 0) == 1
 
 
 def _fetch_batch_stock(item_codes, warehouse):

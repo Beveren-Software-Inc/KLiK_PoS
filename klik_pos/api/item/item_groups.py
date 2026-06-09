@@ -1,7 +1,6 @@
 import frappe
 from frappe import _
-from frappe.utils import cint
-from klik_pos.klik_pos.utils import get_current_pos_profile
+from klik_pos.klik_pos.utils import get_current_pos_profile, pos_allows_service_items
 from ..sql_builder import apply_sql_permissions
 
 @frappe.whitelist(allow_guest=True)
@@ -10,7 +9,7 @@ def get_item_groups_for_pos():
         pos_profile = get_current_pos_profile()
         hide_unavailable = pos_profile.get("hide_unavailable_items", 0)
         warehouse = pos_profile.get("warehouse")
-        include_service_items = cint(getattr(pos_profile, "custom_enable_service_items", 0) or 0) == 1
+        include_service_items = pos_allows_service_items(pos_profile)
         
         formatted_groups = []
         item_group_names = []

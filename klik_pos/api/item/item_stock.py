@@ -191,7 +191,13 @@ def get_items_stock_batch(item_codes):
             if code.strip()
         ]
 
-        all_stock = _fetch_batch_stock(item_codes_list, warehouse)
+        stock_item_codes = frappe.get_all(
+            "Item",
+            filters={"name": ["in", item_codes_list], "is_stock_item": 1},
+            pluck="name",
+        ) or []
+
+        all_stock = _fetch_batch_stock(stock_item_codes, warehouse)
 
         if hide_unavailable:
             return {k: v for k, v in all_stock.items() if v > 0}
