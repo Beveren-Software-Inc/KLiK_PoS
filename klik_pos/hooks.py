@@ -72,6 +72,10 @@ fixtures = [
 		"doctype": "Property Setter",
 		"filters": [[ "module", "=", "KLiK PoS", ]],
 	},
+    {
+		"doctype": "Custom Field",
+		"filters": [[ "name", "=", "POS Profile-custom_show_variants", ]],
+	},
 ]
 # Includes in <head>
 # ------------------

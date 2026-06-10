@@ -31,6 +31,7 @@ def get_items(
     requested_price_list = price_list
     pos_doc, warehouse, pos_price_list, hide_unavailable = _get_pos_context()
     include_service_items = pos_allows_service_items(pos_doc)
+    show_variants = bool(getattr(pos_doc, "custom_show_variants", True))
     
     price_list = requested_price_list or _get_priority_price_list(customer, pos_doc, pos_price_list)
 
@@ -128,6 +129,10 @@ def get_items(
             params_list.extend(allowed_item_groups)
             count_params.extend(allowed_item_groups)
 
+        if not show_variants:
+            base_query.append("AND i.variant_of IS NULL")
+            count_query.append("AND i.variant_of IS NULL")
+
         # Apply category filter from request
         if category and category != "all":
             base_query.append("AND i.item_group = %s")
@@ -203,6 +208,7 @@ def get_items(
             category,
             enhanced_search,
             include_service_items,
+            show_variants,
         )
 
         if not items:
@@ -244,6 +250,12 @@ def get_items(
             is_stock_item = int(item.get("is_stock_item") or 0) == 1
             is_product_bundle = int(item.get("is_product_bundle") or 0) == 1
             is_variant_template = int(item.get("has_variants") or 0) == 1
+
+            is_variant_child = bool(item.get("variant_of"))
+
+            if not show_variants and is_variant_child:
+                continue
+
             bundle_items = product_bundle_map.get(item_code, [])
             variant_count = variant_count_map.get(item_code, 0)
 
@@ -627,6 +639,7 @@ def _get_item_groups_with_counts(
     selected_category=None,
     enhanced_search=False,
     include_service_items=False,
+    show_variants=True,
 ):
     try:
         item_groups = []
@@ -666,6 +679,9 @@ def _get_item_groups_with_counts(
             if not include_service_items:
                 group_query += " AND (i.is_stock_item = 1 OR i.has_variants = 1 OR pb.name IS NOT NULL)"
             
+            if not show_variants:
+                group_query += " AND i.variant_of IS NULL"
+
             if hide_unavailable and warehouse:
                 if include_service_items:
                     group_query += (
@@ -709,6 +725,10 @@ def _get_item_groups_with_counts(
             """
             if not include_service_items:
                 count_query += " AND (i.is_stock_item = 1 OR i.has_variants = 1 OR pb.name IS NOT NULL)"
+
+            if not show_variants:
+                count_query += " AND i.variant_of IS NULL"
+
             params = [group_name]
             
             if hide_unavailable and warehouse:
