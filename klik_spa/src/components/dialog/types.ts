@@ -1,5 +1,6 @@
 import type { CartItem, GiftCoupon } from "../../../types";
 import type { Customer } from "../../types/customer";
+import type { SalesTeamEntry } from "../order/OrderSummaryFooter";
 
 export interface PaymentDialogProps {
   isOpen: boolean;
@@ -15,6 +16,8 @@ export interface PaymentDialogProps {
   externalInvoiceData?: any;
   itemDiscounts?: any;
   totalItemDiscount?: number;
+  selectedSalesPerson?: string;
+  selectedSalesTeam?: SalesTeamEntry[];
 }
 
 export interface PaymentMethod {

@@ -19,7 +19,7 @@ import { getOriginalDraftInvoiceId } from "../../utils/draftInvoiceCache";
 import { CustomerSearchSection } from "./CustomerSearchSection";
 import CustomerLoyaltySummary from "./CustomerLoyaltySummary";
 import { CartItemRow } from "./CartItemRow";
-import { OrderSummaryFooter } from "./OrderSummaryFooter";
+import { OrderSummaryFooter, type SalesTeamEntry } from "./OrderSummaryFooter";
 import { usePOSProfileStore } from "../../stores/posProfileStore";
 import { useSalespersonStore } from "../../stores/salespersonStore";
 import { getEffectiveDisplayRate, getEffectiveItemRate } from "../../utils/cartPricing";
@@ -47,6 +47,7 @@ export default function OrderSummary({
     clearCart,
   } = useCartStore();
 
+  const [salesTeam, setSalesTeam] = useState<SalesTeamEntry[]>([]);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showSalespersonAuthModal, setShowSalespersonAuthModal] = useState(false);
   const [isValidatingCheckout, setIsValidatingCheckout] = useState(false);
@@ -317,13 +318,17 @@ export default function OrderSummary({
     return true;
   };
 
-  const startCheckoutFlow = async () => {
+  const startCheckoutFlow = async (salesTeam: SalesTeamEntry[]) => {
     if (!validateCustomer() || isValidatingCheckout) return;
+    if (!salesTeam.length || !salesTeam[0].sales_person) {
+      toast.error("Please select a service person");
+      return;
+    }
     setIsValidatingCheckout(true);
     try {
       const payload = {
         customer: { id: selectedCustomer?.id },
-        items: cartItems.map(item => ({
+        items: cartItems.map((item) => ({
           id: item.item_code || item.id,
           quantity: item.quantity,
           price: getDiscountedPrice(item),
@@ -332,8 +337,10 @@ export default function OrderSummary({
         })),
         itemDiscounts,
         businessType: posDetails?.business_type,
+        sales_team: salesTeam,
       };
       await validateCheckoutInvoice(payload);
+      setSalesTeam(salesTeam); // persist for PaymentDialog
       setShowPaymentDialog(true);
     } catch (error) {
       toast.error(extractErrorFromException(error, "Checkout validation failed"));
@@ -342,7 +349,34 @@ export default function OrderSummary({
     }
   };
 
-  const holdCurrentOrder = async () => {
+  // const startCheckoutFlow = async () => {
+  //   if (!validateCustomer() || isValidatingCheckout) return;
+  //   setIsValidatingCheckout(true);
+  //   try {
+  //     const payload = {
+  //       customer: { id: selectedCustomer?.id },
+  //       items: cartItems.map(item => ({
+  //         id: item.item_code || item.id,
+  //         quantity: item.quantity,
+  //         price: getDiscountedPrice(item),
+  //         uom: item.uom || "Nos",
+  //         serial_batch_bundle: item.bundle_entries,
+  //       })),
+  //       itemDiscounts,
+  //       businessType: posDetails?.business_type,
+  //     };
+  //     await validateCheckoutInvoice(payload);
+  //     setShowPaymentDialog(true);
+  //   } catch (error) {
+  //     toast.error(extractErrorFromException(error, "Checkout validation failed"));
+  //   } finally {
+  //     setIsValidatingCheckout(false);
+  //   }
+  // };
+
+  // const holdCurrentOrder = async () => {
+  const holdCurrentOrder = async (salesTeam: SalesTeamEntry[] = []) => {
+
     if (!selectedCustomer) {
       toast.error("Kindly select a customer");
       return;
@@ -366,6 +400,7 @@ export default function OrderSummary({
         totalSavings: totalItemDiscount + couponDiscount,
         status: "held",
         salesperson: activeSalesperson?.name || null,
+        sales_team: salesTeam.length ? salesTeam : undefined,
         draft_invoice_id: originalDraftInvoiceId,
       });
       if (result?.success) {
@@ -379,23 +414,44 @@ export default function OrderSummary({
     }
   };
 
-  const requireSalespersonAndRun = async (action: "checkout" | "hold") => {
+  // const requireSalespersonAndRun = async (action: "checkout" | "hold") => {
+  //   const requiresSalespersonPin = !!posDetails?.custom_sales_person_pin_required;
+  //   if (!requiresSalespersonPin || activeSalesperson) {
+  //     if (action === "checkout") {
+  //       await startCheckoutFlow();
+  //     } else {
+  //       await holdCurrentOrder();
+  //     }
+  //     return;
+  //   }
+
+  //   setPendingSalespersonAction(action);
+  //   setShowSalespersonAuthModal(true);
+  // };
+
+  const requireSalespersonAndRun = async (
+    action: "checkout" | "hold",
+    salesTeam: SalesTeamEntry[] = []
+  ) => {
     const requiresSalespersonPin = !!posDetails?.custom_sales_person_pin_required;
     if (!requiresSalespersonPin || activeSalesperson) {
       if (action === "checkout") {
-        await startCheckoutFlow();
+        await startCheckoutFlow(salesTeam);
       } else {
-        await holdCurrentOrder();
+        await holdCurrentOrder(salesTeam);
       }
       return;
     }
-
     setPendingSalespersonAction(action);
     setShowSalespersonAuthModal(true);
   };
 
-  const handleCheckoutClick = async () => {
-    await requireSalespersonAndRun("checkout");
+  // const handleCheckoutClick = async () => {
+  //   await requireSalespersonAndRun("checkout");
+  // };
+
+  const handleCheckoutClick = async (salesTeam: SalesTeamEntry[]) => {
+    await requireSalespersonAndRun("checkout", salesTeam);
   };
 
   const handleClearCart = () => {
@@ -411,7 +467,7 @@ export default function OrderSummary({
     setShowSalespersonAuthModal(false);
 
     if (nextAction === "checkout") {
-      void startCheckoutFlow();
+      void startCheckoutFlow(salesTeam);
     }
 
     if (nextAction === "hold") {
@@ -530,23 +586,42 @@ export default function OrderSummary({
       </div>
 
       {cartItems.length > 0 && (
+        // <OrderSummaryFooter
+        //   subtotal={subtotal}
+        //   total={total}
+        //   totalItemDiscount={totalItemDiscount}
+        //   couponDiscount={couponDiscount}
+        //   onCheckout={handleCheckoutClick}
+        //   onClearCart={handleClearCart}
+        //   onHoldOrder={() => {
+        //     if (!validateCustomer()) return;
+        //     void requireSalespersonAndRun("hold");
+        //   }}
+        //   isHoldingOrder={isHoldingOrder}
+        //   isValidating={isValidatingCheckout}
+        //   isMobile={isMobile}
+        //   currency_symbol={currency_symbol}
+        //   allow_holding_invoices={posDetails?.allow_holding_invoices === 1}
+        // />
         <OrderSummaryFooter
-          subtotal={subtotal}
-          total={total}
-          totalItemDiscount={totalItemDiscount}
-          couponDiscount={couponDiscount}
-          onCheckout={handleCheckoutClick}
-          onClearCart={handleClearCart}
-          onHoldOrder={() => {
-            if (!validateCustomer()) return;
-            void requireSalespersonAndRun("hold");
-          }}
-          isHoldingOrder={isHoldingOrder}
-          isValidating={isValidatingCheckout}
-          isMobile={isMobile}
-          currency_symbol={currency_symbol}
-          allow_holding_invoices={posDetails?.allow_holding_invoices === 1}
-        />
+        subtotal={subtotal}
+        total={total}
+        totalItemDiscount={totalItemDiscount}
+        couponDiscount={couponDiscount}
+        onCheckout={handleCheckoutClick}         // now accepts salesPerson param
+        // onSalesPersonChange={setSelectedSalesPerson}
+        // selectedSalesPerson={selectedSalesPerson}
+        onClearCart={handleClearCart}
+        onHoldOrder={(team) => {
+          if (!validateCustomer()) return;
+          void requireSalespersonAndRun("hold", team);
+        }}
+        isHoldingOrder={isHoldingOrder}
+        isValidating={isValidatingCheckout}
+        isMobile={isMobile}
+        currency_symbol={currency_symbol}
+        allow_holding_invoices={posDetails?.allow_holding_invoices === 1}
+      />
       )}
 
       {showPaymentDialog && (
@@ -569,6 +644,7 @@ export default function OrderSummary({
           isMobile={isMobile}
           itemDiscounts={itemDiscounts}
           totalItemDiscount={totalItemDiscount}
+          selectedSalesTeam={salesTeam}
         />
       )}
 

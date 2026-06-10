@@ -921,6 +921,7 @@ def validate_checkout_invoice(data):
 			allow_partial_payment,
 			due_date,
 			salesperson,
+			sales_team,
 			tax_id,
 			enable_background_submission,
 			loyalty_redemption,
@@ -940,6 +941,7 @@ def validate_checkout_invoice(data):
 			is_credit_sale=is_credit_sale,
 			due_date=due_date,
 			salesperson=salesperson,
+			sales_team=sales_team,
 			tax_id=tax_id,
 			create_batch_and_serial_bundle=False,
 			enable_background_submission=enable_background_submission,
@@ -1139,6 +1141,7 @@ def queue_sales_invoice(data):
 			allow_partial_payment,
 			due_date,
 			salesperson,
+			sales_team,
 			tax_id,
 			enable_background_submission,
 			loyalty_redemption,
@@ -1164,6 +1167,7 @@ def queue_sales_invoice(data):
 			allow_partial_payment=allow_partial_payment,
 			due_date=due_date,
 			salesperson=salesperson,
+			sales_team=sales_team,
 			tax_id=tax_id,
 			enable_background_submission=enable_background_submission,
 			loyalty_redemption=loyalty_redemption,
@@ -1368,6 +1372,7 @@ def create_draft_invoice(data):
 			allow_partial_payment,
 			due_date,
 			salesperson,
+			sales_team,
 			tax_id,
 			enable_background_submission,
 			loyalty_redemption,
@@ -1397,6 +1402,7 @@ def create_draft_invoice(data):
 				allow_partial_payment=allow_partial_payment,
 				due_date=due_date,
 				salesperson=salesperson,
+				sales_team=sales_team,
 				tax_id=tax_id,
 				enable_background_submission=enable_background_submission,
 				loyalty_redemption=loyalty_redemption,
@@ -1417,6 +1423,7 @@ def create_draft_invoice(data):
 				allow_partial_payment=allow_partial_payment,
 				due_date=due_date,
 				salesperson=salesperson,
+				sales_team=sales_team,
 				tax_id=tax_id,
 				enable_background_submission=enable_background_submission,
 				loyalty_redemption=loyalty_redemption,
@@ -1437,6 +1444,8 @@ def create_draft_invoice(data):
 	
 
 def parse_invoice_data(data):
+	print(f"parse_invoice_data payload keys: {list(data.keys())}")
+	print(f"salesperson: {data.get('salesperson')}, sales_team: {data.get('sales_team')}")
 	if isinstance(data, str):
 		data = json.loads(data)
 
@@ -1662,8 +1671,18 @@ def parse_invoice_data(data):
 		sales_and_tax_charges = data.get("SalesTaxCharges")
 
 	delivery_personnel = data.get("deliveryPersonnel")
+	tax_id = data.get("tax_id")  # ← this line is missing
+	# salesperson = data.get("salesperson")
 	salesperson = data.get("salesperson")
-	tax_id = data.get("tax_id")
+	sales_team = data.get("sales_team")
+
+	# Validate and resolve
+	if sales_team and isinstance(sales_team, list) and len(sales_team) > 0:
+		total_pct = sum(flt(row.get("allocated_percentage", 0)) for row in sales_team)
+		if abs(total_pct - 100) > 0.01:
+			frappe.throw(_("Service person percentages must sum to 100%. Current total: {0}%").format(total_pct))
+		if not salesperson:
+			salesperson = sales_team[0].get("sales_person")
 
 	if not customer or not items:
 		frappe.throw(_("Customer and items are required"))
@@ -1682,6 +1701,7 @@ def parse_invoice_data(data):
 		allow_partial_payment,
 		due_date,
 		salesperson,
+		sales_team,
 		tax_id,
 		enable_background_submission,
 		loyalty_redemption,
@@ -1703,6 +1723,7 @@ def build_sales_invoice_doc(
 	allow_partial_payment=False,
 	due_date=None,
 	salesperson=None,
+	sales_team=None,
 	tax_id=None,
 	create_batch_and_serial_bundle=True,
 	enable_background_submission=False,
@@ -1725,11 +1746,36 @@ def build_sales_invoice_doc(
 		doc.tax_id = tax_id
 
 	# Set salesperson in sales team
-	if salesperson:
-		doc.append("sales_team", {
-			"sales_person": salesperson,
-			"allocated_percentage": 100,
-		})
+	# if salesperson:
+	# 	doc.append("sales_team", {
+	# 		"sales_person": salesperson,
+	# 		"allocated_percentage": 100,
+	# 	})
+
+	resolved_team = sales_team if sales_team and isinstance(sales_team, list) else (
+        [{"sales_person": salesperson, "allocated_percentage": 100}] if salesperson else []
+    )
+
+	for entry in resolved_team:
+		if entry.get("sales_person"):
+			# commission_rate = flt(frappe.db.get_value(
+			# 	"Sales Person",
+			# 	entry["sales_person"],
+			# 	"commission_rate"
+			# ) or 0)
+
+			commission_rate = 10
+
+			doc.append("sales_team", {
+				"sales_person": entry["sales_person"],
+				"allocated_percentage": flt(entry.get("allocated_percentage", 0)),
+				"commission_rate": commission_rate,
+				# "incentives": roundcurrency(
+				# 	flt(entry.get("allocated_percentage", 0)) / 100
+				# 	* commission_rate / 100
+				# 	* flt(doc.grand_total or 0)
+				# ),
+			})
 
 	# Configure POS profile and company settings
 	pos_profile = _get_active_pos_profile()
@@ -1800,6 +1846,7 @@ def _update_existing_draft_invoice(
 	allow_partial_payment=False,
 	due_date=None,
 	salesperson=None,
+	sales_team=None,
 	tax_id=None,
 	enable_background_submission=False,
 	loyalty_redemption=None,
@@ -1819,6 +1866,7 @@ def _update_existing_draft_invoice(
 		allow_partial_payment=allow_partial_payment,
 		due_date=due_date,
 		salesperson=salesperson,
+		sales_team=sales_team,
 		tax_id=tax_id,
 		create_batch_and_serial_bundle=False,
 		enable_background_submission=enable_background_submission,
@@ -4000,7 +4048,8 @@ def submit_draft_invoice(invoice_id, data=None):
 				"success": False,
 				"error": f"Cannot submit invoice {invoice_id}. Only Draft invoices can be submitted. Current status: {invoice_doc.status}",
 			}
-
+		tax_id = None
+		enable_background_submission = False
 		if data:
 			(
 				customer,
@@ -4016,6 +4065,7 @@ def submit_draft_invoice(invoice_id, data=None):
 				allow_partial_payment,
 				due_date,
 				salesperson,
+				sales_team,
 				tax_id,
 				enable_background_submission,
 				loyalty_redemption,
@@ -4036,6 +4086,7 @@ def submit_draft_invoice(invoice_id, data=None):
 				allow_partial_payment=allow_partial_payment,
 				due_date=due_date,
 				salesperson=salesperson,
+				sales_team=sales_team,
 				tax_id=tax_id,
 				create_batch_and_serial_bundle=False,
 				enable_background_submission=enable_background_submission,

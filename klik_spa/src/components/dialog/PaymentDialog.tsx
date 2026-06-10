@@ -122,6 +122,8 @@ export default function PaymentDialog(props: PaymentDialogProps) {
     initialSharingMode = null,
     externalInvoiceData = null,
     itemDiscounts = {},
+    selectedSalesPerson: orderSalesPerson = "",
+    selectedSalesTeam = [],
   } = props;
 
   const [selectedSalesTaxCharges, setSelectedSalesTaxCharges] = useState("");
@@ -639,6 +641,9 @@ export default function PaymentDialog(props: PaymentDialogProps) {
       allowPartialPayment: allowPartialPayments,
       allow_partial_payment: allowPartialPayments,
       salesperson: currentSalesperson?.name || null,
+      sales_team: selectedSalesTeam.length
+        ? selectedSalesTeam
+        : undefined,
       tax_id: taxPin || null,
       loyalty: appliedLoyalty
         ? {
@@ -1077,6 +1082,7 @@ export default function PaymentDialog(props: PaymentDialogProps) {
             : null,
           // Preview-only context: avoid checkout payment validation until user submits payment.
           status: "held",
+          sales_team: selectedSalesTeam?.length ? selectedSalesTeam : undefined, 
         };
 
         const response = await validateCheckoutInvoice(payload);
@@ -1421,6 +1427,7 @@ export default function PaymentDialog(props: PaymentDialogProps) {
         status: "held",
         businessType: posDetails?.business_type,
         salesperson: currentSalesperson?.name || null,
+        sales_team: selectedSalesTeam.length ? selectedSalesTeam : undefined,
         tax_id: taxPin || null,
         loyalty: appliedLoyalty
           ? {
