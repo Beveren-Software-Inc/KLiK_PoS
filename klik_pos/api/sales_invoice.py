@@ -1758,13 +1758,11 @@ def build_sales_invoice_doc(
 
 	for entry in resolved_team:
 		if entry.get("sales_person"):
-			# commission_rate = flt(frappe.db.get_value(
-			# 	"Sales Person",
-			# 	entry["sales_person"],
-			# 	"commission_rate"
-			# ) or 0)
-
-			commission_rate = 10
+			commission_rate = flt(frappe.db.get_value(
+				"Sales Person",
+				entry["sales_person"],
+				"commission_rate"
+			) or 0)
 
 			doc.append("sales_team", {
 				"sales_person": entry["sales_person"],
