@@ -101,6 +101,35 @@ def _get_variant_pos_context():
     return pos_doc, warehouse, getattr(pos_doc, "selling_price_list", None)
 
 
+# def _get_template_variant_rows(template_item_code):
+#     sql = """
+#         SELECT
+#             i.name,
+#             i.item_name,
+#             i.description,
+#             i.item_group,
+#             i.image,
+#             i.stock_uom,
+#             i.sales_uom,
+#             i.is_stock_item,
+#             i.has_batch_no,
+#             i.has_serial_no,
+#             (
+#                 SELECT ib.barcode
+#                 FROM `tabItem Barcode` ib
+#                 WHERE ib.parent = i.name
+#                 ORDER BY ib.idx
+#                 LIMIT 1
+#             ) AS barcode
+#         FROM `tabItem` i
+#         WHERE i.disabled = 0
+#         AND IFNULL(i.is_sales_item, 1) = 1
+#         AND i.variant_of = %s
+#         ORDER BY i.item_name ASC
+#     """
+#     sql = apply_sql_permissions(sql)
+#     return frappe.db.sql(sql, (template_item_code,), as_dict=True)
+
 def _get_template_variant_rows(template_item_code):
     sql = """
         SELECT
@@ -113,14 +142,7 @@ def _get_template_variant_rows(template_item_code):
             i.sales_uom,
             i.is_stock_item,
             i.has_batch_no,
-            i.has_serial_no,
-            (
-                SELECT ib.barcode
-                FROM `tabItem Barcode` ib
-                WHERE ib.parent = i.name
-                ORDER BY ib.idx
-                LIMIT 1
-            ) AS barcode
+            i.has_serial_no
         FROM `tabItem` i
         WHERE i.disabled = 0
         AND IFNULL(i.is_sales_item, 1) = 1
@@ -128,8 +150,27 @@ def _get_template_variant_rows(template_item_code):
         ORDER BY i.item_name ASC
     """
     sql = apply_sql_permissions(sql)
-    return frappe.db.sql(sql, (template_item_code,), as_dict=True)
+    rows = frappe.db.sql(sql, (template_item_code,), as_dict=True)
 
+    if rows:
+        barcode_map = _get_variant_barcode_map([r.name for r in rows])
+        for r in rows:
+            r.barcode = barcode_map.get(r.name)
+
+    return rows
+
+
+def _get_variant_barcode_map(item_codes):
+    barcodes = frappe.get_all(
+        "Item Barcode",
+        filters={"parent": ["in", item_codes]},
+        fields=["parent", "barcode"],
+        order_by="idx",
+    )
+    barcode_map = {}
+    for row in barcodes:
+        barcode_map.setdefault(row.parent, row.barcode)
+    return barcode_map
 
 def _get_variant_attribute_map(variant_codes):
     if not variant_codes:
