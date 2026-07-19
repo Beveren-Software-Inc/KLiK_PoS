@@ -38,7 +38,7 @@ export default function ClosingShiftPage() {
   const [selectedInvoice] = useState<SalesInvoice | null>(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
-  const [closingAmounts, setClosingAmounts] = useState({});
+  const [closingAmounts, setClosingAmounts] = useState<Record<string, number>>({});
 
   // Draft Invoice Edit states
   // const [showEditOptions, setShowEditOptions] = useState(false);
@@ -160,20 +160,35 @@ export default function ClosingShiftPage() {
 
   // Payment Stats Calculation - Calculate from filtered invoices
   const paymentStats = useMemo(() => {
-    if (!modes || modes.length === 0) {
-      return {};
-    }
+    const stats: Record<string, {
+      name: string;
+      openingAmount: number;
+      amount: number;
+      transactions: number;
+    }> = {};
 
-    const stats = modes.reduce((acc, mode) => {
-      // @ts-expect-error just ignore for now
-      acc[mode.name] = {
-        name: mode.name,
-        openingAmount: mode.openingAmount || 0,
-        amount: 0,
-        transactions: 0
-      };
-      return acc;
-    }, {});
+    const ensurePaymentStat = (modeName?: string, openingAmount = 0) => {
+      if (!modeName) return null;
+
+      if (!stats[modeName]) {
+        stats[modeName] = {
+          name: modeName,
+          openingAmount,
+          amount: 0,
+          transactions: 0
+        };
+      } else if (openingAmount) {
+        stats[modeName].openingAmount = openingAmount;
+      }
+
+      return stats[modeName];
+    };
+
+    (modes || []).forEach((mode) => {
+      const modeName = mode.name || mode.mode_of_payment;
+      const openingAmount = Number(mode.openingAmount || mode.amount || 0);
+      ensurePaymentStat(modeName, openingAmount);
+    });
 
     // Calculate amounts and transactions from filtered invoices
     filteredInvoices.forEach(invoice => {
@@ -181,44 +196,38 @@ export default function ClosingShiftPage() {
       if (invoice.payment_methods && Array.isArray(invoice.payment_methods)) {
         //eslint-disable-next-line @typescript-eslint/no-explicit-any
         invoice.payment_methods.forEach((payment: any) => {
-                // @ts-expect-error just ignore for now
-          if (stats[payment.mode_of_payment]) {
-            const isReturn = invoice.status === "Return";
-            const amount = isReturn ? -Math.abs(payment.amount || 0) : (payment.amount || 0);
-      // @ts-expect-error just ignore for now
-            stats[payment.mode_of_payment].amount += amount;
+          const stat = ensurePaymentStat(payment.mode_of_payment);
+          if (!stat) return;
 
-      // @ts-expect-error just ignore for now
-            if (invoice.payment_methods.indexOf(payment) === 0) {
-                    // @ts-expect-error just ignore for now
-              stats[payment.mode_of_payment].transactions += 1;
-            }
+          const isReturn = invoice.status === "Return";
+          const amount = isReturn ? -Math.abs(payment.amount || 0) : (payment.amount || 0);
+          stat.amount += amount;
+
+          if (invoice.payment_methods.indexOf(payment) === 0) {
+            stat.transactions += 1;
           }
         });
       } else {
-      // @ts-expect-error just ignore for now
-        if (invoice.paymentMethod && stats[invoice.paymentMethod]) {
-          // For return invoices, ensure the amount is subtracted (negative)
-          const isReturn = invoice.status === "Return";
-          const amount = isReturn ? -Math.abs(invoice.totalAmount || 0) : (invoice.totalAmount || 0);
-      // @ts-expect-error just ignore for now
-          stats[invoice.paymentMethod].amount += amount;
-                // @ts-expect-error just ignore for now
-          stats[invoice.paymentMethod].transactions += 1;
-        }
+        const stat = ensurePaymentStat(invoice.paymentMethod);
+        if (!stat) return;
+
+        // For return invoices, ensure the amount is subtracted (negative)
+        const isReturn = invoice.status === "Return";
+        const amount = isReturn ? -Math.abs(invoice.totalAmount || 0) : (invoice.totalAmount || 0);
+        stat.amount += amount;
+        stat.transactions += 1;
       }
     });
 
     // Add opening amounts to the total amounts for each payment method
     Object.keys(stats).forEach(methodName => {
-            // @ts-expect-error just ignore for now
       stats[methodName].amount += stats[methodName].openingAmount;
     });
 
     return stats;
   }, [modes, filteredInvoices]);
-      // @ts-expect-error just ignore for now
   const total = Object.values(paymentStats).reduce((sum, stat) => sum + stat.amount, 0);
+  const hasPaymentStats = Object.keys(paymentStats).length > 0;
 
   // Loading state
   if (isLoading || modesLoading) {
@@ -352,12 +361,24 @@ export default function ClosingShiftPage() {
     setShowInvoiceModal(false);
   };
 
-        // @ts-expect-error just ignore for now
-  const handleClosingAmountChange = (modeName, value) => {
+  const handleClosingAmountChange = (modeName: string, value: string) => {
     setClosingAmounts(prev => ({
       ...prev,
       [modeName]: parseFloat(value) || 0
     }));
+  };
+
+  const getClosingVariance = (modeName: string, expectedAmount: number) => {
+    return (closingAmounts[modeName] || 0) - expectedAmount;
+  };
+
+  const getVarianceClass = (variance: number) => {
+    if (Math.abs(variance) < 0.005) {
+      return "text-green-700 dark:text-green-400";
+    }
+    return variance > 0
+      ? "text-blue-700 dark:text-blue-400"
+      : "text-red-700 dark:text-red-400";
   };
 
   const handleFinalClose = async () => {
@@ -648,8 +669,8 @@ export default function ClosingShiftPage() {
 
         {/* Close Shift Modal */}
         {showCloseModal && (
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-lg mx-4">
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-4xl mx-4">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">Close Shift</h2>
                 <button
@@ -660,41 +681,53 @@ export default function ClosingShiftPage() {
                 </button>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+                {!hasPaymentStats && (
+                  <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200">
+                    No payment modes were found for this session. Check that the POS Opening Entry has opening balance rows and that the POS Profile has payment methods configured.
+                  </div>
+                )}
+
                 {Object.values(paymentStats).map((stat) => (
-                        // @ts-expect-error just ignore for now
-                  <div key={stat.name} className="flex items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <div className="flex items-center space-x-3 flex-shrink-0">
-                                            {/* @ts-expect-error just ignore */}
-                      {stat.name.toLowerCase().includes('cash') ? (
-                        <div className="text-xl">💵</div>
-                      ) : (
-                        <CreditCard className="w-5 h-5 text-orange-600" />
-                      )}
-                                            {/* @ts-expect-error just ignore */}
-                      <span className="font-medium text-gray-900 dark:text-white">{stat.name}</span>
+                  <div key={stat.name} className="grid grid-cols-1 gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg md:grid-cols-[1.2fr_1fr_1fr_1fr_1fr] md:items-center">
+                    <div className="flex items-center space-x-3">
+                      {stat.name.toLowerCase().includes('cash') ? <div className="text-xl">💵</div> : <CreditCard className="w-5 h-5 text-orange-600" />}
+                      <div>
+                        <div className="font-medium text-gray-900 dark:text-white">{stat.name}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{stat.transactions} transaction(s)</div>
+                      </div>
                     </div>
 
-                    <div className="flex flex-col space-y-2">
-                      <div className="text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">Opening: </span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                                                {/* @ts-expect-error just ignore */}
-                          {formatCurrencyWithSymbol(stat.openingAmount, posDetails?.currency || 'USD')}
-                        </span>
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Opening</div>
+                      <div className="font-medium text-gray-900 dark:text-white">
+                        {formatCurrencyWithSymbol(stat.openingAmount, posDetails?.currency || 'USD')}
                       </div>
+                    </div>
 
-                      <div className="flex-shrink-0">
-                        <input
-                          type="number"
-                          step="0.01"
-                          placeholder="Closing amount"
-                                // @ts-expect-error just ignore for now
-                          value={closingAmounts[stat.name] || ''}
-                          // @ts-expect-error just ignore for now
-                          onChange={(e) => handleClosingAmountChange(stat.name, e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                        />
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Expected</div>
+                      <div className="font-semibold text-gray-900 dark:text-white">
+                        {formatCurrencyWithSymbol(stat.amount, posDetails?.currency || 'USD')}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Counted</div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={closingAmounts[stat.name] || ''}
+                        onChange={(e) => handleClosingAmountChange(stat.name, e.target.value)}
+                        className="mt-1 w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Variance</div>
+                      <div className={`font-semibold ${getVarianceClass(getClosingVariance(stat.name, stat.amount))}`}>
+                        {formatCurrencyWithSymbol(getClosingVariance(stat.name, stat.amount), posDetails?.currency || 'USD')}
                       </div>
                     </div>
                   </div>
@@ -710,9 +743,9 @@ export default function ClosingShiftPage() {
                 </button>
                 <button
                   onClick={handleFinalClose}
-                  disabled={isCreating}
+                  disabled={isCreating || !hasPaymentStats}
                   className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-                    isCreating
+                    isCreating || !hasPaymentStats
                       ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
                       : 'bg-beveren-600 text-white hover:bg-beveren-700'
                   }`}
@@ -1001,8 +1034,8 @@ export default function ClosingShiftPage() {
 
         {/* Close Shift Modal */}
         {showCloseModal && (
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-lg mx-4">
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-4xl mx-4">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">Close Shift</h2>
                 <button
@@ -1013,43 +1046,53 @@ export default function ClosingShiftPage() {
                 </button>
               </div>
 
-              <div className="space-y-4 max-h-64 overflow-y-auto pr-1">
-                {Object.values(paymentStats).map((stat) => (
-                  // @ts-expect-error just ignore for now
-                  <div key={stat.name} className="flex items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <div className="flex items-center space-x-3 flex-shrink-0">
-                      {/* @ts-expect-error just ignore */}
-                      {stat.name.toLowerCase().includes('cash') ? (
-                        <div className="text-xl">💵</div>
-                      ) : (
-                        <CreditCard className="w-5 h-5 text-beveren-600" />
-                      )}
-                                            {/* @ts-expect-error just ignore */}
+              <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+                {!hasPaymentStats && (
+                  <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200">
+                    No payment modes were found for this session. Check that the POS Opening Entry has opening balance rows and that the POS Profile has payment methods configured.
+                  </div>
+                )}
 
-                      <span className="font-medium text-gray-900 dark:text-white">{stat.name}</span>
+                {Object.values(paymentStats).map((stat) => (
+                  <div key={stat.name} className="grid grid-cols-1 gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg md:grid-cols-[1.2fr_1fr_1fr_1fr_1fr] md:items-center">
+                    <div className="flex items-center space-x-3">
+                      {stat.name.toLowerCase().includes('cash') ? <div className="text-xl">💵</div> : <CreditCard className="w-5 h-5 text-beveren-600" />}
+                      <div>
+                        <div className="font-medium text-gray-900 dark:text-white">{stat.name}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{stat.transactions} transaction(s)</div>
+                      </div>
                     </div>
 
-                    <div className="flex items-center space-x-4">
-                      <div className="text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">Opening: </span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                                                {/* @ts-expect-error just ignore */}
-
-                          {formatCurrencyWithSymbol(stat.openingAmount, posDetails?.currency || 'USD')}
-                        </span>
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Opening</div>
+                      <div className="font-medium text-gray-900 dark:text-white">
+                        {formatCurrencyWithSymbol(stat.openingAmount, posDetails?.currency || 'USD')}
                       </div>
+                    </div>
 
-                      <div className="flex-shrink-0">
-                        <input
-                          type="number"
-                          step="0.01"
-                          placeholder="Closing amount"
-                                // @ts-expect-error just ignore for now
-                          value={closingAmounts[stat.name] || ''}
-                          // @ts-expect-error just ignore for now
-                          onChange={(e) => handleClosingAmountChange(stat.name, e.target.value)}
-                          className="w-32 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                        />
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Expected</div>
+                      <div className="font-semibold text-gray-900 dark:text-white">
+                        {formatCurrencyWithSymbol(stat.amount, posDetails?.currency || 'USD')}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Counted</div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={closingAmounts[stat.name] || ''}
+                        onChange={(e) => handleClosingAmountChange(stat.name, e.target.value)}
+                        className="mt-1 w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Variance</div>
+                      <div className={`font-semibold ${getVarianceClass(getClosingVariance(stat.name, stat.amount))}`}>
+                        {formatCurrencyWithSymbol(getClosingVariance(stat.name, stat.amount), posDetails?.currency || 'USD')}
                       </div>
                     </div>
                   </div>
@@ -1065,9 +1108,9 @@ export default function ClosingShiftPage() {
                 </button>
                 <button
                   onClick={handleFinalClose}
-                  disabled={isCreating}
+                  disabled={isCreating || !hasPaymentStats}
                   className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-                    isCreating
+                    isCreating || !hasPaymentStats
                       ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
                       : 'bg-beveren-600 text-white hover:bg-beveren-700'
                   }`}

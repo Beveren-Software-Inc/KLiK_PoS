@@ -15,7 +15,6 @@ interface InvoicePreviewProps {
   displayTaxTotal: number;
   displayTaxIsIncluded: boolean;
   checkoutGrandTotal: number;
-  roundOffAmount: number;
   paymentAmounts: PaymentAmount;
   displayCurrencySymbol: string;
   isB2B: boolean;
@@ -35,7 +34,6 @@ export default function InvoicePreview({
   displayTaxTotal,
   displayTaxIsIncluded,
   checkoutGrandTotal,
-  roundOffAmount,
   paymentAmounts,
   displayCurrencySymbol,
   isB2B,
@@ -132,12 +130,6 @@ export default function InvoicePreview({
               : formatCurrencyWithSymbol(displayTaxTotal, displayCurrencySymbol)}
           </span>
         </div>
-        {roundOffAmount !== 0 && (
-          <div className="flex justify-between">
-            <span className="text-gray-600 dark:text-gray-400">Round Off</span>
-            <span className="text-gray-900 dark:text-white">{formatCurrencyWithSymbol(roundOffAmount, displayCurrencySymbol)}</span>
-          </div>
-        )}
         <div className="border-t border-gray-200 dark:border-gray-600 pt-1">
           <div className="flex justify-between font-bold">
             <span className="text-gray-900 dark:text-white">Total</span>

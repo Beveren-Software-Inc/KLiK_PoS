@@ -128,7 +128,6 @@ export default function PaymentDialog(props: PaymentDialogProps) {
   const [paymentAmounts, setPaymentAmounts] = useState<PaymentAmount>({});
   const [activeMethodId, setActiveMethodId] = useState<string | null>(null);
   const [lastModifiedMethodId, setLastModifiedMethodId] = useState<string | null>(null);
-  const [roundOffAmount, setRoundOffAmount] = useState(0);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isHoldingOrder, setIsHoldingOrder] = useState(false);
   const [invoiceSubmitted, setInvoiceSubmitted] = useState(false);
@@ -136,7 +135,6 @@ export default function PaymentDialog(props: PaymentDialogProps) {
   const [dueDate, setDueDate] = useState("");
   const [submittedInvoice, setSubmittedInvoice] = useState<any>(null);
   const [invoiceData, setInvoiceData] = useState<any>(null);
-  const [roundOffInput, setRoundOffInput] = useState(roundOffAmount.toFixed(2));
   const [isAutoPrinting, setIsAutoPrinting] = useState(false);
   const [sharingMode, setSharingMode] = useState<string | null>(initialSharingMode);
   const [sharingData, setSharingData] = useState({
@@ -319,11 +317,11 @@ export default function PaymentDialog(props: PaymentDialogProps) {
       couponDiscount,
       taxableAmount,
       taxAmount,
-      grandTotal: roundCurrency(grandTotal + roundOffAmount),
+      grandTotal: roundCurrency(grandTotal),
       selectedTax,
       isInclusive,
     };
-  }, [cartItems, appliedCoupons, getEffectiveItemRate, isTaxIncludedInBasicRate, roundOffAmount, selectedTaxTemplate]);
+  }, [cartItems, appliedCoupons, getEffectiveItemRate, isTaxIncludedInBasicRate, selectedTaxTemplate]);
 
   // Inclusive grand total: sum of discountedPriceIncl (already computed correctly in OrderSummary mapping)
   // This is reliable regardless of whether items have ERPNext Item Tax Templates
@@ -331,8 +329,8 @@ export default function PaymentDialog(props: PaymentDialogProps) {
     const itemTotal = cartItems.reduce((sum, item) => {
       return roundCurrency(sum + roundCurrency(getEffectiveDisplayRate(item) * item.quantity));
     }, 0);
-    return roundCurrency(itemTotal + roundOffAmount + Number(deliveryCharge || 0));
-  }, [cartItems, deliveryCharge, getEffectiveDisplayRate, roundOffAmount]);
+    return roundCurrency(itemTotal + Number(deliveryCharge || 0));
+  }, [cartItems, deliveryCharge, getEffectiveDisplayRate]);
 
   const totalPaidAmount = calculateTotalPayments(Object.values(paymentAmounts));
   const hasNegativePaymentAmount = Object.values(paymentAmounts).some((amount) => amount < 0);
@@ -364,13 +362,6 @@ export default function PaymentDialog(props: PaymentDialogProps) {
     : calculations.taxAmount > 0 ? calculations.taxAmount : Math.max(0, localTaxTotal);
   
   const previousCheckoutGrandTotalRef = useRef(checkoutPayableTotal);
-
-  const roundOffEnabled = (() => {
-    if (!posDetails?.custom_allow_write_off) return false;
-    const cashMethods = modes.filter((mode) => mode.type === "Cash");
-    const cashMethodsWithAmount = cashMethods.filter((mode) => (paymentAmounts[mode.mode_of_payment] || 0) > 0);
-    return cashMethodsWithAmount.length > 0;
-  })();
 
   const toggleCreditSale = () => {
     setIsCreditSale((prev) => {
@@ -623,7 +614,6 @@ export default function PaymentDialog(props: PaymentDialogProps) {
       taxAmount: displayTaxTotal,
       taxType: displayTaxIsIncluded ? "inclusive" : "exclusive",
       couponDiscount: calculations.couponDiscount,
-      roundOffAmount,
       deliveryCharge: Number(deliveryCharge || 0),
       delivery_charge: Number(deliveryCharge || 0),
       grandTotal: checkoutGrandTotal,
@@ -861,17 +851,6 @@ export default function PaymentDialog(props: PaymentDialogProps) {
     return updatedAmounts;
   };
 
-  const getRoundTargetMethodId = (): string | null => {
-    if (activeMethodId && activeMethodId in paymentAmounts) return activeMethodId;
-    if (lastModifiedMethodId && lastModifiedMethodId in paymentAmounts) return lastModifiedMethodId;
-    const nonZero = Object.entries(paymentAmounts).filter(([, amt]) => (amt || 0) > 0).map(([id]) => id);
-    if (nonZero.length === 1) return nonZero[0] ?? null;
-    const defaultId = modes.find((m) => m.default === 1)?.mode_of_payment || null;
-    const nonDefaultWithValue = nonZero.find((id) => id !== defaultId);
-    if (nonDefaultWithValue) return nonDefaultWithValue;
-    return defaultId;
-  };
-
   const handlePaymentAmountChange = (methodId: string, amount: string) => {
     if (invoiceSubmitted || isProcessingPayment) return;
     const numericAmount = roundCurrency(parseFloat(amount) || 0);
@@ -900,80 +879,6 @@ export default function PaymentDialog(props: PaymentDialogProps) {
       const baseAmounts = { ...prev, [methodId]: numericAmount };
       return autoAllocateRemainingToNextMethod(methodId, baseAmounts);
     });
-  };
-
-  const handleRoundOff = () => {
-    if (invoiceSubmitted || isProcessingPayment) return;
-    if (!posDetails?.custom_allow_write_off) {
-      toast.error("Writeoff not allowed. Ask your administrator to enable it in POS profile.");
-      return;
-    }
-    const cashMethods = modes.filter((mode) => mode.type === "Cash");
-    const cashMethodsWithAmount = cashMethods.filter((mode) => (paymentAmounts[mode.mode_of_payment] || 0) > 0);
-    if (cashMethodsWithAmount.length === 0) {
-      toast.error("Writeoff is only allowed for cash payment methods");
-      return;
-    }
-    const totalCashAmount = cashMethodsWithAmount.reduce((sum, mode) => sum + (paymentAmounts[mode.mode_of_payment] || 0), 0);
-    if (totalCashAmount === 0) {
-      toast.error("Cash payment method must have an amount to apply writeoff");
-      return;
-    }
-    const totalBeforeRoundOff = calculations.isInclusive ? calculations.taxableAmount : calculations.taxableAmount + calculations.taxAmount;
-    const writeOffLimit = posDetails?.write_off_limit || 1.0;
-    let rounded, difference;
-    if (writeOffLimit <= 1) {
-      rounded = Math.floor(totalBeforeRoundOff);
-      difference = rounded - totalBeforeRoundOff;
-    } else {
-      rounded = Math.floor(totalBeforeRoundOff / writeOffLimit) * writeOffLimit;
-      difference = rounded - totalBeforeRoundOff;
-    }
-    setRoundOffAmount(difference);
-    setRoundOffInput(difference.toFixed(2));
-    if (!(isB2B && !isB2C)) {
-      const targetId = getRoundTargetMethodId();
-      let finalTargetId = targetId;
-      if (!finalTargetId && paymentMethods.length > 0) {
-        const firstMethod = paymentMethods[0];
-        if (firstMethod) finalTargetId = firstMethod.id;
-      }
-      if (!finalTargetId) {
-        const fallbackDefaultFromModes = modes.find((m) => m.default === 1)?.mode_of_payment || modes[0]?.mode_of_payment;
-        if (fallbackDefaultFromModes) finalTargetId = fallbackDefaultFromModes;
-      }
-      if (finalTargetId) {
-        const newPaymentAmounts: PaymentAmount = {};
-        newPaymentAmounts[finalTargetId] = rounded;
-        setPaymentAmounts(newPaymentAmounts);
-      }
-    }
-  };
-
-  const handleRoundOffChange = (value: string) => {
-    if (!roundOffEnabled) return;
-    let processedValue = value;
-    if (value && !value.startsWith("-") && !isNaN(parseFloat(value))) {
-      processedValue = "-" + value;
-    }
-    const parsed = parseFloat(processedValue);
-    if (!isNaN(parsed)) {
-      const writeOffLimit = posDetails?.write_off_limit || 1.0;
-      const maxAllowedRoundoff = writeOffLimit <= 1 ? 0.99 : writeOffLimit - 0.01;
-      if (Math.abs(parsed) > maxAllowedRoundoff) {
-        toast.error(`Roundoff amount cannot exceed ${maxAllowedRoundoff.toFixed(2)}. Write-off limit is ${writeOffLimit}.`);
-        return;
-      }
-      setRoundOffInput(processedValue);
-      setRoundOffAmount(parsed);
-      const newGrandTotal = (calculations.isInclusive ? calculations.taxableAmount : calculations.taxableAmount + calculations.taxAmount) + parsed;
-      const targetId = getRoundTargetMethodId();
-      if (targetId) {
-        const sumOthers = Object.entries(paymentAmounts).filter(([id]) => id !== targetId).reduce((sum, [, amt]) => sum + (amt || 0), 0);
-        const newTargetAmount = Math.max(0, parseFloat((newGrandTotal - sumOthers).toFixed(2)));
-        setPaymentAmounts((prev) => ({ ...prev, [targetId]: newTargetAmount }));
-      }
-    }
   };
 
   useEffect(() => {
@@ -1007,7 +912,6 @@ export default function PaymentDialog(props: PaymentDialogProps) {
       }),
       SalesTaxCharges: selectedSalesTaxCharges,
       businessType: posDetails?.business_type || "",
-      roundOffAmount: Number(roundOffAmount || 0),
       deliveryCharge: Number(deliveryCharge || 0),
       loyalty: appliedLoyalty
         ? {
@@ -1067,7 +971,6 @@ export default function PaymentDialog(props: PaymentDialogProps) {
           itemDiscounts,
           SalesTaxCharges: selectedSalesTaxCharges,
           businessType: posDetails?.business_type,
-          roundOffAmount,
           deliveryCharge,
           loyalty: appliedLoyalty
             ? {
@@ -1143,7 +1046,6 @@ export default function PaymentDialog(props: PaymentDialogProps) {
     defaultTax,
     salesTaxLoading,
     posDetails?.business_type,
-    roundOffAmount,
     deliveryCharge,
     appliedLoyalty,
     isCreditSale,
@@ -1411,7 +1313,6 @@ export default function PaymentDialog(props: PaymentDialogProps) {
         taxAmount: calculations.taxAmount,
         taxType: calculations.isInclusive ? "inclusive" : "exclusive",
         couponDiscount: calculations.couponDiscount,
-        roundOffAmount,
         deliveryCharge,
         grandTotal: checkoutGrandTotal,
         appliedCoupons,
@@ -1657,13 +1558,6 @@ export default function PaymentDialog(props: PaymentDialogProps) {
       }, 500);
     }
   }, [invoiceSubmitted, invoiceData, print_receipt_on_order_complete, posDetails?.custom_prevent_invoice_reprinting]);
-
-  useEffect(() => {
-    if (!roundOffEnabled && roundOffAmount !== 0) {
-      setRoundOffAmount(0);
-      setRoundOffInput("0.00");
-    }
-  }, [roundOffEnabled, roundOffAmount]);
 
   useEffect(() => {
     if (externalInvoiceData && sharingMode) {
@@ -2047,10 +1941,6 @@ export default function PaymentDialog(props: PaymentDialogProps) {
                   backendTaxPreview={backendTaxPreview}
                   isTaxPreviewLoading={isTaxPreviewLoading}
                   taxPreviewError={taxPreviewError}
-                  roundOffInput={roundOffInput}
-                  roundOffEnabled={roundOffEnabled}
-                  onRoundOffChange={handleRoundOffChange}
-                  onRoundOff={handleRoundOff}
                 />
 
                 <TotalsSection
@@ -2275,10 +2165,6 @@ export default function PaymentDialog(props: PaymentDialogProps) {
                   backendTaxPreview={backendTaxPreview}
                   isTaxPreviewLoading={isTaxPreviewLoading}
                   taxPreviewError={taxPreviewError}
-                  roundOffInput={roundOffInput}
-                  roundOffEnabled={roundOffEnabled}
-                  onRoundOffChange={handleRoundOffChange}
-                  onRoundOff={handleRoundOff}
                 />
 
                 <SalesPersonSection
@@ -2327,7 +2213,6 @@ export default function PaymentDialog(props: PaymentDialogProps) {
               displayTaxTotal={displayTaxTotal}
               displayTaxIsIncluded={displayTaxIsIncluded}
               checkoutGrandTotal={checkoutGrandTotal}
-              roundOffAmount={roundOffAmount}
               paymentAmounts={paymentAmounts}
               displayCurrencySymbol={displayCurrencySymbol}
               isB2B={isB2B}

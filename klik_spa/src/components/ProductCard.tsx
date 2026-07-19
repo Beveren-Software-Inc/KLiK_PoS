@@ -163,9 +163,9 @@ export default function ProductCard({
         </div>
 
         <div
-          className={`${isMobile ? "p-2 min-h-[5.25rem]" : "p-2 h-20"} flex flex-col justify-between ${isDisabled ? "opacity-70" : ""}`}
+          className={`${isMobile ? "p-2 min-h-[5.25rem]" : "p-2 h-24"} flex flex-col justify-between overflow-hidden ${isDisabled ? "opacity-70" : ""}`}
         >
-          <div>
+          <div className="min-w-0">
             <h3
               className={`font-semibold text-gray-900 dark:text-white ${isMobile ? "text-xs leading-tight break-words whitespace-normal" : "text-sm truncate"}`}
             >
@@ -187,9 +187,9 @@ export default function ProductCard({
               </p>
             )}
           </div>
-          <div className="flex items-center justify-between">
+          <div className="flex min-w-0 items-center justify-between gap-1">
             <p
-              className={`text-gray-500 dark:text-gray-400 capitalize ${isMobile ? "text-xs" : "text-xs"}`}
+              className={`min-w-0 truncate text-gray-500 dark:text-gray-400 capitalize ${isMobile ? "text-xs" : "text-xs"}`}
             >
               {item.category}
             </p>
@@ -200,15 +200,15 @@ export default function ProductCard({
               {taxBadgeLabel}
             </span>
           </div>
-          <div className="flex items-center justify-end">
-            <div className="text-right">
+          <div className="flex min-w-0 items-center justify-end">
+            <div className="min-w-0 max-w-full text-right">
               <span
-                className={`block font-bold text-beveren-600 dark:text-beveren-400 ${isMobile ? "text-xs" : "text-sm"}`}
+                className={`block truncate font-bold text-beveren-600 dark:text-beveren-400 ${isMobile ? "text-xs" : "text-sm"}`}
               >
                 {formattedPrice}
               </span>
               {showsAdjustedPrice && (
-                <span className="block text-[10px] font-medium leading-tight text-gray-600 dark:text-gray-300">
+                <span className="block truncate text-[10px] font-medium leading-tight text-gray-600 dark:text-gray-300">
                   Base {formattedBasePrice}
                 </span>
               )}
