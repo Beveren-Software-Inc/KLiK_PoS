@@ -32,7 +32,6 @@ export default function SingleInvoiceReturn({
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingReturnData, setLoadingReturnData] = useState(true);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [originalInvoiceGrandTotal, setOriginalInvoiceGrandTotal] = useState<number>(0);
   const [originalInvoicePaidAmount, setOriginalInvoicePaidAmount] = useState<number>(0);
 
@@ -75,8 +74,13 @@ export default function SingleInvoiceReturn({
       let calculatedReturnAmount;
 
       if (ignoreWriteoffOnPartialReturns && isPartialReturn) {
-        // For partial returns when checkbox is ticked: ignore writeoff, use original item rates
-        calculatedReturnAmount = returnedItemsAmount;
+        // For partial returns when checkbox is ticked: use the exact amount for the
+        // returned items, scaled up by the invoice's grand-to-net ratio so tax is still
+        // included - returnedItemsAmount alone (qty * rate) excludes tax entirely.
+        const taxInclusiveRatio = totalItemsAmount > 0 && originalInvoiceGrandTotal > 0
+          ? originalInvoiceGrandTotal / totalItemsAmount
+          : 1;
+        calculatedReturnAmount = returnedItemsAmount * taxInclusiveRatio;
       } else {
         // Original logic: Calculate percentage of items being returned
         const returnPercentage = totalItemsAmount > 0 ? returnedItemsAmount / totalItemsAmount : 0;
@@ -93,7 +97,7 @@ export default function SingleInvoiceReturn({
       }, 0);
       setReturnAmount(Math.round(total * 100) / 100);
     }
-  }, [returnItems, originalInvoicePaidAmount, posDetails?.custom_ignore_write_off_on_partial_returns]);
+  }, [returnItems, originalInvoicePaidAmount, originalInvoiceGrandTotal, posDetails?.custom_ignore_write_off_on_partial_returns]);
 
   // Set default payment method when payment modes are loaded
 
@@ -138,23 +142,27 @@ export default function SingleInvoiceReturn({
 
         for (const item of itemsArray) {
 
-        // Get returned quantity for each item
-        const returnedData = await getReturnedQty(
-          invoiceWithItems.customer,
-          invoiceWithItems.name || invoiceWithItems.id,
-          item.item_code || item.id
-        );
-
-        const returnedQty = returnedData.success ?
-          returnedData.data?.total_returned_qty || 0 : 0;
-
         // Handle different property names from different invoice sources
         const itemCode = item.item_code || item.id;
         const itemName = item.item_name || item.name;
         const qty = Number(item.qty ?? item.quantity ?? 0);
         const rate = Number(item.rate ?? item.unitPrice ?? 0);
         const amount = Number(item.amount ?? item.total ?? (qty * rate));
+        // Needed to disambiguate invoices with multiple lines sharing the same item_code
+        // (e.g. different UOM) - without it, returned qty for one such line leaks onto its sibling.
+        const uom = typeof item.uom === 'string' ? item.uom : undefined;
 
+        // Get returned quantity for each item (precise per-line when we have uom+rate)
+        const returnedData = await getReturnedQty(
+          invoiceWithItems.customer,
+          invoiceWithItems.name || invoiceWithItems.id,
+          itemCode,
+          uom,
+          rate
+        );
+
+        const returnedQty = returnedData.success ?
+          returnedData.data?.total_returned_qty || 0 : 0;
 
         items.push({
           item_code: itemCode,
@@ -164,7 +172,8 @@ export default function SingleInvoiceReturn({
           amount,
           returned_qty: returnedQty,
           available_qty: Math.round((qty - returnedQty) * 100) / 100,  // Round to 2 decimal places
-          return_qty: Math.round((qty - returnedQty) * 100) / 100  // Round to 2 decimal places
+          return_qty: Math.round((qty - returnedQty) * 100) / 100,  // Round to 2 decimal places
+          uom
         });
       }
 
@@ -177,9 +186,9 @@ export default function SingleInvoiceReturn({
     }
   };
 
-  const handleReturnQtyChange = (itemCode: string, newQty: number) => {
-    setReturnItems(prev => prev.map(item => {
-      if (item.item_code === itemCode) {
+  const handleReturnQtyChange = (index: number, newQty: number) => {
+    setReturnItems(prev => prev.map((item, idx) => {
+      if (idx === index) {
         // Ensure return qty doesn't exceed available qty and round to 2 decimal places
         const validQty = Math.max(0, Math.min(Math.round(newQty * 100) / 100, item.available_qty));
         return { ...item, return_qty: validQty };
@@ -363,8 +372,8 @@ export default function SingleInvoiceReturn({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
-                      {returnItems.map((item) => (
-                        <tr key={item.item_code} className="hover:bg-gray-50 dark:hover:bg-gray-600">
+                      {returnItems.map((item, index) => (
+                        <tr key={`${item.item_code}-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-600">
                           <td className="px-4 py-4">
                             <div className="flex items-center space-x-3">
                               <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
@@ -401,7 +410,7 @@ export default function SingleInvoiceReturn({
                             <div className="flex items-center justify-center space-x-2">
                               <button
                                 onClick={() => handleReturnQtyChange(
-                                  item.item_code,
+                                  index,
                                   Math.round(((item.return_qty || 0) - 1) * 100) / 100  // Round to 2 decimal places
                                 )}
                                 disabled={!item.return_qty || item.return_qty <= 0}
@@ -415,7 +424,7 @@ export default function SingleInvoiceReturn({
                                 max={item.available_qty}
                                 value={item.return_qty || 0}
                                 onChange={(e) => handleReturnQtyChange(
-                                  item.item_code,
+                                  index,
                                   Math.round((parseFloat(e.target.value) || 0) * 100) / 100  // Round to 2 decimal places
                                 )}
                                 className="w-16 px-2 py-1 text-center border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
@@ -423,7 +432,7 @@ export default function SingleInvoiceReturn({
                               />
                               <button
                                 onClick={() => handleReturnQtyChange(
-                                  item.item_code,
+                                  index,
                                   Math.round(((item.return_qty || 0) + 1) * 100) / 100  // Round to 2 decimal places
                                 )}
                                 disabled={item.available_qty === 0 || (item.return_qty || 0) >= item.available_qty}

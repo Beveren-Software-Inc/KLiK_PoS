@@ -7,6 +7,9 @@ export interface ReturnItem {
   returned_qty: number;
   available_qty: number;
   return_qty?: number;
+  // Lets the backend match this exact line via (item_code, uom, rate) even when the invoice
+  // has multiple lines sharing the same item_code (e.g. different UOM).
+  uom?: string;
 }
 
 export interface InvoiceForReturn {
@@ -28,7 +31,7 @@ export interface ReturnData {
   }[];
 }
 
-export async function getReturnedQty(customer: string, salesInvoice: string, item: string) {
+export async function getReturnedQty(customer: string, salesInvoice: string, item: string, uom?: string, rate?: number) {
   const csrfToken = window.csrf_token
   try {
     const response = await fetch(`/api/method/klik_pos.api.sales_invoice.returned_qty`, {
@@ -40,7 +43,8 @@ export async function getReturnedQty(customer: string, salesInvoice: string, ite
       body: JSON.stringify({
         customer,
         sales_invoice: salesInvoice,
-        item
+        item,
+        ...(uom !== undefined && rate !== undefined ? { uom, rate } : {})
       }),
        credentials: 'include'
     });

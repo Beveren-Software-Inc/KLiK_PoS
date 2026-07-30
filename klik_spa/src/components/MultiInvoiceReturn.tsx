@@ -317,11 +317,11 @@ export default function MultiInvoiceReturn({
     }
   };
 
-  const handleReturnQtyChange = (invoiceName: string, itemCode: string, newQty: number) => {
+  const handleReturnQtyChange = (invoiceName: string, itemIndex: number, newQty: number) => {
     setInvoices(prev => prev.map(invoice => {
       if (invoice.name === invoiceName) {
-        const updatedItems = invoice.items.map(item => {
-          if (item.item_code === itemCode) {
+        const updatedItems = invoice.items.map((item, idx) => {
+          if (idx === itemIndex) {
             const validQty = Math.max(0, Math.min(newQty, item.available_qty));
             return { ...item, return_qty: validQty };
           }
@@ -1076,8 +1076,8 @@ export default function MultiInvoiceReturn({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
-                        {invoice.items.map((item) => (
-                          <tr key={item.item_code} className="hover:bg-gray-50 dark:hover:bg-gray-600">
+                        {invoice.items.map((item, itemIndex) => (
+                          <tr key={`${item.item_code}-${itemIndex}`} className="hover:bg-gray-50 dark:hover:bg-gray-600">
                             <td className="px-4 py-3">
                               <div className="flex items-center space-x-2">
                                 <Package className="w-4 h-4 text-blue-500" />
@@ -1111,7 +1111,7 @@ export default function MultiInvoiceReturn({
                                 <button
                                   onClick={() => handleReturnQtyChange(
                                     invoice.name,
-                                    item.item_code,
+                                    itemIndex,
                                     (item.return_qty || 0) - 1
                                   )}
                                   disabled={!item.return_qty || item.return_qty <= 0}
@@ -1126,7 +1126,7 @@ export default function MultiInvoiceReturn({
                                   value={item.return_qty || 0}
                                   onChange={(e) => handleReturnQtyChange(
                                     invoice.name,
-                                    item.item_code,
+                                    itemIndex,
                                     parseInt(e.target.value) || 0
                                   )}
                                   className="w-12 px-1 py-1 text-center border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-1 focus:ring-beveren-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs"
@@ -1135,7 +1135,7 @@ export default function MultiInvoiceReturn({
                                 <button
                                   onClick={() => handleReturnQtyChange(
                                     invoice.name,
-                                    item.item_code,
+                                    itemIndex,
                                     (item.return_qty || 0) + 1
                                   )}
                                   disabled={item.available_qty === 0 || (item.return_qty || 0) >= item.available_qty}
