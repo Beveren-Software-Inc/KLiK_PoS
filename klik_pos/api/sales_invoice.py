@@ -1028,6 +1028,47 @@ def _precache_item_accounts(item_codes, company):
 		_cached_item_accounts[f"{item_code}_expense"] = expense_account
 
 
+def _get_price_list_rate_for_uom(item_code, uom, price_list):
+	"""
+	Resolve the selling Item Price rate for a specific UOM.
+
+	Falls back to the stock-UOM price scaled by the UOM conversion factor when no UOM
+	specific Item Price exists. Returns None when nothing can be resolved, leaving the
+	caller to decide.
+	"""
+	if not item_code or not uom:
+		return None
+
+	filters = {"item_code": item_code, "uom": uom, "selling": 1}
+	if price_list:
+		filters["price_list"] = price_list
+
+	rate = frappe.db.get_value("Item Price", filters, "price_list_rate", order_by="modified desc")
+	if rate:
+		return flt(rate)
+
+	stock_uom = frappe.db.get_value("Item", item_code, "stock_uom")
+	if not stock_uom or stock_uom == uom:
+		return None
+
+	base_filters = {"item_code": item_code, "uom": stock_uom, "selling": 1}
+	if price_list:
+		base_filters["price_list"] = price_list
+	base_rate = frappe.db.get_value(
+		"Item Price", base_filters, "price_list_rate", order_by="modified desc"
+	)
+	if not base_rate:
+		return None
+
+	conversion_factor = frappe.db.get_value(
+		"UOM Conversion Detail", {"parent": item_code, "uom": uom}, "conversion_factor"
+	)
+	if not conversion_factor:
+		return None
+
+	return flt(base_rate) * flt(conversion_factor)
+
+
 def _prepare_item_data(item, item_data_map, pos_profile):
 	"""Prepare item data dictionary for invoice line."""
 	item_code = item.get("id")
@@ -1047,17 +1088,26 @@ def _prepare_item_data(item, item_data_map, pos_profile):
 	# 	final_rate = flt(original_price)
 	# 	ignore_pricing_rule = 0	
 
+	rate = item.get("price") or item.get("original_price")
+
+	price_list_rate = _get_price_list_rate_for_uom(
+		item_code, item.get("uom"), getattr(pos_profile, "selling_price_list", None)
+	)
+	if price_list_rate is None:
+		
+		selected_uom = item.get("uom")
+		stock_uom = frappe.db.get_value("Item", item_code, "stock_uom")
+		if not selected_uom or selected_uom == stock_uom:
+			price_list_rate = item.get("original_price") or item.get("price")
+		else:
+			price_list_rate = rate
+
 	# Build base item data
 	item_data = {
 		"item_code": item_code,
 		"qty": item.get("quantity"),
-		# "rate": final_rate,
-		# "rate": flt(original_price),
-        "price_list_rate": item.get("original_price") or item.get("price"),   # keep original for reference
-        # "ignore_pricing_rule": ignore_pricing_rule,
-		# "rate": item.get("price"),
-		"rate": item.get("price") or item.get("original_price"),
-		# "rate": item.get("discountedPrice") or item.get("price"),
+		"price_list_rate": flt(price_list_rate),
+		"rate": rate,
 		"discount_percentage": flt(item.get("discountPercentage", 0)),
     	"discount_amount": flt(item.get("discountAmount", 0)),
 		"income_account": income_account,
@@ -1089,9 +1139,23 @@ def _validate_item_accounts(item_code, income_account, expense_account):
 
 
 def _add_uom_to_item(item_data, item):
-	"""Add UOM to item data if specified and not default."""
+	"""
+	Add UOM to item data when the client supplied a usable one.
+
+	The old check skipped "Nos", assuming it is always the stock UOM - it is not (this item
+	sells in Kg), so a genuine UOM was silently dropped. The client also defaults to "Nos"
+	when nothing is picked, so only set a UOM the item actually defines and otherwise leave
+	it unset for ERPNext to fall back to the stock UOM.
+	"""
 	selected_uom = item.get("uom")
-	if selected_uom and selected_uom != "Nos":
+	if not selected_uom:
+		return
+
+	item_code = item_data.get("item_code")
+	stock_uom = frappe.db.get_value("Item", item_code, "stock_uom")
+	if selected_uom == stock_uom or frappe.db.exists(
+		"UOM Conversion Detail", {"parent": item_code, "uom": selected_uom}
+	):
 		item_data["uom"] = selected_uom
 
 
