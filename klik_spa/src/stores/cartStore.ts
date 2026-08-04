@@ -184,7 +184,7 @@ export const useCartStore = create<CartState>()(
                 before: { uom: item.uom, price: item.price },
                 after: { uom, price }
               });
-              return { ...item, uom, price };
+              return { ...item, uom, price, original_price: price };
             }
             return item;
           });

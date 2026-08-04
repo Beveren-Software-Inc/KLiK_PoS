@@ -246,7 +246,7 @@ def _batch_fetch_items(invoice_names):
 		return {}
 
 	items_query = """
-		SELECT parent, item_code, qty, rate, amount
+		SELECT name, parent, item_code, uom, qty, rate, amount
 		FROM `tabSales Invoice Item`
 		WHERE parent IN ({})
 	""".format(",".join([f"'{name}'" for name in invoice_names]))
@@ -259,7 +259,9 @@ def _batch_fetch_items(invoice_names):
 			items_map[item.parent] = []
 		items_map[item.parent].append(
 			{
+				"name": item.name,
 				"item_code": item.item_code,
+				"uom": item.uom,
 				"qty": item.qty,
 				"rate": item.rate,
 				"amount": item.amount,
@@ -313,30 +315,49 @@ def _process_invoices(invoices, cashier_names_map, payment_methods_map, items_ma
 		inv["items"] = items
 
 
-def _calculate_return_quantities(invoice, items):
-	"""Calculate return quantities for credit note invoices."""
-	item_codes = [item["item_code"] for item in items]
-	if not item_codes:
-		return
+def _map_returned_qty_by_line(return_against, customer, items):
+	"""
+	Compute returned qty per original invoice line, for a single source invoice.
+
+	An invoice can have multiple lines with the same item_code (e.g. different rate/UOM),
+	so a plain item_code aggregate would misattribute one line's return to a sibling line
+	that was never returned. Returns are matched using the (item_code, uom, rate) triple,
+	which uniquely identifies a line in that scenario (there is no persisted field linking
+	a return line back to a specific original line docname).
+	"""
+	if not items:
+		return []
 
 	returns_query = """
-		SELECT sii.item_code, COALESCE(SUM(ABS(sii.qty)), 0) as total_returned_qty
+		SELECT sii.item_code, sii.uom, sii.rate, COALESCE(SUM(ABS(sii.qty)), 0) as qty
 		FROM `tabSales Invoice` si
 		JOIN `tabSales Invoice Item` sii ON si.name = sii.parent
 		WHERE si.is_return = 1
 		  AND si.return_against = %s
-		  AND sii.item_code IN ({})
 		  AND si.docstatus = 1
 		  AND si.customer = %s
-		GROUP BY sii.item_code
-	""".format(",".join([f"'{code}'" for code in item_codes]))
+		GROUP BY sii.item_code, sii.uom, sii.rate
+	"""
+	returns_data = frappe.db.sql(returns_query, (return_against, customer), as_dict=True)
+	returned_map = {(row.item_code, row.uom, flt(row.rate)): row.qty for row in returns_data}
 
-	returns_data = frappe.db.sql(returns_query, (invoice.name, invoice.customer), as_dict=True)
-	returned_qty_map = {row.item_code: row.total_returned_qty for row in returns_data}
+	# Return a list aligned with the input items order.
+	result = []
+	for item in items:
+		key = (item["item_code"], item.get("uom"), flt(item["rate"]))
+		result.append(returned_map.get(key, 0))
+	return result
+
+
+def _calculate_return_quantities(invoice, items):
+	"""Calculate return quantities for credit note invoices."""
+	if not items:
+		return
+
+	returned_by_line = _map_returned_qty_by_line(invoice.name, invoice.customer, items)
 
 	# Update items with return data
-	for item in items:
-		returned_qty_value = returned_qty_map.get(item["item_code"], 0)
+	for item, returned_qty_value in zip(items, returned_by_line):
 		item["returned_qty"] = round(float(returned_qty_value), 6)
 		item["available_qty"] = round(item["qty"] - returned_qty_value, 6)
 
@@ -393,42 +414,27 @@ def _get_invoice_items_with_returns(invoice_id, customer):
 	"""
 	# Batch fetch all items for this invoice
 	items_query = """
-		SELECT item_code, item_name, qty, rate, amount, description
+		SELECT name, item_code, item_name, uom, qty, rate, amount, description
 		FROM `tabSales Invoice Item`
 		WHERE parent = %s
 	"""
 	items_data = frappe.db.sql(items_query, (invoice_id,), as_dict=True)
 
-	# Batch fetch return quantities for all items at once
-	item_codes = [item.item_code for item in items_data]
-	returned_qty_map = {}
-
-	if item_codes:
-		returns_query = """
-			SELECT sii.item_code, COALESCE(SUM(ABS(sii.qty)), 0) as total_returned_qty
-			FROM `tabSales Invoice` si
-			JOIN `tabSales Invoice Item` sii ON si.name = sii.parent
-			WHERE si.is_return = 1
-			  AND si.return_against = %s
-			  AND sii.item_code IN ({})
-			  AND si.docstatus = 1
-			  AND si.customer = %s
-			GROUP BY sii.item_code
-		""".format(",".join([f"'{code}'" for code in item_codes]))
-
-		returns_data = frappe.db.sql(returns_query, (invoice_id, customer), as_dict=True)
-		returned_qty_map = {row.item_code: row.total_returned_qty for row in returns_data}
+	returned_by_line = (
+		_map_returned_qty_by_line(invoice_id, customer, items_data) if items_data else []
+	)
 
 	# Build items list with return data
 	items = []
-	for item in items_data:
-		returned_qty_value = returned_qty_map.get(item.item_code, 0)
+	for item, returned_qty_value in zip(items_data, returned_by_line):
 		available_qty = round(item.qty - returned_qty_value, 6)
 
 		items.append(
 			{
+				"name": item.name,
 				"item_code": item.item_code,
 				"item_name": item.item_name,
+				"uom": item.uom,
 				"qty": item.qty,
 				"rate": item.rate,
 				"amount": item.amount,
@@ -1022,6 +1028,47 @@ def _precache_item_accounts(item_codes, company):
 		_cached_item_accounts[f"{item_code}_expense"] = expense_account
 
 
+def _get_price_list_rate_for_uom(item_code, uom, price_list):
+	"""
+	Resolve the selling Item Price rate for a specific UOM.
+
+	Falls back to the stock-UOM price scaled by the UOM conversion factor when no UOM
+	specific Item Price exists. Returns None when nothing can be resolved, leaving the
+	caller to decide.
+	"""
+	if not item_code or not uom:
+		return None
+
+	filters = {"item_code": item_code, "uom": uom, "selling": 1}
+	if price_list:
+		filters["price_list"] = price_list
+
+	rate = frappe.db.get_value("Item Price", filters, "price_list_rate", order_by="modified desc")
+	if rate:
+		return flt(rate)
+
+	stock_uom = frappe.db.get_value("Item", item_code, "stock_uom")
+	if not stock_uom or stock_uom == uom:
+		return None
+
+	base_filters = {"item_code": item_code, "uom": stock_uom, "selling": 1}
+	if price_list:
+		base_filters["price_list"] = price_list
+	base_rate = frappe.db.get_value(
+		"Item Price", base_filters, "price_list_rate", order_by="modified desc"
+	)
+	if not base_rate:
+		return None
+
+	conversion_factor = frappe.db.get_value(
+		"UOM Conversion Detail", {"parent": item_code, "uom": uom}, "conversion_factor"
+	)
+	if not conversion_factor:
+		return None
+
+	return flt(base_rate) * flt(conversion_factor)
+
+
 def _prepare_item_data(item, item_data_map, pos_profile):
 	"""Prepare item data dictionary for invoice line."""
 	item_code = item.get("id")
@@ -1041,17 +1088,26 @@ def _prepare_item_data(item, item_data_map, pos_profile):
 	# 	final_rate = flt(original_price)
 	# 	ignore_pricing_rule = 0	
 
+	rate = item.get("price") or item.get("original_price")
+
+	price_list_rate = _get_price_list_rate_for_uom(
+		item_code, item.get("uom"), getattr(pos_profile, "selling_price_list", None)
+	)
+	if price_list_rate is None:
+		
+		selected_uom = item.get("uom")
+		stock_uom = frappe.db.get_value("Item", item_code, "stock_uom")
+		if not selected_uom or selected_uom == stock_uom:
+			price_list_rate = item.get("original_price") or item.get("price")
+		else:
+			price_list_rate = rate
+
 	# Build base item data
 	item_data = {
 		"item_code": item_code,
 		"qty": item.get("quantity"),
-		# "rate": final_rate,
-		# "rate": flt(original_price),
-        "price_list_rate": item.get("original_price") or item.get("price"),   # keep original for reference
-        # "ignore_pricing_rule": ignore_pricing_rule,
-		# "rate": item.get("price"),
-		"rate": item.get("price") or item.get("original_price"),
-		# "rate": item.get("discountedPrice") or item.get("price"),
+		"price_list_rate": flt(price_list_rate),
+		"rate": rate,
 		"discount_percentage": flt(item.get("discountPercentage", 0)),
     	"discount_amount": flt(item.get("discountAmount", 0)),
 		"income_account": income_account,
@@ -1083,9 +1139,23 @@ def _validate_item_accounts(item_code, income_account, expense_account):
 
 
 def _add_uom_to_item(item_data, item):
-	"""Add UOM to item data if specified and not default."""
+	"""
+	Add UOM to item data when the client supplied a usable one.
+
+	The old check skipped "Nos", assuming it is always the stock UOM - it is not (this item
+	sells in Kg), so a genuine UOM was silently dropped. The client also defaults to "Nos"
+	when nothing is picked, so only set a UOM the item actually defines and otherwise leave
+	it unset for ERPNext to fall back to the stock UOM.
+	"""
 	selected_uom = item.get("uom")
-	if selected_uom and selected_uom != "Nos":
+	if not selected_uom:
+		return
+
+	item_code = item_data.get("item_code")
+	stock_uom = frappe.db.get_value("Item", item_code, "stock_uom")
+	if selected_uom == stock_uom or frappe.db.exists(
+		"UOM Conversion Detail", {"parent": item_code, "uom": selected_uom}
+	):
 		item_data["uom"] = selected_uom
 
 
@@ -1314,18 +1384,19 @@ def return_sales_invoice(invoice_name):
 			desired_payment = abs(flt(final_total, return_doc.precision("grand_total")))
 			if desired_payment > 0:
 				if return_doc.payments and len(return_doc.payments) > 0:
-					# For returns, record refund as positive amount on payment row
-					return_doc.payments[0].amount = desired_payment
+					# POS returns require payment rows to be negative (refund) -
+					# a positive amount here fails core's verify_payment_amount_is_negative().
+					return_doc.payments[0].amount = -desired_payment
 					for _p in return_doc.payments[1:]:
 						_p.amount = 0
 				else:
 					return_doc.append(
 						"payments",
-						{"mode_of_payment": "Cash", "amount": desired_payment},
+						{"mode_of_payment": "Cash", "amount": -desired_payment},
 					)
 			# Sync totals fields
-			return_doc.paid_amount = desired_payment
-			return_doc.base_paid_amount = desired_payment * (return_doc.conversion_rate or 1)
+			return_doc.paid_amount = -desired_payment
+			return_doc.base_paid_amount = -desired_payment * (return_doc.conversion_rate or 1)
 			return_doc.outstanding_amount = 0
 			return_doc.save(ignore_permissions=True)
 
@@ -1694,34 +1765,60 @@ def get_customer_receivable_account(customer, company):
 
 
 @frappe.whitelist()
-def returned_qty(customer, sales_invoice, item):
+def returned_qty(customer, sales_invoice, item, uom=None, rate=None):
 	"""
-	Get total returned quantity for a specific item (item_code) against a given sales invoice.
+	Get total returned quantity for a specific item against a given sales invoice.
 	- sales_invoice should be the original invoice name.
-	- item should be the item_code (not item name or child row name).
+	- item should be the item_code.
+	- uom/rate (optional): when an invoice has multiple lines with the same item_code (e.g.
+	  different rate/UOM), aggregating by item_code alone attributes one line's return to
+	  every line sharing that code. Pass both to get the precise figure for just that line
+	  (there's no persisted field linking a return line back to a specific original line
+	  docname, so (item_code, uom, rate) is used to identify it instead); omitted, this falls
+	  back to the old item_code-wide aggregate for backward compatibility.
 	Returns: {'total_returned_qty': <float>}
 	"""
 	values = {
 		"customer": customer,
 		"sales_invoice": sales_invoice,
 		"item": item,
+		"uom": uom,
+		"rate": rate,
 	}
 
-	# Sum qty from Sales Invoice Items of return invoices that point to the original invoice
-	result = frappe.db.sql(
-		"""
-		SELECT COALESCE(SUM(sii.qty), 0) AS total_returned_qty
-		FROM `tabSales Invoice` si
-		JOIN `tabSales Invoice Item` sii ON si.name = sii.parent
-		WHERE si.is_return = 1
-		  AND si.return_against = %(sales_invoice)s
-		  AND sii.item_code = %(item)s
-		  AND si.docstatus = 1
-		  AND si.customer = %(customer)s
-		""",
-		values=values,
-		as_dict=True,
-	)
+	if uom is not None and rate is not None:
+		result = frappe.db.sql(
+			"""
+			SELECT COALESCE(SUM(ABS(sii.qty)), 0) AS total_returned_qty
+			FROM `tabSales Invoice` si
+			JOIN `tabSales Invoice Item` sii ON si.name = sii.parent
+			WHERE si.is_return = 1
+			  AND si.return_against = %(sales_invoice)s
+			  AND sii.item_code = %(item)s
+			  AND sii.uom = %(uom)s
+			  AND sii.rate = %(rate)s
+			  AND si.docstatus = 1
+			  AND si.customer = %(customer)s
+			""",
+			values=values,
+			as_dict=True,
+		)
+	else:
+		# Sum qty from Sales Invoice Items of return invoices that point to the original invoice
+		result = frappe.db.sql(
+			"""
+			SELECT COALESCE(SUM(sii.qty), 0) AS total_returned_qty
+			FROM `tabSales Invoice` si
+			JOIN `tabSales Invoice Item` sii ON si.name = sii.parent
+			WHERE si.is_return = 1
+			  AND si.return_against = %(sales_invoice)s
+			  AND sii.item_code = %(item)s
+			  AND si.docstatus = 1
+			  AND si.customer = %(customer)s
+			""",
+			values=values,
+			as_dict=True,
+		)
 
 	total = abs(result[0]["total_returned_qty"]) if result else 0.0
 	return {
@@ -1844,40 +1941,38 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None, s
 			all_items = frappe.get_all(
 				"Sales Invoice Item",
 				filters={"parent": ["in", invoice_names]},
-				fields=["parent", "item_code", "item_name", "qty", "rate", "amount"],
+				fields=["name", "parent", "item_code", "item_name", "uom", "qty", "rate", "amount"],
 				order_by="parent, idx",
 			)
 
-		# Batch fetch all returned quantities for all items at once
-		returned_qty_map = {}
+		# Batch fetch all returned quantities. An invoice can have multiple lines sharing the
+		# same item_code (e.g. different rate/UOM), so a plain item_code aggregate would
+		# misattribute one line's return to a sibling line that was never returned. Match on
+		# (invoice, item_code, uom, rate) instead, which uniquely identifies a line in that
+		# scenario (there's no persisted field linking a return line back to a specific
+		# original line docname).
+		returned_map = {}
 		if all_items:
-			item_codes = list(set([item.item_code for item in all_items]))
-			_invoice_item_pairs = [(item.parent, item.item_code) for item in all_items]
-
-			if item_codes:
-				# Create a more efficient query to get all returned quantities
-				returns_query = """
-					SELECT
-						rsi.return_against as original_invoice,
-						sii.item_code,
-						COALESCE(SUM(ABS(sii.qty)), 0) as total_returned_qty
-					FROM `tabSales Invoice` rsi
-					JOIN `tabSales Invoice Item` sii ON rsi.name = sii.parent
-					WHERE rsi.is_return = 1
-					  AND rsi.return_against IN ({})
-					  AND sii.item_code IN ({})
-					  AND rsi.docstatus = 1
-					  AND rsi.customer = %s
-					GROUP BY rsi.return_against, sii.item_code
-				""".format(
-					",".join([f"'{name}'" for name in invoice_names]),
-					",".join([f"'{code}'" for code in item_codes]),
-				)
-
-				returns_data = frappe.db.sql(returns_query, (customer,), as_dict=True)
-				returned_qty_map = {
-					(row.original_invoice, row.item_code): row.total_returned_qty for row in returns_data
-				}
+			returns_query = """
+				SELECT
+					rsi.return_against as original_invoice,
+					sii.item_code,
+					sii.uom,
+					sii.rate,
+					COALESCE(SUM(ABS(sii.qty)), 0) as total_returned_qty
+				FROM `tabSales Invoice` rsi
+				JOIN `tabSales Invoice Item` sii ON rsi.name = sii.parent
+				WHERE rsi.is_return = 1
+				  AND rsi.return_against IN ({})
+				  AND rsi.docstatus = 1
+				  AND rsi.customer = %s
+				GROUP BY rsi.return_against, sii.item_code, sii.uom, sii.rate
+			""".format(",".join([f"'{name}'" for name in invoice_names]))
+			returns_data = frappe.db.sql(returns_query, (customer,), as_dict=True)
+			returned_map = {
+				(row.original_invoice, row.item_code, row.uom, flt(row.rate)): row.total_returned_qty
+				for row in returns_data
+			}
 
 		# Group items by invoice and calculate returned quantities
 		invoice_items_map = {}
@@ -1885,7 +1980,8 @@ def get_customer_invoices_for_return(customer, start_date=None, end_date=None, s
 			if item.parent not in invoice_items_map:
 				invoice_items_map[item.parent] = []
 
-			returned_qty_value = returned_qty_map.get((item.parent, item.item_code), 0)
+			key = (item.parent, item.item_code, item.uom, flt(item.rate))
+			returned_qty_value = returned_map.get(key, 0)
 			item.returned_qty = returned_qty_value
 			item.available_qty = round(
 				item.qty - returned_qty_value, 6
@@ -1993,15 +2089,45 @@ def create_partial_return(
 		return_doc.custom_base_roundoff_amount = 0
 		return_doc.custom_roundoff_account = get_writeoff_account()
 
-		# Filter items to only include selected ones with return quantities
+		# Filter items to only include selected ones with return quantities.
+		# An invoice can have multiple lines with the same item_code (different rate/batch),
+		# so matched rows are removed from the candidate pool as they're used - otherwise a
+		# single original row could be matched (and its amount double-counted) by more than
+		# one return_item entry while other rows are silently skipped.
+		candidate_items = list(return_doc.items)
 		filtered_items = []
 		for return_item in return_items:
 			if return_item.get("return_qty", 0) > 0:
-				for item in return_doc.items:
-					if item.item_code == return_item["item_code"]:
-						item.qty = -abs(return_item["return_qty"])
-						filtered_items.append(item)
-						break
+				match_idx = None
+				# Most precise: item_code + uom + rate, which uniquely identifies a line even
+				# when an invoice has multiple lines sharing the same item_code (e.g. different
+				# UOM). There's no persisted field linking a return line back to a specific
+				# original line docname, so this composite key is used instead.
+				if return_item.get("uom"):
+					for idx, item in enumerate(candidate_items):
+						if (
+							item.item_code == return_item["item_code"]
+							and item.uom == return_item["uom"]
+							and flt(item.rate) == flt(return_item.get("rate", item.rate))
+						):
+							match_idx = idx
+							break
+				if match_idx is None:
+					for idx, item in enumerate(candidate_items):
+						if item.item_code == return_item["item_code"] and flt(item.rate) == flt(
+							return_item.get("rate", item.rate)
+						):
+							match_idx = idx
+							break
+				if match_idx is None:
+					for idx, item in enumerate(candidate_items):
+						if item.item_code == return_item["item_code"]:
+							match_idx = idx
+							break
+				if match_idx is not None:
+					item = candidate_items.pop(match_idx)
+					item.qty = -abs(return_item["return_qty"])
+					filtered_items.append(item)
 
 		return_doc.items = filtered_items
 
@@ -2010,15 +2136,31 @@ def create_partial_return(
 		# Clear existing payments
 		return_doc.payments = []
 
-		# Calculate total returned amount (baseline expected refund)
-		# Prefer client-provided expected amount; fallback to backend computation
+		# Calculate total returned amount (baseline expected refund).
+		# This must be tax-inclusive - final_return_amount (from the client) is based on
+		# paid_amount, which includes tax. Comparing that against a tax-EXCLUSIVE item sum
+		# always looks like a "write-off" equal to the tax amount and corrupts the return's
+		# grand_total, so compute the actual tax-inclusive total for the selected items first.
+		try:
+			return_doc.calculate_taxes_and_totals()
+			computed_return_total = abs(
+				flt(return_doc.grand_total, return_doc.precision("grand_total") or 2)
+				# flt(
+				# 	return_doc.rounded_total or return_doc.grand_total,
+				# 	return_doc.precision("grand_total") or 2,
+				# )
+			)
+		except Exception:
+			computed_return_total = sum(abs(item.qty * item.rate) for item in return_doc.items)
+
+		# Prefer client-provided expected amount; fallback to the computed tax-inclusive total
 		if expected_return_amount is not None:
 			try:
 				total_returned_amount = flt(expected_return_amount, return_doc.precision("grand_total") or 2)
 			except Exception:
-				total_returned_amount = sum(abs(item.qty * item.rate) for item in return_doc.items)
+				total_returned_amount = computed_return_total
 		else:
-			total_returned_amount = sum(abs(item.qty * item.rate) for item in return_doc.items)
+			total_returned_amount = computed_return_total
 
 		final_return_amount = return_amount if return_amount is not None else total_returned_amount
 
@@ -2080,12 +2222,25 @@ def create_partial_return(
 					"amount": -abs(final_return_amount),
 				},
 			)
-		print("Mko 3", -abs(final_return_amount))
 		# Recalculate totals (payment amount stays as user entered)
 		try:
 			return_doc.calculate_taxes_and_totals()
 		except Exception:
 			pass
+
+		# Core settles POS returns against rounded_total, not grand_total. If the refund row
+		# doesn't match it to the cent, set_total_amount_to_default_mop() wipes the payments
+		# table and inserts a POSITIVE "pending amount" row, which then trips
+		# verify_payment_amount_is_negative ("Amount must be negative"). Rounding makes this
+		# routine: a -52.5 grand_total rounds to a -52.0 rounded_total, leaving 0.5 pending.
+		# if return_doc.payments:
+		# 	settled_total = flt(
+		# 		return_doc.rounded_total or return_doc.grand_total,
+		# 		return_doc.precision("grand_total") or 2,
+		# 	)
+		# 	return_doc.payments[0].amount = -abs(settled_total)
+		# 	for _p in return_doc.payments[1:]:
+		# 		_p.amount = 0
 
 		return_doc.save(ignore_permissions=True)
 		return_doc.submit()

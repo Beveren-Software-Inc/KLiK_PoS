@@ -46,10 +46,16 @@ def fetch_item_balance(item_code: str, warehouse: str) -> float:
 
 
 def _get_uom_conversion_factor(item_code: str, uom: str) -> float | None:
-	"""Get conversion factor for a specific UOM from Item UOM table."""
+	"""
+	Get conversion factor for a specific UOM from the Item's UOM table.
+
+	The rows live in "UOM Conversion Detail" (Item.uoms); querying "UOM" raised on the
+	missing `parent` column and the except swallowed it, so this always returned None and
+	every UOM-conversion fallback silently degraded.
+	"""
 	try:
 		conversion_factor = frappe.db.get_value(
-			"UOM",
+			"UOM Conversion Detail",
 			{"parent": item_code, "uom": uom},
 			"conversion_factor",
 		)
