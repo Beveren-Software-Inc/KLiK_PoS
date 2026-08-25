@@ -49,6 +49,12 @@ import {
   processKlikPosMpesaPayments,
   type MpesaRegisterPayment,
 } from "../../services/mpesa";
+import {
+  clearCheckoutAttempt,
+  getCheckoutCartFingerprint,
+  getOrCreateCheckoutAttempt,
+  markCheckoutAttemptAccepted,
+} from "../../utils/checkoutAttempt";
 
 interface MpesaFlowState {
   modeOfPayment: string;
@@ -1184,6 +1190,7 @@ export default function PaymentDialog(props: PaymentDialogProps) {
     setIsProcessingPayment(true);
     const paymentData = buildPaymentData(deliveryPersonnel);
     const originalDraftInvoiceId = getOriginalDraftInvoiceId();
+    let activeCheckoutRequestId: string | null = null;
     try {
       let response;
 
@@ -1205,10 +1212,21 @@ export default function PaymentDialog(props: PaymentDialogProps) {
           }
         );
       } else {
-        response = await createSalesInvoice({
+        const checkoutPayload = {
           ...paymentData,
           enable_background_invoice_submission: enableBackgroundSubmission,
+        };
+        const cartFingerprint = getCheckoutCartFingerprint(
+          selectedCustomer.id,
+          cartItems as unknown as Array<Record<string, unknown>>,
+        );
+        const attempt = getOrCreateCheckoutAttempt(cartFingerprint, checkoutPayload);
+        activeCheckoutRequestId = attempt.requestId;
+        response = await createSalesInvoice({
+          ...checkoutPayload,
+          checkout_request_id: attempt.requestId,
         });
+        markCheckoutAttemptAccepted(attempt.requestId, response.invoice_name || response.invoice_id);
       }
 
       setInvoiceSubmitted(true);
@@ -1220,6 +1238,14 @@ export default function PaymentDialog(props: PaymentDialogProps) {
 
       clearDraftInvoiceCache();
     } catch (err: any) {
+      if (activeCheckoutRequestId && err?.checkoutResponseReceived) {
+        const existingInvoice = err?.checkoutResponse?.invoice_name || err?.checkoutResponse?.invoice_id;
+        if (existingInvoice) {
+          markCheckoutAttemptAccepted(activeCheckoutRequestId, existingInvoice);
+        } else {
+          clearCheckoutAttempt(activeCheckoutRequestId);
+        }
+      }
       const defaultMessage = isB2B ? "Failed to submit invoice" : "Failed to process payment";
       const errorMessage = extractErrorFromException(err, defaultMessage);
       toast.error(errorMessage);

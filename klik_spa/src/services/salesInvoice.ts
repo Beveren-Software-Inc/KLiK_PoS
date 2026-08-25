@@ -108,9 +108,32 @@ export async function createSalesInvoice(data: any) {
 
   if (!response.ok || !result.message || result.message.success === false) {
     const errorMessage = extractErrorMessage(result, 'Failed to create invoice');
-    throw new Error(errorMessage);
+    const error = new Error(errorMessage) as Error & {
+      checkoutResponseReceived?: boolean;
+      checkoutResponse?: any;
+    };
+    error.checkoutResponseReceived = true;
+    error.checkoutResponse = result.message;
+    throw error;
   }
 
+  return result.message;
+}
+
+export async function getCheckoutRequestStatus(checkoutRequestId: string) {
+  const params = new URLSearchParams({ checkout_request_id: checkoutRequestId });
+  const response = await fetch(
+    `/api/method/klik_pos.api.sales_invoice.get_checkout_request_status?${params.toString()}`,
+    {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    },
+  );
+  const result = await response.json();
+  if (!response.ok || !result.message || result.message.success === false) {
+    throw new Error(extractErrorMessage(result, 'Failed to recover checkout status'));
+  }
   return result.message;
 }
 

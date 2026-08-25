@@ -37,6 +37,14 @@ def ensure_sales_invoice_reserve_stock_field():
         ignore_validate=True,
     )
 
+
+def remove_deprecated_sales_invoice_checkout_request_field():
+    """Remove metadata from the superseded wide-table checkout-key design."""
+    field_name = "Sales Invoice-custom_checkout_request_id"
+    if frappe.db.exists("Custom Field", field_name):
+        frappe.delete_doc("Custom Field", field_name, ignore_permissions=True)
+
+
 def ensure_stock_reservation_is_enabled():
     if not frappe.db.get_single_value("Stock Settings", "enable_stock_reservation"):
         frappe.db.set_value("Stock Settings", None, "enable_stock_reservation", 1)

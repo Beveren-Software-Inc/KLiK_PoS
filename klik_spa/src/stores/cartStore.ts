@@ -7,6 +7,7 @@ import { toast } from 'react-toastify'
 import { clearDraftInvoiceCache } from '../utils/draftInvoiceCache'
 import { usePOSProfileStore } from './posProfileStore'
 import { roundCurrency } from '../utils/currencyMath'
+import { clearCheckoutAttempt } from '../utils/checkoutAttempt'
 
 interface SerialBatchEntry {
   serial_no?: string;
@@ -405,6 +406,7 @@ export const useCartStore = create<CartState>()(
 
       clearCart: () => {
         clearDraftInvoiceCache();
+        clearCheckoutAttempt();
         set(() => ({
           cartItems: [],
           appliedCoupons: [],

@@ -13,6 +13,7 @@ import PaymentDialog from "../dialog/PaymentDialog";
 import SalespersonAuthModal from "../dialog/SalespersonAuthModal";
 import {
   createDraftSalesInvoice,
+  getCheckoutRequestStatus,
   validateCheckoutInvoice,
 } from "../../services/salesInvoice";
 import { getOriginalDraftInvoiceId } from "../../utils/draftInvoiceCache";
@@ -24,6 +25,10 @@ import { usePOSProfileStore } from "../../stores/posProfileStore";
 import { useSalespersonStore } from "../../stores/salespersonStore";
 import { getEffectiveDisplayRate, getEffectiveItemRate } from "../../utils/cartPricing";
 import { roundCurrency } from "../../utils/currencyMath";
+import {
+  getCheckoutAttemptForCart,
+  getCheckoutCartFingerprint,
+} from "../../utils/checkoutAttempt";
 
 interface OrderSummaryProps {
   onClearCart?: () => void;
@@ -50,6 +55,7 @@ export default function OrderSummary({
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showSalespersonAuthModal, setShowSalespersonAuthModal] = useState(false);
   const [isValidatingCheckout, setIsValidatingCheckout] = useState(false);
+  const [isRecoveringCheckout, setIsRecoveringCheckout] = useState(false);
   const [isHoldingOrder, setIsHoldingOrder] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [pendingSalespersonAction, setPendingSalespersonAction] = useState<
@@ -96,6 +102,69 @@ export default function OrderSummary({
     posDetails?.is_tax_included_in_basic_rate === 1
     || posDetails?.is_tax_included_in_basic_rate === "1"
     || posDetails?.is_tax_included_in_basic_rate === true;
+
+  useEffect(() => {
+    if (!selectedCustomer?.id || cartItems.length === 0) {
+      setIsRecoveringCheckout(false);
+      return;
+    }
+
+    const cartFingerprint = getCheckoutCartFingerprint(
+      selectedCustomer.id,
+      cartItems as unknown as Array<Record<string, unknown>>,
+    );
+    const attempt = getCheckoutAttemptForCart(cartFingerprint);
+    if (!attempt) {
+      setIsRecoveringCheckout(false);
+      return;
+    }
+
+    let cancelled = false;
+    let timer: number | undefined;
+    const recoveryDeadline = attempt.createdAt + 30_000;
+
+    const recoverCheckout = async () => {
+      try {
+        const status = await getCheckoutRequestStatus(attempt.requestId);
+        if (cancelled) return;
+
+        if (status.invoice_name || status.invoice_id) {
+          const invoiceName = status.invoice_name || status.invoice_id;
+          clearCart();
+          setItemDiscounts({});
+          setIsRecoveringCheckout(false);
+          if (status.checkout_status === "failed") {
+            toast.error(`Checkout recovered as ${invoiceName}, but submission failed. Retry it from Invoice History.`);
+          } else {
+            toast.success(`Previous checkout recovered as invoice ${invoiceName}.`);
+          }
+          onClearCart?.();
+          onPaymentCompleted?.();
+          return;
+        }
+
+        if (Date.now() < recoveryDeadline) {
+          setIsRecoveringCheckout(true);
+          timer = window.setTimeout(recoverCheckout, 2000);
+        } else {
+          // Keep the same request ID for a safe resubmission, but unlock the checkout UI.
+          setIsRecoveringCheckout(false);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to recover previous checkout:", error);
+          setIsRecoveringCheckout(false);
+        }
+      }
+    };
+
+    setIsRecoveringCheckout(true);
+    void recoverCheckout();
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [cartItems, selectedCustomer?.id, clearCart, onClearCart, onPaymentCompleted]);
 
   useEffect(() => {
     // When a held invoice is loaded back into cart, restore per-line discounts from persisted draft fields.
@@ -395,6 +464,10 @@ export default function OrderSummary({
   };
 
   const handleCheckoutClick = async () => {
+    if (isRecoveringCheckout) {
+      toast.info("Checking whether the previous checkout already created an invoice.");
+      return;
+    }
     await requireSalespersonAndRun("checkout");
   };
 
@@ -542,7 +615,7 @@ export default function OrderSummary({
             void requireSalespersonAndRun("hold");
           }}
           isHoldingOrder={isHoldingOrder}
-          isValidating={isValidatingCheckout}
+          isValidating={isValidatingCheckout || isRecoveringCheckout}
           isMobile={isMobile}
           currency_symbol={currency_symbol}
           allow_holding_invoices={posDetails?.allow_holding_invoices === 1}

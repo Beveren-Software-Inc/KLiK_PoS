@@ -30,6 +30,140 @@ QUEUE_STATUSES = {
 	"submitted": "Submitted",
 }
 
+CHECKOUT_REQUEST_DOCTYPE = "Klik Checkout Request"
+
+
+def _normalize_checkout_request_id(value):
+	request_id = str(value or "").strip()
+	if not request_id:
+		return None
+	if len(request_id) > 140:
+		frappe.throw(_("Checkout request ID is invalid."))
+	return request_id
+
+
+def _get_checkout_request(checkout_request_id, for_update=False):
+	"""Return a checkout ledger row, using a current read after a duplicate insert."""
+	if not checkout_request_id or not frappe.db.table_exists(CHECKOUT_REQUEST_DOCTYPE):
+		return None
+
+	lock_clause = " FOR UPDATE" if for_update else ""
+	rows = frappe.db.sql(
+		f"""
+		SELECT name, requested_by, status, sales_invoice, error_message
+		FROM `tab{CHECKOUT_REQUEST_DOCTYPE}`
+		WHERE name = %s
+		LIMIT 1{lock_clause}
+		""",
+		(checkout_request_id,),
+		as_dict=True,
+	)
+	if not rows:
+		return None
+
+	request = rows[0]
+	if request.requested_by != frappe.session.user and "System Manager" not in frappe.get_roles():
+		frappe.throw(_("This checkout request belongs to another user."), frappe.PermissionError)
+	return request
+
+
+def _claim_checkout_request(checkout_request_id):
+	"""Atomically claim a browser checkout key; return an existing row on replay."""
+	if not checkout_request_id:
+		return None
+	if not frappe.db.table_exists(CHECKOUT_REQUEST_DOCTYPE):
+		frappe.throw(_("Checkout protection is not installed. Run the site migration before taking sales."))
+
+	existing = _get_checkout_request(checkout_request_id)
+	if existing:
+		return existing
+
+	request = frappe.new_doc(CHECKOUT_REQUEST_DOCTYPE)
+	request.request_id = checkout_request_id
+	request.requested_by = frappe.session.user
+	request.status = "Processing"
+	try:
+		request.insert(ignore_permissions=True)
+		return None
+	except frappe.DuplicateEntryError:
+		existing = _get_checkout_request(checkout_request_id, for_update=True)
+		if existing:
+			return existing
+		raise
+
+
+def _update_checkout_request(checkout_request_id, *, status, invoice_name=None, error_message=None):
+	if not checkout_request_id:
+		return
+	values = {
+		"status": status,
+		"error_message": _truncate_queue_error(error_message) if error_message else None,
+	}
+	if invoice_name:
+		values["sales_invoice"] = invoice_name
+	frappe.db.set_value(CHECKOUT_REQUEST_DOCTYPE, checkout_request_id, values, update_modified=True)
+
+
+def _checkout_invoice_state(doc):
+	queue_status = str(getattr(doc, "queue_status", "") or "").strip().lower()
+	if queue_status == QUEUE_STATUSES["failed"].lower():
+		return "failed"
+	if doc.docstatus == 1 or queue_status == QUEUE_STATUSES["submitted"].lower():
+		return "submitted"
+	if queue_status in (QUEUE_STATUSES["queued"].lower(), QUEUE_STATUSES["processing"].lower()):
+		return queue_status
+	return "accepted"
+
+
+def _existing_checkout_response(doc, checkout_request_id=None):
+	state = _checkout_invoice_state(doc)
+	response = {
+		"success": state != "failed",
+		"idempotent_replay": True,
+		"checkout_status": state,
+		"checkout_request_id": checkout_request_id,
+		"queue_status": getattr(doc, "queue_status", None),
+		"invoice_name": doc.name,
+		"invoice_id": doc.name,
+		"invoice": _get_invoice_response_summary(doc),
+		"payment_entry": None,
+	}
+	if state == "failed":
+		response["message"] = getattr(doc, "queue_error", None) or _(
+			"This checkout already created invoice {0}, but its submission failed. Retry it from Invoice History."
+		).format(doc.name)
+	return response
+
+
+def _checkout_request_response(request):
+	if request.sales_invoice:
+		response = _existing_checkout_response(
+			frappe.get_doc("Sales Invoice", request.sales_invoice),
+			checkout_request_id=request.name,
+		)
+		if request.status == "Failed":
+			response["success"] = False
+			response["checkout_status"] = "failed"
+			response["message"] = request.error_message or _(
+				"This checkout created invoice {0}, but submission failed. Retry it from Invoice History."
+			).format(request.sales_invoice)
+		return response
+	if request.status == "Failed":
+		return {
+			"success": False,
+			"idempotent_replay": True,
+			"checkout_status": "failed",
+			"checkout_request_id": request.name,
+			"message": request.error_message or _("The previous checkout attempt failed."),
+		}
+	return {
+		"success": False,
+		"idempotent_replay": True,
+		"checkout_status": "processing",
+		"checkout_request_id": request.name,
+		"message": _("This checkout is still being processed. Please wait while its status is recovered."),
+	}
+
 
 def _set_checkbox_field_value(doc, fieldname, value):
 	"""Safely set checkbox fields only when present on the document."""
@@ -1120,6 +1254,8 @@ def create_and_submit_invoice(data):
 
 @frappe.whitelist()
 def queue_sales_invoice(data):
+	checkout_request_id = None
+	checkout_claimed = False
 	try:
 		import time
 
@@ -1127,6 +1263,14 @@ def queue_sales_invoice(data):
 
 		if not data:
 			frappe.throw("No data provided for invoice creation")
+		if isinstance(data, str):
+			data = json.loads(data)
+
+		checkout_request_id = _normalize_checkout_request_id(data.get("checkout_request_id"))
+		existing_checkout = _claim_checkout_request(checkout_request_id)
+		if existing_checkout:
+			return _checkout_request_response(existing_checkout)
+		checkout_claimed = bool(checkout_request_id)
 
 		(
 			customer,
@@ -1186,13 +1330,30 @@ def queue_sales_invoice(data):
 		if enable_background_submission:
 			_mark_invoice_queued(doc, frappe.session.user)
 			doc.save(ignore_permissions=True)
+			_update_checkout_request(
+				checkout_request_id,
+				status="Accepted",
+				invoice_name=doc.name,
+			)
 
 			try:
 				_reserve_stock_for_queued_invoice(doc)
 			except Exception as reserve_error:
 				_update_queue_fields(doc, QUEUE_STATUSES["failed"], error_message=str(reserve_error))
 				doc.save(ignore_permissions=True)
-				return {"success": False, "message": str(reserve_error)}
+				_update_checkout_request(
+					checkout_request_id,
+					status="Failed",
+					invoice_name=doc.name,
+					error_message=reserve_error,
+				)
+				return {
+					"success": False,
+					"message": str(reserve_error),
+					"checkout_request_id": checkout_request_id,
+					"invoice_name": doc.name,
+					"invoice_id": doc.name,
+				}
 
 			frappe.enqueue(
 				"klik_pos.api.sales_invoice.process_queued_sales_invoice",
@@ -1212,6 +1373,7 @@ def queue_sales_invoice(data):
 
 			return {
 				"success": True,
+				"checkout_request_id": checkout_request_id,
 				"queue_status": doc.queue_status,
 				"invoice_name": doc.name,
 				"invoice_id": doc.name,
@@ -1221,6 +1383,11 @@ def queue_sales_invoice(data):
 			}
 		else:
 			doc.insert(ignore_permissions=True)
+			_update_checkout_request(
+				checkout_request_id,
+				status="Accepted",
+				invoice_name=doc.name,
+			)
 
 			if tax_id:
 				doc.db_set("tax_id", tax_id)
@@ -1250,6 +1417,7 @@ def queue_sales_invoice(data):
 
 			return {
 				"success": True,
+				"checkout_request_id": checkout_request_id,
 				"invoice_name": doc.name,
 				"invoice_id": doc.name,
 				"invoice": _get_invoice_response_summary(doc),
@@ -1258,8 +1426,31 @@ def queue_sales_invoice(data):
 			}
 
 	except Exception as e:
+		if checkout_claimed:
+			_update_checkout_request(checkout_request_id, status="Failed", error_message=e)
 		frappe.log_error(frappe.get_traceback(), "Submit Invoice Error")
 		return {"success": False, "message": str(e)}
+
+
+@frappe.whitelist()
+def get_checkout_request_status(checkout_request_id):
+	"""Recover a checkout after refresh or a lost HTTP response."""
+	request_id = _normalize_checkout_request_id(checkout_request_id)
+	if not request_id:
+		return {"success": True, "checkout_status": "not_found"}
+
+	request = _get_checkout_request(request_id)
+	if not request:
+		return {
+			"success": True,
+			"checkout_status": "not_found",
+			"checkout_request_id": request_id,
+		}
+
+	response = _checkout_request_response(request)
+	# Status lookups themselves succeeded even when the queued invoice needs attention.
+	response["success"] = True
+	return response
 	
 
 @frappe.whitelist()
