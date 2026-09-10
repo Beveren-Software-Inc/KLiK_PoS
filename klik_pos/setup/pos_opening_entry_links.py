@@ -33,6 +33,21 @@ def ensure_payment_entry_pos_fields():
 def ensure_pos_opening_entry_links():
 	"""Ensure required Document Links exist in the POS Opening Entry DocType."""
 	ensure_payment_entry_pos_fields()
+	create_custom_fields(
+		{
+			"POS Closing Entry": [
+				{
+					"fieldname": "custom_sales_invoice",
+					"label": "Sales Invoices",
+					"fieldtype": "Table",
+					"options": "Klik Sales Invoice Reference",
+					"insert_after": "pos_opening_entry",
+					"module": "KLiK PoS",
+				}
+			]
+		},
+		update=True,
+	)
 
 	required_links = [
 		{"link_doctype": "Sales Invoice", "link_fieldname": "custom_pos_opening_entry"},

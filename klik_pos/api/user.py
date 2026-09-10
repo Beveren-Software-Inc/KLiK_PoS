@@ -53,7 +53,7 @@ def get_current_user_info():
 		# Get current POS profile
 		from klik_pos.klik_pos.utils import get_current_pos_profile
 
-		pos_profile = get_current_pos_profile()
+		pos_profile = get_current_pos_profile(allow_missing=True)
 
 		_total_time = time.time() - start_time
 

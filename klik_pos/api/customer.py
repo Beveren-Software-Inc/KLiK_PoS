@@ -13,7 +13,15 @@ from .sql_builder import apply_sql_permissions
 @frappe.whitelist(allow_guest=True)
 def get_customers(limit: int = 100, start: int = 0, search: str = ""):
     try:
-        pos_profile = get_current_pos_profile()
+        pos_profile = get_current_pos_profile(allow_missing=True)
+        if not pos_profile:
+            return {
+                "success": True,
+                "data": [],
+                "total_count": 0,
+                "start": 0,
+                "limit": 0,
+            }
         business_type = getattr(pos_profile, "custom_business_type", "B2C")
         company, company_currency = get_user_company_and_currency()
         
@@ -268,7 +276,15 @@ def get_customer_info(customer_name: str):
         import urllib.parse
 
         customer_name = urllib.parse.unquote(customer_name)
-        pos_profile = get_current_pos_profile()
+        pos_profile = get_current_pos_profile(allow_missing=True)
+        if not pos_profile:
+            return {"success": False, "error": "A POS Profile is required."}
+
+        if not (
+            frappe.db.exists("Customer", customer_name)
+            or frappe.db.exists("Customer", {"customer_name": customer_name})
+        ):
+            return {"success": False, "error": f"Customer not found: {customer_name}"}
         party_details = get_party_details(party=customer_name, party_type="Customer", pos_profile=pos_profile.name)  # This will raise if customer doesn't exist
         # First try to find by customer_name
         customers = frappe.get_all(
@@ -561,7 +577,7 @@ def get_or_create_customer(name, email, phone, country, tax_id, name_arabic="", 
 def get_customer_groups():
     """Fetch customer groups based on POS profile configuration."""
     try:
-        pos_profile = get_current_pos_profile()
+        pos_profile = get_current_pos_profile(allow_missing=True)
 
         # Check if POS profile has customer groups configured
         if hasattr(pos_profile, "customer_groups") and pos_profile.customer_groups:
