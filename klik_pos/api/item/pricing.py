@@ -54,7 +54,8 @@ def get_cart_pricing(cart_items, customer=None, price_list=None):
         }
 
     except Exception as e:
-        frappe.log_error(frappe.get_traceback(), f"Error in get_cart_pricing: {e!s}")
+        if "No POS Profile found" not in str(e):
+            frappe.log_error(frappe.get_traceback(), f"Error in get_cart_pricing: {e!s}")
         return {"items": cart_items, "total_discount": 0, "total_after_discount": 0}
 
 
@@ -65,7 +66,7 @@ def _parse_cart_items(cart_items):
 
 
 def _build_pricing_context(customer=None, price_list=None):
-    pos_profile = get_current_pos_profile()
+    pos_profile = get_current_pos_profile(allow_missing=True)
     company = pos_profile.company if pos_profile else frappe.defaults.get_user_default("Company")
     
     context = {
@@ -125,7 +126,7 @@ def _get_price_list(customer=None):
             if group_doc and group_doc[0].get("default_price_list"):
                 return group_doc[0]["default_price_list"]
 
-    pos_profile = get_current_pos_profile()
+    pos_profile = get_current_pos_profile(allow_missing=True)
     if pos_profile and getattr(pos_profile, "selling_price_list", None):
         return pos_profile.selling_price_list
 
