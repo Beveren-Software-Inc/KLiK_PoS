@@ -746,17 +746,8 @@ def _get_pos_context():
 
     warehouse = getattr(pos_doc, "warehouse", None)
 
-    if not warehouse:
-        default_company = (
-            frappe.defaults.get_user_default("Company")
-            or frappe.db.get_single_value("Global Defaults", "default_company")
-        )
-
-        warehouse = frappe.db.get_value(
-            "Company",
-            default_company,
-            "default_warehouse",
-        )
+    if not warehouse and frappe.db.has_column("Stock Settings", "default_warehouse"):
+        warehouse = frappe.db.get_single_value("Stock Settings", "default_warehouse")
 
     if not warehouse:
         any_wh = frappe.get_list(
