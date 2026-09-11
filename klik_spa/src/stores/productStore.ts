@@ -39,7 +39,7 @@ interface ProductStoreState {
   stopBackgroundRefresh: () => void;
   startBackgroundRefresh: () => void;
   executeSearch: (query: string) => Promise<void>;
-  fetchProductsFromAPI: (limit: number, offset: number, search: string, category: string, customerId: string, priceList?: string) => Promise<{
+  fetchProductsFromAPI: (limit: number, offset: number, search: string, category: string, customerId: string, priceList?: string, signal?: AbortSignal) => Promise<{
     items: MenuItem[];
     item_groups: ItemGroup[];
     total_count: number;
@@ -57,12 +57,13 @@ interface ProductStoreState {
   getEffectivePriceList: () => string;
 }
 
-const PAGE_SIZE = 1000;
-const LOAD_MORE_SIZE = 500;
+const PAGE_SIZE = 100;
+const LOAD_MORE_SIZE = 100;
 const CACHE_DURATION = 5 * 60 * 1000;
 let currentPosName = '';
 let refreshTimers: Array<ReturnType<typeof setInterval>> = [];
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
+let searchAbortController: AbortController | null = null;
 
 export const useProductStore = create<ProductStoreState>()(
   persist(
@@ -153,7 +154,7 @@ export const useProductStore = create<ProductStoreState>()(
         }
       },
 
-      fetchProductsFromAPI: async (limit, offset, search, category, customerId, priceList) => {
+      fetchProductsFromAPI: async (limit, offset, search, category, customerId, priceList, signal) => {
         try {
           const params = new URLSearchParams({
             limit: limit.toString(),
@@ -172,7 +173,7 @@ export const useProductStore = create<ProductStoreState>()(
           if (search) params.append('search', search);
           if (category && category !== 'all') params.append('category', category);
           
-          const response = await fetch(`/api/method/klik_pos.api.item.item_listing.get_items?${params.toString()}`);
+          const response = await fetch(`/api/method/klik_pos.api.item.item_listing.get_items?${params.toString()}`, { signal });
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           
           const data = await response.json();
@@ -185,6 +186,9 @@ export const useProductStore = create<ProductStoreState>()(
             has_more: message.has_more || false,
           };
         } catch (err) {
+          if (err instanceof DOMException && err.name === 'AbortError') {
+            throw err;
+          }
           console.error('fetchProductsFromAPI error:', err);
           return { items: [], item_groups: [], total_count: 0, has_more: false };
         }
@@ -321,7 +325,7 @@ export const useProductStore = create<ProductStoreState>()(
             lastUpdated: new Date(),
             isInitialized: true,
           });
-        } catch (err) {
+        } catch {
           set({ error: 'Failed to fetch products', isLoading: false });
         }
       },
@@ -336,40 +340,55 @@ export const useProductStore = create<ProductStoreState>()(
       },
 
       searchProducts: async (query: string, immediate = false) => {
-        const trimmedQuery = query.trim();
+        const normalizedQuery = query.trim().replace(/\s+/g, ' ');
+        const previousQuery = get().searchQuery.trim();
 
         if (searchTimer) {
           clearTimeout(searchTimer);
           searchTimer = null;
         }
 
-        set({ searchQuery: query, isSearching: true });
+        set({ searchQuery: normalizedQuery, isSearching: Boolean(normalizedQuery) });
 
-        if (!trimmedQuery) {
+        if (!normalizedQuery) {
+          if (searchAbortController) {
+            searchAbortController.abort();
+            searchAbortController = null;
+          }
           set({ isSearching: false });
-          get().fetchProducts(true);
+          if (previousQuery) {
+            searchTimer = setTimeout(() => {
+              get().fetchProducts(true);
+            }, 400);
+          }
           return;
         }
         
         if (!immediate) {
           searchTimer = setTimeout(async () => {
-            await get().executeSearch(trimmedQuery);
+            await get().executeSearch(normalizedQuery);
           }, 400);
           return;
         }
         
-        await get().executeSearch(trimmedQuery);
+        await get().executeSearch(normalizedQuery);
       },
 
       executeSearch: async (query: string) => {
         const { fetchProductsFromAPI, selectedCategory } = get();
+
+        if (searchAbortController) {
+          searchAbortController.abort();
+        }
+        const controller = new AbortController();
+        searchAbortController = controller;
         
         const effectiveCustomer = get().getEffectiveCustomer();
         const customerId = effectiveCustomer?.id || '';
         const priceList = get().getEffectivePriceList();
         
         try {
-          const result = await fetchProductsFromAPI(500, 0, query, selectedCategory, customerId, priceList);
+          const result = await fetchProductsFromAPI(100, 0, query, selectedCategory, customerId, priceList, controller.signal);
           
           if (get().searchQuery.trim() === query) {
             set({
@@ -382,7 +401,13 @@ export const useProductStore = create<ProductStoreState>()(
             });
           }
         } catch (err) {
-          set({ error: 'Search failed', isSearching: false });
+          if (!(err instanceof DOMException && err.name === 'AbortError')) {
+            set({ error: 'Search failed', isSearching: false });
+          }
+        } finally {
+          if (searchAbortController === controller) {
+            searchAbortController = null;
+          }
         }
       },
 
@@ -391,8 +416,13 @@ export const useProductStore = create<ProductStoreState>()(
           clearTimeout(searchTimer);
           searchTimer = null;
         }
-        set({ searchQuery: '' });
-        get().fetchProducts(true);
+        if (searchAbortController) {
+          searchAbortController.abort();
+          searchAbortController = null;
+        }
+        const hadSearch = Boolean(get().searchQuery.trim());
+        set({ searchQuery: '', isSearching: false });
+        if (hadSearch) get().fetchProducts(true);
       },
 
       setCategory: (category: string) => {

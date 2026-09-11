@@ -1,3 +1,6 @@
+import hashlib
+import json
+
 import frappe
 from frappe import _
 from frappe.utils import cint, flt, getdate
@@ -9,24 +12,35 @@ from .item_price import fetch_item_price
 from .item_stock import apply_queue_reservations_to_stock_map, fetch_item_balance
 from .search_utils import build_item_search_conditions
 
+MAX_ITEM_LIMIT = 100
+MAX_SEARCH_LENGTH = 100
+GET_ITEMS_RATE_LIMIT = 60
+GET_ITEMS_RATE_WINDOW = 60
 
-@frappe.whitelist(allow_guest=True)
+
+@frappe.whitelist()
 def get_items(
-    limit: int = 1000,
+    limit: int = MAX_ITEM_LIMIT,
     offset: int = 0,
     search: str | None = None,
     category: str | None = None,
     customer: str | None = None,
     price_list: str | None = None,
 ):
+    _enforce_get_items_rate_limit()
+    search = " ".join(str(search or "").strip().split())
+    if len(search) > MAX_SEARCH_LENGTH:
+        frappe.throw(_("Search text cannot exceed {0} characters.").format(MAX_SEARCH_LENGTH))
+
     try:
-        limit = int(limit) if limit else 1000
+        limit = int(limit) if limit else MAX_ITEM_LIMIT
         offset = int(offset) if offset else 0
     except (ValueError, TypeError):
-        limit = 1000
+        limit = MAX_ITEM_LIMIT
         offset = 0
 
-    limit = min(limit, 2000)
+    limit = min(max(limit, 1), MAX_ITEM_LIMIT)
+    offset = max(offset, 0)
 
     requested_price_list = price_list
     pos_doc, warehouse, pos_price_list, hide_unavailable = _get_pos_context()
@@ -136,13 +150,13 @@ def get_items(
             count_params.append(category)
 
         enhanced_search = bool(getattr(pos_doc, "custom_enhanced_search", False))
-        search_clauses, search_params = build_item_search_conditions(search or "", enhanced_search)
+        search_clauses, search_params = build_item_search_conditions(search, enhanced_search)
         base_query.extend(search_clauses)
         count_query.extend(search_clauses)
         params_list.extend(search_params)
         count_params.extend(search_params)
         # pass raw search string to category-count helper so it applies the same logic
-        search_term = search.strip() if search and search.strip() else None
+        search_term = search or None
 
         count_sql = "\n".join(count_query)
         count_sql = apply_sql_permissions(count_sql)
@@ -232,10 +246,16 @@ def get_items(
         stock_map = _fetch_batch_stock(item_codes, warehouse)
         product_bundle_map = _fetch_product_bundle_map(item_codes, warehouse)
         variant_count_map = _fetch_variant_count_map(item_codes)
-        
-        enriched_items = []
         current_date = frappe.utils.today()
+        item_prices_map = _fetch_item_prices_map(item_codes, price_list, current_date)
+        conversion_factor_map = _fetch_conversion_factors_map(item_codes)
+        company_currency = (
+            frappe.db.get_value("Company", pos_doc.company, "default_currency")
+            or frappe.defaults.get_global_default("currency")
+        )
 
+        pending_items = []
+        currencies = set()
         price_by_item = {}
 
         for item in items:
@@ -258,29 +278,29 @@ def get_items(
             if hide_unavailable and not is_variant_template and (is_stock_item or is_product_bundle) and balance <= 0:
                 continue
 
-            item_prices = _fetch_item_prices_sql(item_code, price_list, current_date)
-            
+            item_prices = item_prices_map.get(item_code, [])
+
             stock_uom_price = next((d for d in item_prices if d.get("uom") == item.stock_uom), {})
             item_uom = item.stock_uom
             item_uom_price = stock_uom_price
-            
+
             if item.sales_uom and item.sales_uom != item.stock_uom:
                 item_uom = item.sales_uom
                 sales_uom_price = next((d for d in item_prices if d.get("uom") == item.sales_uom), {})
                 if sales_uom_price:
                     item_uom_price = sales_uom_price
-            
+
             if item_prices and not item_uom_price:
                 item_uom = item_prices[0].get("uom")
                 item_uom_price = item_prices[0]
             
-            conversion_factor = _get_conversion_factor_sql(item_code, item_uom)
+            conversion_factor = conversion_factor_map.get((item_code, item_uom), 1)
             
             if item.stock_uom != item_uom and conversion_factor:
                 balance = balance // conversion_factor
             
             price = 0
-            currency = frappe.db.get_value("Company", pos_doc.company, "default_currency") or frappe.defaults.get_global_default("currency")
+            currency = company_currency
             
             if item_uom_price:
                 price = flt(item_uom_price.get("price_list_rate", 0))
@@ -289,10 +309,9 @@ def get_items(
                 if item_uom and item_uom != item_uom_price.get("uom") and conversion_factor:
                     price = price * conversion_factor
             
-            currency_symbol = frappe.db.get_value("Currency", currency, "symbol") if currency else currency
             price_by_item[item_code] = price
 
-            enriched_items.append(
+            pending_items.append(
                 {
                     "id": item_code,
                     "name": item.item_name or item_code,
@@ -300,7 +319,7 @@ def get_items(
                     "category": item.item_group or "General",
                     "price": price,
                     "currency": currency,
-                    "currency_symbol": currency_symbol,
+                    "currency_symbol": "",
                     "available": variant_count if is_variant_template else balance if (is_stock_item or is_product_bundle) else 0,
                     "is_stock_item": False if is_variant_template else True if is_product_bundle else is_stock_item,
                     "is_product_bundle": is_product_bundle,
@@ -319,6 +338,15 @@ def get_items(
                     "has_serial_no": item.has_serial_no,
                 }
             )
+
+            if currency:
+                currencies.add(currency)
+
+        currency_symbol_map = _fetch_currency_symbols_map(currencies)
+        enriched_items = []
+        for item in pending_items:
+            item["currency_symbol"] = currency_symbol_map.get(item["currency"], item["currency"])
+            enriched_items.append(item)
 
         tax_info_map = _fetch_item_tax_info_map(
             [item["id"] for item in enriched_items],
@@ -341,41 +369,133 @@ def get_items(
             "offset": offset,
         }
 
-    except Exception:
-        frappe.log_error(
-            frappe.get_traceback(),
-            "Get Combined Item Data Error",
+    except Exception as exc:
+        _log_get_items_exception(
+            exc,
+            count_sql=locals().get("count_sql"),
+            main_sql=locals().get("main_sql"),
+            count_params=locals().get("count_params"),
+            main_params=locals().get("params_list"),
+            pos_doc=locals().get("pos_doc"),
+            search=search,
         )
         frappe.throw(_("Something went wrong while fetching item data."))
- 
 
-def _fetch_item_prices_sql(item_code, price_list, current_date):
-    if not price_list:
-        return []
-    
-    try:
-        query = """
-            SELECT price_list_rate, currency, uom, batch_no, valid_from, valid_upto
-            FROM `tabItem Price`
-            WHERE price_list = %s
-            AND item_code = %s
-            AND selling = 1
-            AND (valid_from <= %s OR valid_from IS NULL)
-            AND (valid_upto >= %s OR valid_upto IS NULL)
-            ORDER BY valid_from DESC
-        """
-        
-        query = apply_sql_permissions(query)
-        
-        results = frappe.db.sql(
-            query,
-            (price_list, item_code, current_date, current_date),
-            as_dict=True,
+
+def _enforce_get_items_rate_limit():
+    """Limit catalogue requests per authenticated user/session using Redis."""
+    user = getattr(frappe.session, "user", None)
+    session_id = getattr(frappe.session, "sid", None)
+    identity = user if user and user != "Guest" else session_id
+    if not identity:
+        frappe.throw(_("A valid authenticated session is required."), frappe.AuthenticationError)
+
+    cache_key = frappe.cache.make_key(f"klik_pos:get_items:{identity}")
+    if not frappe.cache.get(cache_key):
+        frappe.cache.setex(cache_key, GET_ITEMS_RATE_WINDOW, 0)
+
+    request_count = frappe.cache.incrby(cache_key, 1)
+    if request_count > GET_ITEMS_RATE_LIMIT:
+        frappe.throw(
+            _("Too many product requests. Please try again shortly."),
+            frappe.RateLimitExceededError,
         )
-        
-        return results
-    except Exception:
-        return []
+
+
+def _fetch_item_prices_map(item_codes, price_list, current_date):
+    """Fetch all selling prices for the page in one query."""
+    if not item_codes or not price_list:
+        return {}
+
+    placeholders = ", ".join(["%s"] * len(item_codes))
+    query = f"""
+        SELECT item_code, price_list_rate, currency, uom, batch_no, valid_from, valid_upto
+        FROM `tabItem Price`
+        WHERE price_list = %s
+        AND item_code IN ({placeholders})
+        AND selling = 1
+        AND (valid_from <= %s OR valid_from IS NULL)
+        AND (valid_upto >= %s OR valid_upto IS NULL)
+        ORDER BY item_code, valid_from DESC
+    """
+    query = apply_sql_permissions(query)
+    rows = frappe.db.sql(
+        query,
+        tuple([price_list, *item_codes, current_date, current_date]),
+        as_dict=True,
+    )
+
+    result = {}
+    for row in rows:
+        result.setdefault(row.get("item_code"), []).append(row)
+    return result
+
+
+def _fetch_conversion_factors_map(item_codes):
+    """Fetch UOM conversion factors for all items in one query."""
+    if not item_codes:
+        return {}
+
+    placeholders = ", ".join(["%s"] * len(item_codes))
+    query = f"""
+        SELECT parent AS item_code, uom, conversion_factor
+        FROM `tabUOM Conversion Detail`
+        WHERE parent IN ({placeholders})
+    """
+    rows = frappe.db.sql(query, tuple(item_codes), as_dict=True)
+    return {
+        (row.get("item_code"), row.get("uom")): flt(row.get("conversion_factor") or 1)
+        for row in rows
+    }
+
+
+def _fetch_currency_symbols_map(currencies):
+    """Fetch symbols for all currencies used by the page in one query."""
+    currencies = [currency for currency in currencies if currency]
+    if not currencies:
+        return {}
+
+    rows = frappe.get_all(
+        "Currency",
+        filters={"name": ["in", currencies]},
+        fields=["name", "symbol"],
+        ignore_permissions=True,
+    )
+    return {row.get("name"): row.get("symbol") or row.get("name") for row in rows}
+
+
+def _safe_query_params(params):
+    """Keep diagnostics useful without recording raw request/search values."""
+    safe = []
+    for value in params or []:
+        if isinstance(value, str):
+            safe.append({"type": "str", "length": len(value)})
+        else:
+            safe.append(value)
+    return safe
+
+
+def _query_fingerprint(query):
+    if not query:
+        return None
+    return hashlib.sha256(query.encode("utf-8")).hexdigest()[:16]
+
+
+def _log_get_items_exception(exc, *, count_sql, main_sql, count_params, main_params, pos_doc, search):
+    details = {
+        "exception_type": type(exc).__name__,
+        "exception_message": str(exc),
+        "request_id": getattr(frappe.local, "request_id", None),
+        "pos_profile": getattr(pos_doc, "name", None),
+        "search_length": len(search or ""),
+        "normalized_search_type": "empty" if not search else "text",
+        "count_query_fingerprint": _query_fingerprint(count_sql),
+        "main_query_fingerprint": _query_fingerprint(main_sql),
+        "count_params": _safe_query_params(count_params),
+        "main_params": _safe_query_params(main_params),
+        "traceback": frappe.get_traceback(),
+    }
+    frappe.log_error(json.dumps(details, default=str, indent=2), "Get Items Error")
 
 
 def _empty_tax_info():
@@ -588,25 +708,6 @@ def _fetch_item_tax_template_details(template_names):
     return details
 
    
-def _get_conversion_factor_sql(item_code, uom):
-    try:
-        query = """
-            SELECT conversion_factor
-            FROM `tabUOM Conversion Detail`
-            WHERE parent = %s AND uom = %s
-            LIMIT 1
-        """
-        
-        result = frappe.db.sql(query, (item_code, uom), as_dict=True)
-        
-        if result:
-            return flt(result[0].get("conversion_factor", 1))
-        
-        return 1
-    except Exception:
-        return 1
-
-
 def _get_item_groups_with_counts(
     pos_doc,
     warehouse,
@@ -739,24 +840,13 @@ def _get_item_groups_with_counts(
    
 
 def _get_pos_context():
-    try:
-        pos_doc = get_current_pos_profile()
-    except Exception:
-        pos_doc = frappe._dict({})
+    pos_doc = get_current_pos_profile()
+    if not pos_doc or not getattr(pos_doc, "name", None):
+        frappe.throw(_("A valid POS Profile is required to load items."))
 
     warehouse = getattr(pos_doc, "warehouse", None)
-
-    if not warehouse and frappe.db.has_column("Stock Settings", "default_warehouse"):
-        warehouse = frappe.db.get_single_value("Stock Settings", "default_warehouse")
-
     if not warehouse:
-        any_wh = frappe.get_list(
-            "Warehouse",
-            filters={"is_group": 0},
-            fields=["name"],
-            limit=1,
-        )
-        warehouse = any_wh[0].name if any_wh else None
+        frappe.throw(_("POS Profile {0} has no warehouse configured.").format(pos_doc.name))
 
     return (
         pos_doc,
