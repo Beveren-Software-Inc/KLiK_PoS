@@ -155,6 +155,13 @@ export const useProductStore = create<ProductStoreState>()(
       },
 
       fetchProductsFromAPI: async (limit, offset, search, category, customerId, priceList, signal) => {
+        // A persisted store can become available before the active POS profile
+        // has been restored. Do not make a request that cannot have a valid POS
+        // context in that window.
+        if (!usePOSProfileStore.getState().isAuthenticated || !currentPosName.trim()) {
+          return { items: [], item_groups: [], total_count: 0, has_more: false };
+        }
+
         try {
           const params = new URLSearchParams({
             limit: limit.toString(),
@@ -535,6 +542,15 @@ export const useProductStore = create<ProductStoreState>()(
 
       clearCache: () => {
         get().stopBackgroundRefresh();
+
+        if (searchTimer) {
+          clearTimeout(searchTimer);
+          searchTimer = null;
+        }
+        if (searchAbortController) {
+          searchAbortController.abort();
+          searchAbortController = null;
+        }
         
         set({
           products: [],
