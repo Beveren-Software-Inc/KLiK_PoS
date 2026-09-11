@@ -1,5 +1,5 @@
 import { createBrowserRouter } from "react-router-dom";
-import LoginPage from "../pages/LoginPage";
+import FrappeLoginRedirect from "../pages/FrappeLoginRedirect";
 import POSPage from "../pages/POSPage";
 import DashboardPage from "../pages/DashboardPage";
 import ClosingShiftPage from "../pages/ClosingShiftPage";
@@ -29,7 +29,7 @@ const router = createBrowserRouter([
       },
       {
         path: "login",
-        element: <LoginPage />,
+        element: <FrappeLoginRedirect />,
       },
       {
         path: "pos",
