@@ -149,7 +149,7 @@ export const useProductStore = create<ProductStoreState>()(
           const profileName = profileStore.posDetails.name;
           set({ posName: profileName });
           get().initializePOS(profileName);
-        } else if (posName && !isInitialized && !isLoading) {
+        } else if (posName && (!isInitialized || currentPosName !== posName) && !isLoading) {
           get().initializePOS(posName);
         }
       },
@@ -284,6 +284,12 @@ export const useProductStore = create<ProductStoreState>()(
         
         if (!posName && !currentPosName) {
           return;
+        }
+
+        // Restore the in-memory context when the persisted product store is
+        // loaded before the POS profile store finishes initializing.
+        if (!currentPosName && posName) {
+          currentPosName = posName;
         }
         
         const effectiveCustomer = get().getEffectiveCustomer();
