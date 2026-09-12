@@ -65,6 +65,8 @@ let refreshTimers: Array<ReturnType<typeof setInterval>> = [];
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
 let searchAbortController: AbortController | null = null;
 
+const normalizeSearchQuery = (query: string) => query.trim().replace(/\s+/g, ' ');
+
 export const useProductStore = create<ProductStoreState>()(
   persist(
     (set, get) => ({
@@ -295,7 +297,7 @@ export const useProductStore = create<ProductStoreState>()(
         const effectiveCustomer = get().getEffectiveCustomer();
         const customerId = effectiveCustomer?.id || '';
         const priceList = get().getEffectivePriceList();
-        const requestSearchQuery = searchQuery;
+        const requestSearchQuery = normalizeSearchQuery(searchQuery);
         const requestCategory = selectedCategory;
         const requestCustomerId = customerId;
         const requestPriceList = priceList;
@@ -318,7 +320,7 @@ export const useProductStore = create<ProductStoreState>()(
           const latestCustomerId = latestCustomer?.id || '';
           const latestPriceList = latest.getEffectivePriceList();
           if (
-            latest.searchQuery !== requestSearchQuery ||
+            normalizeSearchQuery(latest.searchQuery) !== requestSearchQuery ||
             latest.selectedCategory !== requestCategory ||
             latestCustomerId !== requestCustomerId ||
             latestPriceList !== requestPriceList
@@ -353,7 +355,7 @@ export const useProductStore = create<ProductStoreState>()(
       },
 
       searchProducts: async (query: string, immediate = false) => {
-        const normalizedQuery = query.trim().replace(/\s+/g, ' ');
+        const normalizedQuery = normalizeSearchQuery(query);
         const previousQuery = get().searchQuery.trim();
 
         if (searchTimer) {
@@ -361,9 +363,8 @@ export const useProductStore = create<ProductStoreState>()(
           searchTimer = null;
         }
 
-        set({ searchQuery: normalizedQuery, isSearching: Boolean(normalizedQuery) });
-
         if (!normalizedQuery) {
+          set({ searchQuery: '', isSearching: false });
           if (searchAbortController) {
             searchAbortController.abort();
             searchAbortController = null;
@@ -376,6 +377,10 @@ export const useProductStore = create<ProductStoreState>()(
           }
           return;
         }
+
+        // Keep the display value intact so users can type a space between
+        // words; only the request value is normalized.
+        set({ searchQuery: query, isSearching: true });
         
         if (!immediate) {
           searchTimer = setTimeout(async () => {
@@ -403,7 +408,7 @@ export const useProductStore = create<ProductStoreState>()(
         try {
           const result = await fetchProductsFromAPI(100, 0, query, selectedCategory, customerId, priceList, controller.signal);
           
-          if (get().searchQuery.trim() === query) {
+          if (normalizeSearchQuery(get().searchQuery) === normalizeSearchQuery(query)) {
             set({
               products: result.items,
               itemGroups: result.item_groups,
