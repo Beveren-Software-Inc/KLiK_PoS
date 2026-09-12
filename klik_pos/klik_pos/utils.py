@@ -7,10 +7,12 @@ _cached_pos_profiles = {}
 _cached_company_data = {}
 
 
-def get_current_pos_profile():
+def get_current_pos_profile(allow_missing=False):
 	"""Get the active POS Profile with identity-only caching keyed by user and opening entry.
 
 	Returns a fresh POS Profile Doc each call to avoid stale field values.
+	When ``allow_missing`` is true, return ``None`` for users (including Guest)
+	who do not have a POS Profile instead of raising a validation error.
 	"""
 	user = frappe.session.user
 
@@ -29,10 +31,18 @@ def get_current_pos_profile():
 		else:
 			pos_profile_name = frappe.get_value("POS Profile User", {"user": user}, "parent")
 			if not pos_profile_name:
+				if allow_missing:
+					_cached_pos_profiles[cache_key] = None
+					return None
 				frappe.throw(_("No POS Profile found for user {0}").format(user))
 
 		# Cache identity (name) only
 		_cached_pos_profiles[cache_key] = pos_profile_name
+
+	if not pos_profile_name:
+		if allow_missing:
+			return None
+		frappe.throw(_("No POS Profile found for user {0}").format(user))
 
 	# Mania: Always fetch a fresh doc to ensure latest fields -> Issue reported 04/11/2025
 	pos_profile_doc = frappe.get_doc("POS Profile", pos_profile_name)

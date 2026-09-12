@@ -326,6 +326,9 @@ def _populate_sales_invoices_to_closing_entry(closing_doc, opening_entry_name):
 	linked to the opening entry.
 	"""
 	try:
+		if not closing_doc.meta.has_field("custom_sales_invoice"):
+			return
+
 		# Fetch all submitted Sales Invoices linked to this opening entry
 		invoices = frappe.get_all(
 			"Sales Invoice",

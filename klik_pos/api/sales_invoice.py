@@ -3,7 +3,9 @@ import json
 import erpnext
 import frappe
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import SalesInvoice
+from erpnext.setup.doctype.item_group.item_group import get_item_group_defaults
 from erpnext.stock.get_item_details import get_item_details
+from erpnext.stock.doctype.item.item import get_item_defaults
 from frappe import _
 from frappe.exceptions import ValidationError
 from frappe.utils import cint, flt, nowdate
@@ -2637,18 +2639,39 @@ def _precache_item_accounts(item_codes, company):
 	if not item_codes:
 		return
 
-	# Cache company data
-	if company not in _cached_company_data:
-		_cached_company_data[company] = frappe.get_doc("Company", company)
-
-	company_doc = _cached_company_data[company]
-	income_account = company_doc.default_income_account
-	expense_account = company_doc.default_expense_account
-
 	# Pre-populate account cache
 	for item_code in item_codes:
+		income_account, expense_account = _get_item_accounts(item_code, company)
 		_cached_item_accounts[item_code] = income_account
 		_cached_item_accounts[f"{item_code}_expense"] = expense_account
+
+
+def _get_item_accounts(item_code, company):
+	"""Resolve accounts using ERPNext's item, item group, and company defaults."""
+	item_defaults = get_item_defaults(item_code, company)
+	item_group_defaults = get_item_group_defaults(item_code, company)
+
+	if company not in _cached_company_data:
+		_cached_company_data[company] = frappe.get_doc("Company", company)
+	company_doc = _cached_company_data[company]
+
+	income_account = (
+		item_defaults.get("income_account")
+		or item_group_defaults.get("income_account")
+		or company_doc.default_income_account
+	)
+
+	# Sales Invoice uses default_cogs_account for item/group defaults. Keep
+	# expense_account as a fallback for installations using the older field.
+	expense_account = (
+		item_defaults.get("default_cogs_account")
+		or item_defaults.get("expense_account")
+		or item_group_defaults.get("default_cogs_account")
+		or item_group_defaults.get("expense_account")
+		or company_doc.default_expense_account
+	)
+
+	return income_account, expense_account
 
 
 def _resolve_item_tax_details_for_line(doc, item, pos_profile):
@@ -3047,13 +3070,7 @@ def get_income_accounts(item_code):
 		try:
 			pos_profile = get_current_pos_profile()
 			company = pos_profile.company
-
-			# Cache company data
-			if company not in _cached_company_data:
-				_cached_company_data[company] = frappe.get_doc("Company", company)
-
-			company_doc = _cached_company_data[company]
-			_cached_item_accounts[item_code] = company_doc.default_income_account
+			_cached_item_accounts[item_code] = _get_item_accounts(item_code, company)[0]
 		except Exception as e:
 			frappe.log_error(
 				f"Error fetching income account for {item_code}: {e!s}",
@@ -3073,13 +3090,7 @@ def get_expense_accounts(item_code):
 		try:
 			pos_profile = get_current_pos_profile()
 			company = pos_profile.company
-
-			# Cache company data
-			if company not in _cached_company_data:
-				_cached_company_data[company] = frappe.get_doc("Company", company)
-
-			company_doc = _cached_company_data[company]
-			_cached_item_accounts[cache_key] = company_doc.default_expense_account
+			_cached_item_accounts[cache_key] = _get_item_accounts(item_code, company)[1]
 		except Exception as e:
 			frappe.log_error(
 				f"Error fetching expense account for {item_code}: {e!s}",
