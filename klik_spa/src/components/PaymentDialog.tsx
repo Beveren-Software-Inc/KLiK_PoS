@@ -36,7 +36,8 @@ import { usePaymentModes } from "../hooks/usePaymentModes";
 import { useSalesTaxCharges } from "../hooks/useSalesTaxCharges";
 import { usePOSDetails } from "../hooks/usePOSProfile";
 import { createDraftSalesInvoice } from "../services/salesInvoice";
-import { createSalesInvoice } from "../services/salesInvoice";
+import { createSalesInvoice, previewSalesInvoice } from "../services/salesInvoice";
+import { useCartStore } from "../stores/cartStore";
 import { useNavigate } from "react-router-dom";
 import DisplayPrintPreview from "../utils/invoicePrint";
 import { handlePrintInvoice } from "../utils/printHandler";
@@ -145,6 +146,7 @@ export default function PaymentDialog({
   const [lastModifiedMethodId, setLastModifiedMethodId] = useState<string | null>(null);
   const [roundOffAmount, setRoundOffAmount] = useState(0);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [isVerifyingPrices, setIsVerifyingPrices] = useState(false);
   const [isHoldingOrder, setIsHoldingOrder] = useState(false);
   const [invoiceSubmitted, setInvoiceSubmitted] = useState(false);
   //eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -188,6 +190,7 @@ export default function PaymentDialog({
   const { modes, isLoading, error } = usePaymentModes(typeof posDetails?.name === 'string' ? posDetails.name : '');
   const { salesTaxCharges, defaultTax } = useSalesTaxCharges();
   const { personnel: deliveryPersonnelList } = useDeliveryPersonnel();
+  const applyServerPricing = useCartStore((state) => state.applyServerPricing);
   const navigate = useNavigate();
 
   // Determine if this is B2B business type
@@ -419,6 +422,91 @@ export default function PaymentDialog({
       setEmailMessage(template.response_html || template.response);
     }
   };
+
+  // Invoice line payload shared by preview and submit
+  const buildInvoiceItems = () =>
+    cartItems.map(item => ({
+      ...item,
+      id: item.item_code || item.id,        // ← override the generated id
+      item_code: item.item_code || item.id,  // ← keep item_code correct too
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      price: item.price || (item as any).discountedPrice,
+      batchNumber: itemDiscounts[item.id]?.batchNumber || null,
+      serialNumber: itemDiscounts[item.id]?.serialNumber || null,
+      uom: item.uom || 'Nos',
+      discountPercentage: itemDiscounts[item.id]?.discountPercentage || 0,
+      discountAmount: itemDiscounts[item.id]?.discountAmount || 0,
+    }));
+
+  // Stable key so the price check re-runs only when the cart content actually changes
+  const cartSignature = cartItems
+    .map(item => `${item.id}|${item.uom}|${item.quantity}|${item.price}`)
+    .join(",");
+
+  // Re-price the cart with the server's invoice calculation (pricing rules are applied
+  // again on save), so the amount collected always matches the submitted invoice.
+  useEffect(() => {
+    if (!isOpen || invoiceSubmitted || externalInvoiceData || !selectedCustomer?.id || cartItems.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+    setIsVerifyingPrices(true);
+
+    previewSalesInvoice({
+      items: buildInvoiceItems(),
+      customer: selectedCustomer,
+      SalesTaxCharges: selectedSalesTaxCharges || undefined,
+      businessType: posDetails?.business_type,
+    })
+      .then((preview) => {
+        if (cancelled) return;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const updates: Record<string, Record<string, any>> = {};
+        const repricedItems: string[] = [];
+
+        cartItems.forEach((item, idx) => {
+          const line = preview.items?.[idx];
+          if (!line) return;
+          // Only lines the server applies a pricing rule to. Lines without one keep the cart
+          // price as their rate, so they already match; manual discounts stay as entered.
+          if (line.pricing_rules.length === 0) return;
+
+          // Server line rate excludes the cashier's manual discount (applied at invoice level
+          // on pricing-rule lines), so compare it with the cart price before that discount
+          if (Math.abs(line.rate - item.price) < 0.005) return;
+
+          updates[item.id] = {
+            price: line.rate,
+            original_price: line.price_list_rate,
+            discount_percentage: line.discount_percentage,
+            discount_amount: line.discount_amount,
+            pricing_rules: JSON.stringify(line.pricing_rules),
+            has_pricing_rule: 1,
+          };
+          repricedItems.push(item.name);
+        });
+
+        if (repricedItems.length > 0) {
+          applyServerPricing(updates);
+          toast.info(`Prices updated by pricing rules: ${repricedItems.join(", ")}`);
+        }
+      })
+      .catch((err) => {
+        // Submit is still validated on the server, so a failed preview is not blocking
+        console.error("Failed to verify prices with server:", err);
+      })
+      .finally(() => {
+        if (!cancelled) setIsVerifyingPrices(false);
+      });
+
+    return () => {
+      cancelled = true;
+      setIsVerifyingPrices(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, invoiceSubmitted, cartSignature, selectedCustomer?.id]);
 
   // Calculate totals with memoization for performance
   const calculations = useMemo(() => {
@@ -925,17 +1013,7 @@ export default function PaymentDialog({
       //   discountPercentage: itemDiscounts[item.id]?.discountPercentage || 0,
       //   discountAmount: itemDiscounts[item.id]?.discountAmount || 0,
       // })),
-      items: cartItems.map(item => ({
-          ...item,
-          id: item.item_code || item.id,        // ← override the generated id
-          item_code: item.item_code || item.id,  // ← keep item_code correct too
-          price: item.price || (item as any).discountedPrice,
-          batchNumber: itemDiscounts[item.id]?.batchNumber || null,
-          serialNumber: itemDiscounts[item.id]?.serialNumber || null,
-          uom: item.uom || 'Nos',
-          discountPercentage: itemDiscounts[item.id]?.discountPercentage || 0,
-          discountAmount: itemDiscounts[item.id]?.discountAmount || 0,
-        })),
+      items: buildInvoiceItems(),
       customer: selectedCustomer,
       paymentMethods: (adjustedPaymentMethods ?? []).map(([method, amount]) => ({ method, amount: parseFloat((Number(amount) || 0).toFixed(2)) })),
       subtotal: calculations.subtotal,
@@ -1078,6 +1156,9 @@ export default function PaymentDialog({
 
   // Get the appropriate button text and validation
   const getActionButtonText = () => {
+    if (isVerifyingPrices) {
+      return "Verifying prices...";
+    }
     if (isProcessingPayment) {
       return isB2B ? "Submitting Invoice..." : "Processing Payment...";
     }
@@ -1096,7 +1177,7 @@ export default function PaymentDialog({
   };
 
   const isActionButtonDisabled = () => {
-    if (invoiceSubmitted || isProcessingPayment) return true;
+    if (invoiceSubmitted || isProcessingPayment || isVerifyingPrices) return true;
     // For B2C, check if payment is complete
     if (isB2C) return outstandingAmount > 0;
     // For B2B, no payment validation needed

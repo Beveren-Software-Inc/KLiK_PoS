@@ -24,6 +24,49 @@ const csrfToken = window.csrf_token;
   return result.message;
 }
 
+export interface InvoicePreviewLine {
+  idx: number;
+  item_code: string;
+  uom: string;
+  qty: number;
+  price_list_rate: number;
+  rate: number;
+  discount_percentage: number;
+  discount_amount: number;
+  pricing_rules: string[];
+}
+
+export interface InvoicePreview {
+  grand_total: number;
+  rounded_total: number;
+  items: InvoicePreviewLine[];
+}
+
+// Server-side calculation of the invoice (pricing rules, taxes) without saving it
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function previewSalesInvoice(data: any): Promise<InvoicePreview> {
+  const csrfToken = window.csrf_token;
+
+  const response = await fetch('/api/method/klik_pos.api.sales_invoice.preview_invoice', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Frappe-CSRF-Token': csrfToken
+    },
+    body: JSON.stringify({ data }),
+    credentials: 'include'
+  });
+
+  const result = await response.json();
+
+  if (!response.ok || !result.message || result.message.success === false) {
+    const errorMessage = extractErrorMessage(result, 'Failed to preview invoice');
+    throw new Error(errorMessage);
+  }
+
+  return result.message;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function createSalesInvoice(data: any) {
   const csrfToken = window.csrf_token;

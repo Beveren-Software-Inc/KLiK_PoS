@@ -1220,7 +1220,12 @@ def apply_pricing_rules_to_cart(cart_items, customer=None):
 
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), f"Error applying pricing rules to cart: {e!s}")
-		return cart_items
+		frappe.throw(_("Could not apply pricing rules: {0}").format(str(e)))
+
+
+def _get_cart_item_code(cart_item):
+	"""Item code of a cart line; duplicated lines carry a generated id like 'CODE-<timestamp>'."""
+	return cart_item.get("item_code") or cart_item.get("id")
 
 
 def _parse_cart_items(cart_items):
@@ -1265,7 +1270,7 @@ def _prepare_erpnext_items(cart_items, context):
 
 	# for item in cart_items:
 	for idx, item in enumerate(cart_items):
-		item_code = item.get("id") or item.get("item_code")
+		item_code = _get_cart_item_code(item)
 		if not item_code:
 			continue
 
@@ -1426,7 +1431,7 @@ def _apply_pricing_rules(erpnext_items, context):
 			message=f"Error in apply_pricing_rule: {e!s}\n{traceback.format_exc()}",
 			title="Pricing Rule Error",
 		)
-		results = []
+		raise
 
 	return results
 
@@ -1434,30 +1439,22 @@ def _apply_pricing_rules(erpnext_items, context):
 def _process_pricing_results(pricing_results, erpnext_items, cart_items, context):
 	"""Process pricing rule results and map back to cart items."""
 	result_items = []
-
-	# Create a map from item_code to cart_item for quick lookup
-	cart_item_map = {}
-	for cart_item in cart_items:
-		cart_item_code = cart_item.get("id") or cart_item.get("item_code")
-		if cart_item_code:
-			cart_item_map[cart_item_code] = cart_item
+	processed_lines = set()
 
 	# Process each pricing result - they correspond to erpnext_items by index
 	for idx, pricing_result in enumerate(pricing_results):
 		if idx >= len(erpnext_items):
 			continue
 
-		# Get the item_code from the corresponding erpnext_item
 		erpnext_item = erpnext_items[idx]
-		item_code = erpnext_item.get("item_code")
-
-		if not item_code:
+		if not erpnext_item.get("item_code"):
 			continue
 
-		# Find the matching cart item
-		cart_item = cart_item_map.get(item_code)
-		if not cart_item:
-			continue
+		# erpnext_item.name is the cart line index, so duplicated lines of the same item
+		# (or the same item in different UOMs) each get their own result
+		cart_line = int(erpnext_item.get("name"))
+		cart_item = cart_items[cart_line]
+		processed_lines.add(cart_line)
 
 		# Check if pricing rule was applied
 		has_rule = _has_pricing_rule(pricing_result)
@@ -1478,10 +1475,8 @@ def _process_pricing_results(pricing_results, erpnext_items, cart_items, context
 		result_items.append(processed_item)
 
 	# Add unprocessed cart items (items not in erpnext_items)
-	processed_item_codes = {item.get("id") or item.get("item_code") for item in result_items}
-	for cart_item in cart_items:
-		cart_item_code = cart_item.get("id") or cart_item.get("item_code")
-		if cart_item_code and cart_item_code not in processed_item_codes:
+	for cart_line, cart_item in enumerate(cart_items):
+		if cart_line not in processed_lines:
 			result_items.append(cart_item)
 
 	return result_items
@@ -1514,7 +1509,7 @@ def _handle_no_pricing_rule(erpnext_item, cart_items, context):
 		return []
 
 	for cart_item in cart_items:
-		cart_item_code = cart_item.get("id") or cart_item.get("item_code")
+		cart_item_code = _get_cart_item_code(cart_item)
 		if cart_item_code == item_code:
 			item_uom = cart_item.get("uom")
 			price_list = context.get("price_list")
@@ -1619,7 +1614,7 @@ def _handle_no_pricing_rule(erpnext_item, cart_items, context):
 
 def _calculate_discounted_price(cart_item, pricing_result, context):
 	"""Calculate final price after applying discounts."""
-	cart_item_code = cart_item.get("id") or cart_item.get("item_code")
+	cart_item_code = _get_cart_item_code(cart_item)
 	item_uom = cart_item.get("uom")
 	price_list = context.get("price_list")
 	customer = context.get("customer")
@@ -1825,9 +1820,9 @@ def _apply_discount_logic(original_price, pricing_result):
 
 def _add_unprocessed_items(result_items, cart_items):
 	"""Add cart items that weren't processed by pricing rules."""
-	processed_item_codes = {item.get("id") or item.get("item_code") for item in result_items}
+	processed_item_codes = {_get_cart_item_code(item) for item in result_items}
 
 	for cart_item in cart_items:
-		cart_item_code = cart_item.get("id") or cart_item.get("item_code")
+		cart_item_code = _get_cart_item_code(cart_item)
 		if cart_item_code and cart_item_code not in processed_item_codes:
 			result_items.append(cart_item)
