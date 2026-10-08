@@ -2,6 +2,7 @@ import json
 
 import erpnext
 import frappe
+from erpnext.accounts.doctype.pricing_rule.utils import get_applied_pricing_rules
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import SalesInvoice
 from frappe import _
 from frappe.utils import flt
@@ -12,6 +13,9 @@ from klik_pos.klik_pos.utils import get_current_pos_profile
 _cached_company_data = {}
 _cached_customer_data = {}
 _cached_item_accounts = {}
+
+# Max allowed difference between collected payments and the server invoice total
+PAYMENT_TOLERANCE = 0.05
 
 
 def get_current_pos_opening_entry():
@@ -547,15 +551,27 @@ def create_and_submit_invoice(data):
 			roundoff_amount,
 			include_payments=True,
 			delivery_personnel=delivery_personnel,
+			coupon_discount=_get_coupon_discount(data),
 		)
 
 		doc.base_paid_amount = amount_paid
 		doc.paid_amount = amount_paid
-		doc.outstanding_amount = 0
+
+		# The round-off total is a monkey patch normally activated inside the validate hook,
+		# i.e. after totals are calculated; activate it up front so the saved total is final.
+		set_grand_total_with_roundoff(doc, None)
 
 		# Save then submit; if submit fails (e.g. negative stock), delete the draft and return error
 		# (do not re-raise: Frappe would rollback the transaction and undo the delete)
 		doc.save(ignore_permissions=True)
+
+		# Pricing rules are re-applied on save, so the server total can differ from what the
+		# cashier collected. Never submit a POS invoice whose payments don't match its total.
+		payment_mismatch = _get_payment_mismatch(doc, business_type)
+		if payment_mismatch:
+			frappe.db.rollback()
+			return payment_mismatch
+
 		try:
 			doc.submit()
 		except Exception as submit_err:
@@ -614,6 +630,120 @@ def create_and_submit_invoice(data):
 		return {"success": False, "message": str(e)}
 
 
+def _get_payment_mismatch(doc, business_type):
+	"""Return an error response if POS payments don't match the server-calculated total."""
+	if not doc.is_pos:
+		return None
+
+	precision = doc.precision("grand_total") or 2
+	grand_total = flt(doc.grand_total, precision)
+	server_total = flt(doc.rounded_total or doc.grand_total, precision)
+	paid_total = flt(sum(flt(p.amount) for p in doc.payments), precision)
+
+	# The POS collects the unrounded grand total while ERPNext may round it to whole
+	# units (52.5 -> 52), so a payment matching either total is consistent.
+	if any(abs(paid_total - total) <= PAYMENT_TOLERANCE for total in (grand_total, server_total)):
+		return None
+
+	applied_rules = sorted(
+		{rule for item in doc.items for rule in get_applied_pricing_rules(item.pricing_rules)}
+	)
+	details = (
+		f"Customer: {doc.customer}\nGrand total: {grand_total}\nRounded total: {server_total}\n"
+		f"Paid: {paid_total}\nPricing rules: {applied_rules}\n"
+		f"Items: {[(i.item_code, i.uom, i.qty, i.price_list_rate, i.discount_percentage, i.rate) for i in doc.items]}"
+	)
+
+	# The POS sends exactly its own grand total for walk-in sales (change is already
+	# deducted), so overpayment means the server priced lower than the cart showed.
+	if paid_total <= max(grand_total, server_total) + PAYMENT_TOLERANCE:
+		# Underpayment is only logged: "B2B & B2C" individuals may pay partially, and for B2C
+		# it signals a cart/server price difference worth investigating, not blocking.
+		if business_type == "B2C":
+			frappe.log_error(title="POS Underpayment (not blocked)", message=details)
+		return None
+
+	message = _(
+		"Invoice total is {0} but {1} was collected. Prices were recalculated on the server"
+	).format(
+		frappe.format_value(server_total, currency=doc.currency),
+		frappe.format_value(paid_total, currency=doc.currency),
+	)
+	if applied_rules:
+		message += _(" (pricing rule {0} applied)").format(", ".join(applied_rules))
+	message += _(". Please review the cart and collect the correct amount.")
+
+	# Deferred so the log survives the rollback of the rejected invoice
+	frappe.log_error(title="POS Payment Mismatch", message=details, defer_insert=True)
+
+	return {
+		"success": False,
+		"message": message,
+		"server_total": server_total,
+		"paid_total": paid_total,
+	}
+
+
+@frappe.whitelist()
+def preview_invoice(data):
+	"""
+	Build the invoice exactly as create_and_submit_invoice would, without saving it, and
+	return the server-calculated line prices and totals (including pricing rules).
+	"""
+	try:
+		(
+			customer,
+			items,
+			amount_paid,
+			sales_and_tax_charges,
+			mode_of_payment,
+			business_type,
+			roundoff_amount,
+			delivery_personnel,
+		) = parse_invoice_data(data)
+
+		doc = build_sales_invoice_doc(
+			customer,
+			items,
+			amount_paid,
+			sales_and_tax_charges,
+			mode_of_payment,
+			business_type,
+			roundoff_amount,
+			include_payments=False,
+			delivery_personnel=delivery_personnel,
+			coupon_discount=_get_coupon_discount(data),
+		)
+		# Same steps Sales Invoice validate runs: pricing rules, then taxes and totals
+		doc.set_missing_values(for_validate=True)
+		set_grand_total_with_roundoff(doc, None)
+		doc.calculate_taxes_and_totals()
+
+		return {
+			"success": True,
+			"grand_total": doc.grand_total,
+			"rounded_total": doc.rounded_total or doc.grand_total,
+			"items": [
+				{
+					"idx": item.idx,
+					"item_code": item.item_code,
+					"uom": item.uom,
+					"qty": item.qty,
+					"price_list_rate": item.price_list_rate,
+					"rate": item.rate,
+					"discount_percentage": item.discount_percentage,
+					"discount_amount": item.discount_amount,
+					"pricing_rules": get_applied_pricing_rules(item.pricing_rules),
+				}
+				for item in doc.items
+			],
+		}
+
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Preview Invoice Error")
+		return {"success": False, "message": str(e)}
+
+
 @frappe.whitelist()
 def create_draft_invoice(data):
 	try:
@@ -637,7 +767,9 @@ def create_draft_invoice(data):
 			roundoff_amount,
 			include_payments=True,
 			delivery_personnel=delivery_personnel,
+			coupon_discount=_get_coupon_discount(data),
 		)
+		set_grand_total_with_roundoff(doc, None)
 		doc.insert(ignore_permissions=True)
 
 		return {"success": True, "invoice_name": doc.name, "invoice": doc}
@@ -704,6 +836,7 @@ def build_sales_invoice_doc(
 	roundoff_amount=0.0,
 	include_payments=False,
 	delivery_personnel=None,
+	coupon_discount=0.0,
 ):
 	"""Main function to build a sales invoice document."""
 	doc = frappe.new_doc("Sales Invoice")
@@ -739,6 +872,9 @@ def build_sales_invoice_doc(
 
 	# Populate tax details
 	_populate_tax_details(doc)
+
+	# Discounts that can't live on the item rate (coupons, manual discounts on pricing-rule lines)
+	_apply_invoice_level_discounts(doc, items, coupon_discount)
 
 	# Add payment information
 	if include_payments:
@@ -781,6 +917,9 @@ def _set_pos_profile_fields(doc, pos_profile, customer, business_type):
 	doc.conversion_rate = 1.0
 	doc.update_stock = 1
 	doc.warehouse = pos_profile.warehouse
+	# The POS collects the exact total (it has its own round-off), so ERPNext must not round
+	# it again to whole units, which would leave e.g. 0.5 outstanding or as fake change
+	doc.disable_rounded_total = 1
 
 	# Determine if this is a POS invoice
 	doc.is_pos = _determine_is_pos(customer, business_type)
@@ -1089,6 +1228,11 @@ def _prepare_item_data(item, item_data_map, pos_profile):
 	# 	ignore_pricing_rule = 0	
 
 	rate = item.get("price") or item.get("original_price")
+	discount_percentage = flt(item.get("discountPercentage", 0))
+	discount_amount = flt(item.get("discountAmount", 0))
+	has_manual_discount = bool(discount_percentage or discount_amount)
+	if has_manual_discount:
+		rate = _apply_manual_discount(rate, discount_percentage, discount_amount)
 
 	price_list_rate = _get_price_list_rate_for_uom(
 		item_code, item.get("uom"), getattr(pos_profile, "selling_price_list", None)
@@ -1108,13 +1252,19 @@ def _prepare_item_data(item, item_data_map, pos_profile):
 		"qty": item.get("quantity"),
 		"price_list_rate": flt(price_list_rate),
 		"rate": rate,
-		"discount_percentage": flt(item.get("discountPercentage", 0)),
-    	"discount_amount": flt(item.get("discountAmount", 0)),
+		"discount_percentage": 0,
+		"discount_amount": 0,
 		"income_account": income_account,
 		"expense_account": expense_account,
 		"warehouse": pos_profile.warehouse,
 		"cost_center": pos_profile.cost_center,
 	}
+
+	if has_manual_discount and flt(price_list_rate) > 0:
+		# Express the cashier's discount relative to the price list rate, as ERPNext does;
+		# without pricing rules ERPNext keeps the given rate.
+		item_data["discount_amount"] = max(0.0, flt(price_list_rate) - flt(rate))
+		item_data["discount_percentage"] = item_data["discount_amount"] / flt(price_list_rate) * 100
 
 	# Add optional fields
 	_add_uom_to_item(item_data, item)
@@ -1122,6 +1272,54 @@ def _prepare_item_data(item, item_data_map, pos_profile):
 	_add_serial_to_item(item_data, item)
 
 	return item_data
+
+
+def _apply_manual_discount(price, discount_percentage, discount_amount):
+	"""Unit price after the cashier's line discount: percentage first, then amount (as the POS cart)."""
+	discounted = flt(price) * (1 - flt(discount_percentage) / 100)
+	return max(0.0, discounted - flt(discount_amount))
+
+
+def _get_coupon_discount(data):
+	"""Total value of gift coupons applied in the POS."""
+	if isinstance(data, str):
+		data = json.loads(data)
+	return sum(flt(coupon.get("value")) for coupon in (data.get("appliedCoupons") or []))
+
+
+def _apply_invoice_level_discounts(doc, items, coupon_discount=0.0):
+	"""
+	Apply coupons, and manual discounts on lines a pricing rule applies to, as an invoice-level
+	discount. ERPNext re-applies pricing rules on save and overwrites the line discount, while the
+	POS stacks the manual discount on top of the rule price.
+	"""
+	manual_lines = [
+		idx
+		for idx, item in enumerate(items)
+		if flt(item.get("discountPercentage")) or flt(item.get("discountAmount"))
+	]
+
+	rule_line_discount = 0.0
+	if manual_lines:
+		# Run the pricing rules now (save repeats this) to know which lines they apply to
+		doc.set_missing_values(for_validate=True)
+		for idx in manual_lines:
+			row = doc.items[idx]
+			if not row.pricing_rules:
+				continue
+			item = items[idx]
+			discounted = _apply_manual_discount(row.rate, item.get("discountPercentage"), item.get("discountAmount"))
+			rule_line_discount += (flt(row.rate) - discounted) * flt(row.qty)
+
+	total_discount = flt(coupon_discount) + rule_line_discount
+	if total_discount <= 0:
+		return
+
+	# Match the POS: inclusive tax discounts the grand total, exclusive tax the taxable amount
+	is_inclusive = any(tax.included_in_print_rate for tax in doc.get("taxes"))
+	doc.apply_discount_on = "Grand Total" if is_inclusive else "Net Total"
+	doc.additional_discount_percentage = 0
+	doc.discount_amount = flt(total_discount, doc.precision("discount_amount"))
 
 
 def _validate_item_accounts(item_code, income_account, expense_account):
@@ -1307,6 +1505,23 @@ def get_expense_accounts(item_code):
 from frappe.model.mapper import get_mapped_doc
 
 
+def _set_return_discount(return_doc, original_invoice):
+	"""
+	Reverse the original invoice-level discount (coupons, manual discounts on pricing-rule lines)
+	for the returned share of items. get_mapped_doc copies it positive, which would add it to the
+	negative return total instead of reducing the refund.
+	"""
+	if not flt(original_invoice.discount_amount) or not flt(original_invoice.total):
+		return
+
+	returned_total = sum(abs(flt(item.qty)) * flt(item.rate) for item in return_doc.items)
+	share = min(1.0, returned_total / abs(flt(original_invoice.total)))
+	return_doc.additional_discount_percentage = 0
+	return_doc.discount_amount = -flt(
+		abs(flt(original_invoice.discount_amount)) * share, return_doc.precision("discount_amount")
+	)
+
+
 @frappe.whitelist()
 def return_sales_invoice(invoice_name):
 	try:
@@ -1340,6 +1555,8 @@ def return_sales_invoice(invoice_name):
 
 		for item in return_doc.items:
 			item.qty = -abs(item.qty)
+
+		_set_return_discount(return_doc, original_invoice)
 
 		# Mirror original round-off/write-off as POSITIVE on return; totals logic handles sign for returns
 		try:
@@ -1434,15 +1651,18 @@ def set_grand_total_with_roundoff(doc, method):
 
 def custom_calculate_totals(self):
 	"""Main function to calculate invoice totals with custom round-off logic"""
+	# ERPNext keeps the inclusive-tax discount rounding correction on the calculator, not the doc
+	grand_total_diff = flt(getattr(self, "grand_total_diff", 0))
+
 	# Calculate basic grand total and taxes
 	if self.doc.get("taxes"):
-		self.doc.grand_total = flt(self.doc.get("taxes")[-1].total) + flt(self.doc.get("grand_total_diff"))
+		self.doc.grand_total = flt(self.doc.get("taxes")[-1].total) + grand_total_diff
 	else:
 		self.doc.grand_total = flt(self.doc.net_total)
 
 	if self.doc.get("taxes"):
 		self.doc.total_taxes_and_charges = flt(
-			self.doc.grand_total - self.doc.net_total - flt(self.doc.get("grand_total_diff")),
+			self.doc.grand_total - self.doc.net_total - grand_total_diff,
 			self.doc.precision("total_taxes_and_charges"),
 		)
 	else:
@@ -2130,6 +2350,7 @@ def create_partial_return(
 					filtered_items.append(item)
 
 		return_doc.items = filtered_items
+		_set_return_discount(return_doc, original_invoice)
 
 		# No custom roundoff mirroring for now
 

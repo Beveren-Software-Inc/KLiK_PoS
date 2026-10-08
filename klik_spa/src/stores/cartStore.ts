@@ -23,6 +23,8 @@ interface CartState {
   setSelectedCustomer: (customer: Customer | null) => Promise<void>
   updatePricesForCustomer: (customerId?: string) => Promise<void>
   applyPricingRules: () => Promise<void>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  applyServerPricing: (updates: Record<string, Record<string, any>>) => void
 }
 
 export const useCartStore = create<CartState>()(
@@ -357,7 +359,14 @@ export const useCartStore = create<CartState>()(
         } catch (error) {
           console.error('❌ Error applying pricing rules:', error);
         }
-      }
+      },
+
+      // Overwrite cart line prices with the server's invoice calculation (keyed by cart line id)
+      applyServerPricing: (updates) => set((state) => ({
+        cartItems: state.cartItems.map(item =>
+          updates[item.id] ? { ...item, ...updates[item.id] } : item
+        )
+      }))
     }),
     {
       name: 'beveren-cart-storage'

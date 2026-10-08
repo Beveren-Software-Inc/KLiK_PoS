@@ -1,3 +1,4 @@
+import { toast } from 'react-toastify'
 export interface PriceInfo {
   success: boolean;
   price: number;
@@ -91,6 +92,10 @@ export async function applyPricingRulesToCart(
     return result.message || cartItems; // Return original items if API fails
   } catch (error) {
     console.error('Error applying pricing rules to cart:', error);
+    // Prices are re-checked against the server when the payment dialog opens
+    toast.warning('Could not apply pricing rules to the cart. Prices will be re-checked at payment.', {
+      toastId: 'pricing-rules-error',
+    });
     // Return original items if pricing rule application fails
     return cartItems;
   }
