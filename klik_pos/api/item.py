@@ -1379,6 +1379,9 @@ def _apply_pricing_rules(erpnext_items, context):
 	"""Call ERPNext's pricing rule engine."""
 	# Build args dict - always include customer_group and territory from customer
 	args_dict = {
+		# ERPNext (since the Sep 2026 permission fix) rejects calls whose doctype isn't a
+		# pricing transaction, and checks the user's permission on it
+		"doctype": "Sales Invoice",
 		"items": erpnext_items,
 		"company": context["company"],
 		"currency": context["currency"],
