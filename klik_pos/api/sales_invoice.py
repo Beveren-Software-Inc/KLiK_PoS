@@ -1257,6 +1257,8 @@ def queue_sales_invoice(data):
 		if existing_checkout:
 			return _checkout_request_response(existing_checkout)
 		checkout_claimed = bool(checkout_request_id)
+		frappe.db.savepoint("checkout_request_id")
+		savepoint_set = True
 
 		(
 			customer,
@@ -1413,6 +1415,10 @@ def queue_sales_invoice(data):
 			}
 
 	except Exception as e:
+		if savepoint_set:
+			frappe.db.rollback(savepoint="checkout_request_id")
+		else:
+			frappe.db.rollback()
 		if checkout_claimed:
 			_update_checkout_request(checkout_request_id, status="Failed", error_message=e)
 		frappe.log_error(frappe.get_traceback(), "Submit Invoice Error")
@@ -2256,7 +2262,10 @@ def _validate_and_autofetch_batch_and_serial(items, pos_profile):
 	- If the flag is not set:
 	  * For batch-tracked items missing batch, raise an error and STOP invoice creation.
 	- For serial-tracked items we do NOT auto-assign; user must select serials explicitly.
+	- Batch-tracked items: the selected batch must have enough stock in the POS warehouse.
 	"""
+	from erpnext.stock.doctype.batch.batch import get_batch_qty
+
 	if not items:
 		return
 
@@ -2312,6 +2321,35 @@ def _validate_and_autofetch_batch_and_serial(items, pos_profile):
 						"Serial No / Batch No are mandatory for Item {0}. Please select a batch before submitting the invoice."
 					).format(item_code)
 				)
+
+		if has_batch_no and not has_serial_no:
+			batch_no = item.get("batchNumber") or item.get("batch_no")
+			if not batch_no:
+				batch_no = next((e.get("batch_no") for e in bundle_entries if e.get("batch_no")), None)
+			required_qty = abs(flt(item.get("quantity") or 0))
+
+			if batch_no and required_qty:
+				available_qty = flt(get_batch_qty(batch_no=batch_no, warehouse=pos_profile.warehouse) or 0)
+				if available_qty < required_qty:
+					batch_count = len([e for e in bundle_entries if e.get("batch_no")])
+
+					if auto_fetch_enabled and batch_count <= 1:
+						new_batch = _autofetch_batch_fifo(item_code, pos_profile.warehouse, required_qty)
+						if not new_batch:
+							frappe.throw(
+								_(
+									"Batch {0} of Item {1} has only {2} in {3}, and no other batch has {4}. Please restock or reduce the quantity."
+								).format(batch_no, item_code, available_qty, pos_profile.warehouse, required_qty)
+							)
+						item["batchNumber"] = new_batch
+						item["batch_no"] = new_batch
+						item["bundle_entries"] = [{"batch_no": new_batch, "qty": required_qty}]
+					else:
+						frappe.throw(
+							_(
+								"Batch {0} of Item {1} has only {2} in {3}, but {4} is needed. Please reselect the batch."
+							).format(batch_no, item_code, available_qty, pos_profile.warehouse, required_qty)
+						)
 
 
 def _validate_no_variant_templates(items):
@@ -3897,6 +3935,7 @@ def submit_draft_invoice(invoice_id, data=None):
 	This converts a draft invoice to submitted status.
 	"""
 	try:
+		frappe.db.savepoint("klik_submit_draft")
 		invoice_doc = frappe.get_doc("Sales Invoice", invoice_id)
 
 		if invoice_doc.status != "Draft":
@@ -4042,7 +4081,9 @@ def submit_draft_invoice(invoice_id, data=None):
 			}
 
 	except frappe.DoesNotExistError:
+		frappe.db.rollback(save_point="klik_submit_draft")
 		return {"success": False, "error": f"Invoice {invoice_id} not found"}
 	except Exception as e:
+		frappe.db.rollback(save_point="klik_submit_draft")
 		frappe.log_error(frappe.get_traceback(), f"Error submitting draft invoice {invoice_id}")
 		return {"success": False, "error": str(e)}
