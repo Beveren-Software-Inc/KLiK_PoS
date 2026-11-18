@@ -35,13 +35,13 @@ def get_cart_pricing(cart_items, customer=None, price_list=None):
             return {"items": [], "total_discount": 0, "total_after_discount": 0}
 
         context = _build_pricing_context(customer, price_list)
-        erpnext_items = _prepare_erpnext_items(cart_items, context)
+        erpnext_items, sources = _prepare_erpnext_items(cart_items, context)
 
         if not erpnext_items:
             return {"items": cart_items, "total_discount": 0, "total_after_discount": 0}
 
         pricing_results = _apply_pricing_rules(erpnext_items, context)
-        processed_items = _process_pricing_results(pricing_results, erpnext_items, cart_items, context)
+        processed_items = _process_pricing_results(pricing_results, erpnext_items, sources, context)
         
         # Calculate totals
         total_original = sum(item.get("original_price", item.get("price", 0)) * item.get("quantity", 1) for item in processed_items)
@@ -138,11 +138,15 @@ def _get_price_list(customer=None):
 
 
 def _prepare_erpnext_items(cart_items, context):
+    """Returns the ERPNext pricing rows plus, for each row, the cart line it came
+    from and whether the price list had no price for it."""
     erpnext_items = []
+    sources = []
     price_list = context.get("price_list")
-    
+
     for item in cart_items:
-        item_code = item.get("id") or item.get("item_code")
+        # Duplicated cart lines carry a synthetic id, so prefer item_code.
+        item_code = item.get("item_code") or item.get("id")
         if not item_code:
             continue
 
@@ -159,17 +163,22 @@ def _prepare_erpnext_items(cart_items, context):
         item_uom = item.get("uom") or item_data.stock_uom
         item_qty = item.get("quantity", 1)
         
-        # Get base price
-        base_price = _get_item_price(item_code, item_uom, price_list, context.get("customer"))
-        
-        if base_price <= 0:
-            base_price = item.get("price", 0)
-
         conversion_factor = 1.0
         if item_uom != item_data.stock_uom:
             conv = _get_uom_conversion_factor(item_code, item_uom)
             if conv:
                 conversion_factor = conv
+
+        # Get base price
+        base_price = _get_item_price(item_code, item_uom, price_list, context.get("customer"))
+        if base_price <= 0 and item_uom != item_data.stock_uom:
+            # Same as the item grid: derive the UOM price from the stock UOM price.
+            base_price = _get_item_price(item_code, item_data.stock_uom, price_list) * conversion_factor
+
+        # No price in the chosen list means 0, matching the item grid.
+        price_missing = base_price <= 0
+        if price_missing and not price_list:
+            base_price = item.get("price", 0)
 
         erpnext_items.append({
             "doctype": "Sales Invoice Item",
@@ -183,8 +192,9 @@ def _prepare_erpnext_items(cart_items, context):
             "uom": item_uom,
             "conversion_factor": conversion_factor,
         })
+        sources.append((item, price_missing))
 
-    return erpnext_items
+    return erpnext_items, sources
 
 
 def _get_item_price(item_code, uom, price_list, customer=None):
@@ -236,6 +246,7 @@ def _get_uom_conversion_factor(item_code, uom):
 
 def _apply_pricing_rules(erpnext_items, context):
     args = frappe._dict({
+        "doctype": "Sales Invoice",
         "items": erpnext_items,
         "company": context["company"],
         "currency": context["currency"],
@@ -257,23 +268,18 @@ def _apply_pricing_rules(erpnext_items, context):
         return []
 
 
-def _process_pricing_results(pricing_results, erpnext_items, cart_items, context):
+def _process_pricing_results(pricing_results, erpnext_items, sources, context):
     result_items = []
-    cart_item_map = {(c.get("id") or c.get("item_code")): c for c in cart_items if (c.get("id") or c.get("item_code"))}
 
     for idx, pricing_result in enumerate(pricing_results):
         if idx >= len(erpnext_items):
             continue
 
         erpnext_item = erpnext_items[idx]
-        item_code = erpnext_item.get("item_code")
-        cart_item = cart_item_map.get(item_code)
-
-        if not cart_item:
-            continue
+        cart_item, price_missing = sources[idx]
 
         original_price = erpnext_item.get("price_list_rate", cart_item.get("price", 0))
-        
+
         if not pricing_result.get("pricing_rules") or not pricing_result.get("has_pricing_rule"):
             result_items.append({
                 **cart_item,
@@ -282,6 +288,7 @@ def _process_pricing_results(pricing_results, erpnext_items, cart_items, context
                 "discount_percentage": 0,
                 "discount_amount": 0,
                 "has_pricing_rule": 0,
+                "price_missing": price_missing,
             })
         else:
             discounted_price = _calculate_discounted_price(original_price, pricing_result)
@@ -301,6 +308,7 @@ def _process_pricing_results(pricing_results, erpnext_items, cart_items, context
                 "pricing_rules": pricing_result.get("pricing_rules", ""),
                 "has_pricing_rule": 1,
                 "free_item_data": pricing_result.get("free_item_data", []),
+                "price_missing": price_missing,
             })
 
     return result_items

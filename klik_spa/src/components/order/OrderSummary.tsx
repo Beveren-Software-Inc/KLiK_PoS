@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useCartStore } from "../../stores/cartStore";
 import { useProductStore } from "../../stores/productStore";
 import { toast } from "react-toastify";
@@ -50,7 +50,9 @@ export default function OrderSummary({
     updateQuantity,
     removeItem,
     clearCart,
+    priceListSwitchVersion,
   } = useCartStore();
+  const lastPriceListSwitchVersion = useRef(priceListSwitchVersion);
 
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showSalespersonAuthModal, setShowSalespersonAuthModal] = useState(false);
@@ -209,6 +211,26 @@ export default function OrderSummary({
       return next;
     });
   }, [cartItems]);
+
+  useEffect(() => {
+    if (lastPriceListSwitchVersion.current === priceListSwitchVersion) return;
+    lastPriceListSwitchVersion.current = priceListSwitchVersion;
+
+    setItemDiscounts((prev) => {
+      const next: typeof prev = {};
+      Object.entries(prev).forEach(([itemId, discount]) => {
+        if (discount?.serial_batch_bundle || discount?.bundle_entries) {
+          next[itemId] = {
+            discountPercentage: 0,
+            discountAmount: 0,
+            serial_batch_bundle: discount.serial_batch_bundle,
+            bundle_entries: discount.bundle_entries,
+          };
+        }
+      });
+      return next;
+    });
+  }, [priceListSwitchVersion]);
 
   useEffect(() => {
     if (selectedCustomer && cartItems.length > 0) {

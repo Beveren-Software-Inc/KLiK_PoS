@@ -3,7 +3,7 @@ import traceback
 
 import frappe
 from frappe import _
-from frappe.utils import now_datetime, today
+from frappe.utils import cint, flt, now_datetime, today
 
 # Import for clearing cache and clearing draft invoices on close
 from klik_pos.api.cache import clear_backend_cache
@@ -159,6 +159,19 @@ def create_closing_entry():
 		frappe.throw(_("Failed to create POS Closing Entry: {0}").format(str(e)))
 
 
+@frappe.whitelist()
+def get_closing_entry_preview():
+	"""Preview the payment reconciliation create_closing_entry would save. Read-only."""
+	opening_entry = _get_open_pos_entry(frappe.session.user)
+	sales_by_mode = _get_shift_sales_by_mode(opening_entry)
+	payments = _calculate_payment_reconciliation(opening_entry, {"closing_balance": {}}, sales_by_mode)
+
+	for row in payments:
+		row["transactions"] = sales_by_mode.get(row["mode_of_payment"], {}).get("transactions", 0)
+
+	return payments
+
+
 def _parse_request_data():
 	"""Parse and normalize the incoming request data."""
 	data = frappe.local.form_dict
@@ -194,15 +207,17 @@ def _get_open_pos_entry(user):
 	return open_entry[0]
 
 
-def _calculate_payment_reconciliation(opening_entry, data):
+def _calculate_payment_reconciliation(opening_entry, data, sales_by_mode=None):
 	"""
 	Calculate payment reconciliation data including opening balances,
 	sales amounts, and expected vs closing amounts.
+
+	Pass sales_by_mode from _get_shift_sales_by_mode to reuse an existing aggregation.
 	"""
+	if sales_by_mode is None:
+		sales_by_mode = _get_shift_sales_by_mode(opening_entry)
+
 	opening_entry_name = opening_entry.name
-	opening_start = opening_entry.period_start_date
-	opening_date = opening_start.date()
-	opening_time = opening_start.time().strftime("%H:%M:%S")
 
 	# Fetch opening balances
 	opening_modes = frappe.get_all(
@@ -212,26 +227,8 @@ def _calculate_payment_reconciliation(opening_entry, data):
 	)
 	opening_balance_map = {row.mode_of_payment: row.opening_amount for row in opening_modes}
 
-	# Aggregate sales by payment mode
-	sales_data = frappe.db.sql(
-		"""
-		SELECT sip.mode_of_payment,
-		       SUM(sip.amount) as total_amount,
-		       COUNT(DISTINCT si.name) as transactions
-		FROM `tabSales Invoice` si
-		JOIN `tabSales Invoice Payment` sip ON si.name = sip.parent
-		WHERE si.pos_profile = %s
-		  AND si.docstatus = 1
-		  AND si.posting_date = %s
-		  AND si.posting_time >= %s
-		  AND si.custom_pos_opening_entry IS NOT NULL
-		  AND si.custom_pos_opening_entry != ''
-		GROUP BY sip.mode_of_payment
-		""",
-		(opening_entry.pos_profile, opening_date, opening_time),
-		as_dict=True,
-	)
-	sales_map = {row.mode_of_payment: row.total_amount for row in sales_data}
+	# Aggregate sales by payment mode, net of change given
+	sales_map = {mode: sales["amount"] for mode, sales in sales_by_mode.items()}
 
 	# Build reconciliation entries
 	closing_balance = data.get("closing_balance", {})
@@ -272,6 +269,60 @@ def _calculate_payment_reconciliation(opening_entry, data):
 			)
 
 	return reconciliation
+
+
+def _get_shift_sales_by_mode(opening_entry):
+	"""
+	Aggregate submitted sales for the shift by mode of payment, net of change given.
+	"""
+	# Date/time filters dropped invoices from shifts spanning past the opening day.
+	shift_params = (opening_entry.name,)
+	shift_conditions = """
+		si.custom_pos_opening_entry = %s
+		AND si.docstatus = 1
+	"""
+
+	payment_rows = frappe.db.sql(
+		f"""
+		SELECT sip.mode_of_payment,
+		       sip.account,
+		       SUM(sip.amount) as total_amount,
+		       COUNT(DISTINCT si.name) as transactions
+		FROM `tabSales Invoice` si
+		JOIN `tabSales Invoice Payment` sip ON si.name = sip.parent
+		WHERE {shift_conditions}
+		GROUP BY sip.mode_of_payment, sip.account
+		ORDER BY sip.mode_of_payment
+		""",
+		shift_params,
+		as_dict=True,
+	)
+
+	change_rows = frappe.db.sql(
+		f"""
+		SELECT si.account_for_change_amount as account,
+		       SUM(si.change_amount) as change_amount
+		FROM `tabSales Invoice` si
+		WHERE {shift_conditions}
+		  AND IFNULL(si.change_amount, 0) != 0
+		GROUP BY si.account_for_change_amount
+		""",
+		shift_params,
+		as_dict=True,
+	)
+	change_by_account = {row.account: flt(row.change_amount) for row in change_rows if row.account}
+
+	sales_by_mode = {}
+	for row in payment_rows:
+		sales = sales_by_mode.setdefault(row.mode_of_payment, {"amount": 0.0, "transactions": 0})
+		amount = flt(row.total_amount)
+		# pop() so an account's change is deducted once, even if several modes share it
+		if row.account in change_by_account:
+			amount -= change_by_account.pop(row.account)
+		sales["amount"] += amount
+		sales["transactions"] += cint(row.transactions)
+
+	return sales_by_mode
 
 
 def _calculate_closing_entry_totals(opening_entry_name):
@@ -424,8 +475,16 @@ def _create_and_submit_closing_doc(opening_entry, data, payment_data, user):
 def _clear_draft_invoices_on_close_if_enabled(opening_entry):
 	"""If POS Profile has custom_clear_draft_invoices set, delete all draft invoices for this session."""
 	try:
-		pos_profile_name = opening_entry.get("pos_profile") if isinstance(opening_entry, dict) else getattr(opening_entry, "pos_profile", None)
-		opening_entry_name = opening_entry.get("name") if isinstance(opening_entry, dict) else getattr(opening_entry, "name", None)
+		pos_profile_name = (
+			opening_entry.get("pos_profile")
+			if isinstance(opening_entry, dict)
+			else getattr(opening_entry, "pos_profile", None)
+		)
+		opening_entry_name = (
+			opening_entry.get("name")
+			if isinstance(opening_entry, dict)
+			else getattr(opening_entry, "name", None)
+		)
 		if not pos_profile_name or not opening_entry_name:
 			return
 		# Check custom field (safe if field does not exist)

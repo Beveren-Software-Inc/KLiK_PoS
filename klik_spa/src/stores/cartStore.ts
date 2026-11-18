@@ -34,6 +34,7 @@ interface PricedItemPayload {
   discount_amount?: number;
   pricing_rules?: unknown;
   has_pricing_rule?: boolean;
+  price_missing?: boolean;
 }
 
 const roundToCurrencyPrecision = (value: number): number => {
@@ -114,6 +115,7 @@ interface CartState {
   appliedCoupons: GiftCoupon[]
   selectedCustomer: Customer | null
   selectedPriceList: string | null
+  priceListSwitchVersion: number
   isPricingLoading: boolean
   pricingError: string | null
 
@@ -127,6 +129,7 @@ interface CartState {
   removeCoupon: (couponCode: string) => void
   setSelectedCustomer: (customer: Customer | null) => Promise<void>
   setSelectedPriceList: (priceList: string | null) => Promise<void>
+  switchPriceList: (priceList: string | null) => Promise<{ missingPriceItems: string[] }>
   refreshCartPricing: () => Promise<void>
   updateItemBundleEntries: (id: string, entries: SerialBatchEntry[]) => void
 }
@@ -143,6 +146,7 @@ export const useCartStore = create<CartState>()(
       appliedCoupons: [],
       selectedCustomer: null,
       selectedPriceList: null,
+      priceListSwitchVersion: 0,
       isPricingLoading: false,
       pricingError: null,
 
@@ -186,9 +190,9 @@ export const useCartStore = create<CartState>()(
           if (pricingData?.items) {
             set((state) => ({
               cartItems: state.cartItems.map(item => {
-                const pricedItem = (pricingData.items as PricedItemPayload[]).find((p) => 
-                  (p.id === item.id) || (p.item_code === (item.item_code || item.id))
-                );
+                const pricedItems = pricingData.items as PricedItemPayload[];
+                const pricedItem = pricedItems.find((p) => p.id === item.id)
+                  || pricedItems.find((p) => p.item_code === (item.item_code || item.id));
                 if (pricedItem) {
                   const basePrice = Number(pricedItem.price || 0);
 
@@ -200,6 +204,7 @@ export const useCartStore = create<CartState>()(
                     discount_amount: pricedItem.discount_amount,
                     pricing_rules: pricedItem.pricing_rules,
                     has_pricing_rule: pricedItem.has_pricing_rule,
+                    price_missing: !!pricedItem.price_missing,
                   };
                 }
                 return item;
@@ -442,6 +447,30 @@ export const useCartStore = create<CartState>()(
         if (state.cartItems.length > 0) {
           await state.refreshCartPricing();
         }
+      },
+
+      switchPriceList: async (priceList) => {
+        set((state) => ({
+          selectedPriceList: priceList,
+          priceListSwitchVersion: state.priceListSwitchVersion + 1,
+          cartItems: state.cartItems.map((item) => ({
+            ...item,
+            custom_rate: undefined,
+            custom_rate_includes_tax: undefined,
+            discount_amount: 0,
+            discount_percentage: 0,
+          }) as CartItem),
+        }));
+
+        if (get().cartItems.length === 0) return { missingPriceItems: [] };
+
+        await get().refreshCartPricing();
+        if (get().pricingError) throw new Error(get().pricingError || 'Failed to update prices');
+
+        const missingPriceItems = get().cartItems
+          .filter((item) => (item as CartItem & { price_missing?: boolean }).price_missing)
+          .map((item) => item.name);
+        return { missingPriceItems };
       },
 
       updateItemBundleEntries: (id: string, entries: SerialBatchEntry[]) => {

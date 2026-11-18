@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   CreditCard,
@@ -17,6 +17,7 @@ import { useSalesInvoices } from "../hooks/useSalesInvoices"
 import { toast } from "react-toastify";
 import { createSalesReturn } from "../services/salesInvoice";
 import { useAllPaymentModes } from "../hooks/usePaymentModes";
+import { useClosingEntryPreview } from "../hooks/useClosingEntryPreview";
 
 import { usePOSProfileStore } from "../stores/posProfileStore";
 import { useCreatePOSClosingEntry } from "../services/closingEntry";
@@ -55,6 +56,7 @@ export default function ClosingShiftPage() {
 
   const { invoices, isLoading,  error,  } = useSalesInvoices();
   const { modes, isLoading: modesLoading, error: modesError } = useAllPaymentModes()
+  const { payments: closingPreview, isLoading: closingPreviewLoading, refetch: refetchClosingPreview} = useClosingEntryPreview();
   const { posDetails } = usePOSProfileStore();
   const canProcessReturns = ![0, "0", false].includes(posDetails?.custom_allow_return as 0 | "0" | false);
 
@@ -158,7 +160,8 @@ export default function ClosingShiftPage() {
   }, [invoices, searchQuery, statusFilter, dateFilter, paymentFilter, isLoading, error, posDetails]);
 
 
-  // Payment Stats Calculation - Calculate from filtered invoices
+  // Payment stats come from the server so the cards and close modal show exactly
+  // what create_closing_entry will save, independent of the list's filters and paging.
   const paymentStats = useMemo(() => {
     const stats: Record<string, {
       name: string;
@@ -167,70 +170,29 @@ export default function ClosingShiftPage() {
       transactions: number;
     }> = {};
 
-    const ensurePaymentStat = (modeName?: string, openingAmount = 0) => {
-      if (!modeName) return null;
-
-      if (!stats[modeName]) {
-        stats[modeName] = {
-          name: modeName,
-          openingAmount,
-          amount: 0,
-          transactions: 0
-        };
-      } else if (openingAmount) {
-        stats[modeName].openingAmount = openingAmount;
-      }
-
-      return stats[modeName];
-    };
-
-    (modes || []).forEach((mode) => {
-      const modeName = mode.name || mode.mode_of_payment;
-      const openingAmount = Number(mode.openingAmount || mode.amount || 0);
-      ensurePaymentStat(modeName, openingAmount);
-    });
-
-    // Calculate amounts and transactions from filtered invoices
-    filteredInvoices.forEach(invoice => {
-      // Check if invoice has multiple payment methods
-      if (invoice.payment_methods && Array.isArray(invoice.payment_methods)) {
-        //eslint-disable-next-line @typescript-eslint/no-explicit-any
-        invoice.payment_methods.forEach((payment: any) => {
-          const stat = ensurePaymentStat(payment.mode_of_payment);
-          if (!stat) return;
-
-          const isReturn = invoice.status === "Return";
-          const amount = isReturn ? -Math.abs(payment.amount || 0) : (payment.amount || 0);
-          stat.amount += amount;
-
-          if (invoice.payment_methods.indexOf(payment) === 0) {
-            stat.transactions += 1;
-          }
-        });
-      } else {
-        const stat = ensurePaymentStat(invoice.paymentMethod);
-        if (!stat) return;
-
-        // For return invoices, ensure the amount is subtracted (negative)
-        const isReturn = invoice.status === "Return";
-        const amount = isReturn ? -Math.abs(invoice.totalAmount || 0) : (invoice.totalAmount || 0);
-        stat.amount += amount;
-        stat.transactions += 1;
-      }
-    });
-
-    // Add opening amounts to the total amounts for each payment method
-    Object.keys(stats).forEach(methodName => {
-      stats[methodName].amount += stats[methodName].openingAmount;
+    closingPreview.forEach((row) => {
+      stats[row.mode_of_payment] = {
+        name: row.mode_of_payment,
+        openingAmount: Number(row.opening_amount || 0),
+        amount: Number(row.expected_amount || 0),
+        transactions: Number(row.transactions || 0),
+      };
     });
 
     return stats;
-  }, [modes, filteredInvoices]);
+  }, [closingPreview]);
+
+  // Refresh when the close modal opens so the expected amounts are current
+  useEffect(() => {
+    if (showCloseModal) {
+      refetchClosingPreview();
+    }
+  }, [showCloseModal, refetchClosingPreview]);
   const total = Object.values(paymentStats).reduce((sum, stat) => sum + stat.amount, 0);
   const hasPaymentStats = Object.keys(paymentStats).length > 0;
 
   // Loading state
-  if (isLoading || modesLoading) {
+  if (isLoading || modesLoading || closingPreviewLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
@@ -312,6 +274,7 @@ export default function ClosingShiftPage() {
     try {
       const result = await createSalesReturn(invoiceName);
       toast.success(`Invoice returned: ${result.return_invoice}`);
+      refetchClosingPreview();
       //eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       toast.error(error.message || "Failed to return invoice");

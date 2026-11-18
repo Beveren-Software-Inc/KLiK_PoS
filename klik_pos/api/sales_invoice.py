@@ -251,7 +251,7 @@ def _truncate_queue_error(error_message, max_length=900):
 
 
 def get_reserved_stock_map(item_codes=None, warehouse=None, exclude_invoice=None):
-	"""Return reserved stock from Stock Reservation Entries keyed by (item_code, warehouse)."""
+	"""Return active Stock Reservation Entries keyed by (item_code, warehouse)."""
 	conditions = [
 		"sre.docstatus = 1",
 		"sre.delivered_qty < sre.reserved_qty",
@@ -348,83 +348,66 @@ def _should_reserve_stock(doc):
 
 
 def _reserve_stock_for_queued_invoice(doc):
-	"""Create Stock Reservation Entry rows for queued Sales Invoice draft rows."""
+	"""Create submitted Stock Reservation Entries for a queued draft invoice."""
 	if not doc or doc.doctype != "Sales Invoice" or doc.docstatus != 0:
 		return
-	if not _should_reserve_stock(doc):
-		return
-	if getattr(doc, "is_return", 0):
+	if not _should_reserve_stock(doc) or getattr(doc, "is_return", 0):
 		return
 
 	_cancel_sales_invoice_reservations(doc.name)
-
 	item_codes = list({row.item_code for row in doc.items if row.item_code})
-	item_meta_map = {}
-	if item_codes:
-		item_meta_map = {
-			row.name: row
-			for row in frappe.get_all(
-				"Item",
-				filters={"name": ["in", item_codes]},
-				fields=["name", "is_stock_item", "has_serial_no", "has_batch_no", "stock_uom"],
-			)
-		}
+	item_meta_map = {
+		row.name: row
+		for row in frappe.get_all(
+			"Item",
+			filters={"name": ["in", item_codes]},
+			fields=["name", "is_stock_item", "has_serial_no", "has_batch_no", "stock_uom"],
+		)
+	} if item_codes else {}
 
 	for row in doc.items:
 		if not row.item_code or not row.warehouse:
 			continue
-
 		item_meta = item_meta_map.get(row.item_code)
 		if not item_meta or not int(item_meta.is_stock_item or 0):
 			continue
 
-		required_qty = flt(abs(getattr(row, "stock_qty", 0) or 0))
-		if required_qty <= 0:
-			required_qty = flt(abs(getattr(row, "qty", 0) or 0))
+		required_qty = flt(abs(getattr(row, "stock_qty", 0) or 0)) or flt(abs(getattr(row, "qty", 0) or 0))
 		if required_qty <= 0:
 			continue
 
 		actual_qty = flt(
-			frappe.db.get_value(
-				"Bin",
-				{"item_code": row.item_code, "warehouse": row.warehouse},
-				"actual_qty",
-			)
-			or 0
+			frappe.db.get_value("Bin", {"item_code": row.item_code, "warehouse": row.warehouse}, "actual_qty") or 0
 		)
 		reserved_map = get_reserved_stock_map(
-			item_codes=[row.item_code],
-			warehouse=row.warehouse,
-			exclude_invoice=doc.name,
+			item_codes=[row.item_code], warehouse=row.warehouse, exclude_invoice=doc.name
 		)
 		available_to_reserve = flt(actual_qty - reserved_map.get((row.item_code, row.warehouse), 0))
-
 		if required_qty > available_to_reserve + 1e-9:
 			frappe.throw(
 				_(
 					"Insufficient stock to reserve for item {0} in warehouse {1}. Required: {2}, Available to reserve: {3}."
-				).format(
-					frappe.bold(row.item_code),
-					frappe.bold(row.warehouse),
-					flt(required_qty),
-					flt(available_to_reserve),
-				)
+				).format(frappe.bold(row.item_code), frappe.bold(row.warehouse), flt(required_qty), flt(available_to_reserve))
 			)
 
 		sre = frappe.new_doc("Stock Reservation Entry")
-		sre.item_code = row.item_code
-		sre.warehouse = row.warehouse
-		sre.has_serial_no = int(item_meta.has_serial_no or 0)
-		sre.has_batch_no = int(item_meta.has_batch_no or 0)
-		sre.voucher_type = "Sales Invoice"
-		sre.voucher_no = doc.name
-		sre.voucher_detail_no = row.name
-		sre.available_qty = available_to_reserve
-		sre.voucher_qty = required_qty
-		sre.reserved_qty = required_qty
-		sre.company = doc.company
-		sre.stock_uom = row.stock_uom or item_meta.stock_uom
-		sre.project = doc.project
+		sre.update(
+			{
+				"item_code": row.item_code,
+				"warehouse": row.warehouse,
+				"has_serial_no": int(item_meta.has_serial_no or 0),
+				"has_batch_no": int(item_meta.has_batch_no or 0),
+				"voucher_type": "Sales Invoice",
+				"voucher_no": doc.name,
+				"voucher_detail_no": row.name,
+				"available_qty": available_to_reserve,
+				"voucher_qty": required_qty,
+				"reserved_qty": required_qty,
+				"company": doc.company,
+				"stock_uom": row.stock_uom or item_meta.stock_uom,
+				"project": doc.project,
+			}
+		)
 		sre.save(ignore_permissions=True)
 		sre.submit()
 
@@ -1083,6 +1066,7 @@ def validate_checkout_invoice(data):
 			create_batch_and_serial_bundle=False,
 			enable_background_submission=enable_background_submission,
 			loyalty_redemption=loyalty_redemption,
+			price_list=_get_requested_price_list(data),
 		)
 
 		validate_required_salesperson(preview_doc)
@@ -1273,6 +1257,8 @@ def queue_sales_invoice(data):
 		if existing_checkout:
 			return _checkout_request_response(existing_checkout)
 		checkout_claimed = bool(checkout_request_id)
+		frappe.db.savepoint("checkout_request_id")
+		savepoint_set = True
 
 		(
 			customer,
@@ -1316,6 +1302,7 @@ def queue_sales_invoice(data):
 			tax_id=tax_id,
 			enable_background_submission=enable_background_submission,
 			loyalty_redemption=loyalty_redemption,
+			price_list=_get_requested_price_list(data),
 		)
 
 		validate_required_salesperson(doc)
@@ -1428,6 +1415,10 @@ def queue_sales_invoice(data):
 			}
 
 	except Exception as e:
+		if savepoint_set:
+			frappe.db.rollback(savepoint="checkout_request_id")
+		else:
+			frappe.db.rollback()
 		if checkout_claimed:
 			_update_checkout_request(checkout_request_id, status="Failed", error_message=e)
 		frappe.log_error(frappe.get_traceback(), "Submit Invoice Error")
@@ -1524,7 +1515,6 @@ def retry_failed_sales_invoice(invoice_name):
 
 		_validate_reserved_stock_for_items(doc, exclude_invoice=doc.name)
 		_reserve_stock_for_queued_invoice(doc)
-
 		_update_queue_fields(doc, QUEUE_STATUSES["queued"], error_message="")
 		doc.save(ignore_permissions=True)
 
@@ -1596,6 +1586,7 @@ def create_draft_invoice(data):
 				tax_id=tax_id,
 				enable_background_submission=enable_background_submission,
 				loyalty_redemption=loyalty_redemption,
+				price_list=_get_requested_price_list(data) or doc.selling_price_list,
 			)
 		else:
 			doc = build_sales_invoice_doc(
@@ -1616,6 +1607,7 @@ def create_draft_invoice(data):
 				tax_id=tax_id,
 				enable_background_submission=enable_background_submission,
 				loyalty_redemption=loyalty_redemption,
+				price_list=_get_requested_price_list(data),
 			)
 
 			validate_required_salesperson(doc)
@@ -1902,6 +1894,7 @@ def build_sales_invoice_doc(
 	create_batch_and_serial_bundle=True,
 	enable_background_submission=False,
 	loyalty_redemption=None,
+	price_list=None,
 ):
 	"""Main function to build a sales invoice document."""
 	doc = frappe.new_doc("Sales Invoice")
@@ -1928,7 +1921,9 @@ def build_sales_invoice_doc(
 
 	# Configure POS profile and company settings
 	pos_profile = _get_active_pos_profile()
-	_set_pos_profile_fields(doc, pos_profile, customer, business_type, amount_paid, allow_partial_payment)
+	_set_pos_profile_fields(
+		doc, pos_profile, customer, business_type, amount_paid, allow_partial_payment, price_list=price_list
+	)
 
 	# Ensure batch/serial requirements are satisfied BEFORE building items
 	_validate_no_variant_templates(items)
@@ -1998,6 +1993,7 @@ def _update_existing_draft_invoice(
 	tax_id=None,
 	enable_background_submission=False,
 	loyalty_redemption=None,
+	price_list=None,
 ):
 	rebuilt_doc = build_sales_invoice_doc(
 		customer,
@@ -2018,6 +2014,7 @@ def _update_existing_draft_invoice(
 		create_batch_and_serial_bundle=False,
 		enable_background_submission=enable_background_submission,
 		loyalty_redemption=loyalty_redemption,
+		price_list=price_list,
 	)
 
 	invoice_doc.customer = rebuilt_doc.customer
@@ -2217,12 +2214,32 @@ def _get_active_pos_profile():
 		raise
 
 
-def _set_pos_profile_fields(doc, pos_profile, customer, business_type, amount_paid=0.0, allow_partial_payment=False):
+def _get_requested_price_list(data):
+	"""Price list the cashier switched to in Klik, if the POS Profile allows switching."""
+	if isinstance(data, str):
+		data = json.loads(data)
+	price_list = (data or {}).get("priceList")
+	if not price_list:
+		return None
+	if not cint(getattr(get_current_pos_profile(), "allow_price_list_switching", 0) or 0):
+		return None
+	if not frappe.db.exists("Price List", {"name": price_list, "selling": 1, "enabled": 1}):
+		frappe.throw(_("Price List {0} is not an enabled selling price list.").format(price_list))
+	return price_list
+
+
+def _set_pos_profile_fields(
+	doc, pos_profile, customer, business_type, amount_paid=0.0, allow_partial_payment=False, price_list=None
+):
 	"""Set POS profile, company, currency and POS-specific fields."""
 	doc.pos_profile = pos_profile.name
 	doc.company = pos_profile.company
 	doc.currency = get_customer_billing_currency(customer)
-	price_list = get_price_list_with_customer_priority(customer) or getattr(pos_profile, "selling_price_list", None)
+	price_list = (
+		price_list
+		or get_price_list_with_customer_priority(customer)
+		or getattr(pos_profile, "selling_price_list", None)
+	)
 	if price_list:
 		doc.selling_price_list = price_list
 	doc.conversion_rate = 1.0
@@ -2245,7 +2262,10 @@ def _validate_and_autofetch_batch_and_serial(items, pos_profile):
 	- If the flag is not set:
 	  * For batch-tracked items missing batch, raise an error and STOP invoice creation.
 	- For serial-tracked items we do NOT auto-assign; user must select serials explicitly.
+	- Batch-tracked items: the selected batch must have enough stock in the POS warehouse.
 	"""
+	from erpnext.stock.doctype.batch.batch import get_batch_qty
+
 	if not items:
 		return
 
@@ -2301,6 +2321,35 @@ def _validate_and_autofetch_batch_and_serial(items, pos_profile):
 						"Serial No / Batch No are mandatory for Item {0}. Please select a batch before submitting the invoice."
 					).format(item_code)
 				)
+
+		if has_batch_no and not has_serial_no:
+			batch_no = item.get("batchNumber") or item.get("batch_no")
+			if not batch_no:
+				batch_no = next((e.get("batch_no") for e in bundle_entries if e.get("batch_no")), None)
+			required_qty = abs(flt(item.get("quantity") or 0))
+
+			if batch_no and required_qty:
+				available_qty = flt(get_batch_qty(batch_no=batch_no, warehouse=pos_profile.warehouse) or 0)
+				if available_qty < required_qty:
+					batch_count = len([e for e in bundle_entries if e.get("batch_no")])
+
+					if auto_fetch_enabled and batch_count <= 1:
+						new_batch = _autofetch_batch_fifo(item_code, pos_profile.warehouse, required_qty)
+						if not new_batch:
+							frappe.throw(
+								_(
+									"Batch {0} of Item {1} has only {2} in {3}, and no other batch has {4}. Please restock or reduce the quantity."
+								).format(batch_no, item_code, available_qty, pos_profile.warehouse, required_qty)
+							)
+						item["batchNumber"] = new_batch
+						item["batch_no"] = new_batch
+						item["bundle_entries"] = [{"batch_no": new_batch, "qty": required_qty}]
+					else:
+						frappe.throw(
+							_(
+								"Batch {0} of Item {1} has only {2} in {3}, but {4} is needed. Please reselect the batch."
+							).format(batch_no, item_code, available_qty, pos_profile.warehouse, required_qty)
+						)
 
 
 def _validate_no_variant_templates(items):
@@ -3163,6 +3212,21 @@ def return_sales_invoice(invoice_name):
 
 
 class CustomSalesInvoice(SalesInvoice):
+	def set_pos_fields(self, for_validate=False):
+		# ERPNext resets selling_price_list to the customer/POS default on every POS save;
+		# keep the list a Klik cashier switched to when the POS Profile allows switching.
+		chosen_price_list = self.selling_price_list
+		pos = super().set_pos_fields(for_validate)
+		if (
+			chosen_price_list
+			and chosen_price_list != self.selling_price_list
+			and cint(self.get("custom_is_created_from_klik"))
+			and self.pos_profile
+			and cint(frappe.get_cached_value("POS Profile", self.pos_profile, "allow_price_list_switching"))
+		):
+			self.selling_price_list = chosen_price_list
+		return pos
+
 	def validate_pos_opening_entry(self):
 		opening_entries = frappe.get_all(
 			"POS Opening Entry",
@@ -3871,6 +3935,7 @@ def submit_draft_invoice(invoice_id, data=None):
 	This converts a draft invoice to submitted status.
 	"""
 	try:
+		frappe.db.savepoint("klik_submit_draft")
 		invoice_doc = frappe.get_doc("Sales Invoice", invoice_id)
 
 		if invoice_doc.status != "Draft":
@@ -3918,6 +3983,7 @@ def submit_draft_invoice(invoice_id, data=None):
 				create_batch_and_serial_bundle=False,
 				enable_background_submission=enable_background_submission,
 				loyalty_redemption=loyalty_redemption,
+				price_list=_get_requested_price_list(data) or invoice_doc.selling_price_list,
 			)
 
 			invoice_doc.customer = rebuilt_doc.customer
@@ -4015,7 +4081,9 @@ def submit_draft_invoice(invoice_id, data=None):
 			}
 
 	except frappe.DoesNotExistError:
+		frappe.db.rollback(save_point="klik_submit_draft")
 		return {"success": False, "error": f"Invoice {invoice_id} not found"}
 	except Exception as e:
+		frappe.db.rollback(save_point="klik_submit_draft")
 		frappe.log_error(frappe.get_traceback(), f"Error submitting draft invoice {invoice_id}")
 		return {"success": False, "error": str(e)}

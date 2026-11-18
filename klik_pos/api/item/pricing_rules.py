@@ -161,6 +161,7 @@ def _prepare_erpnext_items(cart_items, context):
 def _apply_pricing_rules(erpnext_items, context):
     args = frappe._dict(
         {
+            "doctype": "Sales Invoice",
             "items": erpnext_items,
             "company": context["company"],
             "currency": context["currency"],

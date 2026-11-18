@@ -56,6 +56,10 @@ extend_doctype_class = {
     "POS Opening Entry": "klik_pos.overrides.pos_opening_entry.CustomPOSOpeningEntry",
 }
 
+override_doctype_class = {
+	"Stock Reservation Entry": "klik_pos.overrides.stock_reservation_entry.KlikStockReservationEntry",
+}
+
 # Migration hooks
 before_migrate = [
     "klik_pos.setup.install.ensure_stock_reservation_is_enabled",

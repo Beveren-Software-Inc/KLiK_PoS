@@ -23,6 +23,8 @@ import { useCartStore } from "../../stores/cartStore";
 import countryList from "react-select-country-list";
 import { parsePhoneNumber } from "react-phone-number-input";
 import AddCustomerModal from "../customer/AddCustomerModal";
+import { toast } from "react-toastify";
+import { getOriginalDraftInvoiceId } from "../../utils/draftInvoiceCache";
 
 interface CustomerSearchSectionProps {
   selectedCustomer: Customer | null;
@@ -70,7 +72,9 @@ export const CustomerSearchSection = ({
   const { fetchProducts, setSelectedCustomer: setProductCustomer } = useProductStore();
   const selectedPriceList = useCartStore((state) => state.selectedPriceList);
   const setSelectedPriceList = useCartStore((state) => state.setSelectedPriceList);
-  const refreshCartPricing = useCartStore((state) => state.refreshCartPricing);
+  const switchPriceList = useCartStore((state) => state.switchPriceList);
+  // Held invoices keep their saved prices; start a new invoice to use another price list.
+  const isEditingHeldInvoice = !!getOriginalDraftInvoiceId();
   const [priceLists, setPriceLists] = useState<SellingPriceList[]>([]);
   const [isLoadingPriceLists, setIsLoadingPriceLists] = useState(false);
 
@@ -314,8 +318,24 @@ export const CustomerSearchSection = ({
   };
 
   const handlePriceListChange = async (value: string) => {
-    await setSelectedPriceList(value || null);
-    await refreshCartPricing();
+    const priceList = value || null;
+    const hadItems = useCartStore.getState().cartItems.length > 0;
+    try {
+      const { missingPriceItems } = await switchPriceList(priceList);
+      if (hadItems) {
+        const label = priceList || "the default price list";
+        if (missingPriceItems.length > 0) {
+          toast.warning(
+            `Cart switched to ${label}. No price for: ${missingPriceItems.join(", ")} (set to 0).`
+          );
+        } else {
+          toast.success(`Cart switched to ${label}.`);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to switch price list:", error);
+      toast.error("Failed to update cart prices for the selected price list.");
+    }
     await fetchProducts(true);
   };
 
@@ -701,7 +721,8 @@ export const CustomerSearchSection = ({
         <select
           value={activePriceList}
           onChange={(event) => { void handlePriceListChange(event.target.value); }}
-          disabled={isLoadingPriceLists}
+          disabled={isLoadingPriceLists || isEditingHeldInvoice}
+          title={isEditingHeldInvoice ? "Price list can't be changed on a held invoice. Start a new invoice instead." : undefined}
           className="w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-beveren-500 focus:border-transparent disabled:opacity-60"
         >
           {!activePriceList && <option value="">Default Price List</option>}

@@ -1,5 +1,17 @@
 
 import { extractErrorMessage } from "../utils/errorExtraction";
+import { useCartStore } from "../stores/cartStore";
+import { usePOSProfileStore } from "../stores/posProfileStore";
+
+// Send the cashier's chosen price list so the invoice header matches the cart line rates.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function withSelectedPriceList(data: any) {
+  if (!data || typeof data !== 'object') return data;
+  const allowSwitching = !!usePOSProfileStore.getState().posDetails?.allow_price_list_switching;
+  const priceList = useCartStore.getState().selectedPriceList;
+  if (!allowSwitching || !priceList) return data;
+  return { ...data, priceList };
+}
 
 export interface LoyaltyRedemptionPreview {
   loyalty_program: string
@@ -75,7 +87,7 @@ const csrfToken = window.csrf_token;
       'Content-Type': 'application/json',
       'X-Frappe-CSRF-Token': csrfToken
     },
-    body: JSON.stringify({ data }),
+    body: JSON.stringify({ data: withSelectedPriceList(data) }),
     credentials: 'include'
   });
 
@@ -99,7 +111,7 @@ export async function createSalesInvoice(data: any) {
       'Content-Type': 'application/json',
       'X-Frappe-CSRF-Token': csrfToken
     },
-    body: JSON.stringify({ data }),
+    body: JSON.stringify({ data: withSelectedPriceList(data) }),
     credentials: 'include'
   });
 
@@ -147,7 +159,7 @@ export async function validateCheckoutInvoice(data: any) {
       'Content-Type': 'application/json',
       'X-Frappe-CSRF-Token': csrfToken
     },
-    body: JSON.stringify({ data }),
+    body: JSON.stringify({ data: withSelectedPriceList(data) }),
     credentials: 'include'
   });
 
@@ -324,7 +336,7 @@ export async function submitDraftInvoice(invoiceId: string, data?: unknown) {
       'Content-Type': 'application/json',
       'X-Frappe-CSRF-Token': csrfToken
     },
-    body: JSON.stringify({ invoice_id: invoiceId, data }),
+    body: JSON.stringify({ invoice_id: invoiceId, data: withSelectedPriceList(data) }),
     credentials: 'include'
   });
 
